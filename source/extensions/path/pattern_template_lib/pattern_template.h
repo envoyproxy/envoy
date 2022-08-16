@@ -46,7 +46,7 @@ absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_r
 
 // Returns if path_template and rewrite_template have valid variables
 absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
-                                      absl::string_view  capture_regex);
+                                      absl::string_view capture_regex);
 
 absl::Status isValidMatchPattern(absl::string_view match_pattern);
 

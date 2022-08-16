@@ -8822,11 +8822,11 @@ virtual_hosts:
 
   const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
   EXPECT_TRUE(pattern_match_policy.enabled());
-  EXPECT_EQ(pattern_match_policy.predicate()->pattern(), "/bar/{country}/{lang}");
+  EXPECT_EQ(pattern_match_policy.path_matcher()->pattern(), "/bar/{country}/{lang}");
 
   const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewritePolicy();
   EXPECT_TRUE(pattern_rewrite_policy.enabled());
-  EXPECT_EQ(pattern_rewrite_policy.predicate()->pattern(), "/bar/{lang}/{country}");
+  EXPECT_EQ(pattern_rewrite_policy.path_rewriter()->pattern(), "/bar/{lang}/{country}");
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {

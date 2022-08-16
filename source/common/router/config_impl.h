@@ -466,17 +466,18 @@ public:
   PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
                       ProtobufMessage::ValidationVisitor& validator);
 
-  // Default constructor that disables internal redirect.
+  // Constructs a disabled PathMatchPolicyImpl
   PathMatchPolicyImpl();
 
+  // Router::PathMatchPolicy
   bool enabled() const override { return enabled_; }
 
-  PathMatchPredicateSharedPtr predicate() const override;
+  PathMatcherSharedPtr path_matcher() const override;
 
 private:
   const bool enabled_;
-  ProtobufTypes::MessagePtr predicate_config_;
-  PathMatchPredicateSharedPtr predicate_;
+  ProtobufTypes::MessagePtr config_;
+  PathMatcherSharedPtr path_matcher_;
 };
 
 /**
@@ -488,17 +489,18 @@ public:
   PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
                         ProtobufMessage::ValidationVisitor& validator);
 
-  // Default constructor that disables internal redirect.
+  // Constructs a disabled PathRewritePolicyImpl
   PathRewritePolicyImpl();
 
+  // Router::PathRewritePolicy
   bool enabled() const override { return enabled_; }
 
-  PathRewritePredicateSharedPtr predicate() const override;
+  PathRewriterSharedPtr path_rewriter() const override;
 
 private:
   const bool enabled_;
-  ProtobufTypes::MessagePtr predicate_config_;
-  PathRewritePredicateSharedPtr predicate_;
+  ProtobufTypes::MessagePtr config_;
+  PathRewriterSharedPtr rewriter_;
 };
 
 /**

@@ -13,10 +13,10 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-class PatternTemplateMatchPredicateFactory : public Router::PathMatchPredicateFactory {
+class PatternTemplateMatcherFactory : public Router::PathMatcherFactory {
 public:
-  absl::StatusOr<Router::PathMatchPredicateSharedPtr>
-  createPathMatchPredicate(const Protobuf::Message& config) override {
+  absl::StatusOr<Router::PathMatcherSharedPtr>
+  createPathMatcher(const Protobuf::Message& config) override {
     auto path_match_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig&>(
         config, ProtobufMessage::getStrictValidationVisitor());
@@ -26,9 +26,10 @@ public:
                                                     path_match_config.path_template()));
     }
 
-    return std::make_shared<PatternTemplateMatchPredicate>(path_match_config);
+    return std::make_shared<PatternTemplateMatcher>(path_match_config);
   }
 
+  // Router::PathMatcherFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig>();

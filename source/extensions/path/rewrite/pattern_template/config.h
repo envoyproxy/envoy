@@ -11,10 +11,10 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Rewrite {
 
-class PatternTemplateRewritePredicateFactory : public Router::PathRewritePredicateFactory {
+class PatternTemplateRewriterFactory : public Router::PathRewriterFactory {
 public:
-  absl::StatusOr<Router::PathRewritePredicateSharedPtr>
-  createPathRewritePredicate(const Protobuf::Message& rewrite_config) override {
+  absl::StatusOr<Router::PathRewriterSharedPtr>
+  createPathRewriter(const Protobuf::Message& rewrite_config) override {
     auto path_rewrite_config =
         MessageUtil::downcastAndValidate<const envoy::extensions::path::rewrite::pattern_template::
                                              v3::PatternTemplateRewriteConfig&>(
@@ -27,9 +27,10 @@ public:
           fmt::format("path_rewrite_policy.path_template_rewrite {} is invalid",
                       path_rewrite_config.path_template_rewrite()));
     }
-    return std::make_shared<PatternTemplateRewritePredicate>(path_rewrite_config);
+    return std::make_shared<PatternTemplateRewriter>(path_rewrite_config);
   }
 
+  // Router::PathRewriterFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig>();

@@ -15,19 +15,19 @@ namespace Router {
  * Creates the new route path based on the provided rewrite pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
-class PathRewritePredicate : Logger::Loggable<Logger::Id::router> {
+class PathRewriter : Logger::Loggable<Logger::Id::router> {
 public:
-  PathRewritePredicate() = default;
-  virtual ~PathRewritePredicate() = default;
+  PathRewriter() = default;
+  virtual ~PathRewriter() = default;
 
   /**
-   * Used to determine if the match policy is compatible.
+   * Used to determine if the matcher policy is compatible.
    *
    * @param path_match_policy current path match policy for route
    * @param active_policy true if user provided policy
    * @return true if current path match policy is acceptable
    */
-  virtual absl::Status isCompatibleMatchPolicy(PathMatchPredicateSharedPtr path_match_policy,
+  virtual absl::Status isCompatibleMatchPolicy(PathMatcherSharedPtr path_match_policy,
                                                bool active_policy) const PURE;
 
   /**
@@ -38,45 +38,45 @@ public:
    * @param matched_path pattern to rewrite the url to
    * @return the rewritten url.
    */
-  virtual absl::StatusOr<std::string> rewriteUrl(absl::string_view url,
+  virtual absl::StatusOr<std::string> rewriteUrl(absl::string_view current_pattern,
                                                  absl::string_view matched_path) const PURE;
 
   /**
-   * @return the rewrite pattern of the predicate.
+   * @return the rewrite pattern.
    */
   virtual absl::string_view pattern() const PURE;
 
   /**
-   * @return the name of the rewrite predicate.
+   * @return the name.
    */
   virtual absl::string_view name() const PURE;
 };
 
-using PathRewritePredicateSharedPtr = std::shared_ptr<PathRewritePredicate>;
+using PathRewriterSharedPtr = std::shared_ptr<PathRewriter>;
 
 /**
- * Factory for PatternRewriteTemplatePredicate.
+ * Factory for PathRewrite.
  */
-class PathRewritePredicateFactory : public Envoy::Config::TypedFactory {
+class PathRewriterFactory : public Envoy::Config::TypedFactory {
 public:
-  ~PathRewritePredicateFactory() override = default;
+  ~PathRewriterFactory() override = default;
 
   /**
-   * @param rewrite_config contains the proto stored in TypedExtensionConfig for the predicate.
-   * @return an PathRewritePredicateSharedPtr.
+   * @param rewrite_config contains the proto stored in TypedExtensionConfig.
+   * @return an PathRewriterSharedPtr.
    */
-  virtual absl::StatusOr<PathRewritePredicateSharedPtr>
-  createPathRewritePredicate(const Protobuf::Message& rewrite_config) PURE;
+  virtual absl::StatusOr<PathRewriterSharedPtr>
+  createPathRewriter(const Protobuf::Message& rewrite_config) PURE;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
   /**
-   * @return the name of the rewrite pattern predicate to be created.
+   * @return the name of the rewrite pattern to be created.
    */
   std::string name() const override PURE;
 
   /**
-   * @return the category of the rewrite pattern predicate to be created.
+   * @return the category of the rewrite pattern to be created.
    */
   std::string category() const override { return "envoy.path.rewrite"; }
 };

@@ -14,10 +14,10 @@ namespace Router {
  * Decides if the target route path matches the provided pattern.
  * Subclassing Logger::Loggable so that implementations can log details.
  */
-class PathMatchPredicate : Logger::Loggable<Logger::Id::router> {
+class PathMatcher : Logger::Loggable<Logger::Id::router> {
 public:
-  PathMatchPredicate() = default;
-  virtual ~PathMatchPredicate() = default;
+  PathMatcher() = default;
+  virtual ~PathMatcher() = default;
 
   /**
    * Used to determine if the current url matches the predicate pattern.
@@ -25,7 +25,7 @@ public:
    * @param url current url of route
    * @return true if route url matches the predicate pattern.
    */
-  virtual bool match(absl::string_view url) const PURE;
+  virtual bool match(absl::string_view path) const PURE;
 
   /**
    * @return the match pattern of the predicate.
@@ -38,21 +38,21 @@ public:
   virtual absl::string_view name() const PURE;
 };
 
-using PathMatchPredicateSharedPtr = std::shared_ptr<PathMatchPredicate>;
+using PathMatcherSharedPtr = std::shared_ptr<PathMatcher>;
 
 /**
  * Factory for PathMatchPredicateFactory.
  */
-class PathMatchPredicateFactory : public Envoy::Config::TypedFactory {
+class PathMatcherFactory : public Envoy::Config::TypedFactory {
 public:
-  ~PathMatchPredicateFactory() override = default;
+  ~PathMatcherFactory() override = default;
 
   /**
    * @param config contains the proto stored in TypedExtensionConfig for the predicate.
    * @return an PathMatchPredicateSharedPtr.
    */
-  virtual absl::StatusOr<PathMatchPredicateSharedPtr>
-  createPathMatchPredicate(const Protobuf::Message& config) PURE;
+  virtual absl::StatusOr<PathMatcherSharedPtr>
+  createPathMatcher(const Protobuf::Message& config) PURE;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 

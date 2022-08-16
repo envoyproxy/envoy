@@ -25,8 +25,9 @@ namespace Rewrite {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-absl::Status PatternTemplateRewritePredicate::isCompatibleMatchPolicy(
-    Router::PathMatchPredicateSharedPtr path_match_predicate, bool active_policy) const {
+absl::Status
+PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr path_match_predicate,
+                                                 bool active_policy) const {
   if (!active_policy || path_match_predicate->name() != Extensions::PatternTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
                                                   Extensions::PatternTemplate::Rewrite::NAME,
@@ -45,8 +46,8 @@ absl::Status PatternTemplateRewritePredicate::isCompatibleMatchPolicy(
 }
 
 absl::StatusOr<std::string>
-PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
-                                            absl::string_view matched_path) const {
+PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
+                                    absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertURLPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse url pattern regex");
@@ -70,9 +71,8 @@ PatternTemplateRewritePredicate::rewriteUrl(absl::string_view current_pattern,
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(PatternTemplateInternal::toStringPiece(current_pattern), /*startpos=*/0,
-                   /*endpos=*/current_pattern.size(), RE2::ANCHOR_BOTH, captures.data(),
-                   captures.size())) {
+  if (!regex.Match(PatternTemplateInternal::toStringPiece(pattern), /*startpos=*/0,
+                   /*endpos=*/pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
   }
 

@@ -172,10 +172,10 @@ class MockPathRewritePolicy : public PathRewritePolicy {
 public:
   MockPathRewritePolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PathRewritePredicateSharedPtr, predicate, (), (const));
+  MOCK_METHOD(PathRewriterSharedPtr, path_rewriter, (), (const));
 };
 
-class MockPathRewritePredicate : public PathRewritePredicate {
+class MockPathRewriter : public PathRewriter {
 public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
@@ -184,10 +184,10 @@ class MockPathMatchPolicy : public PathMatchPolicy {
 public:
   MockPathMatchPolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PathMatchPredicateSharedPtr, predicate, (), (const));
+  MOCK_METHOD(PathMatcherSharedPtr, path_matcher, (), (const));
 };
 
-class MockPathMatchPredicate : public PathMatchPredicate {
+class MockPathMatcher : public PathMatcher {
 public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };

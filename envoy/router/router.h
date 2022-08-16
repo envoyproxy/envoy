@@ -317,14 +317,14 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * Returns the stored target route predicate.
-   * @return a PathMatchPredicate instance.
+   * Returns the stored target route PathMatcher.
+   * @return a PathMatcher instance.
    */
-  virtual PathMatchPredicateSharedPtr predicate() const PURE;
+  virtual PathMatcherSharedPtr path_matcher() const PURE;
 };
 
 /**
- * PathRewritePolicy from the route configuration.
+ * PathRewriterPolicy from the route configuration.
  */
 class PathRewritePolicy {
 public:
@@ -336,10 +336,10 @@ public:
   virtual bool enabled() const PURE;
 
   /**
-   * Returns the stored target route predicate.
-   * @return a PathRewritePredicate instance.
+   * Returns the stored target route PathRewriter.
+   * @return a PathRewriter instance.
    */
-  virtual PathRewritePredicateSharedPtr predicate() const PURE;
+  virtual PathRewriterSharedPtr path_rewriter() const PURE;
 };
 
 /**
@@ -960,8 +960,14 @@ public:
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
+  /**
+   * @return const PathMatchPolicy& the path match policy for the route.
+   */
   virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
 
+  /**
+   * @return const PathRewritePolicy& the path match rewrite for the route.
+   */
   virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
 
   /**

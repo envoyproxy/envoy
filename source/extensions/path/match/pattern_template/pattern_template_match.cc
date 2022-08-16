@@ -17,14 +17,14 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-bool PatternTemplateMatchPredicate::match(absl::string_view pattern) const {
+bool PatternTemplateMatcher::match(absl::string_view path) const {
   RE2 matching_pattern_regex = RE2(convertURLPatternSyntaxToRegex(path_template_).value());
   return RE2::FullMatch(
-      PatternTemplateInternal::toStringPiece(Http::PathUtil::removeQueryAndFragment(pattern)),
+      PatternTemplateInternal::toStringPiece(Http::PathUtil::removeQueryAndFragment(path)),
       matching_pattern_regex);
 }
 
-absl::string_view PatternTemplateMatchPredicate::pattern() const { return path_template_; }
+absl::string_view PatternTemplateMatcher::pattern() const { return path_template_; }
 
 } // namespace Match
 } // namespace PatternTemplate
