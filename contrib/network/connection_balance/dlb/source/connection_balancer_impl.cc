@@ -19,14 +19,12 @@ namespace Dlb {
 Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
-#ifdef DLB_DISABLED
-  context.localInfo();
-  throw EnvoyException("X86_64 architecture is required for Dlb.");
-#else
   const auto dlb_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb&>(
       config, context.messageValidationVisitor());
-
+#ifdef DLB_DISABLED
+  throw EnvoyException("X86_64 architecture is required for Dlb.");
+#else
   int device_id = 0;
   struct stat buffer;
 
