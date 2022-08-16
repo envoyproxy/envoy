@@ -401,6 +401,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "metadata_interface_test",
+    srcs = ["metadata_interface_test.cc"],
+    deps = [
+        "//envoy/http:metadata_interface",
+    ],
+)
+
+envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
     deps = [
