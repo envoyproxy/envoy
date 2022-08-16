@@ -6,7 +6,9 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
+
 #include "test/test_common/logging.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
