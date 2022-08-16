@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import common
 import functools
 import logging
 import multiprocessing
@@ -9,13 +8,15 @@ import os
 import os.path
 import pathlib
 import re
-import subprocess
+import shutil
 import stat
+import subprocess
 import sys
 import traceback
-import shutil
-import paths
 from functools import cached_property
+
+import common
+import paths
 
 EXCLUDED_PREFIXES = (
     "./.", "./generated/", "./thirdparty/", "./build", "./bazel-", "./tools/dev/src",
@@ -1152,7 +1153,7 @@ if __name__ == "__main__":
             "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' ")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % exclude_list)
+            % ''.join(exclude_list))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
