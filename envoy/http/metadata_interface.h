@@ -78,8 +78,9 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
     *out++ = '{';
     int i = 0;
     for (const auto& item : map) {
-      if (i > 0)
+      if (i > 0) {
         *out++ = ',';
+      }
       out = detail::write_range_entry<char>(out, absl::CEscape(item.first));
       *out++ = ':';
       *out++ = ' ';
