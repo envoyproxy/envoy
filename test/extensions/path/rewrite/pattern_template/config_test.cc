@@ -23,7 +23,7 @@ TEST(ConfigTest, TestEmptyConfig) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(),
@@ -51,7 +51,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(),
@@ -62,8 +62,8 @@ TEST(ConfigTest, InvalidConfigSetup) {
 
   EXPECT_NE(nullptr, message);
 
-  absl::StatusOr<Router::PathRewritePredicateSharedPtr> config_or_error =
-      factory->createPathRewritePredicate(*message);
+  absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
+      factory->createPathRewriter(*message);
 
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_EQ(config_or_error.status().message(),
@@ -82,7 +82,7 @@ TEST(ConfigTest, TestConfigSetup) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(),
@@ -93,8 +93,8 @@ TEST(ConfigTest, TestConfigSetup) {
 
   EXPECT_NE(nullptr, message);
 
-  absl::StatusOr<Router::PathRewritePredicateSharedPtr> config_or_error =
-      factory->createPathRewritePredicate(*message);
+  absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
+      factory->createPathRewriter(*message);
 
   EXPECT_TRUE(config_or_error.ok());
 }
@@ -111,7 +111,7 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewritePredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(),
@@ -122,8 +122,8 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
 
   EXPECT_NE(nullptr, message);
 
-  absl::StatusOr<Router::PathRewritePredicateSharedPtr> config_or_error =
-      factory->createPathRewritePredicate(*message);
+  absl::StatusOr<Router::PathRewriterSharedPtr> config_or_error =
+      factory->createPathRewriter(*message);
 
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_EQ(config_or_error.status().message(),

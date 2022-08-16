@@ -12,18 +12,18 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-Router::PathMatchPredicateSharedPtr createMatchPredicateFromYaml(std::string yaml_string) {
+Router::PathMatcherSharedPtr createMatchPredicateFromYaml(std::string yaml_string) {
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatchPredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
 
-  absl::StatusOr<Router::PathMatchPredicateSharedPtr> config_or_error =
-      factory->createPathMatchPredicate(*message);
+  absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
+      factory->createPathMatcher(*message);
 
   return config_or_error.value();
 }
@@ -36,7 +36,7 @@ TEST(MatchTest, BasicUsage) {
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathMatchPredicateSharedPtr predicate = createMatchPredicateFromYaml(yaml_string);
+  Router::PathMatcherSharedPtr predicate = createMatcherFromYaml(yaml_string);
   EXPECT_EQ(predicate->pattern(), "/bar/{lang}/{country}");
   EXPECT_EQ(predicate->name(),
             "envoy.path.match.pattern_template.pattern_template_match_predicate");

@@ -23,7 +23,7 @@ TEST(ConfigTest, TestEmptyConfig) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatchPredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
@@ -50,7 +50,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatchPredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
@@ -60,8 +60,8 @@ TEST(ConfigTest, InvalidConfigSetup) {
 
   EXPECT_NE(nullptr, message);
 
-  absl::StatusOr<Router::PathMatchPredicateSharedPtr> config_or_error =
-      factory->createPathMatchPredicate(*message);
+  absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
+      factory->createPathMatcher(*message);
 
   EXPECT_FALSE(config_or_error.ok());
   EXPECT_EQ(config_or_error.status().message(),
@@ -80,7 +80,7 @@ TEST(ConfigTest, TestConfigSetup) {
   TestUtility::loadFromYaml(yaml_string, config);
 
   const auto& factory =
-      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatchPredicateFactory>(config);
+      &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
   EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
@@ -90,8 +90,8 @@ TEST(ConfigTest, TestConfigSetup) {
 
   EXPECT_NE(nullptr, message);
 
-  absl::StatusOr<Router::PathMatchPredicateSharedPtr> config_or_error =
-      factory->createPathMatchPredicate(*message);
+  absl::StatusOr<Router::PathMatcherSharedPtr> config_or_error =
+      factory->createPathMatcher(*message);
 
   EXPECT_TRUE(config_or_error.ok());
 }
