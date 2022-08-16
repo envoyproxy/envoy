@@ -227,6 +227,10 @@ message FilterChain {
   // connections established with the listener. Order matters as the filters are
   // processed sequentially as connection events happen. Note: If the filter
   // list is empty, the connection will close by default.
+  //
+  // For UDP connections, network filters can be created but do not process
+  // incoming data as network filters on TCP connections do (i.e. the onData method
+  // will never be called).
   repeated Filter filters = 3;
 
   // Whether the listener should expect a PROXY protocol V1 header on new
