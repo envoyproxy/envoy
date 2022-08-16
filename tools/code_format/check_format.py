@@ -1153,7 +1153,7 @@ if __name__ == "__main__":
             "':(exclude)source/extensions/udp_packet_writer/gso/BUILD' ")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % ''.join(exclude_list))
+            % "".join([f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]]))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
