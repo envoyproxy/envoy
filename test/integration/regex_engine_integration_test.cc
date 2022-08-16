@@ -42,9 +42,27 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   initialize();
 
   envoy::type::matcher::v3::RegexMatcher matcher;
-  *matcher.mutable_regex() = ".*";
+  *matcher.mutable_regex() = "/asdf/.*";
 
-  EXPECT_NO_THROW(Regex::Utility::parseRegex(matcher));
+  Envoy::Regex::CompiledMatcherPtr re = Regex::Utility::parseRegex(matcher);
+  EXPECT_EQ(re->match("/asdf/1234"), true);
+  EXPECT_EQ(re->match("1234/asdf/1234"), false);
+};
+
+TEST_P(RegexEngineIntegrationTest, GoogleRE2PartialMatch) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::extensions::regex_engines::v3::GoogleRE2 google_re2;
+    google_re2.set_partial_match(true);
+    bootstrap.mutable_default_regex_engine()->mutable_typed_config()->PackFrom(google_re2);
+  });
+  initialize();
+
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_regex() = "/asdf/.*";
+
+  Envoy::Regex::CompiledMatcherPtr re = Regex::Utility::parseRegex(matcher);
+  EXPECT_EQ(re->match("/asdf/1234"), true);
+  EXPECT_EQ(re->match("1234/asdf/1234"), true);
 };
 
 } // namespace
