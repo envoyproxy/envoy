@@ -332,7 +332,7 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
 }
 
-TEST_P(URLPatternMatchAndRewrite, isValidMatchPattern) {
+TEST_P(URLPatternMatchAndRewrite, IsValidMatchPattern) {
   EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}").ok());
   EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}/{doo}").ok());
   EXPECT_TRUE(isValidMatchPattern("/{hoo}/bar/{goo}").ok());
@@ -342,7 +342,7 @@ TEST_P(URLPatternMatchAndRewrite, isValidMatchPattern) {
   EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
 }
 
-TEST_P(URLPatternMatchAndRewrite, isValidPathTemplateRewritePattern) {
+TEST_P(URLPatternMatchAndRewrite, IsValidPathTemplateRewritePattern) {
   EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}").ok());
   EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}/{doo}").ok());
   EXPECT_TRUE(isValidPathTemplateRewritePattern("/{hoo}/bar/{goo}").ok());
@@ -352,7 +352,7 @@ TEST_P(URLPatternMatchAndRewrite, isValidPathTemplateRewritePattern) {
   EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
 }
 
-TEST_P(URLPatternMatchAndRewrite, isValidSharedVariableSet) {
+TEST_P(URLPatternMatchAndRewrite, IsValidSharedVariableSet) {
   EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}", "/foo/bar/{goo}").ok());
   EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}/{doo}", "/foo/bar/{doo}/{goo}").ok());
   EXPECT_TRUE(isValidSharedVariableSet("/bar/{goo}", "/bar/{goo}").ok());
