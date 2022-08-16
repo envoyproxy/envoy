@@ -978,7 +978,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
       "type.googleapis.com/"
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
   if (is_quic &&
-      (filter_chain.filters().size() < 1 ||
+      (filter_chain.filters().empty() ||
        filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
            hcm_str)) {
     throw EnvoyException(
