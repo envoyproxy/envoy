@@ -53,7 +53,7 @@ public:
   std::string failure_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;
-  uint64_t num_streams_;
+  uint64_t num_streams_ = 0;
   absl::optional<Http::Protocol> upstream_protocol_;
 };
 
@@ -130,6 +130,7 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

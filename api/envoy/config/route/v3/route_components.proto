@@ -639,7 +639,7 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
@@ -687,6 +687,12 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's ``Origin`` to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+
+  // Specify whether allow requests whose target server's IP address is more private than that from
+  // which the request initiator was fetched.
+  //
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  google.protobuf.BoolValue allow_private_network_access = 12;
 }
 
 // [#next-free-field: 42]
