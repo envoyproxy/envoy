@@ -19,14 +19,16 @@ namespace Igzip {
 namespace Compressor {
 
 namespace {
-
+#ifndef IGZIP_DISABLED
 const std::string& igzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "igzip."); }
+#endif
 const std::string& igzipExtensionName() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.compression.compressor.igzip");
 }
 
 } // namespace
 
+#ifndef IGZIP_DISABLED
 class IgzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
   IgzipCompressorFactory(
@@ -40,17 +42,17 @@ public:
   }
 
 private:
-#ifndef IGZIP_DISABLED
   static IgzipCompressorImpl::CompressionLevel compressionLevelEnum(
       envoy::extensions::compression::compressor::igzip::v3alpha::Igzip::CompressionLevel
           compression_level);
 
   IgzipCompressorImpl::CompressionLevel compression_level_;
-#endif
+
   const int32_t memory_level_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;
 };
+#endif
 
 class IgzipCompressorLibraryFactory
     : public Compression::Common::Compressor::CompressorLibraryFactoryBase<

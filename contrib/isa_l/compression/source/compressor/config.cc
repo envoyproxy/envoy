@@ -51,9 +51,15 @@ Envoy::Compression::Compressor::CompressorPtr IgzipCompressorFactory::createComp
 
 Envoy::Compression::Compressor::CompressorFactoryPtr
 IgzipCompressorLibraryFactory::createCompressorFactoryFromProtoTyped(
+#ifndef IGZIP_DISABLED
     const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& proto_config,
     Server::Configuration::FactoryContext&) {
   return std::make_unique<IgzipCompressorFactory>(proto_config);
+#else
+    const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip&,
+    Server::Configuration::FactoryContext&) {
+  throw EnvoyException("X86_64 architecture is required for ISA-L.");
+#endif
 }
 
 /**
