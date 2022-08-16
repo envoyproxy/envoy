@@ -20,8 +20,6 @@ const absl::string_view NAME = "envoy.path.match.pattern_template.pattern_templa
 /**
  * PatternTemplateMatcher allows matching based on pattern templates.
  * Examples of several pattern templates types are below:
- * Wildcard: /foo/bar/**
- *    Will match any path that starts with /foo/bar and any number of following segments
  * Variable: /foo/bar/{var}
  *    Will match any path that starts with /foo/bar and has one additional segment
  * Literal: /foo/bar/goo
