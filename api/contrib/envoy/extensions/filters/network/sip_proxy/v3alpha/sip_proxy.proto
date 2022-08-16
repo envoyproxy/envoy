@@ -71,10 +71,8 @@ message SipProxy {
     // True:  sip load balancer
     bool operate_via = 4;
 
-    // Whether upstream transactions are allowed by the use of X-Envoy-Origin-Ingress header custom header
-    // False: upstream transactions disabled
-    // True:  upstream transactions enabled
-    bool allow_upstream_requests = 5;
+    // Upstream transactions support configuration
+    UpstreamTransactionSupport upstream_transaction_support = 5;
   }
 
   // The human readable prefix to use when emitting statistics.
@@ -163,4 +161,12 @@ message LocalService {
 
   // The parameter to get domain
   string parameter = 2;
+}
+
+// Upstream transaction support by the use of X-Envoy-Origin-Ingress header custom header
+message UpstreamTransactionSupport {
+  // Whether upstream transactions are allowed
+  // False: upstream transactions disabled
+  // True:  upstream transactions enabled
+  bool enabled = 1;
 }

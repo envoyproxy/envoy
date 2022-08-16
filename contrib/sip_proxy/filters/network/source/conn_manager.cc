@@ -174,7 +174,7 @@ ConnectionManager::~ConnectionManager() {
 }
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
-  if (settings()->allowUpstreamRequests()) {
+  if (settings()->UpstreamTransactionsEnabled()) {
     std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
                             "@" +
                             read_callbacks_->connection()
@@ -368,7 +368,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllDownstreamTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (settings()->allowUpstreamRequests() && local_origin_ingress_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) || (event == Network::ConnectionEvent::LocalClose))) {
+  if (settings()->UpstreamTransactionsEnabled() && local_origin_ingress_.has_value() && ((event == Network::ConnectionEvent::RemoteClose) || (event == Network::ConnectionEvent::LocalClose))) {
     resetAllUpstreamTrans();
     downstream_connection_infos_->deleteDownstreamConnection(
         local_origin_ingress_->getDownstreamConnectionID());
@@ -378,7 +378,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   std::string&& k = std::string(metadata->transactionId().value());
 
-  if ((settings()->allowUpstreamRequests()) &&
+  if ((settings()->UpstreamTransactionsEnabled()) &&
       (metadata->msgType() == MsgType::Response) && 
       (upstream_transaction_infos_->hasTransaction(k))) {
     ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);

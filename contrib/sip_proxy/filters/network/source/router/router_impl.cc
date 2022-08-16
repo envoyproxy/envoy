@@ -200,7 +200,7 @@ FilterStatus Router::handleAffinity() {
           SipFilters::SipFilterNames::get().SipProxy);
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && settings_->allowUpstreamRequests()) {
+  if (!metadata->destination().empty() && settings_->UpstreamTransactionsEnabled()) {
     ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
@@ -288,7 +288,7 @@ FilterStatus Router::handleAffinity() {
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  if (settings_->allowUpstreamRequests()) {
+  if (settings_->UpstreamTransactionsEnabled()) {
     if (callbacks_->originIngress().has_value()) {
       if (metadata->hasXEnvoyOriginIngressHeader()) {
         ENVOY_STREAM_LOG(info,
@@ -415,7 +415,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response && settings_->allowUpstreamRequests()) {
+  if (!metadata->destination().empty() && metadata->msgType() == MsgType::Response && settings_->UpstreamTransactionsEnabled()) {
     std::string host = metadata->destination();
     metadata->setStopLoadBalance(true);
 
@@ -803,7 +803,7 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
   ENVOY_LOG(trace, "UpstreamMessageDecoder\n{}", metadata->rawMsg());
 
   // ONLY used in case of responses to upstream initiated transactions
-  if ((metadata->msgType() == MsgType::Request) && (settings()->allowUpstreamRequests())) {
+  if ((metadata->msgType() == MsgType::Request) && (settings()->UpstreamTransactionsEnabled())) {
     auto origin_ingress = metadata->originIngress();
     if (origin_ingress == nullptr) {
       ENVOY_LOG(
@@ -856,7 +856,7 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
 
       // ONLY used in case of responses to upstream initiated transactions
       // It shouldn't be necessary to remove this header in this case, but just in case
-      if (settings()->allowUpstreamRequests() && metadata->hasXEnvoyOriginIngressHeader()) {
+      if (settings()->UpstreamTransactionsEnabled() && metadata->hasXEnvoyOriginIngressHeader()) {
         metadata->removeXEnvoyOriginIngressHeader();
       }
 
