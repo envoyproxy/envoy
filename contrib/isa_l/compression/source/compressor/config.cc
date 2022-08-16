@@ -6,6 +6,7 @@ namespace Compression {
 namespace Igzip {
 namespace Compressor {
 
+#ifndef IGZIP_DISABLED
 namespace {
 
 // Default memory level.
@@ -18,7 +19,6 @@ const uint64_t DefaultWindowBits = 15;
 const uint32_t DefaultChunkSize = 4096;
 } // namespace
 
-#ifndef IGZIP_DISABLED
 IgzipCompressorFactory::IgzipCompressorFactory(
     const envoy::extensions::compression::compressor::igzip::v3alpha::Igzip& igzip)
     : compression_level_(compressionLevelEnum(igzip.compression_level())),
