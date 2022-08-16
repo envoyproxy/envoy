@@ -34,6 +34,12 @@ public:
     // sanitizer() will catch that an do simple escapes on the string.
     invalid_3byte_intervals_.insert(0xd800, 0xe000);
 
+    // Version 3.21.5 of the protobuf library appears to handle the unicode
+    // point 0xfffd differently from the nlohmann library, so exclude it. Note
+    // that Envoy does not depend on this version of the protobuf library yet,
+    // but this 1-code-point exclusion will simplify the update process.
+    invalid_3byte_intervals_.insert(0xfffd, 0xfffe);
+
     // Avoid differential testing of Unicode ranges generated from 4-byte utf-8
     // where protobuf serialization generates two small Unicode values instead
     // of the correct one. This must be a protobuf serialization issue.
