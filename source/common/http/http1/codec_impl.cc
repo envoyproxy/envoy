@@ -688,10 +688,13 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser") &&
-        (parser_->errorMessage() == "headers size exceeds limit" ||
-         parser_->errorMessage() == "trailers size exceeds limit")) {
-      error = Http1ResponseCodeDetails::get().HeadersTooLarge;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+      if (parser_->errorMessage() == "headers size exceeds limit" ||
+          parser_->errorMessage() == "trailers size exceeds limit") {
+        error = Http1ResponseCodeDetails::get().HeadersTooLarge;
+      } else if (parser_->errorMessage() == "header value contains invalid chars") {
+        error = Http1ResponseCodeDetails::get().InvalidCharacters;
+      }
     }
     RETURN_IF_ERROR(sendProtocolError(error));
     // Avoid overwriting the codec_status_ set in the callbacks.
