@@ -42,11 +42,10 @@ void addCircuitBreakerSettingsAsJson(const envoy::config::core::v3::RoutingPrior
 
 ClustersHandler::ClustersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ClustersHandler::handlerClusters(absl::string_view url,
+Http::Code ClustersHandler::handlerClusters(absl::string_view,
                                             Http::ResponseHeaderMap& response_headers,
-                                            Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseAndDecodeQueryString(url);
-  const auto format_value = Utility::formatParam(query_params);
+                                            Buffer::Instance& response, AdminStream& admin_stream) {
+  const auto format_value = Utility::formatParam(admin_stream.queryParams());
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
