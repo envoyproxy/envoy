@@ -80,12 +80,18 @@ public:
     });
   }
 
-  void initiateClientConnection() {
+  void initiateClientConnection(bool send_request_body = false) {
     // Create a client aimed at Envoy’s default HTTP port.
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-    response_ = codec_client_->makeHeaderOnlyRequest(headers);
+    if (send_request_body) {
+      response_ = codec_client_->makeRequestWithBody(
+          Http::TestRequestHeaderMapImpl{
+              {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
+          "test");
+    } else {
+      response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+    }
   }
 
   void waitForGcpAuthnServerResponse() {
@@ -116,8 +122,8 @@ public:
     EXPECT_TRUE(request_->complete());
   }
 
-  // First cluster (i.e., cluster_0) is destination upstream cluster
-  void sendRequestToFirstClusterAndValidateResponse(bool with_audience) {
+  // Send the request to destination upstream cluster
+  void sendRequestToDestinationAndValidateResponse(bool with_audience) {
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -196,7 +202,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
     // Send the request to cluster `gcp_authn`.
     waitForGcpAuthnServerResponse();
     // Send the request to cluster `cluster_0` and validate the response.
-    sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/true);
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
     // Clean up the codec and connections.
     cleanup();
   }
@@ -217,14 +223,34 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
                                                          std::chrono::milliseconds(200)));
 
   // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/false);
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/false);
 
   // Verify request has been routed to `cluster_0` but not `gcp_authn` cluster.
   EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 
-  // Perform the clean-up.
-  cleanupUpstreamAndDownstream();
+  // Clean up the codec and connections.
+  cleanup();
+}
+
+// This test is sending the request with body to verify that the filter chain iteration which has
+// been stopped by `decodeHeader`'s return status will not be resumed by `decodeData`.
+TEST_P(GcpAuthnFilterIntegrationTest, SendRequestWithBody) {
+  initializeConfig(/*add_audience=*/true);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(/*send_request_body=*/true);
+  // Send the request with long wait time to intentionally delay the response from `gcp_authn`
+  // cluster.
+  EXPECT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_,
+                                                        std::chrono::milliseconds(500000)));
+  // Send the request to `cluster_0` cluster.
+  AssertionResult assert_result = fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(1000));
+  // We expect the request fail to arrive at `cluster_0` because the filter chain iteration
+  // should has already been stopped by waiting for the response from `gcp_authn` cluster above.
+  RELEASE_ASSERT(!assert_result, assert_result.message());
+  // Clean up the codec and connections.
+  cleanup();
 }
 
 } // namespace
