@@ -6,7 +6,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
-
+#include "test/test_common/logging.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -38,13 +38,10 @@ TEST(MetadataMapTest, KeyValueEscaped) {
   EXPECT_THAT(output_str, HasSubstr("key: broken-utf8, value: \\367("));
 
   // The spdlog macro expansion should just work.
-  EXPECT_EXIT(
-      {
-        ENVOY_LOG_MISC(error, "output: {}", m);
-        _exit(0);
-      },
-      ::testing::ExitedWithCode(0), "");
+  EXPECT_LOG_CONTAINS("error", "\"broken-utf8\": \"\\\\367(\"",
+                      ENVOY_LOG_MISC(error, "output: {}", m));
 }
+
 } // namespace
 
 } // namespace Http

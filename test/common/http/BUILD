@@ -405,7 +405,6 @@ envoy_cc_test(
     srcs = ["metadata_interface_test.cc"],
     deps = [
         "//envoy/http:metadata_interface",
-        "//source/common/http:utility_lib",
     ],
 )
 
