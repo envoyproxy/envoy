@@ -35,7 +35,7 @@ TEST(MetadataMapTest, KeyValueEscaped) {
   EXPECT_THAT(output_str, HasSubstr("key: a1, value: a2"));
   // Escaped.
   EXPECT_THAT(output_str, HasSubstr("key: non-utf8, value: \\303("));
-  EXPECT_THAT(output_str, HasSubstr("key: broken-utf8, value: \\360("));
+  EXPECT_THAT(output_str, HasSubstr("key: broken-utf8, value: \\367("));
 
   // The spdlog macro expansion should just work.
   EXPECT_EXIT(
