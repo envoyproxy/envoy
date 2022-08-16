@@ -1,3 +1,5 @@
+#include "envoy/http/metadata_interface.h"
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -6,7 +8,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,9 +24,9 @@ TEST(MetadataMapTest, KeyValueEscaped) {
   m.insert({"b1", "b2"});
   // Broken at the 2nd byte.
   m.insert({"non-utf8", "\xc3\x28"});
-  // Length incorrect: the (\xf0) "1110" requires 4 bytes, but there are only 2.
+  // Length incorrect: the (0xf7) "1110" requires 4 bytes, but there are only 2.
   // ASAN should fail if no escaping.
-  m.insert({"broken-utf8", "\xf0\x28"});
+  m.insert({"broken-utf8", "\xf7\x28"});
 
   // Now check the "<<" operator.
   std::ostringstream oss;
