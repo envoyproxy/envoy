@@ -57,7 +57,7 @@ public:
   }
 
   Envoy::Network::ConnectionBalancerSharedPtr
-  createConnectionBalancerFromProto(const Protobuf::Message&,
+  createConnectionBalancerFromProto(const Protobuf::Message& config,
                                     Server::Configuration::FactoryContext& context) override;
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }
