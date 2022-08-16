@@ -72,7 +72,7 @@ message SipProxy {
     bool operate_via = 4;
 
     // Upstream transactions support configuration
-    UpstreamTransactionSupport upstream_transaction_support = 5;
+    UpstreamTransactions upstream_transactions = 5;
   }
 
   // The human readable prefix to use when emitting statistics.
@@ -164,7 +164,7 @@ message LocalService {
 }
 
 // Upstream transaction support by the use of X-Envoy-Origin-Ingress header custom header
-message UpstreamTransactionSupport {
+message UpstreamTransactions {
   // Whether upstream transactions are allowed
   // False: upstream transactions disabled
   // True:  upstream transactions enabled

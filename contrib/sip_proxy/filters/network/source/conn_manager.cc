@@ -170,30 +170,34 @@ ConnectionManager::ConnectionManager(
       upstream_transaction_infos_(upstream_transaction_infos) {}
 
 ConnectionManager::~ConnectionManager() {
-    ENVOY_LOG(debug, "Killing connection manager");
+    ENVOY_LOG(debug, "Destroying connection manager");
 }
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
   if (settings()->UpstreamTransactionsEnabled()) {
-    std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
-                            "@" +
-                            read_callbacks_->connection()
-                                .connectionInfoProvider()
-                                .localAddress()
-                                ->ip()
-                                ->addressAsString();
-    std::string downstream_conn_id =
-        read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
-        "@" + random_generator_.uuid();
-    local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
-    downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
-
-    ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
-              thread_id, downstream_conn_id);
-    ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
+    createNewDownstreamConnection();
   }
-
+  ENVOY_LOG(debug, "Creating connection manager");
   return Network::FilterStatus::Continue;
+}
+
+void ConnectionManager::createNewDownstreamConnection() {
+  std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
+                          "@" +
+                          read_callbacks_->connection()
+                              .connectionInfoProvider()
+                              .localAddress()
+                              ->ip()
+                              ->addressAsString();
+  std::string downstream_conn_id =
+      read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
+      "@" + random_generator_.uuid();
+  local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
+  downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
+
+  ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
+            thread_id, downstream_conn_id);
+  ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
 }
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
@@ -580,7 +584,8 @@ void ConnectionManager::DownstreamActiveTrans::sendLocalReply(const DirectRespon
 }
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamActiveTrans::upstreamData(
-    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, const std::string& return_destination) {
+    MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route, 
+    const absl::optional<std::string>& return_destination) {
   ASSERT(response_decoder_ != nullptr);
   UNREFERENCED_PARAMETER(return_route);
   UNREFERENCED_PARAMETER(return_destination);
@@ -681,9 +686,9 @@ void ConnectionManager::UpstreamActiveTrans::startUpstreamResponse() {
 
 SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    const std::string& return_destination) {
+    const absl::optional<std::string>& return_destination) {
   return_route_ = return_route;
-  return_destination_ = return_destination;
+  return_destination_ = return_destination.value();
   metadata_ = metadata;
                                   
 
@@ -748,7 +753,7 @@ void ConnectionManager::DownstreamConnection::startUpstreamResponse() {}
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData(
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
-    const std::string& return_destination) {
+    const absl::optional<std::string>& return_destination) {
   std::string&& k = std::string(metadata->transactionId().value());
 
   if (upstreamTransactionInfos()->hasTransaction(k)) {

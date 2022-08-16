@@ -77,6 +77,12 @@ enum ErrorCode {
 
 class HeaderTypeMap {
 public:
+  /*HeaderTypeMap() {
+    for (auto it = sip_header_type_map_.cbegin(); it != sip_header_type_map_.cend();) {
+      sip_header_type_map_reverse_.emplace(it->second, it->first);
+    }
+  }*/
+
   HeaderType str2Header(const absl::string_view& header) const {
     if (const auto& result = sip_header_type_map_.find(header);
         result != sip_header_type_map_.end()) {
@@ -94,6 +100,15 @@ public:
       return HeaderType::Other;
     }
   }
+
+  /*absl::string_view header2Str(const HeaderType type) const {
+    if (const auto& result = sip_header_type_map_reverse_.find(type);
+        result != sip_header_type_map_reverse_.end()) {
+      return result->second;
+    } else {
+      return nullptr;
+    }
+  }*/
 
   absl::string_view header2Str(const HeaderType type) const {
     auto it = std::find_if(
@@ -124,6 +139,9 @@ private:
       {"TopLine", HeaderType::TopLine},
       {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap},
       {"X-Envoy-Origin-Ingress", HeaderType::XEnvoyOriginIngress}};
+      
+  //std::map<HeaderType, absl::string_view> sip_header_type_map_reverse_;
+
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;

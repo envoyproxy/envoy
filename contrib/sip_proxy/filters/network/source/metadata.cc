@@ -163,9 +163,9 @@ void MessageMetadata::removeMsgHeader(HeaderType type) {
 }
 
 bool MessageMetadata::hasMsgHeader(HeaderType type) {
-  auto init_removal_pos = raw_msg_.find(HeaderTypes::get().header2Str(type).data());
-  auto end_removal_pos = raw_msg_.find("\r\n", init_removal_pos);
-  return ((init_removal_pos != std::string::npos) && (end_removal_pos != std::string::npos));
+  auto init_pos = raw_msg_.find(HeaderTypes::get().header2Str(type).data());
+  auto end_pos = raw_msg_.find("\r\n", init_pos);
+  return ((init_pos != std::string::npos) && (end_pos != std::string::npos));
 }
 
 void MessageMetadata::addEPOperation(

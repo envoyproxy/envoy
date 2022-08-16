@@ -73,7 +73,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = nullptr;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos = nullptr;
 
-  if (proto_config.settings().upstream_transaction_support().enabled()) {
+  if (proto_config.settings().upstream_transactions().enabled()) {
     // Map of upstream transactions per worker thread
     upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
         context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -88,8 +88,6 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
 
   return [filter_config, &context, transaction_infos, downstream_connection_infos,
           upstream_transaction_infos](Network::FilterManager& filter_manager) -> void {
-    std::cerr << "Creating New ConnectionManager. Thread: "
-              << context.api().threadFactory().currentThreadId().debugString() << std::endl;
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         *filter_config, context.api().randomGenerator(),
         context.mainThreadDispatcher().timeSource(), context, transaction_infos,
@@ -113,7 +111,7 @@ ConfigImpl::ConfigImpl(
           static_cast<std::chrono::milliseconds>(
               PROTOBUF_GET_MS_OR_DEFAULT(config.settings(), transaction_timeout, 32000)),
           config.settings().local_services(), config.settings().tra_service_config(),
-          config.settings().operate_via(), config.settings().upstream_transaction_support())) {
+          config.settings().operate_via(), config.settings().upstream_transactions())) {
 
   if (config.sip_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

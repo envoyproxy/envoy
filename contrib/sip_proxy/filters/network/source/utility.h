@@ -30,9 +30,9 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig&
           tra_service_config,
       bool operate_via,
-      const envoy::extensions::filters::network::sip_proxy::v3alpha::UpstreamTransactionSupport& upstream_transaction_support)
+      const envoy::extensions::filters::network::sip_proxy::v3alpha::UpstreamTransactions& upstream_transactions)
       : transaction_timeout_(transaction_timeout), tra_service_config_(tra_service_config),
-        operate_via_(operate_via), upstream_transactions_enable_(upstream_transaction_support.enabled()) {
+        operate_via_(operate_via), upstream_transactions_enable_(upstream_transactions.enabled()) {
     for (const auto& service : local_services) {
       local_services_.emplace_back(service);
     }
@@ -44,7 +44,7 @@ public:
         PROTOBUF_GET_MS_OR_DEFAULT(sip_settings, transaction_timeout, 32000));
     tra_service_config_ = sip_settings.tra_service_config();
     operate_via_ = sip_settings.operate_via();
-    upstream_transactions_enable_ = sip_settings.upstream_transaction_support().enabled();
+    upstream_transactions_enable_ = sip_settings.upstream_transactions().enabled();
     for (const auto& service : sip_settings.local_services()) {
       local_services_.emplace_back(service);
     }

@@ -377,7 +377,7 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
   if (auto upstream_connection =
           transaction_info->getUpstreamConnection(host->address()->ip()->addressAsString());
       upstream_connection != nullptr) {
-    // There is action connection, reuse it.
+    // There is active connection, reuse it.
     upstream_connection_ = upstream_connection;
     upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
     upstream_connection_->setMetadata(metadata);
@@ -770,7 +770,7 @@ void UpstreamConnection::delDecoderFilterCallbacks(SipFilters::DecoderFilterCall
 void UpstreamConnection::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                      bool end_stream) {
   if (conn_data_->connection().state() == Network::Connection::State::Closed) {
-    ENVOY_LOG(debug, "Connection state is closed for upstream local reply");
+    ENVOY_LOG(warn, "Connection state is closed for upstream local reply");
     return;
   }
 
@@ -802,7 +802,7 @@ bool UpstreamMessageDecoder::onData(Buffer::Instance& data) {
 FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr metadata) {
   ENVOY_LOG(trace, "UpstreamMessageDecoder\n{}", metadata->rawMsg());
 
-  // ONLY used in case of responses to upstream initiated transactions
+  // ONLY used in case of requests to upstream initiated transactions
   if ((metadata->msgType() == MsgType::Request) && (settings()->UpstreamTransactionsEnabled())) {
     auto origin_ingress = metadata->originIngress();
     if (origin_ingress == nullptr) {
@@ -854,14 +854,8 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
                                                                   absl::nullopt);
       }
 
-      // ONLY used in case of responses to upstream initiated transactions
-      // It shouldn't be necessary to remove this header in this case, but just in case
-      if (settings()->UpstreamTransactionsEnabled() && metadata->hasXEnvoyOriginIngressHeader()) {
-        metadata->removeXEnvoyOriginIngressHeader();
-      }
-
       active_trans->startUpstreamResponse();
-      active_trans->upstreamData(metadata, nullptr, "");
+      active_trans->upstreamData(metadata, nullptr, absl::nullopt);
     } else {
       ENVOY_LOG(debug, "no active trans selected {}\n{}", transaction_id, metadata->rawMsg());
       return FilterStatus::StopIteration;

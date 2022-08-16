@@ -122,7 +122,7 @@ public:
       std::shared_ptr<Router::TransactionInfos> transaction_infos,
       std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info,
       std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_info);
-  ~ConnectionManager() override;
+  ~ConnectionManager();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -167,6 +167,8 @@ private:
   friend class UpstreamTransactionInfos;  // Needs to access UpstreamActiveTrans private inner class
   friend struct ThreadLocalUpstreamTransactionInfo; // Needs to access UpstreamActiveTrans private
                                                      // inner class
+
+  void createNewDownstreamConnection();
 
   struct ActiveTrans;
 
@@ -221,7 +223,7 @@ private:
     void startUpstreamResponse() override { parent_.startUpstreamResponse(); }
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                       Router::RouteConstSharedPtr return_route,
-                                            const std::string& return_destination) override {
+                                      const absl::optional<std::string>& return_destination) override {
       return parent_.upstreamData(metadata, return_route, return_destination);
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
@@ -398,7 +400,7 @@ private:
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                       Router::RouteConstSharedPtr return_route,
-                                      const std::string& return_destination) override;
+                                      const absl::optional<std::string>& return_destination) override;
     void startUpstreamResponse() override;
 
     void onError(const std::string& what) override;
@@ -449,7 +451,7 @@ private:
     void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                       Router::RouteConstSharedPtr return_route,
-                                      const std::string& return_destination) override;
+                                      const absl::optional<std::string>& return_destination) override;
     void startUpstreamResponse() override;
 
     void resetDownstreamConnection() override;
@@ -497,7 +499,7 @@ private:
 
     SipFilters::ResponseStatus upstreamData(MessageMetadataSharedPtr metadata,
                                       Router::RouteConstSharedPtr return_route,
-                                      const std::string& return_destination) override;
+                                      const absl::optional<std::string>& return_destination) override;
 
     void resetDownstreamConnection() override{};
 
