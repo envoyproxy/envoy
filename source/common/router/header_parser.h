@@ -15,6 +15,8 @@ namespace Envoy {
 namespace Router {
 
 class HeaderParser;
+using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
+using HeaderAppendOption = envoy::config::core::v3::HeaderValueOption;
 using HeaderParserPtr = std::unique_ptr<HeaderParser>;
 
 /**
@@ -28,8 +30,8 @@ public:
    * @param headers_to_add defines the headers to add during calls to evaluateHeaders
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
-  static HeaderParserPtr configure(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add);
+  static HeaderParserPtr
+  configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.
@@ -38,16 +40,16 @@ public:
    */
   static HeaderParserPtr
   configure(const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
-            bool append);
+            HeaderAppendAction append_action);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders
    * @param headers_to_remove defines headers to remove during calls to evaluateHeaders
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
-  static HeaderParserPtr configure(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
-      const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
+  static HeaderParserPtr
+  configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add,
+            const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers,
                        const StreamInfo::StreamInfo& stream_info) const override;
@@ -68,8 +70,9 @@ protected:
 
 private:
   struct HeadersToAddEntry {
-    HeaderFormatterPtr formatter_;
+    const HeaderFormatterPtr formatter_;
     const std::string original_value_;
+    const HeaderAppendAction append_action_;
     const bool add_if_empty_ = false;
   };
 

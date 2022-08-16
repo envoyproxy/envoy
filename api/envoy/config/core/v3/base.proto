@@ -358,8 +358,10 @@ message HeaderValueOption {
   // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
 
-  // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
-  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  // Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent.
+  // Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD
+  // <envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
