@@ -79,7 +79,8 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Create a new SegmentContext.
   auto segment_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
 
-  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan("/downstream/path", segment_context);
+  Envoy::Tracing::SpanPtr org_span =
+      tracer_->startSpan("/downstream/path", "HTTP", segment_context);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
   {
