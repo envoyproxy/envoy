@@ -19,6 +19,9 @@ namespace PatternTemplate {
 
 namespace Internal {
 
+/**
+ * String to be concatenated in rewritten url
+ */
 using Literal = absl::string_view;
 
 /**
