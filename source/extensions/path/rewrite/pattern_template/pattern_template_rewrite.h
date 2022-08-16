@@ -31,7 +31,7 @@ public:
           rewrite_config)
       : url_rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
-  std::string pattern() const override { return url_rewrite_pattern_; }
+  absl::string_view pattern() const override { return url_rewrite_pattern_; }
 
   absl::StatusOr<std::string> rewriteUrl(absl::string_view current_pattern,
                                          absl::string_view matched_path) const override;

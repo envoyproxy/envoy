@@ -24,7 +24,7 @@ bool PatternTemplateMatchPredicate::match(absl::string_view pattern) const {
       matching_pattern_regex);
 }
 
-std::string PatternTemplateMatchPredicate::pattern() const { return path_template_; }
+absl::string_view PatternTemplateMatchPredicate::pattern() const { return path_template_; }
 
 } // namespace Match
 } // namespace PatternTemplate

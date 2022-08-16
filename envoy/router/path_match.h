@@ -30,7 +30,7 @@ public:
   /**
    * @return the match pattern of the predicate.
    */
-  virtual std::string pattern() const PURE;
+  virtual absl::string_view pattern() const PURE;
 
   /**
    * @return the name of the current predicate.

@@ -42,13 +42,13 @@ absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegmen
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex);
 
 // Returns if provided rewrite pattern is valid
-absl::Status isValidPathTemplateRewritePattern(const std::string& path_template_rewrite);
+absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_rewrite);
 
 // Returns if path_template and rewrite_template have valid variables
-absl::Status isValidSharedVariableSet(const std::string& path_template_rewrite,
-                                      const std::string& capture_regex);
+absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
+                                      absl::string_view  capture_regex);
 
-absl::Status isValidMatchPattern(const std::string match_pattern);
+absl::Status isValidMatchPattern(absl::string_view match_pattern);
 
 absl::StatusOr<std::string> rewriteURLTemplatePattern(
     absl::string_view url, absl::string_view capture_regex,

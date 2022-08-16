@@ -26,7 +26,7 @@ public:
 
   bool match(absl::string_view pattern) const override;
 
-  std::string pattern() const override;
+  absl::string_view pattern() const override;
   absl::string_view name() const override { return NAME; }
 
 private:
