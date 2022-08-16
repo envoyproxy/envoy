@@ -63,13 +63,21 @@ namespace {
 
 AddressSelectFn
 getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind_config) {
+  if (bind_config.additional_source_addresses_size() > 1) {
+    throw EnvoyException("Only one additional address can be supported");
+  }
+
   std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
   source_address_list.emplace_back(
       Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
-  for (auto i = 0; i < bind_config.additional_source_addresses_size(); i++) {
+  if (bind_config.additional_source_addresses_size() == 1) {
     source_address_list.emplace_back(
-        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(i)));
+        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
+    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
+      throw EnvoyException("Can't specify two source addresses with a same IP version");
+    }
   }
+
   return [source_address_list = std::move(source_address_list)](
              const Network::Address::InstanceConstSharedPtr& address) {
     if (address->type() == Network::Address::Type::Ip) {
