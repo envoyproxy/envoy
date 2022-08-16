@@ -30,21 +30,6 @@ using Literal = absl::string_view;
 enum class Operator { KPathGlob, KTextGlob };
 
 /**
- * Represents a segment of the rewritten URL, including any path segments,
- * slash and prefix.
- */
-struct RewriteSegment {
-
-  // A string that will be concatenated for rewrite.
-  absl::string_view literal_;
-
-  // Represents an index into the RE2 capture which value should be used
-  // to construct the rewritten URL. Note that the index should be greater
-  // than 0 as 0 index into the whole match RE2 pattern.
-  int capture_index_;
-};
-
-/**
  * Represents a pattern variable. Variables are included in both path match and rewrite paths.
  */
 struct Variable {

@@ -53,6 +53,8 @@ TEST(ConvertURLPattern, InvalidPattern) {
               StatusIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(convertURLPatternSyntaxToRegex("/{var12345678901234=*}"),
               StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/{var12345678901234=*"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseRewriteHelperSuccess : public testing::TestWithParam<std::string> {};
@@ -328,6 +330,36 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   ASSERT_OK(rewritten_url);
 
   EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
+}
+
+TEST_P(URLPatternMatchAndRewrite, isValidMatchPattern) {
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}/{doo}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{hoo}/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+}
+
+TEST_P(URLPatternMatchAndRewrite, isValidPathTemplateRewritePattern) {
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}/{doo}").ok());
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/{hoo}/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+}
+
+TEST_P(URLPatternMatchAndRewrite, isValidSharedVariableSet) {
+  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}", "/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}/{doo}", "/foo/bar/{doo}/{goo}").ok());
+  EXPECT_TRUE(isValidSharedVariableSet("/bar/{goo}", "/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}/{goo}", "/foo/{bar}").ok());
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/{goo}", "/foo/bar/").ok());
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}", "/{foo}").ok());
 }
 
 } // namespace

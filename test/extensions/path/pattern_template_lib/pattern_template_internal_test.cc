@@ -112,6 +112,13 @@ TEST(InternalParsing, ConsumeTextGlob) {
   EXPECT_EQ(result->unconsumed_pattern_, "*abc/123");
 }
 
+TEST(InternalParsing, ConsumeInvalidOperator) {
+  std::string pattern = "/";
+
+  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
+  EXPECT_THAT(result, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(InternalParsing, ConsumePathGlob) {
   std::string pattern = "*/123";
 
@@ -145,7 +152,7 @@ INSTANTIATE_TEST_SUITE_P(ConsumeVariableFailureTestSuite, ConsumeVariableFailure
                          testing::Values("{var", "{=abc}", "{_var=*}", "{1v}", "{1v=abc}",
                                          "{var=***}", "{v-a-r}", "{var=*/abc?q=1}", "{var=abc/a*}",
                                          "{var=*def/abc}", "{var=}", "{var=abc=def}",
-                                         "{rc=||||(A+yl/}"));
+                                         "{rc=||||(A+yl/}", "/"));
 
 TEST_P(ConsumeVariableFailure, ConsumeVariableFailureTest) {
   std::string pattern = GetParam();

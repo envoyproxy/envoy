@@ -89,7 +89,6 @@ std::string toString(const Variable val) {
 
   return absl::StrCat("{", val.var_name_, "=",
                       absl::StrJoin(val.var_match_, "/", ToStringFormatter()), "}");
-  return "";
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
