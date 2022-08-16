@@ -1,6 +1,7 @@
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
+#include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "source/extensions/compression/zstd/compressor/zstd_compressor_impl.h"
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
@@ -21,24 +22,25 @@ namespace Compressor {
 
 class MockBrotliCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  MockBrotliCompressorFactory(uint32_t quality)
-      : quality_(quality) {}
+  MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
     return std::make_unique<Compression::Brotli::Compressor::BrotliCompressorImpl>(
-        quality_, window_bits_, input_block_bits_, disable_literal_context_modeling_,
-                      mode_, chunk_size_);
+        quality_, window_bits_, input_block_bits_, disable_literal_context_modeling_, mode_,
+        chunk_size_);
   }
 
-  const std::string& statsPrefix() const override { CONSTRUCT_ON_FIRST_USE(std::string, "brotli."); }
+  const std::string& statsPrefix() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "brotli.");
+  }
   const std::string& contentEncoding() const override {
     return Http::CustomHeaders::get().ContentEncodingValues.Brotli;
   }
 
 private:
-
   const uint64_t chunk_size_{4096};
-  const BrotliCompressorImpl::EncoderMode mode_{BrotliCompressorImpl::EncoderMode::Generic};
+  const Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode mode_{
+      Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Generic};
   const uint32_t input_block_bits_{24};
   const uint32_t quality_;
   const uint32_t window_bits_{18};
@@ -100,8 +102,8 @@ private:
 using CompressionParams = std::tuple<int64_t, uint64_t, int64_t, uint64_t>;
 
 CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
-                                               testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               CompressionParams params) {
+                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
+                                                 CompressionParams params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -202,15 +204,17 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   testing::NiceMock<Runtime::MockLoader> runtime;
   CompressorFilterConfigSharedPtr config;
   std::string compressor = "";
+  std::string encoding = "";
   if (lib == CompressorLibs::Brotli) {
     config = makeBrotliConfig(stats, runtime, params);
+    encoding = "br";
     compressor = "brotli";
   } else if (lib == CompressorLibs::Gzip) {
     config = makeGzipConfig(stats, runtime, params);
-    compressor = "gzip";
+    encoding = compressor = "gzip";
   } else if (lib == CompressorLibs::Zstd) {
     config = makeZstdConfig(stats, runtime, params);
-    compressor = "zstd";
+    encoding = compressor = "zstd";
   }
 
   ON_CALL(runtime.snapshot_, featureEnabled("test.filter_enabled", 100))
@@ -220,7 +224,7 @@ static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImp
   filter->setDecoderFilterCallbacks(decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl headers = {
-      {":method", "get"}, {"accept-encoding", compressor}, {"content-encoding", compressor}};
+      {":method", "get"}, {"accept-encoding", encoding}, {"content-encoding", encoding}};
   filter->decodeHeaders(headers, false);
 
   Http::TestResponseHeaderMapImpl response_headers = {

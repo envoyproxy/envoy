@@ -78,6 +78,7 @@ envoy_cc_benchmark_binary(
     deps = [
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/compression/brotli/compressor:compressor_lib",
         "//source/extensions/compression/gzip/compressor:compressor_lib",
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
