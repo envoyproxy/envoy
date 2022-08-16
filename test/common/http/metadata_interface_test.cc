@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/http/metadata_interface.h"
-
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 
