@@ -1,3 +1,4 @@
+#ifndef IGZIP_DISABLED
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
 
@@ -214,3 +215,4 @@ TEST_F(IgzipCompressorImplTest, CompressWithNotCommonParams) {
 } // namespace Compression
 } // namespace Extensions
 } // namespace Envoy
+#endif
