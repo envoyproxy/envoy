@@ -336,6 +336,7 @@ envoy_cc_test(
         ":listener_manager_impl_test_lib",
         ":utility_lib",
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/rbac:config",
         "//source/extensions/request_id/uuid:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
