@@ -362,17 +362,17 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(
     ProtobufMessage::ValidationVisitor& validator)
     : enabled_(true) {
 
-  const auto& predicate_factory =
-      &Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
+  auto& predicate_factory =
+      Envoy::Config::Utility::getAndCheckFactory<PathRewritePredicateFactory>(typed_config);
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      typed_config.typed_config(), validator, *predicate_factory);
+      typed_config.typed_config(), validator, predicate_factory);
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
   absl::StatusOr<PathRewritePredicateSharedPtr> config_or_error =
-      predicate_factory->createPathRewritePredicate(*predicate_config_);
+      predicate_factory.createPathRewritePredicate(*predicate_config_);
 
   if (!config_or_error.ok()) {
     throw EnvoyException(std::string(config_or_error.status().message()));
@@ -390,17 +390,17 @@ PathMatchPolicyImpl::PathMatchPolicyImpl(
     ProtobufMessage::ValidationVisitor& validator)
     : enabled_(true) {
 
-  const auto& predicate_factory =
-      &Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
+  auto& predicate_factory =
+      Envoy::Config::Utility::getAndCheckFactory<PathMatchPredicateFactory>(typed_config);
 
   predicate_config_ = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      typed_config.typed_config(), validator, *predicate_factory);
+      typed_config.typed_config(), validator, predicate_factory);
 
   // Validate config format and inputs when creating factory.
   // As the validation and create are nearly 1:1 store for later use.
   // Predicate is only ever created once.
   absl::StatusOr<PathMatchPredicateSharedPtr> config_or_error =
-      predicate_factory->createPathMatchPredicate(*predicate_config_);
+      predicate_factory.createPathMatchPredicate(*predicate_config_);
 
   if (!config_or_error.ok()) {
     throw EnvoyException(std::string(config_or_error.status().message()));
