@@ -2453,10 +2453,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
-                                                        factory_context, std::move(scope), false),
-                              EnvoyException,
-                              "Can't specify two source addresses with a same IP version");
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
+        "different IP version source addresses can be supported in BindConfig's source_address and "
+        "additional_source_addresses fields");
   }
 
   {
@@ -2470,9 +2473,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
-                                                        factory_context, std::move(scope), false),
-                              EnvoyException, "Only one additional address can be supported");
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has more than one additional source addresses. Only "
+        "one additional source can be supported in BindConfig's additional_source_addresses field");
   }
 
   {
@@ -2510,8 +2516,29 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   }
 
   {
+    // Test cluster config has more than two multiple source addresses
+    config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
+        "2001::1");
+    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
+        "2001::2");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
+                                                        factory_context, std::move(scope), false),
+                              EnvoyException,
+                              "Cluster staticcluster's upstream binding config has more than one "
+                              "additional source addresses. Only one additional source can be "
+                              "supported in BindConfig's additional_source_addresses field");
+  }
+
+  {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    config.mutable_upstream_bind_config()->clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(

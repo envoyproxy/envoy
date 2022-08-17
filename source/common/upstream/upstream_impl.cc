@@ -62,9 +62,13 @@ namespace Upstream {
 namespace {
 
 AddressSelectFn
-getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind_config) {
+getSourceAddressFnFromBindConfig(const std::string& cluster_name,
+                                 const envoy::config::core::v3::BindConfig& bind_config) {
   if (bind_config.additional_source_addresses_size() > 1) {
-    throw EnvoyException("Only one additional address can be supported");
+    throw EnvoyException(fmt::format(
+        "{}'s upstream binding config has more than one additional source addresses. Only one "
+        "additional source can be supported in BindConfig's additional_source_addresses field",
+        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
   }
 
   std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
@@ -74,7 +78,11 @@ getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind
     source_address_list.emplace_back(
         Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
     if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
-      throw EnvoyException("Can't specify two source addresses with a same IP version");
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has two same IP version source addresses. Only two "
+          "different IP version source addresses can be supported in BindConfig's source_address "
+          "and additional_source_addresses fields",
+          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
     }
   }
 
@@ -97,14 +105,16 @@ getSourceAddressFnFromBindConfig(const envoy::config::core::v3::BindConfig& bind
 
 AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
                                    const envoy::config::core::v3::BindConfig& bind_config) {
+  std::string cluster_name = cluster.name();
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
-    return getSourceAddressFnFromBindConfig(cluster.upstream_bind_config());
+    return getSourceAddressFnFromBindConfig(cluster_name, cluster.upstream_bind_config());
   }
 
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
   if (bind_config.has_source_address()) {
-    return getSourceAddressFnFromBindConfig(bind_config);
+    cluster_name = "";
+    return getSourceAddressFnFromBindConfig(cluster_name, bind_config);
   }
 
   return nullptr;
