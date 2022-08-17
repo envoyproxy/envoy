@@ -151,9 +151,9 @@ author = u'Envoy Project Authors'
 # built documents.
 
 # The short X.Y version.
-version = _config('version_string')
+version = "VERSION" # _config('version_string')
 # The full version, including alpha/beta/rc tags.
-release = _config('version_string')
+release = "RELEASE" # _config('version_string')
 
 rst_epilog = """
 .. |DOCKER_IMAGE_TAG_NAME| replace:: {}
