@@ -6,6 +6,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/utility.h"
 
 #include "test/test_common/logging.h"
 
