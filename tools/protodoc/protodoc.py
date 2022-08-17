@@ -482,6 +482,11 @@ class RstFormatVisitor(visitor.Visitor):
         if self._field_is_required(field):
             field_annotations = ['*REQUIRED*']
 
+        formatted_leading_comment = self._comment(
+            ctx.leading_comment,
+            field.options.HasExtension(xds_status_pb2.field_status)
+            and field.options.Extensions[xds_status_pb2.field_status].work_in_progress)
+
         if field.HasField('oneof_index'):
             oneof_context = outer_ctx.extend_oneof(
                 field.oneof_index, ctx.oneof_names[field.oneof_index])
@@ -489,7 +494,7 @@ class RstFormatVisitor(visitor.Visitor):
                 return {}
             oneof_comment = oneof_context.leading_comment
             formatted_oneof_comment = self._comment(oneof_comment)
-            formatted_leading_comment = ""
+            formatted_leading_comment = formatted_leading_comment.rstrip()
 
             # If the oneof only has one field and marked required, mark the field as required.
             if len(ctx.oneof_fields[field.oneof_index]) == 1 and ctx.oneof_required[
@@ -509,10 +514,6 @@ class RstFormatVisitor(visitor.Visitor):
                     for i, f in ctx.oneof_fields[field.oneof_index])
         else:
             formatted_oneof_comment = ''
-            formatted_leading_comment = self._comment(
-                ctx.leading_comment,
-                field.options.HasExtension(xds_status_pb2.field_status)
-                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress)
 
         security_options = self._field_security_options(field, ctx)
 
