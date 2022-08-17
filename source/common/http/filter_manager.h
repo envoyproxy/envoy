@@ -83,7 +83,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
-  const Network::Connection* connection() override;
+  OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
   Router::RouteConstSharedPtr route() override;
@@ -611,7 +611,7 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id,
+                OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
@@ -810,7 +810,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  const Network::Connection* connection() const { return &connection_; }
+  OptRef<const Network::Connection> connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
@@ -922,7 +922,7 @@ private:
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
-  const Network::Connection& connection_;
+  OptRef<const Network::Connection> connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
