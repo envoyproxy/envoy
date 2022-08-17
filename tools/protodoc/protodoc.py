@@ -498,8 +498,7 @@ class RstFormatVisitor(visitor.Visitor):
             formatted_oneof_comment = self._comment(oneof_comment)
             formatted_leading_comment = (
                 formatted_leading_comment.strip()
-                if not formatted_leading_comment.strip()
-                else formatted_leading_comment)
+                if not formatted_leading_comment.strip() else formatted_leading_comment)
 
             # If the oneof only has one field and marked required, mark the field as required.
             if len(ctx.oneof_fields[field.oneof_index]) == 1 and ctx.oneof_required[
