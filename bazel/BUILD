@@ -19,6 +19,11 @@ exports_files([
     "exported_symbols.txt",
 ])
 
+sh_library(
+    name = "volatile_env",
+    srcs = ["volatile_env.sh"],
+)
+
 genrule(
     name = "gnu_build_id",
     outs = ["gnu_build_id.ldscript"],
@@ -319,6 +324,11 @@ selects.config_setting_group(
 )
 
 config_setting(
+    name = "disable_admin_html",
+    values = {"define": "admin_html=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
     visibility = ["//visibility:private"],
@@ -594,6 +604,30 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "apple_dbg",
+    match_all = [
+        ":apple",
+        ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_fastbuild",
+    match_all = [
+        ":apple",
+        ":fastbuild_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_non_opt",
+    match_any = [
+        ":apple_dbg",
+        ":apple_fastbuild",
+    ],
+)
+
+selects.config_setting_group(
     name = "linux",
     match_any = [
         ":linux_aarch64",
@@ -673,7 +707,7 @@ platform(
 platform(
     name = "android_armeabi",
     constraint_values = [
-        "@platforms//cpu:arm",  # TODO(keith): This should be armv7 https://github.com/bazelbuild/bazel/issues/14982
+        "@platforms//cpu:armv7",
         "@platforms//os:android",
     ],
 )

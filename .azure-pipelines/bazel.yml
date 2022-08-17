@@ -57,7 +57,7 @@ steps:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
 
-  displayName: "Run CI script"
+  displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
     echo "disk space at end of build:"
@@ -72,10 +72,12 @@ steps:
     testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
     testRunTitle: "${{ parameters.ciTarget }}"
     searchFolder: $(Build.StagingDirectory)/tmp
+  timeoutInMinutes: 10
   condition: always()
 
 - task: PublishBuildArtifacts@1
   inputs:
     pathtoPublish: "$(Build.StagingDirectory)/envoy"
     artifactName: ${{ parameters.ciTarget }}${{ parameters.artifactSuffix }}
+  timeoutInMinutes: 10
   condition: always()

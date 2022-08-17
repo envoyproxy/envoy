@@ -32,7 +32,7 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 Currently there are three build images for Linux and one for Windows:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 14 compiler.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 9 and Clang 14 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 14 compiler, this image is experimental and not well tested.
 * `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
 
@@ -64,7 +64,7 @@ invoking the build.
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the defualt GOPROXY in China.
+Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
@@ -104,11 +104,11 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
-To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the remote cache endpoint to
 the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
@@ -131,7 +131,6 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.sizeopt.server_only` &mdash; build Envoy static binary under `-c opt --config=sizeopt` with clang.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverage <test>` &mdash; build and run a specified test or test dir under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`. Specify `//contrib/...` to get contrib coverage.
-* `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
 * `bazel.msan` &mdash; build and run tests under `-c dbg --config=clang-msan` with clang.
 * `bazel.msan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-msan` with clang.
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
@@ -141,9 +140,9 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.compile_time_options` &mdash; build Envoy and run tests with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.compile_time_options <test>` &mdash; build Envoy and run a specified test or test dir with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy <files>` &mdash; build and run clang-tidy specified source files, if no files specified, runs against the diff with the last GitHub commit.
-* `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
-* `format_pre`&mdash; run validation and linting tools.
+* `check_proto_format`&mdash; check configuration, formatting and build issues in API proto files.
+* `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
+* `format`&mdash; run validation, linting and formatting tools.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 ## On Windows
@@ -192,20 +191,3 @@ Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](ht
 which is pre-installed on the [Azure Pipelines macOS image](https://github.com/actions/virtual-environments/blob/main/images/macos/macos-10.15-Readme.md).
 The dependencies are cached and re-installed on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy. Note that the full version of Xcode (not just Command Line Tools) is required.
-
-# Coverity Scan Build Flow
-
-[Coverity Scan Envoy Project](https://scan.coverity.com/projects/envoy-proxy)
-
-Coverity Scan static analysis is not run within Envoy CI. However, Envoy can be locally built and
-submitted for analysis. A Coverity Scan Envoy project token must be generated from the
-[Coverity Project Settings](https://scan.coverity.com/projects/envoy-proxy?tab=project_settings).
-Only a Coverity Project Administrator can create a token. With this token, running
-`ci/do_coverity_local.sh` will use the Ubuntu based `envoyproxy/envoy-build-ubuntu` image to build the
-Envoy static binary with the Coverity Scan tool chain. This process generates an artifact,
-envoy-coverity-output.tgz, that is uploaded to Coverity for static analysis.
-
-To build and submit for analysis:
-```bash
-COVERITY_TOKEN={generated Coverity project token} ./ci/do_coverity_local.sh
-```

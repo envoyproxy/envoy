@@ -55,7 +55,8 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         const Network::TransportSocketOptionsConstSharedPtr&) override {
     return Network::ClientConnectionPtr{
         createClientConnection_(address, source_address, transport_socket, options)};
   }
@@ -113,12 +114,12 @@ public:
   }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
+    if (to_delete) {
+      to_delete->deleteIsPending();
+    }
     deferredDelete_(to_delete.get());
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
-    }
-    if (delete_immediately_) {
-      to_delete_.clear();
     }
   }
 
@@ -170,7 +171,6 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
-  bool delete_immediately_{};
 
 private:
   const std::string name_;

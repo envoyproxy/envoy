@@ -38,7 +38,7 @@ SslCertValidatorIntegrationTest::makeSslClientConnection(const ClientSslTranspor
       createClientSslTransportSocketFactory(modified_options, *context_manager_, *api_);
   return dispatcher_->createClientConnection(
       address, Network::Address::InstanceConstSharedPtr(),
-      client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+      client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
 }
 
 INSTANTIATE_TEST_SUITE_P(

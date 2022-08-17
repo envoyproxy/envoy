@@ -39,6 +39,10 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello"));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString("/hello?hello%26"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
@@ -48,9 +52,19 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello="));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26="));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26="));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello=&"));
+
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26=&"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
@@ -71,6 +85,11 @@ TEST(HttpUtility, parseQueryString) {
             Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
             Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseAndDecodeQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
 
   // A sample of request path with query strings by Prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
@@ -155,7 +174,8 @@ TEST(HttpUtility, replaceQueryString) {
 }
 
 TEST(HttpUtility, getResponseStatus) {
-  EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
+  EXPECT_ENVOY_BUG(Utility::getResponseStatus(TestResponseHeaderMapImpl{}),
+                   "Details: No status in headers");
   EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 
@@ -1067,35 +1087,10 @@ public:
 
 // Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
 TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr,
-            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
-}
-
-// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
-// filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
+  filter_callbacks.route_ = nullptr;
 
-  const Router::RouteSpecificFilterConfig config;
-
-  // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
-
-  // Testing in reverse order, so that the method always returns the last object.
-  // Testing per-virtualhost typed filter config
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
-      .WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
-
-  // Cover the case of no route entry
-  ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  ON_CALL(*filter_callbacks.route_, mostSpecificPerFilterConfig(filter_name))
-      .WillByDefault(Return(&config));
-  EXPECT_EQ(&config, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
-                         filter_name, filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<TestConfig>(&filter_callbacks));
 }
 
 // Verify that merging works as expected and we get back the merged result.
@@ -1105,10 +1100,9 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   baseTestConfig.state_ = 1;
   routeTestConfig.state_ = 1;
 
-  const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
-  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(filter_name, _))
+  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
       .WillOnce(Invoke([&](const std::string&,
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(baseTestConfig);
@@ -1117,7 +1111,7 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
 
   // merge the configs
   auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
-      filter_name, filter_callbacks.route(),
+      &filter_callbacks,
       [&](TestConfig& base_cfg, const TestConfig& route_cfg) { base_cfg.merge(route_cfg); });
 
   // make sure that the callback was called (which means that the dynamic_cast worked.)

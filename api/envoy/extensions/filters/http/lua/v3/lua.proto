@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.lua.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -26,7 +27,14 @@ message Lua {
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
-  string inline_code = 1 [(validate.rules).string = {min_len: 1}];
+  //
+  // This field is deprecated. Please use
+  // :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+  // Only one of :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`
+  // or :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`
+  // can be set for the Lua filter.
+  string inline_code = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Map of named Lua source codes that can be referenced in :ref:`LuaPerRoute
   // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be
@@ -46,6 +54,30 @@ message Lua {
   //       filename: /etc/lua/world.lua
   //
   map<string, config.core.v3.DataSource> source_codes = 2;
+
+  // The default Lua code that Envoy will execute. If no per route config is provided
+  // for the request, this Lua code will be applied.
+  config.core.v3.DataSource default_source_code = 3;
+
+  // Optional additional prefix to use when emitting statistics. By default
+  // metrics are emitted in *.lua.* namespace. If multiple lua filters are
+  // configured in a filter chain, the stats from each filter instance can
+  // be emitted using custom stat prefix to distinguish emitted
+  // statistics. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: foo_script # This emits lua.foo_script.errors etc.
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: bar_script # This emits lua.bar_script.errors etc.
+  //
+  string stat_prefix = 4;
 }
 
 message LuaPerRoute {

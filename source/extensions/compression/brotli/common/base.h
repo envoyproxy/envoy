@@ -12,11 +12,12 @@ namespace Common {
 
 // Keeps a `Brotli` compression stream's state.
 struct BrotliContext {
-  BrotliContext(const uint32_t chunk_size);
+  BrotliContext(uint32_t chunk_size, uint32_t max_output_size = 0);
 
   void updateOutput(Buffer::Instance& output_buffer);
   void finalizeOutput(Buffer::Instance& output_buffer);
 
+  const uint32_t max_output_size_;
   const uint32_t chunk_size_;
   std::unique_ptr<uint8_t[]> chunk_ptr_;
   const uint8_t* next_in_;

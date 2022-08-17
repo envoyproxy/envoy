@@ -218,7 +218,7 @@ using ThreadAwareLoadBalancerPtr = std::unique_ptr<ThreadAwareLoadBalancer>;
  * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
  * it has a registered factory.
  */
-class TypedLoadBalancerFactory : public Config::UntypedFactory {
+class TypedLoadBalancerFactory : public Config::TypedFactory {
 public:
   ~TypedLoadBalancerFactory() override = default;
 

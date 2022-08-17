@@ -88,6 +88,12 @@ public:
     EXPECT_CALL(mock_posix_file_operations_, close(_))
         .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
   }
+  void TearDown() override {
+    // manager_ must be torn down before mock_posix_file_operations_ to ensure that file
+    // operations are completed before the mock is destroyed.
+    manager_ = nullptr;
+    factory_ = nullptr;
+  }
   StrictMock<Api::MockOsSysCalls> mock_posix_file_operations_;
 };
 

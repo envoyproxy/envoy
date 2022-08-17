@@ -13,7 +13,7 @@ class NullRuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createNullVm(); }
 
-  absl::string_view name() override { return "envoy.wasm.runtime.null"; }
+  std::string name() const override { return "envoy.wasm.runtime.null"; }
 };
 
 REGISTER_FACTORY(NullRuntimeFactory, WasmRuntimeFactory);

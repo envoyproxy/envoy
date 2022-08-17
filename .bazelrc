@@ -66,6 +66,9 @@ build:clang --linkopt=-fuse-ld=lld
 build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
+# Use gold linker for gcc compiler.
+build:gcc --linkopt=-fuse-ld=gold
+
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
 build:asan --config=sanitizer
@@ -285,7 +288,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3de483a98c5e24973e710b4f97b2dabcd3cb621f
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

@@ -89,9 +89,10 @@ void MessageMetadata::addEPOperation(
     const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
         local_services) {
   if (header.find(";ep=") != absl::string_view::npos) {
-    // already Contact have ep
+    // already have ep
     return;
   }
+
   auto pos = header.find(">");
   if (pos == absl::string_view::npos) {
     // no url
@@ -155,7 +156,8 @@ void MessageMetadata::addMsgHeader(HeaderType type, absl::string_view value) {
 
 std::string MessageMetadata::getDomainFromHeaderParameter(absl::string_view& header,
                                                           const std::string& parameter) {
-  if (parameter != "host") {
+  // Parameter default is host
+  if (!parameter.empty() && parameter != "host") {
     auto start = header.find(parameter);
     if (start != absl::string_view::npos) {
       // service.parameter() + "="
@@ -178,8 +180,9 @@ std::string MessageMetadata::getDomainFromHeaderParameter(absl::string_view& hea
   }
   start += strlen("sip:");
   auto end = header.find_first_of(":;>", start);
+  // TopLine should be absl::string_view::npos
   if (end == absl::string_view::npos) {
-    return "";
+    end = header.length();
   }
 
   auto addr = header.substr(start, end - start);

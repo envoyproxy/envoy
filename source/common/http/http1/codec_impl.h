@@ -197,6 +197,7 @@ public:
    * @return Network::Connection& the backing network connection.
    */
   Network::Connection& connection() { return connection_; }
+  const Network::Connection& connection() const { return connection_; }
 
   /**
    * Called when the active encoder has completed encoding the outbound half of the stream.
@@ -230,6 +231,7 @@ public:
   virtual void maybeAddSentinelBufferFragment(Buffer::Instance&) {}
   CodecStats& stats() { return stats_; }
   bool enableTrailers() const { return codec_settings_.enable_trailers_; }
+  virtual bool sendFullyQualifiedUrl() const { return codec_settings_.send_fully_qualified_url_; }
   HeaderKeyFormatterOptConstRef formatter() const {
     return makeOptRefFromPtr(encode_only_header_key_formatter_.get());
   }
@@ -314,10 +316,10 @@ private:
   virtual void allocTrailers() PURE;
 
   /**
-   * Called in order to complete an in progress header decode.
+   * Called for each header in order to complete an in progress header decode.
    * @return A status representing success.
    */
-  Status completeLastHeader();
+  Status completeCurrentHeader();
 
   /**
    * Check if header name contains underscore character.
@@ -562,7 +564,8 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count);
+                       const uint32_t max_response_headers_count,
+                       bool passing_through_proxy = false);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
 
@@ -576,6 +579,13 @@ private:
   };
 
   bool cannotHaveBody();
+
+  bool sendFullyQualifiedUrl() const override {
+    // Send fully qualified URLs either if the parent connection is configured to do so or this
+    // stream is passing through a proxy and the underlying transport is plaintext.
+    return ConnectionImpl::sendFullyQualifiedUrl() ||
+           (passing_through_proxy_ && !connection().ssl());
+  }
 
   // ParserCallbacks.
   Status onUrlBase(const char*, size_t) override { return okStatus(); }
@@ -648,6 +658,10 @@ private:
 
   // The default limit of 80 KiB is the vanilla http_parser behaviour.
   static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
+
+  // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
+  // plaintext HTTP should be sent with fully qualified URLs.
+  bool passing_through_proxy_ = false;
 };
 
 } // namespace Http1

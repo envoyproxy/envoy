@@ -7,6 +7,8 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -57,6 +59,12 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setCustomCertValidatorConfig(
+      envoy::config::core::v3::TypedExtensionConfig* custom_validator_config) {
+    custom_validator_config_ = custom_validator_config;
+    return *this;
+  }
+
   bool alpn_{};
   bool client_ecdsa_cert_{false};
   std::vector<std::string> cipher_suites_{};
@@ -67,20 +75,21 @@ struct ClientSslTransportOptions {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
   bool use_expired_spiffe_cert_{false};
   bool client_with_intermediate_cert_{false};
+  envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
 };
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
                                       ContextManager& context_manager, Api::Api& api);
 
-Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
-                                                            Api::Api& api, bool use_http3 = false);
+Network::DownstreamTransportSocketFactoryPtr
+createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool use_http3 = false);
 
-Network::TransportSocketFactoryPtr
+Network::DownstreamTransportSocketFactoryPtr
 createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
                              Server::Configuration::TransportSocketFactoryContext& factory_context);
 
@@ -88,4 +97,21 @@ Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::I
                                                        int port);
 
 } // namespace Ssl
+
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+class ContextImplPeer {
+public:
+  static const Extensions::TransportSockets::Tls::CertValidator&
+  getCertValidator(const Extensions::TransportSockets::Tls::ContextImpl& context) {
+    return *context.cert_validator_;
+  }
+};
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+
 } // namespace Envoy

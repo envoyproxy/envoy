@@ -21,7 +21,16 @@ constexpr absl::string_view AudienceValue = "http://test.com";
 constexpr absl::string_view Url = "http://metadata.google.internal/computeMetadata/v1/instance/"
                                   "service-accounts/default/identity?audience=[AUDIENCE]";
 constexpr absl::string_view MockTokenString =
-    "eyJhbGciOiJSUzI1NiIsImtpZCI6ImYxMzM4Y2EyNjgzNTg2M2Y2NzE0MDhmNDE3MzhhN2I0OWU3NDBmYzAiLCJ0eXAiO";
+    "eyJhbGciOiJSUzI1NiIsImtpZCI6ImIxYTgyNTllYjA3NjYwZWYyMzc4MWM4NWI3ODQ5YmZhMGExYzgwNmMiLCJ0eXAiOi"
+    "JKV1QifQ."
+    "eyJhdWQiOiJ3d3cuZ29vZ2xlLmNvbSIsImF6cCI6IjEwNjI3NTM0NDEzNzgyODM4MDAwOSIsImV4cCI6MTY1MjM4MjA3MS"
+    "wiaWF0IjoxNjUyMzc4NDcxLCJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJzdWIiOiIxMDYyNzUzNDQx"
+    "Mzc4MjgzODAwMDkifQ.OFAt_5aJGWs4JI4SBvs_Exhhra6si9d5W__4pSAzK7YXLA_JUuX46YWTfw6E_"
+    "5c2FvHEzGbgZkGRvuFaTtZebXALAzhpAgYpqVwWg5URI1dkjRG53kQD9dxw3IatT1xryXQP-"
+    "MONOYOaybMzbTIfbEbItRAs3ShZ32ZjQpw-pr-"
+    "om80vnCN78uBlsk4mstgI3RjhWDcvJ1Hc7UJW9QPpDOigfn9SGV9p1bjGdr9imv-"
+    "Ny1oEG72xKhYdKTYAxJCYB8I1Yh3hUL8SU43OxHqpaRJ_Sr680FnKgjXjIRL9sBeu_D8-"
+    "jkaDD39vBNKlQvlZm7p6qpOgCy0j_TxYABFQ-A";
 
 class GcpAuthnFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
@@ -71,12 +80,18 @@ public:
     });
   }
 
-  void initiateClientConnection() {
+  void initiateClientConnection(bool send_request_body = false) {
     // Create a client aimed at Envoy’s default HTTP port.
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
-    response_ = codec_client_->makeHeaderOnlyRequest(headers);
+    if (send_request_body) {
+      response_ = codec_client_->makeRequestWithBody(
+          Http::TestRequestHeaderMapImpl{
+              {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
+          "test");
+    } else {
+      response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+    }
   }
 
   void waitForGcpAuthnServerResponse() {
@@ -85,6 +100,7 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
     RELEASE_ASSERT(result, result.message());
+
     std::string final_url = absl::StrReplaceAll(Url, {{"[AUDIENCE]", AudienceValue}});
     absl::string_view host;
     absl::string_view path;
@@ -102,10 +118,12 @@ public:
     request_->encodeData(MockTokenString, true);
     result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
+    // Verify the proxied request was received upstream, as expected.
+    EXPECT_TRUE(request_->complete());
   }
 
-  // First cluster (i.e., cluster_0) is destination upstream cluster
-  void sendRequestToFirstClusterAndValidateResponse(bool with_audience) {
+  // Send the request to destination upstream cluster
+  void sendRequestToDestinationAndValidateResponse(bool with_audience) {
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -141,6 +159,19 @@ public:
     EXPECT_EQ(0U, response_->body().size());
   }
 
+  // Perform the clean-up.
+  void cleanup() {
+    if (fake_gcp_authn_connection_ != nullptr) {
+      AssertionResult result = fake_gcp_authn_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_gcp_authn_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      fake_gcp_authn_connection_.reset();
+    }
+    // Close |codec_client_| and |fake_upstream_connection_| cleanly.
+    cleanupUpstreamAndDownstream();
+  }
+
   IntegrationStreamDecoderPtr response_;
   IntegrationStreamDecoderPtr gcp_response_;
   FakeHttpConnectionPtr fake_gcp_authn_connection_{};
@@ -151,6 +182,8 @@ public:
       cluster: gcp_authn
       timeout:
         seconds: 5
+    cache_config:
+      cache_size: 100
   )EOF";
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
 };
@@ -162,20 +195,21 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
-  initiateClientConnection();
-
-  // Send the request to cluster `gcp_authn`.
-  waitForGcpAuthnServerResponse();
-
-  // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/true);
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
+    initiateClientConnection();
+    // Send the request to cluster `gcp_authn`.
+    waitForGcpAuthnServerResponse();
+    // Send the request to cluster `cluster_0` and validate the response.
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+    // Clean up the codec and connections.
+    cleanup();
+  }
 
   // Verify request has been routed to both upstream clusters.
-  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
-  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
-
-  // Perform the clean-up.
-  cleanupUpstreamAndDownstream();
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
@@ -189,14 +223,34 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
                                                          std::chrono::milliseconds(200)));
 
   // Send the request to cluster `cluster_0` and validate the response.
-  sendRequestToFirstClusterAndValidateResponse(/*with_audience=*/false);
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/false);
 
   // Verify request has been routed to `cluster_0` but not `gcp_authn` cluster.
   EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 
-  // Perform the clean-up.
-  cleanupUpstreamAndDownstream();
+  // Clean up the codec and connections.
+  cleanup();
+}
+
+// This test is sending the request with body to verify that the filter chain iteration which has
+// been stopped by `decodeHeader`'s return status will not be resumed by `decodeData`.
+TEST_P(GcpAuthnFilterIntegrationTest, SendRequestWithBody) {
+  initializeConfig(/*add_audience=*/true);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection(/*send_request_body=*/true);
+  // Send the request with long wait time to intentionally delay the response from `gcp_authn`
+  // cluster.
+  EXPECT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_,
+                                                        std::chrono::milliseconds(500000)));
+  // Send the request to `cluster_0` cluster.
+  AssertionResult assert_result = fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection_, std::chrono::milliseconds(1000));
+  // We expect the request fail to arrive at `cluster_0` because the filter chain iteration
+  // should has already been stopped by waiting for the response from `gcp_authn` cluster above.
+  RELEASE_ASSERT(!assert_result, assert_result.message());
+  // Clean up the codec and connections.
+  cleanup();
 }
 
 } // namespace

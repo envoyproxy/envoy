@@ -156,8 +156,8 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
-  // The upstream response timed out.
-  const std::string UpstreamTimeout = "upstream_response_timeout";
+  // The request was forwarded upstream but the response timed out.
+  const std::string ResponseTimeout = "response_timeout";
   // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
   // The final upstream try idle timed out.
@@ -728,6 +728,16 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * Dump the info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

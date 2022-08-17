@@ -49,4 +49,7 @@ constexpr char WaitForWholeRequestAndResponseStreamFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
+static Registry::RegisterFactory<SimpleFilterConfig<WaitForWholeRequestAndResponseStreamFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    encoder_register_upstream_;
 } // namespace Envoy

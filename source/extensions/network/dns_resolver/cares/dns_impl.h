@@ -20,6 +20,23 @@
 namespace Envoy {
 namespace Network {
 
+/**
+ * All DNS stats. @see stats_macros.h
+ */
+#define ALL_CARES_DNS_RESOLVER_STATS(COUNTER, GAUGE)                                               \
+  COUNTER(resolve_total)                                                                           \
+  GAUGE(pending_resolutions, NeverImport)                                                          \
+  COUNTER(not_found)                                                                               \
+  COUNTER(get_addr_failure)                                                                        \
+  COUNTER(timeouts)
+
+/**
+ * Struct definition for all DNS stats. @see stats_macros.h
+ */
+struct CaresDnsResolverStats {
+  ALL_CARES_DNS_RESOLVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
 class DnsResolverImplPeer;
 
 /**
@@ -31,8 +48,11 @@ public:
   DnsResolverImpl(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
       Event::Dispatcher& dispatcher,
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      Stats::Scope& root_scope);
   ~DnsResolverImpl() override;
+
+  static CaresDnsResolverStats generateCaresDnsResolverStats(Stats::Scope& scope);
 
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
@@ -131,8 +151,6 @@ private:
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
     // perform resolutions on both families concurrently.
     bool dual_resolution_ = false;
-    // Whether or not to lookup both V4 and V6 address.
-    bool lookup_all_ = false;
     // The number of outstanding pending resolutions. This should always be 0 or 1 for all lookup
     // types other than All. For all, this can be be 0-2 as both queries are issued in parallel.
     // This is used mostly for assertions but is used in the ARES_EDESTRUCTION path to make sure
@@ -167,6 +185,8 @@ private:
   // Return default AresOptions.
   AresOptions defaultAresOptions();
 
+  void chargeGetAddrInfoErrorStats(int status, int timeouts);
+
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
   ares_channel channel_;
@@ -177,6 +197,8 @@ private:
   const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
+  Stats::ScopeSharedPtr scope_;
+  CaresDnsResolverStats stats_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

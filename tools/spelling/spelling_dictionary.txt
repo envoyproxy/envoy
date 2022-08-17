@@ -26,6 +26,9 @@ BBR
 BIDIRECTIONAL
 BSON
 BPF
+Bdecoded
+Bencoded
+GiB
 Repick
 TRA
 btree
@@ -40,6 +43,7 @@ DLE
 DSR
 DSS
 EBADF
+ECH
 ENDIF
 ENOTCONN
 ENQ
@@ -51,6 +55,7 @@ ETX
 FS
 HEXDIG
 HEXDIGIT
+HPE
 LRU
 NAK
 OWS
@@ -269,6 +274,7 @@ OSI
 OSS
 OSX
 OT
+OTLP
 OU
 OVFL
 PAYLOADLEN
@@ -311,6 +317,7 @@ RFC
 RHS
 RLE
 RLS
+RLQS
 RNG
 RPC
 RSA
@@ -341,6 +348,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SIO
 SMTP
 SNI
@@ -801,6 +809,7 @@ iteratively
 javascript
 jitter
 jittered
+js
 kafka
 keepalive
 keepalives
@@ -1104,6 +1113,7 @@ retriable
 retriggers
 revalidated
 revalidation
+reverify
 rfield
 rmdir
 rocketmq
@@ -1259,6 +1269,7 @@ tokenizing
 toolchain
 traceid
 traceparent
+tracestate
 transcode
 transcoded
 transcoder
@@ -1370,4 +1381,5 @@ ElastiCache
 pinterest
 NSS
 SSLKEYLOGFILE
-
+DLB
+PCIE

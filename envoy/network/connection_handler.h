@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/filter.h"
@@ -178,10 +179,12 @@ public:
   /**
    * Obtain the rebalancer of the tcp listener.
    * @param listener_tag supplies the tag of the tcp listener that was passed to addListener().
+   * @param address is used to query the address specific handler.
    * @return BalancedConnectionHandlerOptRef the balancer attached to the listener. `nullopt` if
    * listener doesn't exist or rebalancer doesn't exist.
    */
-  virtual BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) PURE;
+  virtual BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
 
   /**
    * Obtain the rebalancer of the tcp listener.
@@ -199,11 +202,12 @@ public:
 class UdpConnectionHandler : public virtual ConnectionHandler {
 public:
   /**
-   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag``. This will be
+   * Get the ``UdpListenerCallbacks`` associated with ``listener_tag`` and ``address``. This will be
    * absl::nullopt for non-UDP listeners and for ``listener_tag`` values that have already been
    * removed.
    */
-  virtual UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) PURE;
+  virtual UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag, const Network::Address::Instance& address) PURE;
 };
 
 /**
@@ -219,6 +223,7 @@ public:
    * @param runtime the runtime for this server.
    * @param worker_index The index of the worker this listener is being created on.
    * @param parent is the owner of the created ActiveListener objects.
+   * @param listen_socket_ptr is the UDP socket.
    * @param dispatcher is used to create actual UDP listener.
    * @param config provides information needed to create ActiveUdpListener and
    * UdpListener objects.
@@ -226,8 +231,9 @@ public:
    */
   virtual ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
-                          UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                          Network::ListenerConfig& config) PURE;
+                          UdpConnectionHandler& parent,
+                          Network::SocketSharedPtr&& listen_socket_ptr,
+                          Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
 
   /**
    * @return true if the UDP passing through listener doesn't form stateful connections.

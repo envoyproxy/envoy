@@ -136,7 +136,7 @@ public:
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ClientConnectionImpl(dispatcher, remote_address, source_address,
-                             std::move(transport_socket), options) {}
+                             std::move(transport_socket), options, nullptr) {}
 
   void setTransportSocket(Network::TransportSocketPtr&& transport_socket) {
     transport_socket_ = std::move(transport_socket);
@@ -160,8 +160,8 @@ public:
 
   // Contexts needed by raw buffer and tls transport sockets.
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
-  Network::TransportSocketFactoryPtr tls_context_;
-  Network::TransportSocketFactoryPtr cleartext_context_;
+  Network::UpstreamTransportSocketFactoryPtr tls_context_;
+  Network::UpstreamTransportSocketFactoryPtr cleartext_context_;
 
   MockWatermarkBuffer* client_write_buffer_{nullptr};
   ConnectionStatusCallbacks connect_callbacks_;
@@ -203,7 +203,7 @@ void StartTlsIntegrationTest::initialize() {
 
   auto factory =
       std::make_unique<Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory>();
-  cleartext_context_ = Network::TransportSocketFactoryPtr{
+  cleartext_context_ = Network::UpstreamTransportSocketFactoryPtr{
       factory->createTransportSocketFactory(*config, factory_context_)};
 
   // Setup factories and contexts for tls transport socket.
@@ -220,7 +220,8 @@ void StartTlsIntegrationTest::initialize() {
       *dispatcher_, address, Network::Address::InstanceConstSharedPtr(),
       cleartext_context_->createTransportSocket(
           std::make_shared<Network::TransportSocketOptionsImpl>(
-              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>())),
+              absl::string_view(""), std::vector<std::string>(), std::vector<std::string>()),
+          nullptr),
       nullptr);
 
   conn_->enableHalfClose(true);
@@ -280,10 +281,10 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  conn_->setTransportSocket(
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"})));
+  conn_->setTransportSocket(tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr));
   connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -347,10 +348,10 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromUpstream) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  conn_->setTransportSocket(
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"})));
+  conn_->setTransportSocket(tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr));
   connect_callbacks_.reset();
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

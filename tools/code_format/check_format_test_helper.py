@@ -18,7 +18,8 @@ import tempfile
 curr_dir = os.path.dirname(os.path.realpath(__file__))
 tools = os.path.dirname(curr_dir)
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = sys.executable + " " + os.path.join(curr_dir, 'check_format.py')
+check_format = f"{sys.executable}  {os.path.join(curr_dir, 'check_format.py')}"
+check_format_config = f"{os.path.join(curr_dir, 'config.yaml')}"
 errors = 0
 
 
@@ -26,7 +27,7 @@ errors = 0
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
 def run_check_format(operation, filename):
-    command = check_format + " " + operation + " " + filename
+    command = f"{check_format} {operation} {filename} --config_path={check_format_config}"
     status, stdout, stderr = run_command(command)
     return (command, status, stdout + stderr)
 
@@ -121,7 +122,7 @@ def check_tool_not_found_error():
     # Temporarily change PATH to test the error about lack of external tools.
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = "/sbin:/usr/sbin"
-    clang_format = os.getenv("CLANG_FORMAT", "clang-format-11")
+    clang_format = os.getenv("CLANG_FORMAT", "clang-format")
     # If CLANG_FORMAT points directly to the binary, skip this test.
     if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
         os.environ["PATH"] = oldPath
@@ -173,7 +174,7 @@ def run_checks():
     errors += check_unfixable_error("system_clock.cc", real_time_inject_error)
     errors += check_unfixable_error("steady_clock.cc", real_time_inject_error)
     errors += check_unfixable_error(
-        "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
+        "unpack_to.cc", "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
     errors += check_unfixable_error(
         "condvar_wait_for.cc", "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.")
     errors += check_unfixable_error("sleep.cc", real_time_inject_error)
@@ -221,9 +222,6 @@ def run_checks():
     errors += check_unfixable_error("clang_format_double_off.cc", "clang-format nested off")
     errors += check_unfixable_error("clang_format_trailing_off.cc", "clang-format remains off")
     errors += check_unfixable_error("clang_format_double_on.cc", "clang-format nested on")
-    errors += fix_file_expecting_failure(
-        "api/missing_package.proto",
-        "Unable to find package name for proto file: ./api/missing_package.proto")
     errors += check_unfixable_error(
         "proto_enum_mangling.cc", "Don't use mangled Protobuf names for enum constants")
     errors += check_unfixable_error(

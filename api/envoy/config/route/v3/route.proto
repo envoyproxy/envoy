@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -36,10 +36,10 @@ message RouteConfiguration {
   repeated VirtualHost virtual_hosts = 2;
 
   // An array of virtual hosts will be dynamically loaded via the VHDS API.
-  // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used
-  // for a base routing table or for infrequently changing virtual hosts. *vhds* is used for
+  // Both ``virtual_hosts`` and ``vhds`` fields will be used when present. ``virtual_hosts`` can be used
+  // for a base routing table or for infrequently changing virtual hosts. ``vhds`` is used for
   // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
-  // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
+  // generate a routing table for a given RouteConfiguration, with ``vhds`` derived configuration
   // taking precedence.
   Vhds vhds = 9;
 
@@ -122,7 +122,7 @@ message RouteConfiguration {
 
   // A list of plugins and their configurations which may be used by a
   // :ref:`cluster specifier plugin name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin>`
-  // within the route. All *extension.name* fields in this list must be unique.
+  // within the route. All ``extension.name`` fields in this list must be unique.
   repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
 
   // Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
@@ -134,6 +134,12 @@ message RouteConfiguration {
   // NOTE: this option will not strip the port number (if any) contained in route config
   // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
   bool ignore_port_in_host_matching = 14;
+
+  // Ignore path-parameters in path-matching.
+  // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
+  // Envoy by default takes ":path" as "<path>;<params>".
+  // For users who want to only match path on the "<path>" portion, this option should be true.
+  bool ignore_path_parameters_in_path_matching = 15;
 }
 
 message Vhds {
