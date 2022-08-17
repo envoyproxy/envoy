@@ -520,7 +520,7 @@ class RstFormatVisitor(visitor.Visitor):
             formatted_leading_comment=self._comment(
                 ctx.leading_comment,
                 field.options.HasExtension(xds_status_pb2.field_status)
-                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress),
+                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress).strip(),
             formatted_oneof_comment=formatted_oneof_comment,
             security_options=security_options)
 
