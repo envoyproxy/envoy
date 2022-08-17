@@ -965,6 +965,8 @@ private:
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
+  // This is null if there is no downstream connection, e.g. for health check or
+  // async requests.
   const Network::Connection* connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;

@@ -337,6 +337,9 @@ void UpstreamRequest::cleanUp() {
     --downstream_data_disabled_;
   }
   if (allow_upstream_filters_) {
+    // The upstream filter chain callbacks own headers/trailers while they are traversing the filter
+    // chain. Make sure to not delete them immediately when the stream ends, as the stream often
+    // ends during filter chain processing and it causes use-after-free violations.
     parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
   }
 }
@@ -464,6 +467,10 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   ASSERT(!router_sent_end_stream_);
   router_sent_end_stream_ = end_stream;
 
+  // Kick off creation of the upstream connection immediately upon receiving headers.
+  // In future it may be possible for upstream filters to delay this, or influence connection
+  // creation but for now optimize for minimal latency and fetch the connection
+  // as soon as possible.
   conn_pool_->newStream(this);
   if (!allow_upstream_filters_) {
     return;
@@ -493,7 +500,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   filter_manager_->requestHeadersInitialized();
-  //  filter_manager_.setDownstreamRemoteAddress(mutate_result.final_remote_address);
   filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
   filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
 }

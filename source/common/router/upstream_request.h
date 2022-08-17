@@ -45,7 +45,7 @@ class CodecFilter;
  * and forwards the router's headers, buffered body, buffered metadata, and
  * router's trailers to the |upstream_| once the stream is established.
  *
- * In 'classic; mode, when the stream is established, the UpstreamRequest
+ * In 'classic' mode, when the stream is established, the UpstreamRequest
  * handles upstream data by directly implementing UpstreamToDownstream. As
  * upstream headers/body/metadata/trailers are received, they are forwarded
  * directly to the router via the RouterFilterInterface |parent_|

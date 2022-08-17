@@ -1601,6 +1601,8 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     }
   }
 
+  // Defer deletion as this is generally called under the stack of the upstream
+  // request, and immediate deletion is dangerous.
   callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
   cleanup();
 }
