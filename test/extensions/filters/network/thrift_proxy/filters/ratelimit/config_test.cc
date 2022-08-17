@@ -31,7 +31,7 @@ TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(
       RateLimitFilterConfig().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::rateLimit(),
+          envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit(),
           "stats", context),
       ProtoValidationException);
 }
