@@ -14,8 +14,8 @@ namespace RateLimitQuota {
 class RateLimitClient {
 public:
   virtual ~RateLimitClient() = default;
-  // TODO(tyxia) How to defint this interface call
-  virtual void RateLimit() PURE;
+  // TODO(tyxia) How to define this interface call
+  virtual void rateLimit() PURE;
 };
 
 } // namespace RateLimitQuota

@@ -7,6 +7,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +15,7 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 
 using FilterConfigSharedPtr = std::shared_ptr<
-    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>;
+    const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>;
 
 /**
  * TODO(tyxia) Placeholder!!!
@@ -33,14 +34,13 @@ public:
                        RateLimitClientPtr client)
       : config_(std::move(config)), rate_limit_client_(std::move(client)) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
 
   ~RateLimitQuotaFilter() override = default;
 
 private:
   FilterConfigSharedPtr config_;
+  // TODO(tyxia) Rate limit client is a member of rate limit filter.
   RateLimitClientPtr rate_limit_client_;
 };
 

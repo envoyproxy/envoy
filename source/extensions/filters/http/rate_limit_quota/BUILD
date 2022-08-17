@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":client_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -59,5 +60,6 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
+        "//source/common/tracing:http_tracer_lib",
     ],
 )
