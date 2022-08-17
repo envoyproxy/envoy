@@ -11,6 +11,13 @@ namespace Compression {
 namespace Igzip {
 namespace Compressor {
 
+const uint64_t memory_sizes[15] = {
+    ISAL_DEF_LVL1_MIN,         ISAL_DEF_LVL1_SMALL,       ISAL_DEF_LVL1_MEDIUM,
+    ISAL_DEF_LVL1_LARGE,       ISAL_DEF_LVL1_EXTRA_LARGE, ISAL_DEF_LVL2_MIN,
+    ISAL_DEF_LVL2_SMALL,       ISAL_DEF_LVL2_MEDIUM,      ISAL_DEF_LVL2_LARGE,
+    ISAL_DEF_LVL2_EXTRA_LARGE, ISAL_DEF_LVL3_MIN,         ISAL_DEF_LVL3_SMALL,
+    ISAL_DEF_LVL3_MEDIUM,      ISAL_DEF_LVL3_LARGE,       ISAL_DEF_LVL3_EXTRA_LARGE};
+
 /**
  * Implementation of compressor's interface.
  */

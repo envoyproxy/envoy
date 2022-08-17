@@ -40,59 +40,13 @@ void IgzipCompressorImpl::init(CompressionLevel comp_level, int64_t window_bits,
     zstream_ptr_->level = 3;
   }
 
-  uint64_t buf_size = 0;
   uint64_t joint_index = (zstream_ptr_->level - 1) * 5 + memory_level - 1;
-  switch (joint_index) {
-  case 0:
-    buf_size = ISAL_DEF_LVL1_MIN;
-    break;
-  case 1:
-    buf_size = ISAL_DEF_LVL1_SMALL;
-    break;
-  case 2:
-    buf_size = ISAL_DEF_LVL1_MEDIUM;
-    break;
-  case 3:
-    buf_size = ISAL_DEF_LVL1_LARGE;
-    break;
-  case 4:
-    buf_size = ISAL_DEF_LVL1_EXTRA_LARGE;
-    break;
-  case 5:
-    buf_size = ISAL_DEF_LVL2_MIN;
-    break;
-  case 6:
-    buf_size = ISAL_DEF_LVL2_SMALL;
-    break;
-  case 7:
-    buf_size = ISAL_DEF_LVL2_MEDIUM;
-    break;
-  case 8:
-    buf_size = ISAL_DEF_LVL2_LARGE;
-    break;
-  case 9:
-    buf_size = ISAL_DEF_LVL2_EXTRA_LARGE;
-    break;
-  case 10:
-    buf_size = ISAL_DEF_LVL3_MIN;
-    break;
-  case 11:
-    buf_size = ISAL_DEF_LVL3_SMALL;
-    break;
-  case 12:
-    buf_size = ISAL_DEF_LVL3_MEDIUM;
-    break;
-  case 13:
-    buf_size = ISAL_DEF_LVL3_LARGE;
-    break;
-  case 14:
-    buf_size = ISAL_DEF_LVL3_EXTRA_LARGE;
-    break;
-  default:
-    buf_size = ISAL_DEF_LVL3_EXTRA_LARGE;
+  if (joint_index >= 15) {
+    joint_index = 14;
   }
-  zstream_ptr_->level_buf = static_cast<uint8_t*>(malloc(buf_size));
-  zstream_ptr_->level_buf_size = buf_size;
+
+  zstream_ptr_->level_buf_size = memory_sizes[joint_index];
+  zstream_ptr_->level_buf = static_cast<uint8_t*>(malloc(zstream_ptr_->level_buf_size));
   initialized_ = true;
 }
 
