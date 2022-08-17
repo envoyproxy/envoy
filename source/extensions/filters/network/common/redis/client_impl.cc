@@ -55,10 +55,10 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const Config& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope,
-                             bool is_transaction_client) {
-  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
-                                             config, redis_command_stats, scope, is_transaction_client);
+                             Stats::Scope& scope, bool is_transaction_client) {
+  auto client =
+      std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
+                                   redis_command_stats, scope, is_transaction_client);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -314,11 +314,10 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password,
-                                    bool is_transaction_client) {
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
-                                        decoder_factory_, config, redis_command_stats, scope,
-                                        is_transaction_client);
+                                    const std::string& auth_password, bool is_transaction_client) {
+  ClientPtr client =
+      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
+                         redis_command_stats, scope, is_transaction_client);
   client->initialize(auth_username, auth_password);
   return client;
 }

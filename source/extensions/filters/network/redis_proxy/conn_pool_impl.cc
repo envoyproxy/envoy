@@ -70,7 +70,8 @@ void InstanceImpl::init() {
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
                           Common::Redis::Client::Transaction& transaction) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks, transaction);
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks,
+                                                       transaction);
 }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
@@ -252,11 +253,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           transaction.active_ ?
-                                                             Common::Redis::Client::ReadPolicy::Primary :
-                                                             config_->readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
 
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
@@ -267,8 +266,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.client_ =
-      client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                              auth_username_, auth_password_, true);
+        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                               auth_username_, auth_password_, true);
     transaction.client_->addConnectionCallbacks(transaction.parent_);
     transaction.connection_established_ = true;
   }
@@ -277,8 +276,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   PendingRequest& pending_request = pending_requests_.back();
 
   if (!transaction.active_) {
-    pending_request.request_handler_ = this->threadLocalActiveClient(host)->redis_client_->makeRequest(
-        getRequest(pending_request.incoming_request_), pending_request);
+    pending_request.request_handler_ =
+        this->threadLocalActiveClient(host)->redis_client_->makeRequest(
+            getRequest(pending_request.incoming_request_), pending_request);
   } else {
     pending_request.request_handler_ = transaction.client_->makeRequest(
         getRequest(pending_request.incoming_request_), pending_request);

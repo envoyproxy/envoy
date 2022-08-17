@@ -111,9 +111,7 @@ private:
       parent_.onResponse(*this, std::move(value));
     }
 
-    Common::Redis::Client::Transaction& transaction() override {
-      return parent_.transaction();
-    }
+    Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
 
     ProxyFilter& parent_;
     Common::Redis::RespValuePtr pending_response_;

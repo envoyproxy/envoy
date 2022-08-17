@@ -72,8 +72,7 @@ public:
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const Config& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                          Stats::Scope& scope,
-                          bool is_transaction_client);
+                          Stats::Scope& scope, bool is_transaction_client);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const Config& config,
@@ -155,8 +154,7 @@ public:
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                    const Config& config, const RedisCommandStatsSharedPtr& redis_command_stats,
                    Stats::Scope& scope, const std::string& auth_username,
-                   const std::string& auth_password,
-                   bool is_transaction_client) override;
+                   const std::string& auth_password, bool is_transaction_client) override;
 
   static ClientFactoryImpl instance_;
 

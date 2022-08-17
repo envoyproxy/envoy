@@ -210,8 +210,7 @@ public:
                            const Config& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password,
-                           bool is_transaction_client) PURE;
+                           const std::string& auth_password, bool is_transaction_client) PURE;
 };
 
 // A MULTI command sent when starting a transaction.
@@ -228,37 +227,35 @@ public:
 
 // A class repsenting a Redis transaction.
 class Transaction {
-  public:
-    Transaction(Network::ConnectionCallbacks& parent) :
-      active_(false), connection_established_(false),
-      should_close_(false), client_(nullptr), parent_(parent) {}
-    ~Transaction() {
-      if (connection_established_) {
-        client_->close();
-        connection_established_ = false;
-      }
+public:
+  Transaction(Network::ConnectionCallbacks& parent)
+      : active_(false), connection_established_(false), should_close_(false), client_(nullptr),
+        parent_(parent) {}
+  ~Transaction() {
+    if (connection_established_) {
+      client_->close();
+      connection_established_ = false;
     }
+  }
 
-    void start() {
-      active_ = true;
+  void start() { active_ = true; }
+
+  void close() {
+    active_ = false;
+    key_.clear();
+    if (connection_established_) {
+      client_->close();
+      connection_established_ = false;
     }
+    should_close_ = false;
+  }
 
-    void close() {
-      active_ = false;
-      key_.clear();
-      if (connection_established_) {
-        client_->close();
-        connection_established_ = false;
-      }
-      should_close_ = false;
-    }
-
-    bool active_;
-    bool connection_established_;
-    bool should_close_;
-    std::string key_;
-    ClientPtr client_;
-    Network::ConnectionCallbacks& parent_;
+  bool active_;
+  bool connection_established_;
+  bool should_close_;
+  std::string key_;
+  ClientPtr client_;
+  Network::ConnectionCallbacks& parent_;
 };
 
 } // namespace Client
