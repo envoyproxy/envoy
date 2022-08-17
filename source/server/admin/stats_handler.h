@@ -23,23 +23,17 @@ class StatsHandler : public HandlerContextBase {
 public:
   StatsHandler(Server::Instance& server);
 
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerResetCounters(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookups(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
-                                            Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsClear(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
-                                              Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsDisable(Http::ResponseHeaderMap& response_headers,
                                               Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
-                                             Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerPrometheusStats(Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
 
   /**
@@ -75,8 +69,7 @@ public:
                                const Stats::CustomStatNamespaces& custom_namespaces,
                                const StatsParams& params, Buffer::Instance& response);
 
-  Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerContention(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
   /**
@@ -92,7 +85,7 @@ public:
 
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
-  Admin::RequestPtr makeRequest(absl::string_view path, AdminStream&);
+  Admin::RequestPtr makeRequest(AdminStream&);
   // static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
   //                                     StatsRequest::UrlHandlerFn url_handler_fn);
 

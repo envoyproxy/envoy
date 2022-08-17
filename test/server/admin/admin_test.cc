@@ -100,8 +100,9 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -199,7 +200,7 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+  auto callback = [](AdminStream&) -> Admin::RequestPtr {
     Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
@@ -267,8 +268,9 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -276,8 +278,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",

@@ -72,9 +72,9 @@ public:
  * done in the RouteConfigProviderManagerImpl constructor in source/common/router/rds_impl.cc.
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
-  [this](absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,              \
-         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
-    return X(path_and_query, response_headers, data, admin_stream);                                \
+  [this](Http::ResponseHeaderMap& response_headers, Buffer::Instance& data,                        \
+         Server::AdminStream& admin_stream) -> Http::Code {                                        \
+    return X(response_headers, data, admin_stream);                                                \
   }
 
 /**
@@ -152,7 +152,7 @@ public:
   /**
    * Lambda to generate a Request.
    */
-  using GenRequestFn = std::function<RequestPtr(absl::string_view path, AdminStream&)>;
+  using GenRequestFn = std::function<RequestPtr(AdminStream&)>;
 
   /**
    * Individual admin handler including prefix, help text, and callback.
@@ -176,9 +176,9 @@ public:
    * its data.
    * @return Http::Code the response code.
    */
-  using HandlerCb = std::function<Http::Code(
-      absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
-      Buffer::Instance& response, AdminStream& admin_stream)>;
+  using HandlerCb =
+      std::function<Http::Code(Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream& admin_stream)>;
 
   /**
    * Add a legacy admin handler where the entire response is written in
