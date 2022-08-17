@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 #include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"

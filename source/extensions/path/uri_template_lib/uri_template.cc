@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 #include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -145,8 +145,8 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   }
 
   std::string rewritten_url;
-  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment&
-           segment : rewrite_pattern.segments()) {
+  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment& segment :
+       rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());
     } else if (segment.has_var_index()) {

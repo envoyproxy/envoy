@@ -321,8 +321,8 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(urlPattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments>
-      rewrite_proto = parseRewritePattern(rewritePattern(), regex.value());
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite_proto =
+      parseRewritePattern(rewritePattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
   absl::StatusOr<std::string> rewritten_url =
