@@ -273,13 +273,17 @@ class RstFormatVisitor(visitor.Visitor):
     def _comment(self, comment, show_wip_warning=False):
         """Format a comment string with additional RST for annotations.
         """
-        return self.tpl_comment.render(
+        comment = self.tpl_comment.render(
             comment=annotations.without_annotations(comment.raw),
             wip_warning=WIP_WARNING if show_wip_warning else "",
             extension=(
                 self._extension(extension) if
                 (extension := comment.annotations.get(annotations.EXTENSION_ANNOTATION)) else ""),
             categories=self._extension_categories(comment))
+        return (
+            comment.strip()
+            if not comment.strip()
+            else comment)
 
     def _enum(self, index, ctx, enum_value) -> Dict:
         """Format a EnumValueDescriptorProto as RST definition list item.
@@ -520,7 +524,7 @@ class RstFormatVisitor(visitor.Visitor):
             formatted_leading_comment=self._comment(
                 ctx.leading_comment,
                 field.options.HasExtension(xds_status_pb2.field_status)
-                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress).strip(),
+                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress),
             formatted_oneof_comment=formatted_oneof_comment,
             security_options=security_options)
 
