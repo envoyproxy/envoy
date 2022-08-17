@@ -1,4 +1,5 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_library", "android_local_test")
+load("@build_bazel_rules_android//android:rules.bzl", "android_library")
+load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("@io_bazel_rules_kotlin//kotlin:jvm.bzl", "kt_jvm_test")
 load("//bazel:kotlin_lib.bzl", "native_lib_name")
 
@@ -78,7 +79,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         exports = deps,
         testonly = True,
     )
-    android_local_test(
+    kt_android_local_test(
         name = name,
         srcs = srcs,
         data = native_deps,
