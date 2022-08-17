@@ -17,10 +17,10 @@
 
 {{ msg.field_name }}
   ({{ pretty_label_names[msg.field.label] }}{{ msg.comment }}{% if msg.field_annotations %}, {{ msg.field_annotations }}{% endif %}) {{ msg.formatted_leading_comment | indent(2)}}
-
 {%- if msg.formatted_oneof_comment %}
   {{ msg.formatted_oneof_comment | indent(2) }}
-{%- endif -%}
+{%- endif %}
+
 {%- if msg.security_options %}
 {%- for section in msg.security_options %}
 {%- if loop.index0 == 0 %}

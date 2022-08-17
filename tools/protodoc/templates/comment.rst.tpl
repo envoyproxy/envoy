@@ -3,7 +3,7 @@
 {{ wip_warning }}
 {%- endif -%}
 {%- if extension %}
-{{ extension | indent(10) }}
+{{ extension }}
 {%- endif -%}
 {%- if categories %}
 {% for category in categories %}

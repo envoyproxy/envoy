@@ -321,6 +321,7 @@ class RstFormatVisitor(visitor.Visitor):
             security_posture = self.extension_security_postures[
                 extension_metadata['security_posture']].strip()
             categories = extension_metadata["categories"]
+            type_urls = extension_metadata.get("type_urls", [])
         except KeyError as e:
             sys.stderr.write(
                 f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
@@ -333,7 +334,8 @@ class RstFormatVisitor(visitor.Visitor):
             contrib=contrib,
             status=status,
             security_posture=security_posture,
-            categories=categories)
+            categories=categories,
+            type_urls=type_urls)
         return f"{rendered_ext}\n"
 
     def _extension_categories(self, comment):
@@ -482,6 +484,11 @@ class RstFormatVisitor(visitor.Visitor):
         if self._field_is_required(field):
             field_annotations = ['*REQUIRED*']
 
+        formatted_leading_comment = self._comment(
+            ctx.leading_comment,
+            field.options.HasExtension(xds_status_pb2.field_status)
+            and field.options.Extensions[xds_status_pb2.field_status].work_in_progress)
+
         if field.HasField('oneof_index'):
             oneof_context = outer_ctx.extend_oneof(
                 field.oneof_index, ctx.oneof_names[field.oneof_index])
@@ -489,6 +496,10 @@ class RstFormatVisitor(visitor.Visitor):
                 return {}
             oneof_comment = oneof_context.leading_comment
             formatted_oneof_comment = self._comment(oneof_comment)
+            formatted_leading_comment = (
+                formatted_leading_comment.strip()
+                if not formatted_leading_comment.strip()
+                else formatted_leading_comment)
 
             # If the oneof only has one field and marked required, mark the field as required.
             if len(ctx.oneof_fields[field.oneof_index]) == 1 and ctx.oneof_required[
@@ -517,10 +528,7 @@ class RstFormatVisitor(visitor.Visitor):
             field_name=field.name,
             comment=self._field_type(ctx.map_typenames, field.type, field.type_name),
             field_annotations=",".join(field_annotations),
-            formatted_leading_comment=self._comment(
-                ctx.leading_comment,
-                field.options.HasExtension(xds_status_pb2.field_status)
-                and field.options.Extensions[xds_status_pb2.field_status].work_in_progress),
+            formatted_leading_comment=formatted_leading_comment,
             formatted_oneof_comment=formatted_oneof_comment,
             security_options=security_options)
 
@@ -568,7 +576,7 @@ class RstFormatVisitor(visitor.Visitor):
             and file_proto.options.Extensions[udpa_status_pb2.file_status].work_in_progress) or (
                 file_proto.options.HasExtension(xds_status_pb2.file_status)
                 and file_proto.options.Extensions[xds_status_pb2.file_status].work_in_progress))
-        return ([WIP_WARNING] if _warnings else [])
+        return (WIP_WARNING if _warnings else "")
 
 
 def main():
