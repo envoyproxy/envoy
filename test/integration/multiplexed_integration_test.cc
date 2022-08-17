@@ -2020,6 +2020,13 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
 }
 
 TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
@@ -2041,6 +2048,13 @@ TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
 }
 
 TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2077,6 +2091,13 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
 // HTTP/2 and HTTP/3 don't support 101 SwitchProtocol response code, the client should
 // reset the request.
 TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });

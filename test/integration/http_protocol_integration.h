@@ -66,6 +66,20 @@ public:
     setDownstreamProtocol(GetParam().downstream_protocol);
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
+
+  enum class SkipOnStream { Upstream, Downstream, AnyStream };
+
+  bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
+#ifdef ENVOY_ENABLE_UHV
+    return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+           (stream == SkipOnStream::AnyStream ||
+            (stream == SkipOnStream::Downstream &&
+             downstreamProtocol() == Http::CodecType::HTTP2) ||
+            (stream == SkipOnStream::Upstream && upstreamProtocol() == Http::CodecType::HTTP2));
+#endif
+
+    return false;
+  }
 };
 
 class UpstreamDownstreamIntegrationTest
@@ -112,6 +126,7 @@ public:
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
     testing_downstream_filter_ = std::get<1>(GetParam());
   }
+
   bool testing_downstream_filter_;
 };
 

@@ -1960,6 +1960,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "typed_metadata_integration_proto",
+    srcs = ["typed_metadata_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "typed_metadata_integration_test",
     srcs = [
@@ -1967,9 +1972,11 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        ":typed_metadata_integration_proto_cc_proto",
         "//source/common/protobuf",
         "//test/integration/filters:listener_typed_metadata_filter_lib",
         "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

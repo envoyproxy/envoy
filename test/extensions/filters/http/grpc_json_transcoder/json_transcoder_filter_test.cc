@@ -476,6 +476,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, EmptyRoute) {
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+  EXPECT_FALSE(filter_.shouldTranscodeResponse());
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, EmptyRouteEntry) {
@@ -483,6 +484,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, EmptyRouteEntry) {
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+  EXPECT_FALSE(filter_.shouldTranscodeResponse());
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
@@ -495,6 +497,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, PerRouteDisabledConfigOverride) {
       .WillByDefault(Return(&route_config));
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
+  EXPECT_FALSE(filter_.shouldTranscodeResponse());
 }
 
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
@@ -520,6 +523,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
 
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
+  EXPECT_FALSE(filter_.shouldTranscodeResponse());
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -588,6 +592,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   bookstore::Shelf response;
   response.set_id(20);
   response.set_theme("Children");
+  EXPECT_TRUE(filter_.shouldTranscodeResponse());
 
   auto response_data = Grpc::Common::serializeToGrpcFrame(response);
 
@@ -638,7 +643,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
-
+  EXPECT_TRUE(filter_.shouldTranscodeResponse());
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
