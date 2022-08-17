@@ -36,7 +36,6 @@
 
 using testing::_;
 using testing::ByMove;
-using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;
@@ -2100,9 +2099,9 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
         return Network::FilterStatus::StopIteration;
       }));
   Network::MockIoHandle io_handle;
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
 
   Event::FileReadyCb file_event_callback;
   EXPECT_CALL(io_handle,
