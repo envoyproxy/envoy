@@ -43,7 +43,6 @@ HTTP filters
   on_demand_updates_filter
   original_src_filter
   rate_limit_filter
-  rate_limit_quota_filter
   rbac_filter
   router_filter
   set_metadata_filter

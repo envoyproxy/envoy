@@ -25,6 +25,7 @@ void RateLimitClientImpl::rateLimit() {
 }
 
 bool RateLimitClientImpl::startStream() {
+  // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     Http::AsyncClient::StreamOptions options;
     stream_ = aync_client_.start(
@@ -32,9 +33,10 @@ bool RateLimitClientImpl::startStream() {
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
         *this, options);
     if (stream_ == nullptr) {
-      ENVOY_LOG(warn, "Unable to establish new stream");
+      ENVOY_LOG(error, "Unable to establish the new stream");
       return false;
       // TODO(tyxia) Error handling
+      // re-try or other kinds of error handling actions
     }
   }
   return true;
