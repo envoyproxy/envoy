@@ -52,7 +52,7 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   if (route_entry->connectConfig().has_value()) {
     Buffer::OwnedImpl data;
     auto& connect_config = route_entry->connectConfig().value();
-    if (connect_config.has_proxy_protocol_config() && upstream_request_->connection()) {
+    if (connect_config.has_proxy_protocol_config() && upstream_request_->connection().has_value()) {
       Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
           connect_config.proxy_protocol_config(), *upstream_request_->connection(), data);
     }

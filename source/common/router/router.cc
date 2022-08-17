@@ -54,7 +54,7 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
   if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
-  if (connection && !connection->ssl()) {
+  if (connection.has_value() && !connection->ssl()) {
     return true;
   }
   return false;
