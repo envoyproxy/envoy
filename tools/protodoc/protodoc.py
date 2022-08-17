@@ -576,7 +576,7 @@ class RstFormatVisitor(visitor.Visitor):
             and file_proto.options.Extensions[udpa_status_pb2.file_status].work_in_progress) or (
                 file_proto.options.HasExtension(xds_status_pb2.file_status)
                 and file_proto.options.Extensions[xds_status_pb2.file_status].work_in_progress))
-        return ([WIP_WARNING] if _warnings else [])
+        return (WIP_WARNING if _warnings else "")
 
 
 def main():
