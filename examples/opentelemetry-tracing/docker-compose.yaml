@@ -1,0 +1,60 @@
+version: "3.8"
+services:
+
+  # base images
+  flask_service:
+    build:
+      context: ../shared/flask
+    image: flask_service:python-3.10-slim-bullseye
+    restart: "no"
+    deploy:
+      replicas: 0
+
+  tracing:
+    build:
+      context: ../shared/tracing
+    image: envoyproxy:tracing
+    restart: "no"
+    deploy:
+      replicas: 0
+
+  # Front envoy
+  front-envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-frontenvoy
+    ports:
+    - "${PORT_PROXY:-8000}:8000"
+    - "${PORT_PROXY_ADMIN:-8001}:8001"
+
+  service1:
+    build:
+      context: ../shared/tracing
+    volumes:
+    - ./service1-envoy-opentelemetry.yaml:/etc/service-envoy.yaml
+    environment:
+    - SERVICE_NAME=1
+    ports:
+    - "8002:8002"
+
+  service2:
+    build:
+      context: ../shared/tracing
+    volumes:
+    - ./service2-envoy-opentelemetry.yaml:/etc/service-envoy.yaml
+    environment:
+    - SERVICE_NAME=2
+    ports:
+    - "8003:8003"
+
+  opentelemetry-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile-opentelemetry-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+    - "${PORT_UI:-16686}:16686"
+    - "4317:4317"   # OTLP gRPC receiver
+
