@@ -423,10 +423,11 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
-    Address::EnvoyInternalInstance address("internal_address");
+    Address::EnvoyInternalInstance address("internal_address", "endpoint_id");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_TRUE(proto_address.has_envoy_internal_address());
     EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
+    EXPECT_EQ("endpoint_id", proto_address.envoy_internal_address().endpoint_id());
   }
 }
 

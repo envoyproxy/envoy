@@ -112,9 +112,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  void createFilterChain(Http::FilterChainManager& manager) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&) override {
+                                Http::FilterChainManager&) const override {
     return false;
   }
 
@@ -203,7 +203,7 @@ public:
   void closeSocket();
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() {
+  GenRequestFn createRequestFunction() const {
     return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> RequestPtr {
       return makeRequest(path_and_query, admin_stream);
     };
@@ -223,7 +223,7 @@ private:
   /**
    * Creates a Request from a url.
    */
-  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream) const;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
@@ -348,7 +348,7 @@ private:
   Http::Code handlerHelp(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
-  void getHelp(Buffer::Instance& response);
+  void getHelp(Buffer::Instance& response) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -384,10 +384,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      ASSERT(parent_.socket_factories_.size() == 1);
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
@@ -477,6 +473,7 @@ private:
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;
+  Server::TcmallocProfilingHandler tcmalloc_profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
   Server::ServerCmdHandler server_cmd_handler_;

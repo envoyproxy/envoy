@@ -18,6 +18,14 @@ using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 
 AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      proto_config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
