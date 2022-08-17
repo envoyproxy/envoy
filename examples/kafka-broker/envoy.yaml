@@ -9,7 +9,7 @@ static_resources:
       - name: envoy.filters.network.kafka_broker
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
-          stat_prefix: exampleprefix
+          stat_prefix: kafka_broker
       - name: envoy.filters.network.tcp_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
@@ -27,7 +27,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1 # Kafka broker's host
+                address: kafka-server # Kafka broker's host
                 port_value: 9092 # Kafka broker's port.
 
 admin:
