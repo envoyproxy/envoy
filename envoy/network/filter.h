@@ -272,20 +272,6 @@ public:
   virtual ConnectionSocket& socket() PURE;
 
   /**
-   * @return the Dispatcher for issuing events.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * If a filter stopped filter iteration by returning FilterStatus::StopIteration,
-   * the filter should call continueFilterChain(true) when complete to continue the filter chain,
-   * or continueFilterChain(false) if the filter execution failed and the connection must be
-   * closed.
-   * @param success boolean telling whether the filter execution was successful or not.
-   */
-  virtual void continueFilterChain(bool success) PURE;
-
-  /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value the struct to set on the namespace. A merge will be performed with new values for

@@ -83,8 +83,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
-  Event::Dispatcher& dispatcher() override;
-  void continueFilterChain(bool success) override;
+  void continueFilterChain(bool success);
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_->dynamicMetadata();
