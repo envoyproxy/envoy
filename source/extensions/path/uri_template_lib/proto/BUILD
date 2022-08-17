@@ -6,7 +6,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Wildcard & Pattern Matching Proto
+# Wildcard & Uri Pattern Matching Proto
 
 envoy_extension_package()
 

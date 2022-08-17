@@ -6,7 +6,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Wildcard & Pattern Matching
+# Wildcard & Uri Pattern Matching
 
 envoy_extension_package()
 
