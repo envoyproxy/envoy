@@ -4,8 +4,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -15,7 +15,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 
 namespace {
 
@@ -87,8 +87,8 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
   const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments expectedProto() const {
-    envoy::extensions::pattern_template::PatternTemplateRewriteSegments expected_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments expectedProto() const {
+    envoy::extensions::uri_template::UriTemplateRewriteSegments expected_proto;
     Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
     return expected_proto;
   }
@@ -148,7 +148,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
                          })));
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
-  absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments> rewrite =
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite =
       parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
   // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
@@ -171,8 +171,8 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 class RewriteUrlTemplateSuccess
     : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewriteProto() const {
-    envoy::extensions::pattern_template::PatternTemplateRewriteSegments proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewriteProto() const {
+    envoy::extensions::uri_template::UriTemplateRewriteSegments proto;
     Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
     return proto;
   }
@@ -236,7 +236,7 @@ TEST_P(RewriteUrlTemplateSuccess, RewriteUrlTemplateSuccessTest) {
 }
 
 TEST(RewriteUrlTemplateFailure, BadRegex) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -251,7 +251,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexNoMatch) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -266,7 +266,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexZero) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -280,7 +280,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -321,7 +321,7 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(urlPattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments>
       rewrite_proto = parseRewritePattern(rewritePattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
@@ -364,6 +364,6 @@ TEST_P(URLPatternMatchAndRewrite, IsValidSharedVariableSet) {
 
 } // namespace
 
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

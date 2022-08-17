@@ -1,4 +1,4 @@
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
 
 #include <map>
 #include <string>
@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
-#include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
+#include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -16,7 +16,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 
 using Internal::ParsedUrlPattern;
 
@@ -77,9 +77,9 @@ absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::str
   return result;
 }
 
-absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
+absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments>
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments parsed_pattern;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments parsed_pattern;
   RE2 regex = RE2(Internal::toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
@@ -130,7 +130,7 @@ absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
 
 absl::StatusOr<std::string> rewriteURLTemplatePattern(
     absl::string_view url, absl::string_view capture_regex,
-    const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern) {
+    const envoy::extensions::uri_template::UriTemplateRewriteSegments& rewrite_pattern) {
   RE2 regex = RE2(Internal::toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
@@ -145,7 +145,7 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   }
 
   std::string rewritten_url;
-  for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
+  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment&
            segment : rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());
@@ -160,6 +160,6 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   return rewritten_url;
 }
 
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package envoy.extensions.pattern_template;
+package envoy.extensions.uri_template;
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.pattern_template";
-option java_outer_classname = "PatternTemplateRewrite";
+option java_package = "io.envoyproxy.envoy.extensions.uri_template";
+option java_outer_classname = "UriTemplateRewrite";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/pattern_template/pattern_template";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/url_template/url_template";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// Holds the segments for rewriting urls base on pattern templates
-message PatternTemplateRewriteSegments {
+// Holds the segments for rewriting urls base on uri pattern templates
+message UriTemplateRewriteSegments {
   message RewriteSegment {
     oneof segment_type {
       // Represents a segment of the rewritten URL, including any path segments,

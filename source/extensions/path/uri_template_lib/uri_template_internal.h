@@ -15,7 +15,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 
 namespace Internal {
 
@@ -130,6 +130,6 @@ std::string toRegexPattern(const struct ParsedUrlPattern& pattern);
 inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
 
 } // namespace Internal
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

@@ -8,14 +8,14 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# Wildcard & Pattern Matching
+# Wildcard & Uri Pattern Matching
 
 envoy_cc_test(
-    name = "pattern_template_test",
-    srcs = ["pattern_template_test.cc"],
+    name = "uri_template_test",
+    srcs = ["uri_template_test.cc"],
     deps = [
-        "//source/extensions/path/pattern_template_lib",
-        "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
+        "//source/extensions/path/uri_template_lib",
+        "//source/extensions/path/uri_template_lib/proto:uri_template_rewrite_segements_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -24,11 +24,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "pattern_template_internal_test",
-    srcs = ["pattern_template_internal_test.cc"],
+    name = "uri_template_internal_test",
+    srcs = ["uri_template_internal_test.cc"],
     deps = [
-        "//source/extensions/path/pattern_template_lib:pattern_template_internal_cc",
-        "//source/extensions/path/pattern_template_lib/proto:pattern_template_rewrite_segements_cc_proto",
+        "//source/extensions/path/uri_template_lib:uri_template_internal_cc",
+        "//source/extensions/path/uri_template_lib/proto:uri_template_rewrite_segements_cc_proto",
         "//test/test_common:status_utility_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
