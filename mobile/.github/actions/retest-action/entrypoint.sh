@@ -41,7 +41,7 @@ curl --silent --request GET \
   --url "https://api.github.com/repos/envoyproxy/envoy-mobile/actions/runs?branch=${PR_BRANCH}" \
   --header "authorization: Bearer ${GITHUB_TOKEN}" \
   --header "content-type: application/json" > runs.json
-jq ".workflow_runs[] | select(.head_sha == \"${PR_COMMIT}\") | select(.conclusion == \"failure\")" runs.json > failed_runs.json
+jq ".workflow_runs[] | select(.head_sha == \"${PR_COMMIT}\") | select((.conclusion == \"cancelled\") or (.conclusion == \"failure\") or (.conclusion == \"timed_out\"))" runs.json > failed_runs.json
 jq -c ". | {name: .name, url: .url}" failed_runs.json > failed_runs_compact.json
 
 # Iterate over each failed run and retry its failed jobs
