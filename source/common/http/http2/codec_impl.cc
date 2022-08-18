@@ -272,6 +272,9 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 
   local_end_stream_ = end_stream;
   submitHeaders(headers, end_stream ? nullptr : &provider);
+  if (local_end_stream_) {
+    onLocalEndStream();
+  }
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
