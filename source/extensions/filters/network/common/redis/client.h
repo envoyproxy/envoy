@@ -225,7 +225,7 @@ public:
   }
 };
 
-// A class repsenting a Redis transaction.
+// A class representing a Redis transaction.
 class Transaction {
 public:
   Transaction(Network::ConnectionCallbacks& parent)
