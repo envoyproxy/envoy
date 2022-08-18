@@ -120,7 +120,7 @@ xcodeproj(
     build_mode = "bazel",
     project_name = "Envoy",
     tags = ["manual"],
-    targets = [
+    top_level_targets = [
         # Libraries
         "//library/swift:ios_lib",
         "//library/objective-c:envoy_engine_objc_lib",
