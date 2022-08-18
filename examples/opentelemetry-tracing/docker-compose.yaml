@@ -54,4 +54,6 @@ services:
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+    - "${PORT_COLLECTOR_ZPAGE:-55679}:55679"
 

@@ -17,6 +17,8 @@ At that point, you should see spans being exported from the Envoy instances,
 including one from the `front-envoy`, one from `service1-inbound`, one from
 `service1-outbound`, and one from `service2`.
 
+You can also explore the Collector zpages via `http://localhost:55679/debug/tracez`.
+
 Example span:
 
 ```

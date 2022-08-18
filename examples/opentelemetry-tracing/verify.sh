@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 export NAME=opentelemetry-tracing
-export PORT_PROXY="${JAEGER_PORT_PROXY:-11010}"
-export PORT_UI="${JAEGER_PORT_UI:-11011}"
+export PORT_PROXY="${PORT_PROXY:-8000}"
+export PORT_COLLECTOR_ZPAGE="${PORT_COLLECTOR_ZPAGE:-55679}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -13,7 +13,7 @@ responds_with \
     Hello \
     "http://localhost:${PORT_PROXY}/trace/1"
 
-run_log "Test Jaeger UI"
+run_log "Test OpenTelemetry Collector zpage UI"
 responds_with \
-    "<!doctype html>" \
-    "http://localhost:${PORT_UI}"
+    "<!DOCTYPE html>" \
+    "http://localhost:${PORT_COLLECTOR_ZPAGE}/debug/tracez"

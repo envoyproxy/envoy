@@ -1,2 +1,1 @@
-# Update with whatever this should be
 FROM otel/opentelemetry-collector:latest
