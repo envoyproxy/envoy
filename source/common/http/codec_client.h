@@ -232,8 +232,8 @@ private:
     void onStreamEnd() override { parent_.onRequestStreamEnd(*this); }
 
     // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(); }
-    void onDecodeComplete() override { parent_.onDecodeComplete(*this); }
+    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
+    void onDecodeComplete() override {}
 
     RequestEncoder* encoder_{};
     CodecClient& parent_;
@@ -247,9 +247,7 @@ private:
    * Called when a response finishes decoding. This is called *before* forwarding on to the
    * wrapped decoder.
    */
-  void responsePreDecodeComplete();
-
-  void onDecodeComplete(ActiveRequest& request);
+  void responsePreDecodeComplete(ActiveRequest& request);
   void onRequestStreamEnd(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);

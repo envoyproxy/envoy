@@ -295,7 +295,6 @@ void StreamEncoderImpl::endEncode() {
 
   flushOutput(true);
   connection_.onEncodeComplete();
-  runStreamEndCallbacks();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
   if (connect_request_ || is_tcp_tunneling_ ||
@@ -1491,6 +1490,9 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
     // Encoder is used as part of decode* calls later in this function so pending_response_ can not
     // be reset just yet. Preserve the state in pending_response_done_ instead.
     pending_response_done_ = true;
+
+    // Signal end of request stream on response completion.
+    response.encoder_.runStreamEndCallbacks();
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(

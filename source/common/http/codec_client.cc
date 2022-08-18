@@ -123,15 +123,11 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void CodecClient::responsePreDecodeComplete() {
-  ENVOY_CONN_LOG(debug, "response pre-decode complete", *connection_);
+void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
+  ENVOY_CONN_LOG(debug, "response complete", *connection_);
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamPreDecodeComplete();
   }
-}
-
-void CodecClient::onDecodeComplete(ActiveRequest& request) {
-  ENVOY_CONN_LOG(debug, "response complete", *connection_);
 
   request.decode_complete_ = true;
   if (request.encode_complete_) {
@@ -140,6 +136,8 @@ void CodecClient::onDecodeComplete(ActiveRequest& request) {
     // of CodecClient will deal with the premature response case and we should not handle any
     // further reset notification.
     request.encoder_->getStream().removeCallbacks(request);
+  } else {
+    ENVOY_CONN_LOG(debug, "waiting for encode to complete", *connection_);
   }
 }
 
