@@ -8,6 +8,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: listener
+  change: |
+    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly and that will lead to a memory leak.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
