@@ -232,7 +232,9 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
   return true;
 }
 
-const Network::Connection* ActiveStreamFilterBase::connection() { return parent_.connection(); }
+OptRef<const Network::Connection> ActiveStreamFilterBase::connection() {
+  return parent_.connection();
+}
 
 Event::Dispatcher& ActiveStreamFilterBase::dispatcher() { return parent_.dispatcher_; }
 
@@ -1335,7 +1337,9 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
 }
 
 void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
-  tracked_object_stack.add(connection_);
+  if (connection_.has_value()) {
+    tracked_object_stack.add(*connection_);
+  }
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
