@@ -208,8 +208,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //
   const auto& key_string_view = name.getStringView();
   bool allow_underscores = !config_.reject_headers_with_underscores();
-  // This header name is initially invalid if the name is empty or if the name
-  // matches an incompatible connection-specific header.
+  // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
   }

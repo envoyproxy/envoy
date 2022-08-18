@@ -24,8 +24,8 @@ protected:
 };
 
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
-  HeaderString valid{"CHunkeD"};
-  HeaderString invalid{"deflate"};
+  HeaderString valid{"gzip, chunked"};
+  HeaderString invalid{"{deflate}"};
   auto uhv = createH1(empty_config);
 
   EXPECT_TRUE(uhv->validateTransferEncodingHeader(valid).ok());
@@ -130,7 +130,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryPath) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryTransferEncoding) {
   HeaderString name{"transfer-encoding"};
   HeaderString valid{"chunked"};
-  HeaderString invalid{"deflate"};
+  HeaderString invalid{"{deflate}"};
   auto uhv = createH1(empty_config);
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),

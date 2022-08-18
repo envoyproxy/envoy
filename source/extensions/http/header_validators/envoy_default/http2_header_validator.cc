@@ -1,5 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
@@ -19,7 +21,6 @@ using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValid
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
   const std::string ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
-  const std::string InvalidHeaderName = "uhv.http2.invalid_header_name";
 };
 
 using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
@@ -320,7 +321,21 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderString& key) {
+Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
+  //
+  // Verify that the header name is valid. This also honors the underscore in
+  // header configuration setting.
+  //
+  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  //
+  // header-field   = field-name ":" OWS field-value OWS
+  // field-name     = token
+  // token          = 1*tchar
+  //
+  // tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+  //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+  //                / DIGIT / ALPHA
+  //                ; any VCHAR, except delimiters
   //
   // For HTTP/2, connection-specific headers must be treated as malformed. From RFC 7540,
   // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
@@ -330,11 +345,21 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
   //
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
+  const auto& key_string_view = name.getStringView();
+  bool allow_underscores = !config_.reject_headers_with_underscores();
 
-  const auto& key_string_view = key.getStringView();
+  // This header name is initially invalid if the name is empty or if the name
+  // matches an incompatible connection-specific header.
+  if (key_string_view.empty()) {
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
+  }
+
   if (kRejectHeaderNames.contains(key_string_view)) {
     return {RejectAction::Reject, Http2ResponseCodeDetail::get().ConnectionHeaderSanitization};
   }
+
+  bool is_valid = true;
+  char c = '\0';
 
   //
   // Verify that the header name is all lowercase. From RFC 7540,
@@ -345,17 +370,19 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
   // to their encoding in HTTP/2. A request or response containing uppercase header field names
   // MUST be treated as malformed (Section 8.1.2.6).
   //
-  bool is_valid = true;
-  for (std::size_t i = 0; i < key_string_view.size() && is_valid; ++i) {
-    char c = key_string_view.at(i);
-    is_valid = c < 'A' || c > 'Z';
+  for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
+    c = key_string_view.at(i);
+    is_valid = testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&
+               (c < 'A' || c > 'Z');
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, Http2ResponseCodeDetail::get().InvalidHeaderName};
+    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
+                            : UhvResponseCodeDetail::get().InvalidCharacters;
+    return {RejectAction::Reject, details};
   }
 
-  return HeaderValidator::validateGenericHeaderName(key);
+  return HeaderEntryValidationResult::success();
 }
 
 } // namespace EnvoyDefault

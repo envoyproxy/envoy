@@ -463,8 +463,55 @@ TEST_F(Http2HeaderValidatorTest, ValidateLowercaseHeader) {
   auto uhv = createH2(empty_config);
 
   EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid),
-                             "uhv.http2.invalid_header_name");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid), "uhv.invalid_characters");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameValid) {
+  HeaderString valid{"x-foo"};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
+  HeaderString invalid_underscore{"x_foo"};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
+                             UhvResponseCodeDetail::get().InvalidUnderscore);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyInvalidChar) {
+  HeaderString invalid_eascii{"x-foo\x80"};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
+                             UhvResponseCodeDetail::get().InvalidCharacters);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictValid) {
+  HeaderString valid{"x-foo"};
+  HeaderString valid_underscore{"x_foo"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+  EXPECT_TRUE(uhv->validateGenericHeaderName(valid_underscore).ok());
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidChar) {
+  HeaderString invalid_eascii{"x-foo\x80"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
+                             UhvResponseCodeDetail::get().InvalidCharacters);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
+  HeaderString invalid_empty{""};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
+                             UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
 } // namespace

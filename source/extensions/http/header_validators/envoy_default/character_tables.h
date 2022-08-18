@@ -187,6 +187,40 @@ const uint32_t kUnreservedCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
+//
+// Transfer-Encoding HTTP/1.1 header character table.
+// From RFC 7230: https://www.rfc-editor.org/rfc/rfc7230#section-4
+//
+// SPELLCHECKER(off)
+// Transfer-Encoding   = *( "," OWS ) transfer-coding *( OWS "," [ OWS
+//                       transfer-coding ] )
+//
+// transfer-coding     = "chunked" ; Section 4.1
+//                     / "compress" ; Section 4.2.1
+//                     / "deflate" ; Section 4.2.2
+//                     / "gzip" ; Section 4.2.3
+//                     / transfer-extension
+//
+// transfer-extension  = token *( OWS ";" OWS transfer-parameter )
+// transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
+// SPELLCHECKER(on)
+//
+const uint32_t kTransferEncodingHeaderCharTable[] = {
+    // control characters
+    0b00000000010000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b11111111001111101111111111010100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100011,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111101010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

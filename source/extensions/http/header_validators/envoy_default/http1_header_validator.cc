@@ -1,5 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -345,10 +347,17 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   // A server that receives a request message with a transfer coding it does not
   // understand SHOULD respond with 501 (Not Implemented).
   //
-  const auto& encoding = value.getStringView();
-  if (!absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
+  bool is_valid = true;
+  const auto encoding = value.getStringView();
+  std::size_t size = encoding.size();
+  for (std::size_t i{0}; i < size && is_valid; ++i) {
+    is_valid = testChar(kTransferEncodingHeaderCharTable, encoding.at(i));
+  }
+
+  if (!is_valid) {
     return {RejectAction::Reject, Http1ResponseCodeDetail::get().InvalidTransferEncoding};
   }
+
   return HeaderEntryValidationResult::success();
 }
 
