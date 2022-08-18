@@ -457,7 +457,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
         factory);
     regex_engine_ = factory.createEngine(*config, serverFactoryContext());
   } else {
-    regex_engine_ = std::make_shared<Regex::GoogleReEngine>(false);
+    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
   }
   Regex::EngineSingleton::clear();
   Regex::EngineSingleton::initialize(regex_engine_.get());
