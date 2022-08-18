@@ -14,19 +14,18 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Match {
 
 bool PatternTemplateMatcher::match(absl::string_view path) const {
   RE2 matching_pattern_regex = RE2(convertURLPatternSyntaxToRegex(path_template_).value());
-  return RE2::FullMatch(
-      PatternTemplateInternal::toStringPiece(Http::PathUtil::removeQueryAndFragment(path)),
-      matching_pattern_regex);
+  return RE2::FullMatch(Internal::toStringPiece(Http::PathUtil::removeQueryAndFragment(path)),
+                        matching_pattern_regex);
 }
 
 absl::string_view PatternTemplateMatcher::pattern() const { return path_template_; }
 
 } // namespace Match
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

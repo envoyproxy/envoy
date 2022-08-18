@@ -1,4 +1,4 @@
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
 
 #include <map>
 #include <string>
@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
-#include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -16,29 +16,24 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 
-using PatternTemplateInternal::ParsedUrlPattern;
+using Internal::ParsedUrlPattern;
 
 #ifndef SWIG
 // Silence warnings about missing initializers for members of LazyRE2.
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
-
 absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
-
-  absl::StatusOr<ParsedUrlPattern> status =
-      PatternTemplateInternal::parseURLPatternSyntax(url_pattern);
+  absl::StatusOr<ParsedUrlPattern> status = Internal::parseURLPatternSyntax(url_pattern);
   if (!status.ok()) {
     return status.status();
   }
-  return PatternTemplateInternal::toRegexPattern(*status);
+  return Internal::toRegexPattern(*status);
 }
 
-absl::StatusOr<std::vector<RewritePatternSegment>>
-parseRewritePatternHelper(absl::string_view pattern) {
+absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view pattern) {
   std::vector<RewritePatternSegment> result;
 
   // The pattern should start with a '/' and thus the first segment should
@@ -49,17 +44,17 @@ parseRewritePatternHelper(absl::string_view pattern) {
 
   // Don't allow contiguous '/' patterns.
   static const LazyRE2 invalid_regex = {"^.*//.*$"};
-  if (RE2::FullMatch(toStringPiece(pattern), *invalid_regex)) {
+  if (RE2::FullMatch(Internal::toStringPiece(pattern), *invalid_regex)) {
     return absl::InvalidArgumentError("Invalid rewrite literal");
   }
 
   while (!pattern.empty()) {
     std::vector<absl::string_view> segments1 = absl::StrSplit(pattern, absl::MaxSplits('{', 1));
     if (!segments1[0].empty()) {
-      if (!PatternTemplateInternal::isValidRewriteLiteral(segments1[0])) {
+      if (!Internal::isValidRewriteLiteral(segments1[0])) {
         return absl::InvalidArgumentError("Invalid rewrite literal pattern");
       }
-      result.emplace_back(segments1[0], RewriteStringKind::KLiteral);
+      result.emplace_back(segments1[0], RewriteStringKind::Literal);
     }
 
     if (segments1.size() < 2) {
@@ -74,23 +69,23 @@ parseRewritePatternHelper(absl::string_view pattern) {
     }
     pattern = segments2[1];
 
-    if (!PatternTemplateInternal::isValidIndent(segments2[0])) {
+    if (!Internal::isValidVariableName(segments2[0])) {
       return absl::InvalidArgumentError("Invalid variable name");
     }
-    result.emplace_back(segments2[0], RewriteStringKind::KVariable);
+    result.emplace_back(segments2[0], RewriteStringKind::Variable);
   }
   return result;
 }
 
-absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
+absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments>
 parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments parsed_pattern;
-  RE2 regex = RE2(toStringPiece(capture_regex));
+  envoy::extensions::uri_template::UriTemplateRewriteSegments parsed_pattern;
+  RE2 regex = RE2(Internal::toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
 
-  absl::StatusOr<std::vector<RewritePatternSegment>> status = parseRewritePatternHelper(pattern);
+  absl::StatusOr<std::vector<RewritePatternSegment>> status = parseRewritePattern(pattern);
   if (!status.ok()) {
     return status.status();
   }
@@ -100,10 +95,10 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
 
   for (const auto& [str, kind] : processed_pattern) {
     switch (kind) {
-    case RewriteStringKind::KLiteral:
+    case RewriteStringKind::Literal:
       parsed_pattern.add_segments()->set_literal(std::string(str));
       break;
-    case RewriteStringKind::KVariable:
+    case RewriteStringKind::Variable:
       auto it = capture_index_map.find(std::string(str));
       if (it == capture_index_map.end()) {
         return absl::InvalidArgumentError("Nonexisting variable name");
@@ -121,7 +116,7 @@ absl::Status isValidMatchPattern(absl::string_view path_template_match) {
 }
 
 absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_rewrite) {
-  return parseRewritePatternHelper(path_template_rewrite).status();
+  return parseRewritePattern(path_template_rewrite).status();
 }
 
 absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
@@ -135,8 +130,8 @@ absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
 
 absl::StatusOr<std::string> rewriteURLTemplatePattern(
     absl::string_view url, absl::string_view capture_regex,
-    const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern) {
-  RE2 regex = RE2(PatternTemplateInternal::toStringPiece(capture_regex));
+    const envoy::extensions::uri_template::UriTemplateRewriteSegments& rewrite_pattern) {
+  RE2 regex = RE2(Internal::toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
@@ -144,14 +139,14 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(PatternTemplateInternal::toStringPiece(url), /*startpos=*/0,
+  if (!regex.Match(Internal::toStringPiece(url), /*startpos=*/0,
                    /*endpos=*/url.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern does not match");
   }
 
   std::string rewritten_url;
-  for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
-           segment : rewrite_pattern.segments()) {
+  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment& segment :
+       rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());
     } else if (segment.has_var_index()) {
@@ -165,6 +160,6 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
   return rewritten_url;
 }
 
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

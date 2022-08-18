@@ -295,6 +295,6 @@ visibility_excludes:
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD
+- source/extensions/path/uri_template_lib/BUILD
 - source/extensions/path/match/pattern_template/BUILD
 - source/extensions/path/rewrite/pattern_template/BUILD
-- source/extensions/path/pattern_template_lib/BUILD

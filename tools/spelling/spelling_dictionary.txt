@@ -234,6 +234,9 @@ hls
 jkl
 js
 lang
+hls
+jkl
+lang
 libsxg
 LLVM
 LPT

@@ -11,18 +11,17 @@
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Rewrite {
 
-const absl::string_view NAME =
-    "envoy.path.rewrite.pattern_template.pattern_template_rewriter";
+const absl::string_view NAME = "envoy.path.rewrite.pattern_template.pattern_template_rewriter";
 
 /**
  * PatternTemplateRewriter allows rewriting paths based on match pattern variables provided
@@ -57,6 +56,6 @@ private:
 };
 
 } // namespace Rewrite
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

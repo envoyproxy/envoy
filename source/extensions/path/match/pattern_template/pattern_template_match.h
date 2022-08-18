@@ -5,14 +5,14 @@
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.h"
 #include "envoy/router/path_match.h"
 
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Match {
 
 const absl::string_view NAME = "envoy.path.match.pattern_template.pattern_template_matcher";
@@ -44,6 +44,6 @@ private:
 };
 
 } // namespace Match
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

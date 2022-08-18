@@ -4,8 +4,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
+#include "source/extensions/path/uri_template_lib/uri_template.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -15,7 +15,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 
 namespace {
 
@@ -53,6 +53,8 @@ TEST(ConvertURLPattern, InvalidPattern) {
               StatusIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(convertURLPatternSyntaxToRegex("/{var12345678901234=*}"),
               StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(convertURLPatternSyntaxToRegex("/{var12345678901234=*"),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseRewriteHelperSuccess : public testing::TestWithParam<std::string> {};
@@ -66,7 +68,7 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_OK(parseRewritePatternHelper(pattern));
+  EXPECT_OK(parseRewritePattern(pattern));
 }
 
 class ParseRewriteHelperFailure : public testing::TestWithParam<std::string> {};
@@ -79,14 +81,14 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(parseRewritePatternHelper(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parseRewritePattern(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
   const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments expectedProto() const {
-    envoy::extensions::pattern_template::PatternTemplateRewriteSegments expected_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments expectedProto() const {
+    envoy::extensions::uri_template::UriTemplateRewriteSegments expected_proto;
     Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
     return expected_proto;
   }
@@ -146,7 +148,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
                          })));
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
-  absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments> rewrite =
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite =
       parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
   // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
@@ -169,8 +171,8 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 class RewriteUrlTemplateSuccess
     : public testing::TestWithParam<std::pair<std::string, std::string>> {
 protected:
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewriteProto() const {
-    envoy::extensions::pattern_template::PatternTemplateRewriteSegments proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewriteProto() const {
+    envoy::extensions::uri_template::UriTemplateRewriteSegments proto;
     Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
     return proto;
   }
@@ -234,7 +236,7 @@ TEST_P(RewriteUrlTemplateSuccess, RewriteUrlTemplateSuccessTest) {
 }
 
 TEST(RewriteUrlTemplateFailure, BadRegex) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -249,7 +251,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexNoMatch) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -264,7 +266,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexZero) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -278,7 +280,7 @@ segments:
 }
 
 TEST(RewriteUrlTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
-  envoy::extensions::pattern_template::PatternTemplateRewriteSegments rewrite_proto;
+  envoy::extensions::uri_template::UriTemplateRewriteSegments rewrite_proto;
 
   const std::string yaml = R"EOF(
 segments:
@@ -319,8 +321,8 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertURLPatternSyntaxToRegex(urlPattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
-      rewrite_proto = parseRewritePattern(rewritePattern(), regex.value());
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite_proto =
+      parseRewritePattern(rewritePattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 
   absl::StatusOr<std::string> rewritten_url =
@@ -330,8 +332,38 @@ TEST_P(URLPatternMatchAndRewrite, URLPatternMatchAndRewriteTest) {
   EXPECT_EQ(rewritten_url.value(), expectedRewrittenUrl());
 }
 
+TEST_P(URLPatternMatchAndRewrite, IsValidMatchPattern) {
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/foo/bar/{goo}/{doo}").ok());
+  EXPECT_TRUE(isValidMatchPattern("/{hoo}/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+}
+
+TEST_P(URLPatternMatchAndRewrite, IsValidPathTemplateRewritePattern) {
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}/{doo}").ok());
+  EXPECT_TRUE(isValidPathTemplateRewritePattern("/{hoo}/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
+  EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
+}
+
+TEST_P(URLPatternMatchAndRewrite, IsValidSharedVariableSet) {
+  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}", "/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidSharedVariableSet("/foo/bar/{goo}/{doo}", "/foo/bar/{doo}/{goo}").ok());
+  EXPECT_TRUE(isValidSharedVariableSet("/bar/{goo}", "/bar/{goo}").ok());
+
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}/{goo}", "/foo/{bar}").ok());
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/{goo}", "/foo/bar/").ok());
+  EXPECT_FALSE(isValidSharedVariableSet("/foo/bar/{goo}", "/{foo}").ok());
+}
+
 } // namespace
 
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

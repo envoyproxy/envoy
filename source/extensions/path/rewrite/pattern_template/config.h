@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Rewrite {
 
 class PatternTemplateRewriterFactory : public Router::PathRewriterFactory {
@@ -20,8 +20,7 @@ public:
                                              v3::PatternTemplateRewriteConfig&>(
             rewrite_config, ProtobufMessage::getStrictValidationVisitor());
 
-    if (!PatternTemplate::isValidPathTemplateRewritePattern(
-             path_rewrite_config.path_template_rewrite())
+    if (!UriTemplate::isValidPathTemplateRewritePattern(path_rewrite_config.path_template_rewrite())
              .ok()) {
       return absl::InvalidArgumentError(
           fmt::format("path_rewrite_policy.path_template_rewrite {} is invalid",
@@ -42,6 +41,6 @@ public:
 };
 
 } // namespace Rewrite
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

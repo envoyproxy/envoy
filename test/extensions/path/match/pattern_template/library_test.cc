@@ -12,7 +12,7 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-Router::PathMatcherSharedPtr createMatchPredicateFromYaml(std::string yaml_string) {
+Router::PathMatcherSharedPtr createMatcherFromYaml(std::string yaml_string) {
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
@@ -38,8 +38,7 @@ TEST(MatchTest, BasicUsage) {
 
   Router::PathMatcherSharedPtr predicate = createMatcherFromYaml(yaml_string);
   EXPECT_EQ(predicate->pattern(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(),
-            "envoy.path.match.pattern_template.pattern_template_matcher");
+  EXPECT_EQ(predicate->name(), "envoy.path.match.pattern_template.pattern_template_matcher");
 
   EXPECT_TRUE(predicate->match("/bar/en/us"));
 }

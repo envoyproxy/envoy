@@ -5,12 +5,12 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Match {
 
 REGISTER_FACTORY(PatternTemplateMatcherFactory, Router::PathMatcherFactory);
 
 } // namespace Match
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

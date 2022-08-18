@@ -7,8 +7,8 @@
 
 #include "source/common/http/path_utility.h"
 #include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-#include "source/extensions/path/pattern_template_lib/pattern_template_internal.h"
-#include "source/extensions/path/pattern_template_lib/proto/pattern_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_split.h"
@@ -17,7 +17,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Rewrite {
 
 #ifndef SWIG
@@ -28,10 +28,10 @@ namespace Rewrite {
 absl::Status
 PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr path_match_predicate,
                                                  bool active_policy) const {
-  if (!active_policy || path_match_predicate->name() != Extensions::PatternTemplate::Match::NAME) {
+  if (!active_policy || path_match_predicate->name() != Extensions::UriTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
-                                                  Extensions::PatternTemplate::Rewrite::NAME,
-                                                  Extensions::PatternTemplate::Match::NAME));
+                                                  Extensions::UriTemplate::Rewrite::NAME,
+                                                  Extensions::UriTemplate::Match::NAME));
   }
 
   // This is needed to match up variable values.
@@ -54,16 +54,16 @@ PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
   }
   std::string regex_pattern_str = *std::move(regex_pattern);
 
-  absl::StatusOr<envoy::extensions::pattern_template::PatternTemplateRewriteSegments>
-      rewrite_pattern = parseRewritePattern(url_rewrite_pattern_, regex_pattern_str);
+  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite_pattern =
+      parseRewritePattern(url_rewrite_pattern_, regex_pattern_str);
 
   if (!rewrite_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse url rewrite pattern");
   }
 
-  const envoy::extensions::pattern_template::PatternTemplateRewriteSegments& rewrite_pattern_proto =
+  const envoy::extensions::uri_template::UriTemplateRewriteSegments& rewrite_pattern_proto =
       *std::move(rewrite_pattern);
-  RE2 regex = RE2(PatternTemplateInternal::toStringPiece(regex_pattern_str));
+  RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
   }
@@ -71,14 +71,14 @@ PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
   // First capture is the whole matched regex pattern.
   int capture_num = regex.NumberOfCapturingGroups() + 1;
   std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(PatternTemplateInternal::toStringPiece(pattern), /*startpos=*/0,
+  if (!regex.Match(Internal::toStringPiece(pattern), /*startpos=*/0,
                    /*endpos=*/pattern.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
     return absl::InvalidArgumentError("Pattern not match");
   }
 
   std::string new_path;
-  for (const envoy::extensions::pattern_template::PatternTemplateRewriteSegments::RewriteSegment&
-           segment : rewrite_pattern_proto.segments()) {
+  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment& segment :
+       rewrite_pattern_proto.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&new_path, segment.literal());
     } else if (segment.has_var_index()) {
@@ -93,6 +93,6 @@ PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
 }
 
 } // namespace Rewrite
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

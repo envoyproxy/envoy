@@ -10,7 +10,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Match {
 
 class PatternTemplateMatcherFactory : public Router::PathMatcherFactory {
@@ -21,7 +21,7 @@ public:
         const envoy::extensions::path::match::pattern_template::v3::PatternTemplateMatchConfig&>(
         config, ProtobufMessage::getStrictValidationVisitor());
 
-    if (!PatternTemplate::isValidMatchPattern(path_match_config.path_template()).ok()) {
+    if (!UriTemplate::isValidMatchPattern(path_match_config.path_template()).ok()) {
       return absl::InvalidArgumentError(fmt::format("path_match_policy.path_template {} is invalid",
                                                     path_match_config.path_template()));
     }
@@ -36,11 +36,11 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.path.match.pattern_template.pattern_template_matcher;
+    return "envoy.path.match.pattern_template.pattern_template_matcher";
   }
 };
 
 } // namespace Match
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

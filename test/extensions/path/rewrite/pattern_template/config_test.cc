@@ -26,8 +26,7 @@ TEST(ConfigTest, TestEmptyConfig) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(),
-            "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -54,8 +53,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(),
-            "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -85,8 +83,7 @@ TEST(ConfigTest, TestConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(),
-            "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -114,8 +111,7 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(),
-            "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
