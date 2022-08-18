@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate"],
+    extension_names = ["envoy.path.rewrite.pattern_template.pattern_template_rewriter"],
     deps = [
         "//source/extensions/path/rewrite/pattern_template:config",
         "//test/mocks/server:factory_context_mocks",
@@ -24,7 +24,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
-    extension_names = ["envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate"],
+    extension_names = ["envoy.path.rewrite.pattern_template.pattern_template_rewriter"],
     deps = [
         "//source/extensions/path/match/pattern_template:config",
         "//source/extensions/path/match/pattern_template:pattern_template_match_lib",

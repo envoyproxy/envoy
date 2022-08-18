@@ -13,7 +13,7 @@ namespace Match {
 
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_match_predicate
+      name: envoy.path.match.pattern_template.pattern_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
@@ -26,7 +26,7 @@ TEST(ConfigTest, TestEmptyConfig) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
+  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_matcher");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -40,7 +40,7 @@ TEST(ConfigTest, TestEmptyConfig) {
 
 TEST(ConfigTest, InvalidConfigSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_match_predicate
+      name: envoy.path.match.pattern_template.pattern_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country"
@@ -53,7 +53,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
+  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_matcher");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -70,7 +70,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
 
 TEST(ConfigTest, TestConfigSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_match_predicate
+      name: envoy.path.match.pattern_template.pattern_template_matcher
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
@@ -83,7 +83,7 @@ TEST(ConfigTest, TestConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathMatcherFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_match_predicate");
+  EXPECT_EQ(factory->name(), "envoy.path.match.pattern_template.pattern_template_matcher");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);

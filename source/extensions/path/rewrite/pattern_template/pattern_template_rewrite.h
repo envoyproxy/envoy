@@ -22,7 +22,7 @@ namespace PatternTemplate {
 namespace Rewrite {
 
 const absl::string_view NAME =
-    "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
+    "envoy.path.rewrite.pattern_template.pattern_template_rewriter";
 
 /**
  * PatternTemplateRewriter allows rewriting paths based on match pattern variables provided

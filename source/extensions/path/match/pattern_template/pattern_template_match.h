@@ -15,7 +15,7 @@ namespace Extensions {
 namespace PatternTemplate {
 namespace Match {
 
-const absl::string_view NAME = "envoy.path.match.pattern_template.pattern_template_match_predicate";
+const absl::string_view NAME = "envoy.path.match.pattern_template.pattern_template_matcher";
 
 /**
  * PatternTemplateMatcher allows matching based on pattern templates.

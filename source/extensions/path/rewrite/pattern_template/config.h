@@ -37,7 +37,7 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate";
+    return "envoy.path.rewrite.pattern_template.pattern_template_rewriter";
   }
 };
 

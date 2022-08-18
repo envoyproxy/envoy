@@ -746,7 +746,7 @@ envoy.matching.matchers.ip:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
-envoy.path.match.pattern_template.pattern_template_match_predicate:
+envoy.path.match.pattern_template.pattern_template_matcher:
     categories:
     - envoy.path.match
     security_posture: unknown
@@ -754,7 +754,7 @@ envoy.path.match.pattern_template.pattern_template_match_predicate:
     undocumented: true
     type_urls:
     - envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
-envoy.path.rewrite.pattern_template.pattern_template_rewrite_predicate:
+envoy.path.rewrite.pattern_template.pattern_template_rewriter:
       categories:
       - envoy.path.rewrite
       security_posture: unknown

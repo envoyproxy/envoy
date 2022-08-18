@@ -36,7 +36,7 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.path.match.pattern_template.pattern_template_match_predicate";
+    return "envoy.path.match.pattern_template.pattern_template_matcher;
   }
 };
 
