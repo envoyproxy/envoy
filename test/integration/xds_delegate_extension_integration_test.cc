@@ -17,6 +17,8 @@
 namespace Envoy {
 namespace {
 
+constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
+
 // A test implementation of the XdsResourcesDelegate extension.
 class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
 public:
@@ -57,86 +59,56 @@ public:
   }
 };
 
-std::string bootstrapConfig() {
-  return fmt::format(R"EOF(
-static_resources:
-  clusters:
-  - name: dummy_cluster
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
-    load_assignment:
-      cluster_name: dummy_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-  - name: rtds_cluster
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {{}}
-    load_assignment:
-      cluster_name: rtds_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 0
-layered_runtime:
-  layers:
-  - name: some_static_layer
-    static_layer:
-      foo: whatevs
-      bar: yar
-  - name: some_rtds_layer
-    rtds_layer:
-      name: some_rtds_layer
-      rtds_config:
-        resource_api_version: V3
-        api_config_source:
-          api_type: GRPC
-          transport_api_version: V3
-          grpc_services:
-            envoy_grpc:
-              cluster_name: rtds_cluster
-          set_node_on_first_message_only: true
-  - name: some_admin_layer
-    admin_layer: {{}}
-xds_delegate_extension:
-  name: envoy.config.xds.test_delegate
-  typed_config:
-    "@type": type.googleapis.com/test.envoy.config.xds.TestXdsResourcesDelegateConfig
-admin:
-  access_log:
-  - name: envoy.access_loggers.file
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "{}"
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-)EOF",
-                     Platform::null_device_path);
-}
-
 class XdsDelegateExtensionIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                             public HttpIntegrationTest {
 public:
   XdsDelegateExtensionIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), bootstrapConfig()) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
+                            ConfigHelper::baseConfigNoListeners()) {
     // TODO(abeyad): Add test for Unified SotW when the UnifiedMux support is implemented.
     use_lds_ = false;
     create_xds_upstream_ = true;
+
+    // Make the default cluster HTTP2.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ConfigHelper::setHttp2(*bootstrap.mutable_static_resources()->mutable_clusters(0));
+    });
+
+    // Build and add the xDS cluster config.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      xds_cluster->MergeFrom(ConfigHelper::buildStaticCluster(std::string(XDS_CLUSTER_NAME),
+                                                              /*port=*/0,
+                                                              /*address=*/"127.0.0.1"));
+      ConfigHelper::setHttp2(*xds_cluster);
+    });
+
+    // Add static runtime values.
+    config_helper_.addRuntimeOverride("whatevs", "yar");
+
+    // Set up the RTDS runtime layer.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+      layer->set_name("some_rtds_layer");
+      auto* rtds_layer = layer->mutable_rtds_layer();
+      rtds_layer->set_name("some_rtds_layer");
+      auto* rtds_config = rtds_layer->mutable_rtds_config();
+      rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* api_config_source = rtds_config->mutable_api_config_source();
+      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      api_config_source->set_set_node_on_first_message_only(true);
+      api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+          XDS_CLUSTER_NAME);
+    });
+
+    // Add test xDS delegate.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* delegate_extension = bootstrap.mutable_xds_delegate_extension();
+      delegate_extension->set_name("envoy.config.xds.test_delegate");
+      delegate_extension->mutable_typed_config()->PackFrom(
+          test::envoy::config::xds::TestXdsResourcesDelegateConfig());
+    });
   }
 
   void TearDown() override {
@@ -151,7 +123,6 @@ public:
     setUpstreamCount(1);
     setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
-    // Register admin port.
     registerTestServerPorts({});
     initial_load_success_ = test_server_->counter("runtime.load_success")->value();
   }
