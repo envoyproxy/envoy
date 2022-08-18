@@ -128,7 +128,8 @@ if __name__ == "__main__":
         # if so, add 128 to signal value to follow convention.
         # sys.exit casts to unsigned int so a negative value leads
         # to unexpected exit code.
-        sys.exit(returncode if returncode >= 0 else 128 + abs(returncode))  # Pass back test pass/fail result
+        exitcode = returncode if returncode >= 0 else 128 + abs(returncode)
+        sys.exit(exitcode)  # Pass back test pass/fail result
     else:
         print("Usage (execute subprocess): stack_decode.py executable_file [additional args]")
         print("Usage (read from stdin): stack_decode.py -s executable_file")
