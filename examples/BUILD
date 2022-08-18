@@ -20,6 +20,7 @@ filegroup(
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
             "mysql/*",
+            "opentelemetry-tracing/otel-collector-config.yaml",
             "postgres/*",
         ],
     ),
