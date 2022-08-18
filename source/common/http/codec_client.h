@@ -229,13 +229,16 @@ private:
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
+    void onStreamEnd() override { parent_.onRequestStreamEnd(*this); }
 
     // StreamDecoderWrapper
-    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
-    void onDecodeComplete() override {}
+    void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(); }
+    void onDecodeComplete() override { parent_.onDecodeComplete(*this); }
 
     RequestEncoder* encoder_{};
     CodecClient& parent_;
+    bool decode_complete_{false};
+    bool encode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
@@ -244,7 +247,10 @@ private:
    * Called when a response finishes decoding. This is called *before* forwarding on to the
    * wrapped decoder.
    */
-  void responsePreDecodeComplete(ActiveRequest& request);
+  void responsePreDecodeComplete();
+
+  void onDecodeComplete(ActiveRequest& request);
+  void onRequestStreamEnd(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);

@@ -115,6 +115,7 @@ private:
                        absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
+    void onStreamEnd() override {}
 
     void onEvent(Network::ConnectionEvent event);
     void onGoAway(Http::GoAwayErrorCode error_code);
@@ -354,6 +355,7 @@ private:
                        absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
+    void onStreamEnd() override {}
 
     void onEvent(Network::ConnectionEvent event);
     void onGoAway(Http::GoAwayErrorCode error_code);

@@ -71,6 +71,8 @@ public:
                      absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override { disableDataFromDownstreamForFlowControl(); }
   void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
+  void onStreamEnd() override {}
+
   // UpstreamToDownstream
   const Route& route() const override;
   const Network::Connection& connection() const override;

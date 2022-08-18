@@ -291,6 +291,11 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * Fires when a stream is ended (half-closed).
+   */
+  virtual void onStreamEnd() PURE;
 };
 
 /**

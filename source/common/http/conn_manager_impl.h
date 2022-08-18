@@ -182,6 +182,7 @@ private:
                        absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
+    void onStreamEnd() override {}
 
     // Http::StreamDecoder
     void decodeData(Buffer::Instance& data, bool end_stream) override;

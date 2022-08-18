@@ -53,6 +53,14 @@ public:
     }
   }
 
+  void runStreamEndCallbacks() {
+    for (StreamCallbacks* callbacks : callbacks_) {
+      if (callbacks) {
+        callbacks->onStreamEnd();
+      }
+    }
+  }
+
   bool local_end_stream_{};
 
 protected:
@@ -100,6 +108,7 @@ public:
     if (hasPendingData()) {
       createPendingFlushTimer();
     }
+    runStreamEndCallbacks();
   }
 
   void disarmStreamIdleTimer() {

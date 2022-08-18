@@ -64,6 +64,7 @@ public:
                      absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  void onStreamEnd() override {}
 
 private:
   Event::Dispatcher& dispatcher_;

@@ -102,6 +102,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {
     upstream_request_.onBelowWriteBufferLowWatermark();
   }
+  void onStreamEnd() override { upstream_request_.onStreamEnd(); }
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override {
     return request_encoder_->getStream().bytesMeter();
