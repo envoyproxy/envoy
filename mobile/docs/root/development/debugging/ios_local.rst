@@ -28,7 +28,7 @@ and ``xed .`` to open it in Xcode (or double-click ``Envoy.xcodeproj``
 in Finder).
 
 In Xcode's scheme selector, pick the app target you want to build (e.g.
-``__examples_swift_hello_world_app``), pick a Simulator to run it on,
+``Hello World App``), pick a Simulator to run it on,
 then hit cmd-R to build and run.
 
 From there, most Xcode features should just work for all transitively

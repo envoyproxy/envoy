@@ -5,7 +5,11 @@ load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:experimental.bzl",
     "device_and_simulator",
 )
-load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl", "xcodeproj")
+load(
+    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl",
+    "xcode_schemes",
+    "xcodeproj",
+)
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
@@ -119,12 +123,52 @@ xcodeproj(
     bazel_path = "./bazelw",
     build_mode = "bazel",
     project_name = "Envoy",
+    scheme_autogeneration_mode = "auto",  # Switch to "all" to generate schemes for all deps
+    schemes = [
+        xcode_schemes.scheme(
+            name = "Async Await App",
+            launch_action = xcode_schemes.launch_action("//examples/swift/async_await:app"),
+        ),
+        xcode_schemes.scheme(
+            name = "Hello World App",
+            launch_action = xcode_schemes.launch_action("//examples/swift/hello_world:app"),
+        ),
+        # TODO(jpsim): Fix Objective-C app support
+        # xcode_schemes.scheme(
+        #     name = "Hello World App (ObjC)",
+        #     launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
+        # ),
+        xcode_schemes.scheme(
+            name = "Baseline App",
+            launch_action = xcode_schemes.launch_action("//test/swift/apps/baseline:app"),
+        ),
+        xcode_schemes.scheme(
+            name = "Experimental App",
+            launch_action = xcode_schemes.launch_action("//test/swift/apps/experimental:app"),
+        ),
+        xcode_schemes.scheme(
+            name = "Swift Library",
+            build_action = xcode_schemes.build_action(["//library/swift:ios_lib"]),
+        ),
+        xcode_schemes.scheme(
+            name = "iOS Tests",
+            test_action = xcode_schemes.test_action([
+                "//experimental/swift:quic_stream_test.__internal__.__test_bundle",
+                "//test/objective-c:envoy_bridge_utility_test.__internal__.__test_bundle",
+                "//test/swift/integration:flatbuffer_test.__internal__.__test_bundle",
+                "//test/swift/integration:test.__internal__.__test_bundle",
+                "//test/swift/stats:test.__internal__.__test_bundle",
+                "//test/swift:test.__internal__.__test_bundle",
+            ]),
+        ),
+        xcode_schemes.scheme(
+            name = "Objective-C Library",
+            build_action = xcode_schemes.build_action(["//library/objective-c:envoy_engine_objc_lib"]),
+            test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test.__internal__.__test_bundle"]),
+        ),
+    ],
     tags = ["manual"],
     top_level_targets = [
-        # Libraries
-        "//library/swift:ios_lib",
-        "//library/objective-c:envoy_engine_objc_lib",
-        "//library/common:envoy_main_interface_lib",
         # Apps
         "//:ios_examples",
         # Tests
