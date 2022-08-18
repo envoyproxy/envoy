@@ -5,8 +5,8 @@ xDS REST and gRPC protocol
 
 Envoy discovers its various dynamic resources via the filesystem or by
 querying one or more management servers. Collectively, these discovery
-services and their corresponding APIs are referred to as *xDS*.
-Resources are requested via *subscriptions*, by specifying a filesystem
+services and their corresponding APIs are referred to as ``xDS``.
+Resources are requested via ``subscriptions``, by specifying a filesystem
 path to watch, initiating gRPC streams, or polling a REST-JSON URL. The
 latter two methods involve sending requests with a :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest>`
 proto payload. Resources are delivered in a
@@ -373,8 +373,8 @@ more details around the exact error message populated in the message field:
 
 In the sequence diagrams, the following format is used to abbreviate messages:
 
-- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
-- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
+- ``DiscoveryRequest``: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
+- ``DiscoveryResponse``: (V=version_info,R=resources,N=nonce,T=type_url)
 
 After a NACK, an API update may succeed at a new version **Y**:
 
@@ -398,14 +398,14 @@ consider the following example:
 ACK and NACK semantics summary
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- The xDS client should ACK or NACK every :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
+- The xDS client should ``ACK`` or ``NACK`` every :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
   received from the management server. The :ref:`response_nonce
   <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` field tells the server which of its responses
-  the ACK or NACK is associated with.
-- ACK signifies successful configuration update and contains the
+  the ``ACK`` or ``NACK`` is associated with.
+- ``ACK`` signifies successful configuration update and contains the
   :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` from the
   :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`.
-- NACK signifies unsuccessful configuration and is indicated by the presence of the
+- ``NACK`` signifies unsuccessful configuration and is indicated by the presence of the
   :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` field. The :ref:`version_info
   <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` indicates the most recent version that the
   client is using, although that may not be an older version in the case where the client has
@@ -420,7 +420,7 @@ When to send an update
 The management server should only send updates to the Envoy client when
 the resources in the :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` have changed. Envoy replies
 to any :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>` with a :ref:`DiscoveryRequest <envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest>` containing the
-ACK/NACK immediately after it has been either accepted or rejected. If
+``ACK``/``NACK`` immediately after it has been either accepted or rejected. If
 the management server provides the same set of resources rather than
 waiting for a change to occur, it will cause needless work on both the client and the management
 server, which could have a severe performance impact.
@@ -456,7 +456,7 @@ specified type.
 
 For :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource
 types, there is also a "wildcard" subscription, which is triggered when subscribing to the special
-name "*". In this case, the server should use site-specific business logic to determine the full
+name ``*``. In this case, the server should use site-specific business logic to determine the full
 set of resources that the client is interested in, typically based on the client's
 :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
 
@@ -466,24 +466,24 @@ resource type have had an empty :ref:`resource_names <envoy_v3_api_field_service
 field, or in incremental, having never sent a request on the stream for that resource type with a
 non-empty :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
 field), the server should treat that identically to how it would treat the client having
-explicitly subscribed to "*". However, once the client does explicitly subscribe to a resource
-name (whether it be "*" or any other name), then this legacy semantic is no longer available; at
+explicitly subscribed to ``*``. However, once the client does explicitly subscribe to a resource
+name (whether it be ``*`` or any other name), then this legacy semantic is no longer available; at
 that point, clearing the list of subscribed resources is interpretted as an unsubscription (see
 :ref:`Unsubscribing From Resources<xds_protocol_unsubscribing>`) rather than as a subscription
-to "*".
+to ``*``.
 
 For example, in SotW:
 
-- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as a subscription to "*".
-- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "*" and "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
-- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "A". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as a subscription to ``*``.
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to ``*`` and "A". Server interprets this as continuing the existing subscription to ``*`` and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "A". Server interprets this as unsubscribing to ``*`` and continuing the existing subscription to "A".
 - Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed to all resources). Although this request is identical to the first one, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` field.
 
 And in incremental:
 
-- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` unset. Server interprets this as a subscription to "*".
-- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` set to "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
-- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to "*". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` unset. Server interprets this as a subscription to ``*``.
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` set to "A". Server interprets this as continuing the existing subscription to ``*`` and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to ``*``. Server interprets this as unsubscribing to ``*`` and continuing the existing subscription to "A".
 - Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to "A". Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed to all resources). Although the set of subscribed resources is now empty, just as it was after the initial request, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` field.
 
 Client Behavior
@@ -840,7 +840,7 @@ client must provide the server with all resource names it is interested in.
 
 Note that for "wildcard" subscriptions (see :ref:`How the client specifies what
 resources to return <xds_protocol_resource_hints>` for details), the
-request must either specify "*" in the :ref:`resource_names_subscribe
+request must either specify ``*`` in the :ref:`resource_names_subscribe
 <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>`
 field or (legacy behavior) the request must have no resources in both
 :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>` and
@@ -897,7 +897,7 @@ to send a response with the unsubscribed resource name in the
 :ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
 field.
 
-However, there is one exception to the above: When a client has a wildcard subscription ("*") *and*
+However, there is one exception to the above: When a client has a wildcard subscription (``*``) *and*
 a subscription to another specific resource name, it is possible that the specific resource name is
 also included in the wildcard subscription, so if the client unsubscribes from that specific
 resource name, it does not know whether or not to continue to cache the resource. To address this,
