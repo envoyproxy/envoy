@@ -386,6 +386,5 @@ message Resource {
 
   // The Metadata field can be used to provide additional information for the resource.
   // E.g. the trace data for debugging.
-  // [#not-implemented-hide:]
   config.core.v3.Metadata metadata = 9;
 }
