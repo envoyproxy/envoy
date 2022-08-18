@@ -80,14 +80,15 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
-                                                  RespVariant&& request,
-                                                  PoolCallbacks& callbacks) override {
-    return makeRequest_(hash_key, request, callbacks);
+  Common::Redis::Client::PoolRequest*
+  makeRequest(const std::string& hash_key, RespVariant&& request, PoolCallbacks& callbacks,
+              Common::Redis::Client::Transaction& transaction) override {
+    return makeRequest_(hash_key, request, callbacks, transaction);
   }
 
   MOCK_METHOD(Common::Redis::Client::PoolRequest*, makeRequest_,
-              (const std::string& hash_key, RespVariant& request, PoolCallbacks& callbacks));
+              (const std::string& hash_key, RespVariant& request, PoolCallbacks& callbacks,
+               Common::Redis::Client::Transaction& transaction));
   MOCK_METHOD(bool, onRedirection, ());
 };
 } // namespace ConnPool
