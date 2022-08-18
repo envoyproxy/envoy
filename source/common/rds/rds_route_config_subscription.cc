@@ -8,7 +8,7 @@ namespace Rds {
 
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
-    std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
+    Envoy::Config::OpaqueResourceDecoderPtr&& resource_decoder,
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& route_config_name, const uint64_t manager_identifier,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
@@ -28,13 +28,12 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), rds_type_(rds_type),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)),
-      resource_decoder_(std::move(resource_decoder)) {
+      manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          *resource_decoder_, {});
+          std::move(resource_decoder), {});
   local_init_manager_.add(local_init_target_);
 }
 

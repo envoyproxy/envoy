@@ -51,10 +51,11 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
-  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
+  OpaqueResourceDecoderPtr resource_decoder(
+      std::make_unique<NiceMock<Config::MockOpaqueResourceDecoder>>());
   EXPECT_THROW_WITH_MESSAGE(
       FilesystemSubscriptionImpl(dispatcher, makePathConfigSource("##!@/dev/null"), callbacks,
-                                 resource_decoder, stats, validation_visitor, *api),
+                                 std::move(resource_decoder), stats, validation_visitor, *api),
       EnvoyException, "bad path");
 }
 
@@ -91,8 +92,12 @@ public:
       : path_(makePathConfigSource(TestEnvironment::temporaryPath("lds.yaml"))),
         stats_(Utility::generateStats(stats_store_)),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
-        subscription_(*dispatcher_, path_, callbacks_, resource_decoder_, stats_,
-                      ProtobufMessage::getStrictValidationVisitor(), *api_) {}
+        subscription_(
+            *dispatcher_, path_, callbacks_,
+            std::make_unique<
+                TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>>(
+                "name"),
+            stats_, ProtobufMessage::getStrictValidationVisitor(), *api_) {}
   ~FilesystemCollectionSubscriptionImplTest() override {
     TestEnvironment::removePath(path_.path());
   }
@@ -153,8 +158,6 @@ public:
   Event::DispatcherPtr dispatcher_;
   Filesystem::Watcher::OnChangedCb on_changed_cb_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>
-      resource_decoder_{"name"};
   FilesystemCollectionSubscriptionImpl subscription_;
 };
 

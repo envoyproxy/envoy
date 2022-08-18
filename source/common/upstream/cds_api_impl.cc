@@ -26,10 +26,12 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
   const auto resource_name = getResourceName();
   if (cds_resources_locator == nullptr) {
     subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        std::move(resource_decoder_), {});
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
+        *cds_resources_locator, cds_config, resource_name, *scope_, *this,
+        std::move(resource_decoder_));
   }
 }
 

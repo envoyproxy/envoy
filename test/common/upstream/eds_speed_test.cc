@@ -93,9 +93,12 @@ public:
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
+    Config::OpaqueResourceDecoderPtr resource_decoder{std::make_unique<
+        Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>>(
+        validation_visitor_, "cluster_name")};
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
-        grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
-        std::chrono::milliseconds(), false, Config::SubscriptionOptions());
+        grpc_mux_, *eds_callbacks_, std::move(resource_decoder), subscription_stats_, type_url_,
+        dispatcher_, std::chrono::milliseconds(), false, Config::SubscriptionOptions());
   }
 
   // Set up an EDS config with multiple priorities, localities, weights and make sure
@@ -166,8 +169,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{validation_visitor_, "cluster_name"};
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

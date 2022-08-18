@@ -63,9 +63,13 @@ public:
           *method_descriptor_, random_, stats_store_, rate_limit_settings_, true,
           std::move(config_validators_));
     }
+    OpaqueResourceDecoderPtr resource_decoder{
+        std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+            envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
-        dispatcher_, init_fetch_timeout, false, SubscriptionOptions());
+        mux_, callbacks_, std::move(resource_decoder), stats_,
+        Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false,
+        SubscriptionOptions());
   }
 
   ~GrpcSubscriptionTestHarness() override {
@@ -221,8 +225,6 @@ public:
   Event::MockTimer* ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;

@@ -26,7 +26,7 @@ LedsSubscription::LedsSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
           leds_resource_locator, leds_config.leds_config(), resource_name, *stats_scope_, *this,
-          resource_decoder_);
+          std::move(resource_decoder_));
   subscription_->start({});
 }
 

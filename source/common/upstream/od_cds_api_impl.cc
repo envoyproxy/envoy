@@ -31,10 +31,12 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   const auto resource_name = getResourceName();
   if (!odcds_resources_locator.has_value()) {
     subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        std::move(resource_decoder_), {});
   } else {
     subscription_ = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
+        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this,
+        std::move(resource_decoder_));
   }
 }
 

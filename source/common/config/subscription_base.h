@@ -12,12 +12,13 @@ template <typename Current> struct SubscriptionBase : public Config::Subscriptio
 public:
   SubscriptionBase(ProtobufMessage::ValidationVisitor& validation_visitor,
                    absl::string_view name_field)
-      : resource_decoder_(validation_visitor, name_field) {}
+      : resource_decoder_(std::make_unique<Config::OpaqueResourceDecoderImpl<Current>>(
+            validation_visitor, name_field)) {}
 
   std::string getResourceName() const { return Envoy::Config::getResourceName<Current>(); }
 
 protected:
-  Config::OpaqueResourceDecoderImpl<Current> resource_decoder_;
+  Config::OpaqueResourceDecoderPtr resource_decoder_;
 };
 
 } // namespace Config

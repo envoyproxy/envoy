@@ -50,7 +50,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
+                           OpaqueResourceDecoderPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string& type_url,
@@ -83,8 +83,10 @@ public:
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators& config_validators)
-        : watch_map_(use_namespace_matching, type_url, config_validators),
+                      CustomConfigValidators& config_validators,
+                      OpaqueResourceDecoderPtr resource_decoder)
+        : watch_map_(use_namespace_matching, type_url, config_validators,
+                     std::move(resource_decoder)),
           sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
@@ -139,7 +141,8 @@ private:
                    const SubscriptionOptions& options);
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  void addSubscription(const std::string& type_url, bool use_namespace_matching);
+  void addSubscription(const std::string& type_url, bool use_namespace_matching,
+                       OpaqueResourceDecoderPtr resource_decoder);
 
   void trySendDiscoveryRequests();
 

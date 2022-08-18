@@ -154,14 +154,14 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     subscription_ =
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-            *this, resource_decoder_, {});
+            *this, std::move(resource_decoder_), {});
   } else {
     const auto srds_resources_locator =
         Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator());
     subscription_ =
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
-            *this, resource_decoder_);
+            *this, std::move(resource_decoder_));
   }
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {

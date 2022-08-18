@@ -77,22 +77,23 @@ void GrpcMuxImpl<S, F, RQ, RS>::onDynamicContextUpdate(absl::string_view resourc
 template <class S, class F, class RQ, class RS>
 Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
     const SubscriptionOptions& options) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
+    OpaqueResourceDecoder& resource_decoder_ref = *resource_decoder;
     // We don't yet have a subscription for type_url! Make one!
-    watch_map =
-        watch_maps_
-            .emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_, type_url,
-                                                          *config_validators_.get()))
-            .first;
+    watch_map = watch_maps_
+                    .emplace(type_url, std::make_unique<WatchMap>(
+                                           options.use_namespace_matching_, type_url,
+                                           *config_validators_.get(), std::move(resource_decoder)))
+                    .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
-                                         type_url, *watch_maps_[type_url], resource_decoder));
+                                         type_url, *watch_maps_[type_url], resource_decoder_ref));
     subscription_ordering_.emplace_back(type_url);
   }
 
-  Watch* watch = watch_map->second->addWatch(callbacks, resource_decoder);
+  Watch* watch = watch_map->second->addWatch(callbacks);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources, options);
   return std::make_unique<WatchImpl>(type_url, watch, *this, options);
@@ -389,7 +390,7 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,
-                                                  SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                                  SubscriptionCallbacks&, OpaqueResourceDecoderPtr,
                                                   const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }

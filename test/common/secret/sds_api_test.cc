@@ -100,8 +100,9 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   const std::string sds_config_path = TestEnvironment::writeStringToFileForTest(
       "sds.yaml", TestEnvironment::substitute(sds_config), false);
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::extensions::transport_sockets::tls::v3::Secret>
-      resource_decoder("name");
+  Config::OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::extensions::transport_sockets::tls::v3::Secret>>("name")};
   Config::SubscriptionStats stats(Config::Utility::generateStats(stats_));
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   envoy::config::core::v3::ConfigSource config_source;
@@ -110,11 +111,11 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
       .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
                         &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                 Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoder&,
+                                Config::OpaqueResourceDecoderPtr,
                                 const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(
-            *dispatcher_, Config::makePathConfigSource(sds_config_path), cbs, resource_decoder,
-            stats, validation_visitor_, *api_);
+            *dispatcher_, Config::makePathConfigSource(sds_config_path), cbs,
+            std::move(resource_decoder), stats, validation_visitor_, *api_);
       }));
 
   auto init_manager = Init::ManagerImpl("testing");

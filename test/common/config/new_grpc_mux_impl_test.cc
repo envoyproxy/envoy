@@ -149,6 +149,11 @@ public:
 
   bool isUnifiedMuxTest() const { return should_use_unified_; }
 
+  static Config::OpaqueResourceDecoderPtr createResourceDecoder() {
+    return std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+        envoy::config::endpoint::v3::ClusterLoadAssignment>>("custer_name");
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   Grpc::MockAsyncClient* async_client_;
@@ -157,8 +162,6 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<GrpcMux> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   ControlPlaneStats control_plane_stats_;
@@ -179,8 +182,8 @@ INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
 TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
   setup();
   InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, createResourceDecoder(), {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, createResourceDecoder(), {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   expectSendMessage("bar", {}, {});
@@ -212,7 +215,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, createResourceDecoder(), {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send on connection.
   expectSendMessage(type_url, {"x", "y"}, {});
@@ -262,7 +265,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, createResourceDecoder(), {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send a wildcard request on new connection.
   expectSendMessage(type_url, {}, {});
@@ -337,7 +340,7 @@ TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, createResourceDecoder(), {});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -378,7 +381,8 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
   SubscriptionOptions options;
   options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch =
+      grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, createResourceDecoder(), options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -415,7 +419,8 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
   SubscriptionOptions options;
   options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch =
+      grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, createResourceDecoder(), options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -443,7 +448,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
   auto watch = grpc_mux_->addWatch(
       type_url,
       {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
-      callbacks_, resource_decoder_, options);
+      callbacks_, createResourceDecoder(), options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -485,7 +490,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
                                        "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/"
                                        "bar/blah?thing=some&some=thing",
                                    },
-                                   callbacks_, resource_decoder_, options);
+                                   callbacks_, createResourceDecoder(), options);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -528,7 +533,7 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
 TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   setup();
 
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, createResourceDecoder(), {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   grpc_mux_->start();
@@ -542,13 +547,13 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
 TEST_P(NewGrpcMuxImplTest, Shutdown) {
   setup();
   InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, createResourceDecoder(), {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   grpc_mux_->start();
 
   shutdownMux();
-  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, createResourceDecoder(), {});
   // We do not expect any messages to be sent here as the mux has been shutdown
   // There won't be any unsubscribe messages for the legacy mux either for the same reason
 }

@@ -1,5 +1,6 @@
 #include "source/common/config/grpc_mux_impl.h"
 
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/decoded_resource_impl.h"
@@ -106,10 +107,10 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder,
+                                      OpaqueResourceDecoderPtr resource_decoder,
                                       const SubscriptionOptions&) {
-  auto watch =
-      std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
+  auto watch = std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, std::move(resource_decoder),
+                                                  type_url, *this);
   ENVOY_LOG(debug, "gRPC mux addWatch for " + type_url);
 
   // Lazily kick off the requests based on first subscription. This has the
@@ -216,7 +217,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourcePtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
-    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_.get();
 
     const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 

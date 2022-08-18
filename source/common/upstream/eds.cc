@@ -26,7 +26,10 @@ EdsClusterImpl::EdsClusterImpl(
       factory_context_(factory_context), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
+                        : cluster.eds_cluster_config().service_name()),
+      resource_decoder_for_timeout_(
+          Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              factory_context.messageValidationVisitor(), "cluster_name")) {
   Event::Dispatcher& dispatcher = factory_context.mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -40,7 +43,7 @@ EdsClusterImpl::EdsClusterImpl(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {});
+          std::move(resource_decoder_), {});
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -277,12 +280,14 @@ void EdsClusterImpl::onAssignmentTimeout() {
   // need to instead change the health status to indicate the assignments are
   // stale.
   // TODO(snowp): This should probably just use xDS TTLs?
+  // TODO(adisuissa): Clean up the access to resource_decoder as part of the
+  // work that converts EDS TTLs to xDS TTLs.
   envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
   auto decoded_resource =
-      Config::DecodedResourceImpl::fromResource(resource_decoder_, any_resource, "");
+      Config::DecodedResourceImpl::fromResource(resource_decoder_for_timeout_, any_resource, "");
   std::vector<Config::DecodedResourceRef> resource_refs = {*decoded_resource};
   onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.

@@ -56,8 +56,11 @@ public:
           random_, stats_store_, rate_limit_settings_, local_info_,
           std::make_unique<NiceMock<MockCustomConfigValidators>>());
     }
+    OpaqueResourceDecoderPtr resource_decoder(
+        std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+            envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        xds_context_, callbacks_, resource_decoder_, stats_,
+        xds_context_, callbacks_, std::move(resource_decoder), stats_,
         Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_, init_fetch_timeout, false,
         SubscriptionOptions());
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -227,8 +230,6 @@ public:
   Event::MockTimer* init_timeout_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

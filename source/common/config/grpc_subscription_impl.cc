@@ -17,12 +17,12 @@ constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::mi
 
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                            SubscriptionCallbacks& callbacks,
-                                           OpaqueResourceDecoder& resource_decoder,
+                                           OpaqueResourceDecoderPtr resource_decoder,
                                            SubscriptionStats stats, absl::string_view type_url,
                                            Event::Dispatcher& dispatcher,
                                            std::chrono::milliseconds init_fetch_timeout,
                                            bool is_aggregated, const SubscriptionOptions& options)
-    : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(resource_decoder),
+    : grpc_mux_(grpc_mux), callbacks_(callbacks), resource_decoder_(std::move(resource_decoder)),
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated), options_(options) {}
 
@@ -35,7 +35,11 @@ void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
 
-  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, options_);
+  // The ownership of the resource decoder is passed to the watch. This implies
+  // that the "start" method is only called once, and is enforced by the
+  // following assertion.
+  ASSERT(resource_decoder_ != nullptr);
+  watch_ = grpc_mux_->addWatch(type_url_, resources, *this, std::move(resource_decoder_), options_);
 
   // The attempt stat here is maintained for the purposes of having consistency between ADS and
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -142,12 +146,12 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
 
 GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
     SubscriptionStats stats, Event::Dispatcher& dispatcher,
     std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
     const SubscriptionOptions& options)
     : GrpcSubscriptionImpl(
-          grpc_mux, callbacks, resource_decoder, stats,
+          grpc_mux, callbacks, std::move(resource_decoder), stats,
           TypeUtil::descriptorFullNameToTypeUrl(collection_locator.resource_type()), dispatcher,
           init_fetch_timeout, is_aggregated, options),
       collection_locator_(collection_locator) {}

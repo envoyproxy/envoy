@@ -59,7 +59,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
+                           OpaqueResourceDecoderPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -89,10 +89,10 @@ private:
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
-                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
                      const std::string& type_url, GrpcMuxImpl& parent)
-        : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
-          parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
+        : callbacks_(callbacks), resource_decoder_(std::move(resource_decoder)),
+          type_url_(type_url), parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
       std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
       iter_ = watches_.emplace(watches_.begin(), this);
     }
@@ -119,7 +119,7 @@ private:
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
-    OpaqueResourceDecoder& resource_decoder_;
+    OpaqueResourceDecoderPtr resource_decoder_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
@@ -210,7 +210,7 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoderPtr,
                            const SubscriptionOptions&) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }

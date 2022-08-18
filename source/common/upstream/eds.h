@@ -90,6 +90,10 @@ private:
   Server::Configuration::TransportSocketFactoryContextImpl factory_context_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
+  // TODO(adisuissa): This is an internal resource decoder that is used when an
+  // assignment becomes stale, and a timeout event occurs.
+  Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder_for_timeout_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
   InitializePhase initialize_phase_;

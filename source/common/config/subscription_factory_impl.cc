@@ -28,8 +28,8 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-    const SubscriptionOptions& options) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderPtr resource_decoder, const SubscriptionOptions& options) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   SubscriptionStats stats = Utility::generateStats(scope);
 
@@ -37,13 +37,13 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
     return std::make_unique<Config::FilesystemSubscriptionImpl>(
-        dispatcher_, makePathConfigSource(config.path()), callbacks, resource_decoder, stats,
-        validation_visitor_, api_);
+        dispatcher_, makePathConfigSource(config.path()), callbacks, std::move(resource_decoder),
+        stats, validation_visitor_, api_);
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path_config_source().path(), api_);
     return std::make_unique<Config::FilesystemSubscriptionImpl>(
-        dispatcher_, config.path_config_source(), callbacks, resource_decoder, stats,
+        dispatcher_, config.path_config_source(), callbacks, std::move(resource_decoder), stats,
         validation_visitor_, api_);
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
@@ -67,8 +67,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
           api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
-          callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
-          validation_visitor_);
+          callbacks, std::move(resource_decoder), stats,
+          Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC: {
       GrpcMuxSharedPtr mux;
       CustomConfigValidatorsPtr custom_config_validators =
@@ -96,7 +96,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             std::move(custom_config_validators));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
+          std::move(mux), callbacks, std::move(resource_decoder), stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false, options);
     }
@@ -124,7 +124,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             std::move(custom_config_validators));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
-          std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
+          std::move(mux), callbacks, std::move(resource_decoder), stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
     }
@@ -132,7 +132,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
-        cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
+        cm_.adsMux(), callbacks, std::move(resource_decoder), stats, type_url, dispatcher_,
         Utility::configSourceInitialFetchTimeout(config), true, options);
   }
   default:
@@ -145,7 +145,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder) {
+    OpaqueResourceDecoderPtr resource_decoder) {
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {
@@ -153,7 +153,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
     Utility::checkFilesystemSubscriptionBackingPath(path, api_);
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
-        dispatcher_, makePathConfigSource(path), callbacks, resource_decoder, stats,
+        dispatcher_, makePathConfigSource(path), callbacks, std::move(resource_decoder), stats,
         validation_visitor_, api_);
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
@@ -188,13 +188,13 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
                 std::move(custom_config_validators)),
-            callbacks, resource_decoder, stats, dispatcher_,
+            callbacks, std::move(resource_decoder), stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }
       case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
         return std::make_unique<GrpcCollectionSubscriptionImpl>(
-            collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
-            Utility::configSourceInitialFetchTimeout(config), false, options);
+            collection_locator, cm_.adsMux(), callbacks, std::move(resource_decoder), stats,
+            dispatcher_, Utility::configSourceInitialFetchTimeout(config), false, options);
       }
       default:
         throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
@@ -208,8 +208,8 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
       // parameters.
       options.add_xdstp_node_context_params_ = true;
       return std::make_unique<GrpcCollectionSubscriptionImpl>(
-          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), true, options);
+          collection_locator, cm_.adsMux(), callbacks, std::move(resource_decoder), stats,
+          dispatcher_, Utility::configSourceInitialFetchTimeout(config), true, options);
     }
     default:
       throw EnvoyException("Missing or not supported config source specifier in "

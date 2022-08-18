@@ -50,7 +50,7 @@ public:
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
-        resource_decoder_, {});
+        std::make_unique<MockOpaqueResourceDecoder>(), {});
   }
 
   SubscriptionPtr
@@ -59,14 +59,13 @@ public:
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
         resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment", stats_store_,
-        callbacks_, resource_decoder_);
+        callbacks_, std::make_unique<MockOpaqueResourceDecoder>());
   }
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   MockSubscriptionCallbacks callbacks_;
-  MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -433,7 +432,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
                               config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              callbacks_, std::make_unique<MockOpaqueResourceDecoder>(), {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
@@ -455,7 +454,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
                               config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              callbacks_, std::make_unique<MockOpaqueResourceDecoder>(), {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }

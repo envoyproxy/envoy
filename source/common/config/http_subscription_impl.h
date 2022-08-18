@@ -27,7 +27,7 @@ public:
                        Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
-                       SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+                       SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
                        SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
@@ -53,7 +53,7 @@ private:
   Protobuf::RepeatedPtrField<std::string> resources_;
   envoy::service::discovery::v3::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
-  Config::OpaqueResourceDecoder& resource_decoder_;
+  Config::OpaqueResourceDecoderPtr resource_decoder_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;

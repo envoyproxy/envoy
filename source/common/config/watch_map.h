@@ -62,14 +62,14 @@ struct Watch {
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators& config_validators)
+           CustomConfigValidators& config_validators, OpaqueResourceDecoderPtr resource_decoder)
       : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
-        config_validators_(config_validators) {}
+        config_validators_(config_validators), resource_decoder_(std::move(resource_decoder)) {}
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
   // Returns the newly added watch, to be used with updateWatchInterest and removeWatch.
-  Watch* addWatch(SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder);
+  Watch* addWatch(SubscriptionCallbacks& callbacks);
 
   // Updates the set of resource names that the given watch should watch.
   // Returns any resource name additions/removals that are unique across all watches. That is:
@@ -133,6 +133,7 @@ private:
   const bool use_namespace_matching_;
   const std::string type_url_;
   CustomConfigValidators& config_validators_;
+  OpaqueResourceDecoderPtr resource_decoder_;
 };
 
 } // namespace Config

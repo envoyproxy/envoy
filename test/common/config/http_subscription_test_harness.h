@@ -51,11 +51,14 @@ public:
     }));
     cm_.initializeThreadLocalClusters({"eds_cluster"});
     EXPECT_CALL(cm_, getThreadLocalCluster("eds_cluster")).Times(AtLeast(0));
+    OpaqueResourceDecoderPtr resource_decoder(
+        std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+            envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_,
-        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, resource_decoder_, stats_,
-        init_fetch_timeout, validation_visitor_);
+        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, std::move(resource_decoder),
+        stats_, init_fetch_timeout, validation_visitor_);
   }
 
   ~HttpSubscriptionTestHarness() override {
@@ -199,8 +202,6 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;

@@ -124,11 +124,13 @@ void doDeltaAndSotwUpdate(WatchMap& watch_map,
 // and then receive subsequent updates to them.
 TEST(WatchMapTest, Basic) {
   MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch = watch_map.addWatch(callbacks);
 
   {
     // nothing is interested, so become wildcard watch
@@ -198,12 +200,14 @@ TEST(WatchMapTest, Basic) {
 TEST(WatchMapTest, Overlap) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  Watch* watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -264,14 +268,17 @@ TEST(WatchMapTest, Overlap) {
 // WatchMap defers deletes and doesn't crash.
 class SameWatchRemoval : public testing::Test {
 public:
-  SameWatchRemoval() : watch_map_(false, "ClusterLoadAssignmentType", config_validators) {}
+  SameWatchRemoval()
+      : watch_map_(false, "ClusterLoadAssignmentType", config_validators,
+                   std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+                       envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {}
 
   void SetUp() override {
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
     alice.set_cluster_name("alice");
     updated_resources_.Add()->PackFrom(alice);
-    watch1_ = watch_map_.addWatch(callbacks1_, resource_decoder_);
-    watch2_ = watch_map_.addWatch(callbacks2_, resource_decoder_);
+    watch1_ = watch_map_.addWatch(callbacks1_);
+    watch2_ = watch_map_.addWatch(callbacks2_);
     watch_map_.updateWatchInterest(watch1_, {"alice"});
     watch_map_.updateWatchInterest(watch2_, {"alice"});
   }
@@ -283,8 +290,6 @@ public:
     watch_map_.removeWatch(watch2_);
   }
 
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
   NiceMock<MockCustomConfigValidators> config_validators;
   WatchMap watch_map_;
   NiceMock<MockSubscriptionCallbacks> callbacks1_;
@@ -340,12 +345,14 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
 TEST(WatchMapTest, AddRemoveAdd) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  Watch* watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
   envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -397,11 +404,13 @@ TEST(WatchMapTest, AddRemoveAdd) {
 // Tests that nothing breaks if an update arrives that we entirely do not care about.
 TEST(WatchMapTest, UninterestingUpdate) {
   MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch, {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
@@ -442,12 +451,14 @@ TEST(WatchMapTest, UninterestingUpdate) {
 TEST(WatchMapTest, WatchingEverything) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  /*Watch* watch1 = */ watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  /*Watch* watch1 = */ watch_map.addWatch(callbacks1);
+  Watch* watch2 = watch_map.addWatch(callbacks2);
   // watch1 never specifies any names, and so is treated as interested in everything.
   watch_map.updateWatchInterest(watch2, {"alice"});
 
@@ -479,13 +490,15 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   MockSubscriptionCallbacks callbacks3;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
-  Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  Watch* watch2 = watch_map.addWatch(callbacks2);
+  Watch* watch3 = watch_map.addWatch(callbacks3);
   watch_map.updateWatchInterest(watch1, {"updated"});
   watch_map.updateWatchInterest(watch2, {"updated", "removed"});
   watch_map.updateWatchInterest(watch3, {"removed"});
@@ -516,16 +529,18 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
 
 TEST(WatchMapTest, OnConfigUpdateFailed) {
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
   // calling on empty map doesn't break
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  watch_map.addWatch(callbacks1, resource_decoder);
-  watch_map.addWatch(callbacks2, resource_decoder);
+  watch_map.addWatch(callbacks1);
+  watch_map.addWatch(callbacks2);
 
   EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
@@ -535,11 +550,13 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
 // Validate watch behavior when subscribed to xdstp:// glob collections.
 TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
 
   // verify update
@@ -580,11 +597,13 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
 // Validate watch behavior when subscribed to xdstp:// singletons.
 TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   MockSubscriptionCallbacks callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz?some=thing&thing=some"});
 
   // verify update
@@ -621,13 +640,15 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
   MockSubscriptionCallbacks callbacks1;
   MockSubscriptionCallbacks callbacks2;
   MockSubscriptionCallbacks callbacks3;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderPtr resource_decoder{
+      std::make_unique<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators);
-  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
-  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
-  Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
+  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators,
+                     std::move(resource_decoder));
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  Watch* watch2 = watch_map.addWatch(callbacks2);
+  Watch* watch3 = watch_map.addWatch(callbacks3);
   watch_map.updateWatchInterest(watch1, {"ns1"});
   watch_map.updateWatchInterest(watch2, {"ns1", "ns2"});
   watch_map.updateWatchInterest(watch3, {"ns3"});

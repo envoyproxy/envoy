@@ -1,5 +1,6 @@
 #include "source/common/config/new_grpc_mux_impl.h"
 
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -154,16 +155,16 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoder& resource_decoder,
+                                         OpaqueResourceDecoderPtr resource_decoder,
                                          const SubscriptionOptions& options) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, options.use_namespace_matching_);
-    return addWatch(type_url, resources, callbacks, resource_decoder, options);
+    addSubscription(type_url, options.use_namespace_matching_, std::move(resource_decoder));
+    entry = subscriptions_.find(type_url);
   }
 
-  Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
+  Watch* watch = entry->second->watch_map_.addWatch(callbacks);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources, options);
   return std::make_unique<WatchImpl>(type_url, watch, *this, options);
@@ -231,11 +232,11 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     const bool use_namespace_matching) {
-  subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_, use_namespace_matching,
-                                                    dispatcher_, *config_validators_.get()));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
+                                     OpaqueResourceDecoderPtr resource_decoder) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_,
+                                       *config_validators_.get(), std::move(resource_decoder)));
   subscription_ordering_.emplace_back(type_url);
 }
 

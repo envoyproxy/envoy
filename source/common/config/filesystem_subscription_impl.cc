@@ -21,10 +21,11 @@ envoy::config::core::v3::PathConfigSource makePathConfigSource(const std::string
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     Event::Dispatcher& dispatcher,
     const envoy::config::core::v3::PathConfigSource& path_config_source,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
-      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+    : path_(path_config_source.path()), callbacks_(callbacks),
+      resource_decoder_(std::move(resource_decoder)), stats_(stats), api_(api),
+      validation_visitor_(validation_visitor) {
   if (!path_config_source.has_watched_directory()) {
     file_watcher_ = dispatcher.createFilesystemWatcher();
     file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
@@ -68,8 +69,8 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   auto& message = *owned_message;
   MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
   *config_update = std::move(owned_message);
-  const auto decoded_resources =
-      DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
+  const auto decoded_resources = DecodedResourcesWrapper(
+      *resource_decoder_.get(), message.resources(), message.version_info());
   callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
   return message.version_info();
 }
@@ -107,10 +108,10 @@ void FilesystemSubscriptionImpl::refresh() {
 FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
     Event::Dispatcher& dispatcher,
     const envoy::config::core::v3::PathConfigSource& path_config_source,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks, resource_decoder, stats,
-                                 validation_visitor, api) {}
+    : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks,
+                                 std::move(resource_decoder), stats, validation_visitor, api) {}
 
 std::string
 FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
@@ -150,7 +151,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
     // TODO(htuch): implement indirect collection entries.
     if (collection_entry.has_inline_entry()) {
       decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(
-          resource_decoder_, collection_entry.inline_entry()));
+          *resource_decoder_.get(), collection_entry.inline_entry()));
     }
   }
   *config_update = std::move(owned_resource_message);

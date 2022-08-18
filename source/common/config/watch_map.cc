@@ -21,9 +21,10 @@ std::string namespaceFromName(const std::string& resource_name) {
 }
 } // namespace
 
-Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks,
-                          OpaqueResourceDecoder& resource_decoder) {
-  auto watch = std::make_unique<Watch>(callbacks, resource_decoder);
+Watch* WatchMap::addWatch(SubscriptionCallbacks& callbacks) {
+  // TODO(adisuissa): there isn't a real need to pass the resource decoder to
+  // the Watch. Need to clean this in the future.
+  auto watch = std::make_unique<Watch>(callbacks, *resource_decoder_);
   Watch* watch_ptr = watch.get();
   wildcard_watches_.insert(watch_ptr);
   watches_.insert(std::move(watch));

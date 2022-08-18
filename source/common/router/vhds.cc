@@ -51,7 +51,8 @@ VhdsSubscription::VhdsSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, std::move(resource_decoder_),
+          options);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
