@@ -350,10 +350,11 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     const bool skip_encoding_empty_trailers = trailers.empty();
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
-      onLocalEndStream();
     }
+    onLocalEndStream();
   } else {
     submitTrailers(trailers);
+    onLocalEndStream();
     if (parent_.sendPendingFramesAndHandleError()) {
       // Intended to check through coverage that this error case is tested
       return;
