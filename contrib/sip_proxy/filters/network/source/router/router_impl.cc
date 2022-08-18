@@ -725,7 +725,7 @@ UpstreamConnection::getDownstreamConnection(std::string& downstream_connection_i
 // Tcp::ConnectionPool::UpstreamCallbacks
 void UpstreamConnection::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   UNREFERENCED_PARAMETER(end_stream);
-  ENVOY_LOG(debug, "sip proxy received resp {} --> {} bytes {}",
+  ENVOY_LOG(debug, "sip proxy received msg {} --> {} bytes {}",
             conn_data_->connection().connectionInfoProvider().remoteAddress()->asStringView(),
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());

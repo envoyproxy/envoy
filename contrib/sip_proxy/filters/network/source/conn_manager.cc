@@ -405,7 +405,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
   } 
 }
 
-bool ConnectionManager::UpstreamMessageDecoder::onData(MessageMetadataSharedPtr metadata) {
+bool ConnectionManager::ResponseDecoder::onData(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   if (auto status = transportBegin(metadata_); status == FilterStatus::StopIteration) {
     return true;
@@ -426,14 +426,14 @@ bool ConnectionManager::UpstreamMessageDecoder::onData(MessageMetadataSharedPtr 
   return true;
 }
 
-FilterStatus ConnectionManager::UpstreamMessageDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
+FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   UNREFERENCED_PARAMETER(metadata);
   return FilterStatus::Continue;
 }
 
-FilterStatus ConnectionManager::UpstreamMessageDecoder::messageEnd() { return FilterStatus::Continue; }
+FilterStatus ConnectionManager::ResponseDecoder::messageEnd() { return FilterStatus::Continue; }
 
-FilterStatus ConnectionManager::UpstreamMessageDecoder::transportEnd() {
+FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
   ConnectionManager& cm = parent_.parent_;
@@ -612,7 +612,7 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamActiveTrans::upstreamDat
 }
 
 void ConnectionManager::DownstreamActiveTrans::startUpstreamResponse() {
-  response_decoder_ = std::make_unique<UpstreamMessageDecoder>(*this);
+  response_decoder_ = std::make_unique<ResponseDecoder>(*this);
 }
 
 void ConnectionManager::DownstreamActiveTrans::onError(const std::string& what) {

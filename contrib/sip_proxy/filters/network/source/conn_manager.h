@@ -172,8 +172,8 @@ private:
 
   struct ActiveTrans;
 
-  struct UpstreamMessageDecoder : public DecoderCallbacks, public DecoderEventHandler {
-    UpstreamMessageDecoder(ActiveTrans& parent) : parent_(parent) {}
+  struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
+    ResponseDecoder(ActiveTrans& parent) : parent_(parent) {}
 
     bool onData(MessageMetadataSharedPtr metadata);
 
@@ -201,7 +201,7 @@ private:
     ActiveTrans& parent_;
     MessageMetadataSharedPtr metadata_;
   };
-  using UpstreamMessageDecoderPtr = std::unique_ptr<UpstreamMessageDecoder>;
+  using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
   // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
@@ -349,7 +349,7 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
     std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
-    UpstreamMessageDecoderPtr response_decoder_;
+    ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
 
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
