@@ -165,6 +165,16 @@ TEST(SpanContextExtractorTest, ExtractSpanContextWithTracestate) {
   EXPECT_EQ(span_context->tracestate(), "sample-tracestate");
 }
 
+TEST(SpanContextExtractorTest, IgnoreTracestateWithoutTraceparent) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"tracestate", "sample-tracestate"}};
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
+}
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace Tracers

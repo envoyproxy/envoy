@@ -93,7 +93,8 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   bool sampled = (decoded_trace_flags & 1);
 
   // If a tracestate header is received without an accompanying traceparent header,
-  // it is invalid and MUST be discarded.
+  // it is invalid and MUST be discarded. Because we're already checking for the
+  // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
   absl::string_view tracestate = "";
   // TODO: what if tracestate is in multiple headers? Spec says we should combine, but Envoy
