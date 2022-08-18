@@ -75,11 +75,11 @@ public:
     });
 
     // Build and add the xDS cluster config.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      xds_cluster->MergeFrom(ConfigHelper::buildStaticCluster(std::string(XDS_CLUSTER_NAME),
-                                                              /*port=*/0,
-                                                              /*address=*/"127.0.0.1"));
+      xds_cluster->MergeFrom(ConfigHelper::buildStaticCluster(
+          std::string(XDS_CLUSTER_NAME),
+          /*port=*/0, ipVersion() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1"));
       ConfigHelper::setHttp2(*xds_cluster);
     });
 
