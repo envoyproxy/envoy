@@ -8,7 +8,7 @@ namespace Server {
 
 ProfilingHandler::ProfilingHandler(const std::string& profile_path) : profile_path_(profile_path) {}
 
-Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code ProfilingHandler::handlerCpuProfiler(Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
@@ -33,7 +33,7 @@ Http::Code ProfilingHandler::handlerCpuProfiler(absl::string_view, Http::Respons
   return Http::Code::OK;
 }
 
-Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code ProfilingHandler::handlerHeapProfiler(Http::ResponseHeaderMap&,
                                                  Buffer::Instance& response,
                                                  AdminStream& admin_stream) {
   if (!Profiler::Heap::profilerEnabled()) {
@@ -78,7 +78,7 @@ Http::Code ProfilingHandler::handlerHeapProfiler(absl::string_view, Http::Respon
   return res;
 }
 
-Http::Code TcmallocProfilingHandler::handlerHeapDump(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code TcmallocProfilingHandler::handlerHeapDump(Http::ResponseHeaderMap&,
                                                      Buffer::Instance& response, AdminStream&) {
   auto dump_result = Profiler::TcmallocProfiler::tcmallocHeapProfile();
 

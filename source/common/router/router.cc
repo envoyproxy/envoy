@@ -50,11 +50,11 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
-                  const Network::Connection& connection) {
+                  OptRef<const Network::Connection> connection) {
   if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
-  if (!connection.ssl()) {
+  if (connection.has_value() && !connection->ssl()) {
     return true;
   }
   return false;
@@ -1660,7 +1660,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 
   const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't change the scheme from the original request
-  const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
+  const bool scheme_is_http = schemeIsHttp(downstream_headers, callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: incorrect scheme for {}", *callbacks_,

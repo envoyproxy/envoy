@@ -12,7 +12,7 @@ namespace Server {
 
 ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ListenersHandler::handlerDrainListeners(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response,
                                                    AdminStream& admin_query) {
   const Http::Utility::QueryParams params = admin_query.queryParams();
@@ -38,8 +38,7 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view, Http::Resp
   return Http::Code::OK;
 }
 
-Http::Code ListenersHandler::handlerListenerInfo(absl::string_view,
-                                                 Http::ResponseHeaderMap& response_headers,
+Http::Code ListenersHandler::handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
                                                  Buffer::Instance& response,
                                                  AdminStream& admin_query) {
   const Http::Utility::QueryParams query_params = admin_query.queryParams();
