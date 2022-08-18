@@ -201,10 +201,10 @@ envoy_benchmark_test(
 )
 
 envoy_cc_test(
-    name = "eds_subscription_factory_test",
-    srcs = ["eds_subscription_factory_test.cc"],
+    name = "multiplexed_subscription_factory_test",
+    srcs = ["multiplexed_subscription_factory_test.cc"],
     deps = [
-        "//source/common/upstream:eds_subscription_factory_lib",
+        "//source/common/upstream:multiplexed_subscription_factory_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:custom_config_validators_mocks",

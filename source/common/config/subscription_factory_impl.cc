@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/filesystem_subscription_impl.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/grpc_subscription_impl.h"
@@ -69,63 +68,17 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
           callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
           validation_visitor_);
-    case envoy::config::core::v3::ApiConfigSource::GRPC: {
-      GrpcMuxSharedPtr mux;
+    case envoy::config::core::v3::ApiConfigSource::GRPC:
+    case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
-
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
-        mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
-            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                   scope, true)
-                ->createUncachedRawAsyncClient(),
-            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
-            Utility::parseRateLimitSettings(api_config_source), local_info_,
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
-      } else {
-        mux = std::make_shared<Config::GrpcMuxImpl>(
-            local_info_,
-            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                   scope, true)
-                ->createUncachedRawAsyncClient(),
-            dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
-            Utility::parseRateLimitSettings(api_config_source),
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
-      }
+      GrpcMuxSharedPtr mux =
+          getOrCreateMux(api_config_source, type_url, scope, custom_config_validators);
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false, options);
-    }
-    case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
-      GrpcMuxSharedPtr mux;
-      CustomConfigValidatorsPtr custom_config_validators =
-          std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
-                                                       api_config_source.config_validators());
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
-        mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
-            Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                   scope, true)
-                ->createUncachedRawAsyncClient(),
-            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
-            Utility::parseRateLimitSettings(api_config_source), local_info_,
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
-      } else {
-        mux = std::make_shared<Config::NewGrpcMuxImpl>(
-            Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                           api_config_source, scope, true)
-                ->createUncachedRawAsyncClient(),
-            dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
-            Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(custom_config_validators));
-      }
-      return std::make_unique<GrpcSubscriptionImpl>(
-          std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
     }
     throw EnvoyException("Invalid API config source API type");
@@ -147,7 +100,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
   SubscriptionStats stats = Utility::generateStats(scope);
-
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());
@@ -223,5 +175,56 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   }
 }
 
+GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, absl::string_view type_url,
+    Stats::Scope& scope, CustomConfigValidatorsPtr& custom_config_validators) {
+  GrpcMuxSharedPtr mux;
+  switch (api_config_source.api_type()) {
+  case envoy::config::core::v3::ApiConfigSource::GRPC: {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+      mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
+          Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                 scope, true)
+              ->createUncachedRawAsyncClient(),
+          dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
+          Utility::parseRateLimitSettings(api_config_source), local_info_,
+          api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators));
+    } else {
+      mux = std::make_shared<Config::GrpcMuxImpl>(
+          local_info_,
+          Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                 scope, true)
+              ->createUncachedRawAsyncClient(),
+          dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
+          Utility::parseRateLimitSettings(api_config_source),
+          api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators));
+    }
+    break;
+  }
+  case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+      mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+          Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
+                                                 scope, true)
+              ->createUncachedRawAsyncClient(),
+          dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+          Utility::parseRateLimitSettings(api_config_source), local_info_,
+          api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators));
+    } else {
+      mux = std::make_shared<Config::NewGrpcMuxImpl>(
+          Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                         api_config_source, scope, true)
+              ->createUncachedRawAsyncClient(),
+          dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+          Utility::parseRateLimitSettings(api_config_source), local_info_,
+          std::move(custom_config_validators));
+    }
+    break;
+  }
+  default:
+    throw EnvoyException("Unsupported api type in api config source, cannot create GRPC mux.");
+  }
+  return mux;
+}
 } // namespace Config
 } // namespace Envoy

@@ -34,8 +34,8 @@
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
-#include "source/common/upstream/eds_subscription_factory.h"
 #include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/multiplexed_subscription_factory.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -323,8 +323,8 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
-  Config::SubscriptionFactory& edsSubscriptionFactory() override {
-    return eds_subscription_factory_;
+  Config::SubscriptionFactory& multiplexedSubscriptionFactory() override {
+    return multiplexed_subscription_factory_;
   }
 
   void
@@ -765,7 +765,7 @@ private:
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
   Config::SubscriptionFactoryImpl subscription_factory_;
-  EdsSubscriptionFactory eds_subscription_factory_;
+  MultiplexedSubscriptionFactory multiplexed_subscription_factory_;
   ClusterSet primary_clusters_;
 };
 

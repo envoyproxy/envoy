@@ -56,7 +56,7 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
-  MOCK_METHOD(Config::SubscriptionFactory&, edsSubscriptionFactory, ());
+  MOCK_METHOD(Config::SubscriptionFactory&, multiplexedSubscriptionFactory, ());
   const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
   const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
     return cluster_load_report_stat_names_;
@@ -86,7 +86,7 @@ public:
   absl::optional<std::string> local_cluster_name_;
   NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
-  NiceMock<Config::MockSubscriptionFactory> eds_subscription_factory_;
+  NiceMock<Config::MockSubscriptionFactory> multiplexed_subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
   Stats::TestUtil::TestSymbolTable symbol_table_;

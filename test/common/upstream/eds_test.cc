@@ -134,11 +134,11 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ = cm_.eds_subscription_factory_.callbacks_;
+    eds_callbacks_ = cm_.multiplexed_subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.eds_subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 

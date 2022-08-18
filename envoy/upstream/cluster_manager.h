@@ -371,11 +371,13 @@ public:
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
   /**
-   * Obtain EDS subscription factory for the cluster manager.
+   * Obtain multiplexed subscription factory for the cluster manager.
+   * This factory shares mux per management server per xds method which reduces number of active
+   * grpc streams.
    *
-   * @return Config::SubscriptionFactory& EDS subscription factory.
+   * @return Config::SubscriptionFactory& multiplexed subscription factory.
    */
-  virtual Config::SubscriptionFactory& edsSubscriptionFactory() PURE;
+  virtual Config::SubscriptionFactory& multiplexedSubscriptionFactory() PURE;
 
   /**
    * Returns a struct with all the Stats::StatName objects needed by
