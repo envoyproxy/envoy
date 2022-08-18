@@ -80,11 +80,20 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
     for (const auto& item : map) {
       if (i > 0) {
         *out++ = ',';
+        *out++ = ' ';
       }
-      out = detail::write_range_entry<char>(out, absl::CEscape(item.first));
+      *out++ = '"';
+      for (const auto& ch : absl::CEscape(item.first)) {
+        *out++ = ch;
+      }
+      *out++ = '"';
       *out++ = ':';
       *out++ = ' ';
-      out = detail::write_range_entry<char>(out, absl::CEscape(item.second));
+      *out++ = '"';
+      for (const auto& ch : absl::CEscape(item.second)) {
+        *out++ = ch;
+      }
+      *out++ = '"';
       ++i;
     }
     *out++ = '}';
