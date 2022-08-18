@@ -1,5 +1,5 @@
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@base_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
@@ -13,7 +13,10 @@ py_binary(
     name = "generate_empty",
     srcs = ["generate_empty.py"],
     visibility = ["//visibility:public"],
-    deps = [":protodoc"],
+    deps = [
+        ":jinja",
+        ":protodoc",
+    ],
 )
 
 py_proto_library(
@@ -128,16 +131,26 @@ py_library(
 
 envoy_jinja_env(
     name = "jinja",
+    env_kwargs = {
+        "trim_blocks": True,
+        "lstrip_blocks": True,
+    },
     filters = {
         "rst_anchor": "tools.protodoc.rst_filters.rst_anchor",
         "rst_header": "tools.protodoc.rst_filters.rst_header",
     },
     templates = [
+        "templates/comment.rst.tpl",
+        "templates/content.rst.tpl",
+        "templates/contrib_message.rst.tpl",
         "templates/empty.rst.tpl",
+        "templates/enum.rst.tpl",
         "templates/extension.rst.tpl",
         "templates/extension_category.rst.tpl",
+        "templates/file.rst.tpl",
+        "templates/header.rst.tpl",
+        "templates/message.rst.tpl",
+        "templates/security.rst.tpl",
     ],
-    deps = [
-        ":rst_filters",
-    ],
+    deps = [":rst_filters"],
 )
