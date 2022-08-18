@@ -14,11 +14,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using FilterConfigSharedPtr = std::shared_ptr<
-    const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>;
+using FilterConfig =
+    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
+using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 
 /**
- * TODO(tyxia) Placeholder!!!
+ * TODO(tyxia) Placeholder!!! Implement as needed.
  */
 class RequestCallbacks {
 public:
@@ -30,16 +31,18 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RequestCallbacks,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
-  RateLimitQuotaFilter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext&,
+  RateLimitQuotaFilter(FilterConfigConstSharedPtr config, Server::Configuration::FactoryContext&,
                        RateLimitClientPtr client)
       : config_(std::move(config)), rate_limit_client_(std::move(client)) {}
 
+  // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+  void onDestroy() override;
 
   ~RateLimitQuotaFilter() override = default;
 
 private:
-  FilterConfigSharedPtr config_;
+  FilterConfigConstSharedPtr config_;
   // TODO(tyxia) Rate limit client is a member of rate limit filter.
   RateLimitClientPtr rate_limit_client_;
 };

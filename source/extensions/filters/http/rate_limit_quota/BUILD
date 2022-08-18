@@ -21,6 +21,8 @@ envoy_cc_library(
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
+        # Needed for bucket id, temporary.
+        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
 )
 

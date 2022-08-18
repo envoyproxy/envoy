@@ -14,25 +14,25 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
         filter_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  FilterConfigSharedPtr config = std::make_shared<
+  FilterConfigConstSharedPtr config = std::make_shared<
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
 
-    // TODO(tyxia) Create the rate limit client when we create the filter
-    // or when we decode the header/data like
-    // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/ext_proc/ext_proc.cc;rcl=467572989;l=155
-    return
-        [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  // TODO(tyxia) Create the rate limit client early but start the grpc stream on the first request.
+  // TODO(tyxia) The filter config is shared pointer but the client is unique pointer.
+  return
+      [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
         callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
             config, context, createRateLimitClient(context, config->rlqs_server())));
-        };
+      };
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 RateLimitQuotaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return nullptr;
+    // TODO(tyxia) Not implemented.
+    return nullptr;
 }
 
 /*

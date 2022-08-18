@@ -15,6 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+// TODO(tyxia) remove this alias if not needed.
 using GrpcAsyncClientPtr = std::unique_ptr<
     Grpc::AsyncClient<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports,
                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>>;
@@ -27,6 +28,7 @@ using RateLimitQuotaResponsePtr =
     std::unique_ptr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 
 // Grpc bi-directional stream client.
+// TODO(tyxia) By current design, this class handles all the grpc operations.
 class RateLimitClientImpl : public RateLimitClient,
                             // TODO(tyxia) Why here is response ???
                             public Grpc::AsyncStreamCallbacks<
@@ -38,24 +40,26 @@ public:
   // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/ratelimit/ratelimit_impl.cc;rcl=399691660;l=22
   // TODO(tyxia) rvalue referecne is not recommended
   // go/cstyle#Rvalue_references
+  // TODO(tyxia) Remove this function we can just create the async_client in place inside of
+  // this class, i.e., no need to pass/move around.
   RateLimitClientImpl(GrpcAsyncClientPtr client) { client_ = std::move(client); }
   RateLimitClientImpl(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)) {
 
-    // TODO(tyxia) Think about how to efficiently open grpc stream
-    // How about starting the stream on the first request.
-    // The difference is when to create the stream object.
-    Http::AsyncClient::StreamOptions options;
-    stream_ = aync_client_.start(
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this, options);
-    if (stream_ == nullptr) {
-      ENVOY_LOG(warn, "Unable to establish new stream");
-      // TODO(tyxia) Error handling
-    }
+    // // TODO(tyxia) Think about how to efficiently open grpc stream
+    // // How about starting the stream on the first request.
+    // // The difference is when to create the stream object.
+    // Http::AsyncClient::StreamOptions options;
+    // stream_ = aync_client_.start(
+    //     *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+    //         "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
+    //     *this, options);
+    // if (stream_ == nullptr) {
+    //   ENVOY_LOG(warn, "Unable to establish new stream");
+    //   // TODO(tyxia) Error handling
+    // }
   }
 
   // TODO(tyxia) I don't see why callbacks need to be implemented implemented as callback
@@ -71,16 +75,23 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  // From RateLimitClient
+  // RateLimitQuota::RateLimitClient
   void rateLimit() override;
 
+  // TODO(tyxia) Do we need this to be abstract class in RateLimit
+  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports& reports);
+  // envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports buildBucketIds()
   bool startStream();
+  void closeStream();
+
 private:
-  // TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it
-  // should not require the ownership transfer.
-  GrpcAsyncClientPtr client_;
-  GrpcAsyncClient aync_client_;
-  Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
+// TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it
+// should not require the ownership transfer.
+GrpcAsyncClientPtr client_;
+GrpcAsyncClient aync_client_;
+Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
+// TODO(tyxia) Do we need this flag??
+bool stream_closed = false;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
