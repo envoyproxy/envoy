@@ -27,7 +27,7 @@ using Literal = absl::string_view;
 /**
  * Determines what operations to use on the input pattern segment
  */
-enum class Operator { KPathGlob, KTextGlob };
+enum class Operator { PathGlob, TextGlob };
 
 /**
  * Represents a pattern variable. Variables are included in both path match and rewrite paths.
@@ -57,16 +57,18 @@ struct ParsedUrlPattern {
 
 /**
  * Check if literal is valid
+ * Literals cannot hold wildcards or curl brackets.
  */
 bool isValidLiteral(absl::string_view literal);
 
 /**
  * Check if rewrite literal is valid
+ * Literals cannot hold wildcards or curl brackets.
  */
 bool isValidRewriteLiteral(absl::string_view literal);
 
 /**
- * Check if indent is valid
+ * Check if variable name is valid
  */
 bool isValidVariableName(absl::string_view indent);
 
@@ -100,7 +102,8 @@ absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern
 absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern);
 
 /**
- * Converts input pattern to ParsedUrlPattern
+ * Converts input pattern to ParsedUrlPattern.
+ * ParsedUrlPattern hold prefix, string literals, and variables for rewrite.
  */
 absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern);
 

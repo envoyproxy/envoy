@@ -44,7 +44,7 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        ":@";
 
 // Default operator used for the variable when none specified.
-constexpr Operator kDefaultVariableOperator = Operator::KPathGlob;
+constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
 
 // Visitor for displaying debug info of a ParsedSegment/Variable.var_match.
 struct ToStringVisitor {
@@ -74,9 +74,9 @@ std::string toString(const Literal val) { return std::string(val); }
 
 std::string toString(const Operator val) {
   switch (val) {
-  case Operator::KPathGlob:
+  case Operator::PathGlob:
     return "*";
-  case Operator::KTextGlob:
+  case Operator::TextGlob:
     return "**";
   }
   return "";
@@ -150,10 +150,10 @@ absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern) 
 
 absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern) {
   if (absl::StartsWith(pattern, "**")) {
-    return ParsedResult<Operator>(Operator::KTextGlob, pattern.substr(2));
+    return ParsedResult<Operator>(Operator::TextGlob, pattern.substr(2));
   }
   if (absl::StartsWith(pattern, "*")) {
-    return ParsedResult<Operator>(Operator::KPathGlob, pattern.substr(1));
+    return ParsedResult<Operator>(Operator::PathGlob, pattern.substr(1));
   }
   return absl::InvalidArgumentError("Invalid Operator");
 }
@@ -247,7 +247,7 @@ absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
       if (seen_text_glob) {
         return absl::InvalidArgumentError("Glob after text glob.");
       }
-      seen_text_glob = (absl::get<Operator>(segment) == Operator::KTextGlob);
+      seen_text_glob = (absl::get<Operator>(segment) == Operator::TextGlob);
     } else if (absl::holds_alternative<Variable>(segment)) {
       const Variable& var = absl::get<Variable>(segment);
       if (var.var_match_.empty()) {
@@ -263,7 +263,7 @@ absl::Status validateNoOperatorAfterTextGlob(struct ParsedUrlPattern pattern) {
           if (seen_text_glob) {
             return absl::InvalidArgumentError("Glob after text glob.");
           }
-          seen_text_glob = (absl::get<Operator>(var_seg) == Operator::KTextGlob);
+          seen_text_glob = (absl::get<Operator>(var_seg) == Operator::TextGlob);
         }
       }
     }
@@ -359,9 +359,9 @@ std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
   switch (pattern) {
-  case Operator::KPathGlob: // "*"
+  case Operator::PathGlob: // "*"
     return *kPathGlobRegex;
-  case Operator::KTextGlob: // "**"
+  case Operator::TextGlob: // "**"
     return *kTextGlobRegex;
   }
   return "";

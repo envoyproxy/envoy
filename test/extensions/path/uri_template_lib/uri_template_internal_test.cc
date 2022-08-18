@@ -33,8 +33,8 @@ TEST(InternalParsing, ParsedUrlDebugString) {
       {
           "abc",
           "def",
-          Operator::KPathGlob,
-          Variable("var", {Operator::KPathGlob, "ghi", Operator::KTextGlob}),
+          Operator::PathGlob,
+          Variable("var", {Operator::PathGlob, "ghi", Operator::TextGlob}),
       },
       ".test",
       {},
@@ -108,7 +108,7 @@ TEST(InternalParsing, ConsumeTextGlob) {
   absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value_, Operator::KTextGlob);
+  EXPECT_EQ(result->parsed_value_, Operator::TextGlob);
   EXPECT_EQ(result->unconsumed_pattern_, "*abc/123");
 }
 
@@ -125,7 +125,7 @@ TEST(InternalParsing, ConsumePathGlob) {
   absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
 
   ASSERT_OK(result);
-  EXPECT_EQ(result->parsed_value_, Operator::KPathGlob);
+  EXPECT_EQ(result->parsed_value_, Operator::PathGlob);
   EXPECT_EQ(result->unconsumed_pattern_, "/123");
 }
 
@@ -268,31 +268,31 @@ TEST(InternalRegexGen, DollarSignMatchesIfself) {
 }
 
 TEST(InternalRegexGen, OperatorRegexPattern) {
-  EXPECT_EQ(toRegexPattern(Operator::KPathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@]+");
-  EXPECT_EQ(toRegexPattern(Operator::KTextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@/]*");
+  EXPECT_EQ(toRegexPattern(Operator::PathGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@]+");
+  EXPECT_EQ(toRegexPattern(Operator::TextGlob), "[a-zA-Z0-9-._~%!$&'()+,;:@/]*");
 }
 
 TEST(InternalRegexGen, PathGlobRegex) {
-  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::KPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("", toRegexPattern(Operator::KPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc/123", toRegexPattern(Operator::KPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::KPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::KPathGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::KPathGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::PathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("", toRegexPattern(Operator::PathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc/123", toRegexPattern(Operator::PathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::PathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::PathGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::PathGlob)));
 }
 
 TEST(InternalRegexGen, TextGlobRegex) {
-  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::KTextGlob)));
-  EXPECT_TRUE(RE2::FullMatch("", toRegexPattern(Operator::KTextGlob)));
-  EXPECT_TRUE(RE2::FullMatch("abc/123", toRegexPattern(Operator::KTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::KTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::KTextGlob)));
-  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::KTextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc.123", toRegexPattern(Operator::TextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("", toRegexPattern(Operator::TextGlob)));
+  EXPECT_TRUE(RE2::FullMatch("abc/123", toRegexPattern(Operator::TextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("*", toRegexPattern(Operator::TextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("**", toRegexPattern(Operator::TextGlob)));
+  EXPECT_FALSE(RE2::FullMatch("abc*123", toRegexPattern(Operator::TextGlob)));
 }
 
 TEST(InternalRegexGen, VariableRegexPattern) {
   EXPECT_EQ(toRegexPattern(Variable("var1", {})), "(?P<var1>[a-zA-Z0-9-._~%!$&'()+,;:@]+)");
-  EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::KPathGlob, "abc", Operator::KTextGlob})),
+  EXPECT_EQ(toRegexPattern(Variable("var2", {Operator::PathGlob, "abc", Operator::TextGlob})),
             "(?P<var2>[a-zA-Z0-9-._~%!$&'()+,;:@]+/abc/"
             "[a-zA-Z0-9-._~%!$&'()+,;:@/]*)");
 }
