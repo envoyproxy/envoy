@@ -14,6 +14,11 @@ namespace Config {
 /**
  * An interface for hooking into xDS resource fetch and update events.
  * Currently, this interface only supports the SotW (state-of-the-world) xDS protocol.
+ *
+ * Instances of this interface get invoked on the main Envoy thread. Thus, it is important for
+ * implementations of this interface to not execute any blocking operations on the same thread.
+ * Any blocking operations (e.g. flushing config to disk) should be handed off to a separate thread
+ * so we don't block the main thread.
  */
 class XdsResourcesDelegate {
 public:
