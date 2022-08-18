@@ -14,7 +14,7 @@ namespace Server {
 namespace {
 
 const Regex::CompiledGoogleReMatcher& promRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false, false);
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
 }
 
 /**

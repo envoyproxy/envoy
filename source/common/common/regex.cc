@@ -14,8 +14,8 @@ namespace Envoy {
 namespace Regex {
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
-                                                 bool do_program_size_check, bool partial_match)
-    : regex_(regex, re2::RE2::Quiet), partial_match_(partial_match) {
+                                                 bool do_program_size_check)
+    : regex_(regex, re2::RE2::Quiet) {
   if (!regex_.ok()) {
     throw EnvoyException(regex_.error());
   }
@@ -44,7 +44,7 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(
     const envoy::type::matcher::v3::RegexMatcher& config)
-    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size(), false) {
+    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
   const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
 
   // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
@@ -62,7 +62,11 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
 GoogleReEngine::GoogleReEngine(bool partial_match) : partial_match_(partial_match) {}
 
 CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {
-  return std::make_unique<CompiledGoogleReMatcher>(regex, true, partial_match_);
+  if (partial_match_) {
+    return std::make_unique<CompiledGoogleRePartialMatcher>(regex, true);
+  }
+
+  return std::make_unique<CompiledGoogleReMatcher>(regex, true);
 }
 
 EnginePtr GoogleReEngineFactory::createEngine(

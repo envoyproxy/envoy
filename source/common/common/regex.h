@@ -20,22 +20,16 @@ namespace Regex {
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check,
-                                   bool partial_match);
+  explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
 
   explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
-      : CompiledGoogleReMatcher(config.regex(), false, false) {}
+      : CompiledGoogleReMatcher(config.regex(), false) {}
 
   explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config);
 
   // CompiledMatcher
   bool match(absl::string_view value) const override {
-    re2::StringPiece text(value.data(), value.size());
-    if (partial_match_) {
-      return re2::RE2::PartialMatch(text, regex_);
-    }
-
-    return re2::RE2::FullMatch(text, regex_);
+    return re2::RE2::FullMatch(re2::StringPiece(value.data(), value.size()), regex_);
   }
 
   // CompiledMatcher
@@ -46,9 +40,19 @@ public:
     return result;
   }
 
-private:
+protected:
   const re2::RE2 regex_;
-  const bool partial_match_;
+};
+
+class CompiledGoogleRePartialMatcher : public CompiledGoogleReMatcher {
+public:
+  explicit CompiledGoogleRePartialMatcher(const std::string& regex, bool do_program_size_check)
+      : CompiledGoogleReMatcher(regex, do_program_size_check) {}
+
+  // CompiledGoogleReMatcher
+  bool match(absl::string_view value) const override {
+    return re2::RE2::PartialMatch(re2::StringPiece(value.data(), value.size()), regex_);
+  }
 };
 
 class GoogleReEngine : public Engine {
