@@ -653,7 +653,6 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
   response.encode(*metadata_, buffer);
 
   MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>(buffer.toString());
-  response_metadata->setEP(return_destination_);
   response_metadata->setMsgType(MsgType::Response);
 
   ENVOY_LOG(debug, "send upstream local reply to {} bytes {}\n{}", return_destination_,
