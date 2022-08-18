@@ -96,14 +96,18 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  absl::string_view tracestate = "";
-  // TODO: what if tracestate is in multiple headers? Spec says we should combine, but Envoy
-  // currently only surfaces the first seen.
-  auto tracestate_header = trace_context_.getByKey(openTelemetryTraceStateHeader());
-  if (tracestate_header.has_value()) {
-    // If there is tracestate content, we want to store that in the OTLP span.
-    tracestate = tracestate_header.value();
-  }
+  absl::string_view tracestate_key = openTelemetryTraceStateHeader();
+  std::vector<std::string> tracestate_values;
+  // Multiple tracestate header fields MUST be handled as specified by RFC7230 Section 3.2.2 Field
+  // Order.
+  trace_context_.forEach(
+      [&tracestate_key, &tracestate_values](absl::string_view key, absl::string_view value) {
+        if (key == tracestate_key) {
+          tracestate_values.push_back(std::string{value});
+        }
+        return true;
+      });
+  std::string tracestate = absl::StrJoin(tracestate_values, ",");
 
   SpanContext span_context(version, trace_id, parent_id, sampled, tracestate);
   return span_context;
