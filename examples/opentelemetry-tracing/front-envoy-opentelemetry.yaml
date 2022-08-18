@@ -18,7 +18,7 @@ static_resources:
                 "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
                 grpc_service:
                   envoy_grpc:
-                    cluster_name: opentelemetry-collector
+                    cluster_name: opentelemetry_collector
                   timeout: 0.250s
                 service_name: "front-envoy"
           codec_type: AUTO
