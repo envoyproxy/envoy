@@ -106,6 +106,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
 
   Http::MockResponseDecoder outer_decoder;
   client_->newStream(outer_decoder);
+  inner_encoder.stream_.runStreamEndCallbacks();
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
@@ -124,6 +125,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
 
   Http::MockResponseDecoder outer_decoder;
   client_->newStream(outer_decoder);
+  inner_encoder.stream_.runStreamEndCallbacks();
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
@@ -172,6 +174,8 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_CALL(callbacks, onStreamEnd());
+  inner_encoder.stream_.runStreamEndCallbacks();
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));

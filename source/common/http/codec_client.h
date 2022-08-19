@@ -249,6 +249,7 @@ private:
    */
   void responsePreDecodeComplete(ActiveRequest& request);
   void onRequestStreamEnd(ActiveRequest& request);
+  void completeRequest(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);

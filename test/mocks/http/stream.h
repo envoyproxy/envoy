@@ -45,6 +45,14 @@ public:
     }
   }
 
+  void runStreamEndCallbacks() {
+    for (auto* callback : callbacks_) {
+      if (callback) {
+        callback->onStreamEnd();
+      }
+    }
+  }
+
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};

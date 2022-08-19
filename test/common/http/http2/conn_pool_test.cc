@@ -296,7 +296,11 @@ void Http2ConnPoolImplTest::closeAllClients() {
 }
 
 void Http2ConnPoolImplTest::completeRequest(ActiveTestRequest& r) {
-  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -364,7 +368,11 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   expectConnectionSetupForClient(1);
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);
-  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -390,7 +398,11 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionReadyWithRequest) {
   expectClientCreate();
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);
-  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -415,7 +427,11 @@ TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
   expectClientCreate();
   ActiveTestRequest r(*this, 0, false);
   expectClientConnect(0, r);
-  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -608,7 +624,11 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -619,7 +639,11 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
   expectClientConnect(1, r2);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -707,18 +731,30 @@ TEST_F(Http2ConnPoolImplTest, PendingStreams) {
   expectClientConnect(0, r3);
 
   // Send a request through each stream.
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
-  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r3.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r3.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -756,18 +792,30 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingTotalRequestsPerConn
   expectClientConnect(1, r3);
 
   // Send a request through each stream.
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
-  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r3.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r3.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -800,18 +848,30 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingConcurrentRequestsPe
   expectClientConnect(1, r3);
 
   // Send a request through each stream.
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
 
-  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r3.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r3.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r3.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -958,7 +1018,11 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -990,7 +1054,11 @@ TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   expectClientConnect(0, r1);
   // capacity goes down by one as one stream is used.
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 536870911 /*capacity*/);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1014,7 +1082,11 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1025,7 +1097,11 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   ActiveTestRequest r2(*this, 0, true);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1096,7 +1172,11 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1124,7 +1204,11 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1132,7 +1216,11 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
   expectClientConnect(1, r2);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1168,7 +1256,11 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1176,7 +1268,11 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
   expectClientConnect(1, r2);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1212,7 +1308,11 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1227,7 +1327,11 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   expectClientConnect(1, r2);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1265,7 +1369,11 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
   expectClientConnect(1, r2);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1294,7 +1402,11 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1320,7 +1432,11 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
-  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r1.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
@@ -1334,7 +1450,11 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
   expectClientConnect(1, r2);
-  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
+  EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const RequestHeaderMap&, bool) -> Status {
+        r2.inner_encoder_.stream_.runStreamEndCallbacks();
+        return okStatus();
+      }));
   EXPECT_TRUE(
       r2.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)

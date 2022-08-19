@@ -131,11 +131,7 @@ void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
 
   request.decode_complete_ = true;
   if (request.encode_complete_) {
-    deleteRequest(request);
-    // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
-    // of CodecClient will deal with the premature response case and we should not handle any
-    // further reset notification.
-    request.encoder_->getStream().removeCallbacks(request);
+    completeRequest(request);
   } else {
     ENVOY_CONN_LOG(debug, "waiting for encode to complete", *connection_);
   }
@@ -145,12 +141,16 @@ void CodecClient::onRequestStreamEnd(ActiveRequest& request) {
   ENVOY_CONN_LOG(debug, "encode complete", *connection_);
   request.encode_complete_ = true;
   if (request.decode_complete_) {
-    deleteRequest(request);
-    // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
-    // of CodecClient will deal with the premature response case and we should not handle any
-    // further reset notification.
-    request.encoder_->getStream().removeCallbacks(request);
+    completeRequest(request);
   }
+}
+
+void CodecClient::completeRequest(ActiveRequest& request) {
+  deleteRequest(request);
+  // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
+  // of CodecClient will deal with the premature response case and we should not handle any
+  // further reset notification.
+  request.encoder_->getStream().removeCallbacks(request);
 }
 
 void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {

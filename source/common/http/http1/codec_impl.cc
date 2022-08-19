@@ -1491,7 +1491,9 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
     // be reset just yet. Preserve the state in pending_response_done_ instead.
     pending_response_done_ = true;
 
-    // Signal end of request stream on response completion.
+    // Signal end of request stream on response completion. This makes a client
+    // behave as if the request stream is always complete on response
+    // completion.
     response.encoder_.runStreamEndCallbacks();
 
     if (deferred_end_stream_headers_) {

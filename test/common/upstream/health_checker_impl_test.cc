@@ -640,6 +640,7 @@ public:
       response_headers->setEnvoyImmediateHealthCheckFail("true");
     }
 
+    test_sessions_[index]->request_encoder_.stream_.runStreamEndCallbacks();
     test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
                                                                      !body && !trailers);
     if (body) {
@@ -4385,6 +4386,7 @@ public:
     for (const auto& header : spec.response_headers) {
       response_headers->addCopy(header.first, header.second);
     }
+    test_sessions_[index]->request_encoder_.stream_.runStreamEndCallbacks();
     test_sessions_[index]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
                                                                      end_stream_on_headers);
     for (size_t i = 0; i < spec.body_chunks.size(); i++) {

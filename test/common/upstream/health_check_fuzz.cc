@@ -155,6 +155,7 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
                                Http::Headers::get().ConnectionValues.Close);
   }
 
+  test_sessions_[0]->request_encoder_.stream_.runStreamEndCallbacks();
   ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
 
@@ -389,6 +390,7 @@ void GrpcHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
 
   response_headers->setStatus(grpc_respond.grpc_respond_headers().status());
 
+  test_session_->request_encoder_.stream_.runStreamEndCallbacks();
   ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
   test_session_->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
                                                            end_stream_on_headers);
