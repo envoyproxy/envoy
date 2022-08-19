@@ -2851,6 +2851,7 @@ TEST_P(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
   auto status = codec_->dispatch(response);
@@ -2885,6 +2886,7 @@ TEST_P(Http1ClientConnectionImplTest, LowWatermarkDuringClose) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
 
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EXPECT_CALL(response_decoder, decodeHeaders_(_, true))
       .WillOnce(Invoke([&](ResponseHeaderMapPtr&, bool) {
         // Fake a call for going below the low watermark. Make sure no stream callbacks get called.

@@ -145,6 +145,8 @@ void EnvoyQuicClientStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
+  // Higher layers expect calling resetStream() to immediately raise reset callbacks.
+  runResetCallbacks(reason);
   Reset(envoyResetReasonToQuicRstError(reason));
 }
 

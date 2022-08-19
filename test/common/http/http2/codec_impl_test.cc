@@ -198,6 +198,7 @@ public:
     EXPECT_CALL(server_callbacks_, newStream(_, _))
         .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
+          EXPECT_CALL(server_stream_callbacks_, onStreamEnd()).Times(AnyNumber());
           encoder.getStream().addCallbacks(server_stream_callbacks_);
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
           return request_decoder_;
@@ -738,6 +739,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -808,6 +810,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -869,6 +872,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -1219,6 +1223,7 @@ TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelay) {
 
   // Now send a ping.
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   send_timer->invokeCallback();
 
   // Send the response and make sure the keepalive timeout is extended. After the response is
@@ -1261,6 +1266,7 @@ TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelayRuntimeFalse) {
 
   // Now send a ping.
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   send_timer->invokeCallback();
 
   // Send the response and make sure the keepalive timeout is not extended. After the response is
@@ -1609,6 +1615,7 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetForClientStreams) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).WillOnce(InvokeWithoutArgs([&]() -> void {
     Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
     EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    EXPECT_CALL(client_stream_callbacks, onStreamEnd());
     request_encoder_->encodeData(body, true);
     EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
@@ -1639,6 +1646,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
     auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(*flush_timer, disableTimer());
@@ -1678,6 +1686,7 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
     auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
     EXPECT_CALL(*flush_timer, disableTimer());
@@ -2089,6 +2098,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   driveClient();
   auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 
   // Now drive the response to completion, allowing a WINDOW_UPDATE from client to server. The
@@ -2113,6 +2123,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(client_stream_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -2132,6 +2143,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 
   // Invoke a stream flush timeout. Make sure we don't get a reset locally for higher layers but
@@ -2153,6 +2165,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(client_stream_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -2165,6 +2178,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   // The server enables the flush timer under encodeData(). The client then decodes some data.
   auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -2193,6 +2207,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(client_stream_callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
   driveToCompletion();
@@ -2205,6 +2220,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   // The server enables the flush timer under encodeData(). The client then decodes some data.
   auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  EXPECT_CALL(server_stream_callbacks_, onStreamEnd());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -2382,6 +2398,7 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks, onStreamEnd());
   EXPECT_CALL(request_decoder_, decodeData(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
     client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
     client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();

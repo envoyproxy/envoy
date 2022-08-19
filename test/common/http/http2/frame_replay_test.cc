@@ -29,6 +29,7 @@ class ResponseFrameCommentTest : public ::testing::Test {};
 // Creates and sets up a stream to reply to.
 void setupStream(ClientCodecFrameInjector& codec, TestClientConnectionImpl& connection) {
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);
+  EXPECT_CALL(codec.client_stream_callbacks_, onStreamEnd());
   codec.request_encoder_->getStream().addCallbacks(codec.client_stream_callbacks_);
   // Setup a single stream to inject frames as a reply to.
   TestRequestHeaderMapImpl request_headers;
