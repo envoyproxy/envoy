@@ -168,7 +168,7 @@ parseRouteConfigurationFromYaml(const std::string& yaml) {
 class ConfigImplTestBase {
 protected:
   ConfigImplTestBase()
-      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>()) {
+      : api_(Api::createApiForTest()), engine_(std::make_unique<Regex::GoogleReEngine>(false)) {
     ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 

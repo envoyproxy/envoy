@@ -119,7 +119,7 @@ class ConnectionManagerTest : public testing::Test {
 public:
   ConnectionManagerTest()
       : stats_(DubboFilterStats::generateStats("test.", store_)),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+        engine_(std::make_unique<Regex::GoogleReEngine>(false)) {
 
     route_config_provider_manager_ =
         std::make_unique<Router::RouteConfigProviderManagerImpl>(factory_context_.admin_);

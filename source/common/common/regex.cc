@@ -59,8 +59,6 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(
   }
 }
 
-GoogleReEngine::GoogleReEngine() : GoogleReEngine(false) {}
-
 GoogleReEngine::GoogleReEngine(bool partial_match) : partial_match_(partial_match) {}
 
 CompiledMatcherPtr GoogleReEngine::matcher(const std::string& regex) const {

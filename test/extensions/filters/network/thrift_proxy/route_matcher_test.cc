@@ -21,7 +21,7 @@ namespace {
 
 class ThriftRouteMatcherTest : public testing::Test {
 public:
-  ThriftRouteMatcherTest() : engine_(std::make_unique<Regex::GoogleReEngine>()) {}
+  ThriftRouteMatcherTest() : engine_(std::make_unique<Regex::GoogleReEngine>(false)) {}
 
 protected:
   RouteMatcher createMatcher(

@@ -49,7 +49,7 @@ class AccessLogImplTest : public Event::TestUsingSimulatedTime, public testing::
 public:
   AccessLogImplTest()
       : stream_info_(time_source_), file_(new MockAccessLogFile()),
-        engine_(std::make_unique<Regex::GoogleReEngine>()) {
+        engine_(std::make_unique<Regex::GoogleReEngine>(false)) {
     ON_CALL(context_, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(context_, accessLogManager()).WillByDefault(ReturnRef(log_manager_));
     ON_CALL(log_manager_, createAccessLog(_)).WillByDefault(Return(file_));

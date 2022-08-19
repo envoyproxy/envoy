@@ -24,7 +24,7 @@ bool hasFailures(
 int main(int argc, char* argv[]) {
   Envoy::Options options(argc, argv);
   Envoy::ScopedInjectableLoader<Envoy::Regex::Engine> engine(
-      std::make_unique<Envoy::Regex::GoogleReEngine>());
+      std::make_unique<Envoy::Regex::GoogleReEngine>(false));
 
   const bool enforce_coverage = options.failUnder() != 0.0;
   // We need this to ensure WSAStartup is called on Windows

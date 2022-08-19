@@ -57,7 +57,6 @@ public:
 
 class GoogleReEngine : public Engine {
 public:
-  GoogleReEngine();
   GoogleReEngine(bool partial_match);
 
   CompiledMatcherPtr matcher(const std::string& regex) const override;

@@ -30,7 +30,7 @@ TEST(Utility, ParseStdRegex) {
 }
 
 TEST(Utility, ParseRegex) {
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>(false));
   {
     envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();

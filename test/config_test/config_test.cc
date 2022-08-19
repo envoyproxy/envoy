@@ -206,7 +206,7 @@ uint32_t run(const std::string& directory) {
   // In the default startup process, we will inject regex engine before initializing config.
   // While in the ConfigTest, these kind of bootstrap injections will not take place, so we must
   // register regex engine in advance.
-  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>(false));
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
