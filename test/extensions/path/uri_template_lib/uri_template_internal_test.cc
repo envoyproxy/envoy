@@ -92,73 +92,73 @@ TEST(InternalParsing, IsValidVariableNameWorks) {
   EXPECT_FALSE(isValidVariableName("a!!!"));
 }
 
-TEST(InternalParsing, ConsumeLiteralWorks) {
+TEST(InternalParsing, ParseLiteralWorks) {
   std::string pattern = "abc/123";
 
-  absl::StatusOr<ParsedResult<Literal>> result = consumeLiteral(pattern);
+  absl::StatusOr<ParsedResult<Literal>> result = parseLiteral(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value_, "abc");
-  EXPECT_EQ(result->unconsumed_pattern_, "/123");
+  EXPECT_EQ(result->unparsed_pattern_, "/123");
 }
 
-TEST(InternalParsing, ConsumeTextGlob) {
+TEST(InternalParsing, ParseTextGlob) {
   std::string pattern = "***abc/123";
 
-  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
+  absl::StatusOr<ParsedResult<Operator>> result = parseOperator(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value_, Operator::TextGlob);
-  EXPECT_EQ(result->unconsumed_pattern_, "*abc/123");
+  EXPECT_EQ(result->unparsed_pattern_, "*abc/123");
 }
 
-TEST(InternalParsing, ConsumeInvalidOperator) {
+TEST(InternalParsing, ParsedInvalidOperator) {
   std::string pattern = "/";
 
-  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
+  absl::StatusOr<ParsedResult<Operator>> result = parseOperator(pattern);
   EXPECT_THAT(result, StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(InternalParsing, ConsumePathGlob) {
+TEST(InternalParsing, ParsePathGlob) {
   std::string pattern = "*/123";
 
-  absl::StatusOr<ParsedResult<Operator>> result = consumeOperator(pattern);
+  absl::StatusOr<ParsedResult<Operator>> result = parseOperator(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value_, Operator::PathGlob);
-  EXPECT_EQ(result->unconsumed_pattern_, "/123");
+  EXPECT_EQ(result->unparsed_pattern_, "/123");
 }
 
-class ConsumeVariableSuccess : public testing::TestWithParam<std::string> {};
+class ParseVariableSuccess : public testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_SUITE_P(ConsumeVariableSuccessTestSuite, ConsumeVariableSuccess,
+INSTANTIATE_TEST_SUITE_P(ParseVariableSuccessTestSuite, ParseVariableSuccess,
                          testing::Values("{var=*}", "{Var}", "{v1=**}", "{v_1=*/abc/**}",
                                          "{v3=abc}", "{v=123/*/*}", "{var=abc/*/def}"));
 
-TEST_P(ConsumeVariableSuccess, ConsumeVariableSuccessTest) {
+TEST_P(ParseVariableSuccess, ParseVariableSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  absl::StatusOr<ParsedResult<Variable>> result = consumeVariable(pattern);
+  absl::StatusOr<ParsedResult<Variable>> result = parseVariable(pattern);
 
   ASSERT_OK(result);
   EXPECT_EQ(result->parsed_value_.debugString(), pattern);
-  EXPECT_TRUE(result->unconsumed_pattern_.empty());
+  EXPECT_TRUE(result->unparsed_pattern_.empty());
 }
 
-class ConsumeVariableFailure : public testing::TestWithParam<std::string> {};
+class ParseVariableFailure : public testing::TestWithParam<std::string> {};
 
-INSTANTIATE_TEST_SUITE_P(ConsumeVariableFailureTestSuite, ConsumeVariableFailure,
+INSTANTIATE_TEST_SUITE_P(ParseVariableFailureTestSuite, ParseVariableFailure,
                          testing::Values("{var", "{=abc}", "{_var=*}", "{1v}", "{1v=abc}",
                                          "{var=***}", "{v-a-r}", "{var=*/abc?q=1}", "{var=abc/a*}",
                                          "{var=*def/abc}", "{var=}", "{var=abc=def}",
                                          "{rc=||||(A+yl/}", "/"));
 
-TEST_P(ConsumeVariableFailure, ConsumeVariableFailureTest) {
+TEST_P(ParseVariableFailure, ParseVariableFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(consumeVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parseVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 class ParseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
@@ -298,7 +298,7 @@ TEST(InternalRegexGen, VariableRegexPattern) {
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var}");
+  absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var}");
   ASSERT_OK(var);
 
   std::string capture;
@@ -307,14 +307,14 @@ TEST(InternalRegexGen, VariableRegexDefaultMatch) {
 }
 
 TEST(InternalRegexGen, VariableRegexDefaultNotMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var}");
+  absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var}");
   ASSERT_OK(var);
 
   EXPECT_FALSE(RE2::FullMatch("abc/def", toRegexPattern(var->parsed_value_)));
 }
 
 TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=abc/*/def}");
+  absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var=abc/*/def}");
   ASSERT_OK(var);
 
   std::string capture;
@@ -323,7 +323,7 @@ TEST(InternalRegexGen, VariableRegexSegmentsMatch) {
 }
 
 TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
-  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=**/def}");
+  absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var=**/def}");
   ASSERT_OK(var);
 
   std::string capture;
@@ -333,7 +333,7 @@ TEST(InternalRegexGen, VariableRegexTextGlobMatch) {
 
 TEST(InternalRegexGen, VariableRegexNamedCapture) {
   re2::StringPiece kPattern = "abc";
-  absl::StatusOr<ParsedResult<Variable>> var = consumeVariable("{var=*}");
+  absl::StatusOr<ParsedResult<Variable>> var = parseVariable("{var=*}");
   ASSERT_OK(var);
 
   RE2 regex = RE2(toRegexPattern(var->parsed_value_));

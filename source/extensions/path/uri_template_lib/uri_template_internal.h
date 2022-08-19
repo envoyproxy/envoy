@@ -20,12 +20,12 @@ namespace UriTemplate {
 namespace Internal {
 
 /**
- * String to be concatenated in rewritten url
+ * String to be concatenated in rewritten url.
  */
 using Literal = absl::string_view;
 
 /**
- * Determines what operations to use on the input pattern segment
+ * Determines what operations to use on the input pattern segment.
  */
 enum class Operator { PathGlob, TextGlob };
 
@@ -33,11 +33,13 @@ enum class Operator { PathGlob, TextGlob };
  * Represents a pattern variable. Variables are included in both path match and rewrite paths.
  */
 struct Variable {
-  absl::string_view var_name_;
-  std::vector<absl::variant<Operator, Literal>> var_match_;
+  absl::string_view name_;
+
+  // replacement value for the rewrite
+  std::vector<absl::variant<Operator, Literal>> match_;
 
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
-      : var_name_(name), var_match_(match) {}
+      : name_(name), match_(match) {}
 
   std::string debugString() const;
 };
@@ -45,10 +47,16 @@ struct Variable {
 using ParsedSegment = absl::variant<Operator, Variable, Literal>;
 
 /**
- * Represents the parsed path including literals and variables.
+ * Represents the parsed url including literals and variables.
  */
 struct ParsedUrlPattern {
   std::vector<ParsedSegment> parsed_segments_;
+
+  // Suffix holds end of url that matched a wildcard
+  // For example:
+  // Pattern: /foo/bar/**
+  // Url: /foo/bar/some/more/stuff
+  // Suffix: some/more/stuff
   absl::optional<absl::string_view> suffix_;
   absl::flat_hash_set<absl::string_view> captured_variables_;
 
@@ -56,81 +64,86 @@ struct ParsedUrlPattern {
 };
 
 /**
- * Check if literal is valid
- * Literals cannot hold wildcards or curl brackets.
+ * Returns true if `literal` is valid for pattern match
+ * (does not contain wildcards or curly brackets).
  */
 bool isValidLiteral(absl::string_view literal);
 
 /**
- * Check if rewrite literal is valid
- * Literals cannot hold wildcards or curl brackets.
+ * Returns true if `literal` is valid for pattern rewrite
+ * (does not contain wildcards or curly brackets).
  */
 bool isValidRewriteLiteral(absl::string_view literal);
 
 /**
- * Check if variable name is valid
+ * Check if variable name is valid.
  */
-bool isValidVariableName(absl::string_view indent);
+bool isValidVariableName(absl::string_view variable);
 
 /**
- * Used by the following Consume{Literal.Operator,Variable} functions
+ * Used by the following Parse{Literal.Operator,Variable} functions
  * in the return value. The functions would take the given pattern,
- * parse what it can into |parsed_value| and return the unconsumed
- *  portion of the pattern in |unconsumed_pattern|.
+ * parse what it can into |parsed_value| and return the unparse
+ *  portion of the pattern in |unparsed_pattern|.
  */
 template <typename T> struct ParsedResult {
   ParsedResult(T val, absl::string_view pattern)
-      : parsed_value_(val), unconsumed_pattern_(pattern) {}
+      : parsed_value_(val), unparsed_pattern_(pattern) {}
 
   T parsed_value_;
-  absl::string_view unconsumed_pattern_;
+  absl::string_view unparsed_pattern_;
 };
 
 /**
- * Converts input pattern to ParsedResult<Literal>
+ * Parses a literal in the front of `pattern` and returns the literal and remaining pattern.
  */
-absl::StatusOr<ParsedResult<Literal>> consumeLiteral(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern);
 
 /**
- * Converts input pattern to ParsedResult<Operator>
+ * Converts input pattern to ParsedResult<Operator>.
  */
-absl::StatusOr<ParsedResult<Operator>> consumeOperator(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Operator>> parseOperator(absl::string_view pattern);
 
 /**
- * Converts input pattern to ParsedResult<Variable>
+ * Parses a variable in the front of `pattern`.
  */
-absl::StatusOr<ParsedResult<Variable>> consumeVariable(absl::string_view pattern);
+absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern);
 
 /**
- * Converts input pattern to ParsedUrlPattern.
+ * Converts input url to ParsedUrlPattern.
  * ParsedUrlPattern hold prefix, string literals, and variables for rewrite.
  */
 absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern);
 
 /**
- * Converts Literal to std::string
+ * Convert Literal to a regex string representation
  */
 std::string toRegexPattern(Literal pattern);
 
 /**
- * Converts Operator to std::string
+ * Converts Operator to a regex string representation
  */
 std::string toRegexPattern(Operator pattern);
 
 /**
- * Converts Variable to std::string
+ * Converts Variable to a regex string representation
  */
 std::string toRegexPattern(const Variable& pattern);
 
 /**
- * Converts ParsedUrlPattern to std::string
+ * Converts ParsedUrlPattern to a regex string representation.
  */
 std::string toRegexPattern(const struct ParsedUrlPattern& pattern);
 
 /**
- * Converts string_view to be used in re2
+ * Converts string_view to be used in re2::string_piece.
  */
 inline re2::StringPiece toStringPiece(absl::string_view text) { return {text.data(), text.size()}; }
+
+/**
+ * Checks end of pattern to ensure glob operator is last.
+ */
+absl::Status validateNoOperatorAfterTextGlob(const struct ParsedUrlPattern& pattern);
 
 } // namespace Internal
 } // namespace UriTemplate

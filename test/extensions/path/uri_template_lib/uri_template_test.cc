@@ -342,10 +342,10 @@ TEST_P(URLPatternMatchAndRewrite, IsValidMatchPattern) {
   EXPECT_FALSE(isValidMatchPattern("/foo/bar/{goo}}").ok());
 }
 
-TEST_P(URLPatternMatchAndRewrite, IsValidPathTemplateRewritePattern) {
-  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}").ok());
-  EXPECT_TRUE(isValidPathTemplateRewritePattern("/foo/bar/{goo}/{doo}").ok());
-  EXPECT_TRUE(isValidPathTemplateRewritePattern("/{hoo}/bar/{goo}").ok());
+TEST_P(URLPatternMatchAndRewrite, IsValidRewritePattern) {
+  EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}").ok());
+  EXPECT_TRUE(isValidRewritePattern("/foo/bar/{goo}/{doo}").ok());
+  EXPECT_TRUE(isValidRewritePattern("/{hoo}/bar/{goo}").ok());
 
   EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());
   EXPECT_FALSE(isValidMatchPattern("/foo//bar/{goo}").ok());

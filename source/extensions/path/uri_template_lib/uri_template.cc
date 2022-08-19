@@ -25,6 +25,11 @@ using Internal::ParsedUrlPattern;
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
+// Match pattern is used to match route.
+// Example: /foo/{bar} matches /foo/cat
+
+// Rewrite pattern is used to rewrite the matched route.
+
 absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url_pattern) {
   absl::StatusOr<ParsedUrlPattern> status = Internal::parseURLPatternSyntax(url_pattern);
   if (!status.ok()) {
@@ -33,23 +38,23 @@ absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url
   return Internal::toRegexPattern(*status);
 }
 
-absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view pattern) {
+absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view url_pattern) {
   std::vector<RewritePatternSegment> result;
 
   // The pattern should start with a '/' and thus the first segment should
   // always be a literal.
-  if (pattern.empty() || pattern[0] != '/') {
+  if (url_pattern.empty() || url_pattern[0] != '/') {
     return absl::InvalidArgumentError("Invalid rewrite variable placement");
   }
 
   // Don't allow contiguous '/' patterns.
   static const LazyRE2 invalid_regex = {"^.*//.*$"};
-  if (RE2::FullMatch(Internal::toStringPiece(pattern), *invalid_regex)) {
+  if (RE2::FullMatch(Internal::toStringPiece(url_pattern), *invalid_regex)) {
     return absl::InvalidArgumentError("Invalid rewrite literal");
   }
 
-  while (!pattern.empty()) {
-    std::vector<absl::string_view> segments1 = absl::StrSplit(pattern, absl::MaxSplits('{', 1));
+  while (!url_pattern.empty()) {
+    std::vector<absl::string_view> segments1 = absl::StrSplit(url_pattern, absl::MaxSplits('{', 1));
     if (!segments1[0].empty()) {
       if (!Internal::isValidRewriteLiteral(segments1[0])) {
         return absl::InvalidArgumentError("Invalid rewrite literal pattern");
@@ -67,7 +72,7 @@ absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::str
     if (segments2.size() < 2) {
       return absl::InvalidArgumentError("Unmatched variable bracket");
     }
-    pattern = segments2[1];
+    url_pattern = segments2[1];
 
     if (!Internal::isValidVariableName(segments2[0])) {
       return absl::InvalidArgumentError("Invalid variable name");
@@ -103,7 +108,7 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
       if (it == capture_index_map.end()) {
         return absl::InvalidArgumentError("Nonexisting variable name");
       }
-      parsed_pattern.add_segments()->set_var_index(it->second);
+      parsed_pattern.add_segments()->set_capture_index(it->second);
       break;
     }
   }
@@ -115,17 +120,17 @@ absl::Status isValidMatchPattern(absl::string_view path_template_match) {
   return convertURLPatternSyntaxToRegex(path_template_match).status();
 }
 
-absl::Status isValidPathTemplateRewritePattern(absl::string_view path_template_rewrite) {
+absl::Status isValidRewritePattern(absl::string_view path_template_rewrite) {
   return parseRewritePattern(path_template_rewrite).status();
 }
 
-absl::Status isValidSharedVariableSet(absl::string_view path_template_rewrite,
+absl::Status isValidSharedVariableSet(absl::string_view pattern,
                                       absl::string_view capture_regex) {
   absl::StatusOr<std::string> status = convertURLPatternSyntaxToRegex(capture_regex).value();
   if (!status.ok()) {
     return status.status();
   }
-  return parseRewritePattern(path_template_rewrite, *std::move(status)).status();
+  return parseRewritePattern(pattern, *std::move(status)).status();
 }
 
 absl::StatusOr<std::string> rewriteURLTemplatePattern(
@@ -149,11 +154,11 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
        rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());
-    } else if (segment.has_var_index()) {
-      if (segment.var_index() < 1 || segment.var_index() >= capture_num) {
+    } else if (segment.capture_index()) {
+      if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
-      absl::StrAppend(&rewritten_url, absl::string_view(captures[segment.var_index()].as_string()));
+      absl::StrAppend(&rewritten_url, absl::string_view(captures[segment.capture_index()].as_string()));
     }
   }
 

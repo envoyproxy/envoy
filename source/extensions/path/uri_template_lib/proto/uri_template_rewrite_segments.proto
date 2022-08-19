@@ -21,7 +21,7 @@ message UriTemplateRewriteSegments {
       // Represents an index into the RE2 capture which value should be used
       // to construct the rewritten URL. Note that the index should be greater
       // than 0 as 0 index into the whole match RE2 pattern.
-      int32 var_index = 2;
+      int32 capture_index = 2;
     }
   }
 
