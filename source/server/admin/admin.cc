@@ -295,20 +295,17 @@ private:
 // generates the entire admin output in one shot.
 class RequestGasket : public Admin::Request {
 public:
-  RequestGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
-                AdminStream& admin_stream)
-      : path_and_query_(std::string(path_and_query)), handler_cb_(handler_cb),
-        admin_stream_(admin_stream) {}
+  RequestGasket(Admin::HandlerCb handler_cb, AdminStream& admin_stream)
+      : handler_cb_(handler_cb), admin_stream_(admin_stream) {}
 
   static Admin::GenRequestFn makeGen(Admin::HandlerCb callback) {
-    return [callback](absl::string_view path_and_query,
-                      AdminStream& admin_stream) -> Server::Admin::RequestPtr {
-      return std::make_unique<RequestGasket>(callback, path_and_query, admin_stream);
+    return [callback](AdminStream& admin_stream) -> Server::Admin::RequestPtr {
+      return std::make_unique<RequestGasket>(callback, admin_stream);
     };
   }
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override {
-    return handler_cb_(path_and_query_, response_headers, response_, admin_stream_);
+    return handler_cb_(response_headers, response_, admin_stream_);
   }
 
   bool nextChunk(Buffer::Instance& response) override {
@@ -317,7 +314,6 @@ public:
   }
 
 private:
-  std::string path_and_query_;
   Admin::HandlerCb handler_cb_;
   AdminStream& admin_stream_;
   Buffer::OwnedImpl response_;
@@ -333,10 +329,9 @@ Admin::RequestPtr Admin::makeStaticTextRequest(Buffer::Instance& response, Http:
   return std::make_unique<StaticTextRequest>(response, code);
 }
 
-Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+Http::Code AdminImpl::runCallback(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
-  RequestPtr request = makeRequest(path_and_query, admin_stream);
+  RequestPtr request = makeRequest(admin_stream);
   Http::Code code = request->start(response_headers);
   bool more_data;
   do {
@@ -346,8 +341,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   return code;
 }
 
-Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
-                                         AdminStream& admin_stream) const {
+Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
+  absl::string_view path_and_query = admin_stream.getRequestHeaders().getPathValue();
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
@@ -367,7 +362,7 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
       }
 
       ASSERT(admin_stream.getRequestHeaders().getPathValue() == path_and_query);
-      return handler.handler_(path_and_query, admin_stream);
+      return handler.handler_(admin_stream);
     }
   }
 
@@ -390,8 +385,8 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   return sorted_handlers;
 }
 
-Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
-                                  Buffer::Instance& response, AdminStream&) {
+Http::Code AdminImpl::handlerHelp(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                  AdminStream&) {
   getHelp(response);
   return Http::Code::OK;
 }
@@ -477,7 +472,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
   filter.decodeHeaders(*request_headers, false);
   Buffer::OwnedImpl response;
 
-  Http::Code code = runCallback(path_and_query, response_headers, response, filter);
+  Http::Code code = runCallback(response_headers, response, filter);
   Utility::populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;

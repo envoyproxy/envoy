@@ -1785,7 +1785,8 @@ TEST_P(WasmHttpFilterTest, Property) {
   request_stream_info_.downstream_connection_info_provider_->setRequestedServerName("w3.org");
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, id()).WillRepeatedly(Return(4));
-  EXPECT_CALL(encoder_callbacks_, connection()).WillRepeatedly(Return(&connection));
+  EXPECT_CALL(encoder_callbacks_, connection())
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection}));
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
