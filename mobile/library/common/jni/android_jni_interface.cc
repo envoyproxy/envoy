@@ -12,7 +12,9 @@
 extern "C" JNIEXPORT jint JNICALL
 Java_io_envoyproxy_envoymobile_engine_AndroidJniLibrary_initialize(JNIEnv* env,
                                                                    jclass, // class
+                                                                   jobject class_loader,
                                                                    jobject connectivity_manager) {
+  set_class_loader(env->NewGlobalRef(class_loader));
   // See note above about c-ares.
   // c-ares jvm init is necessary in order to let c-ares perform DNS resolution in Envoy.
   // More information can be found at:

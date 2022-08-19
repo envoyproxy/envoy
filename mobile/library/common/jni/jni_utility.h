@@ -14,6 +14,25 @@ JavaVM* get_vm();
 
 JNIEnv* get_env();
 
+void set_class_loader(jobject class_loader);
+
+/**
+ * Finds a class with a given name using a class loader provided with the use
+ * of `set_class_loader` function. The class loader is supposed to come from
+ * application's context and should be associated with project's code - Java classes
+ * defined by the project. For finding classes of Java built in-types use
+ * `env->FindClass(...)` method instead as it is lighter to use.
+ *
+ * The method works on Android targets only as the `set_class_loader` method is not
+ * called by JVM-only targets.
+ *
+ * @param class_name, the name of the class to find (i.e. "org.chromium.net.AndroidNetworkLibrary").
+ *
+ * @return jclass, the class with a provided `class_name` or NULL if
+ *         it couldn't be found.
+ */
+jclass find_class(const char* class_name);
+
 void jvm_detach_thread();
 
 void jni_delete_global_ref(void* context);
