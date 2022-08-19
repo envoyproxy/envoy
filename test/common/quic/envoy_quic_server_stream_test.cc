@@ -210,6 +210,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
   quic_stream_->OnStreamFrame(frame);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
@@ -217,6 +218,7 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponse) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   receiveRequest(request_body_, true, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
@@ -308,6 +310,7 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
 
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(response_trailers_);
   EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
@@ -357,6 +360,7 @@ TEST_F(EnvoyQuicServerStreamTest, ReceiveStopSending) {
 TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {
   receiveRequest(request_body_, false, request_body_.size() * 2);
   // Write response headers with FIN before finish receiving request.
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeHeaders(response_headers_, true);
   // Resetting the stream now means stop reading and sending QUIC_STREAM_NO_ERROR or STOP_SENDING.
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
@@ -528,6 +532,7 @@ TEST_F(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([this]() {
     std::string rest_response(1, 'a');
     Buffer::OwnedImpl buffer(rest_response);
+    EXPECT_CALL(stream_callbacks_, onStreamEnd());
     quic_stream_->encodeData(buffer, true);
   }));
   quic_session_.OnCanWrite();
@@ -607,6 +612,7 @@ TEST_F(EnvoyQuicServerStreamTest, HeadersContributeToWatermarkIquic) {
   quic_stream_->encodeData(buffer1, false);
   // Buffering more trailers will cause stream to reach high watermark, but
   // because trailers closes the stream, no callback should be triggered.
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(response_trailers_);
 }
 
@@ -722,6 +728,7 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncodingEndStream) {
   Buffer::OwnedImpl buffer(response);
   // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
   // shouldn't be called because the connection is closed.
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeData(buffer, true);
   EXPECT_EQ(quic_session_.bytesToSend(), 0u);
   EXPECT_TRUE(quic_stream_->write_side_closed() && quic_stream_->read_side_closed());
@@ -744,6 +751,7 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
             return quic::QuicConsumedData{0, false};
           }));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 

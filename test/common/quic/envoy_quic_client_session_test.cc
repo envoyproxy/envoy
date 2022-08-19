@@ -160,6 +160,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
@@ -216,6 +217,7 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
 TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   // G-QUIC or IETF bi-directional stream.
@@ -234,6 +236,7 @@ TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
 TEST_P(EnvoyQuicClientSessionTest, SendResetFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   // IETF bi-directional stream.
@@ -277,6 +280,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
 TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
@@ -293,6 +297,7 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
 TEST_P(EnvoyQuicClientSessionTest, HandshakeTimesOutWithActiveStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_HANDSHAKE_FAILED, _, "fake handshake time out"));

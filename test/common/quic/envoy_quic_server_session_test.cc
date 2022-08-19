@@ -355,6 +355,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                                 quic::QUIC_ERROR_PROCESSING_STREAM, /*bytes_written=*/0u);
   envoy_quic_session_.OnRstStream(rst1);
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   stream1->encodeHeaders(response_headers, true);
 
   EXPECT_EQ(1U, TestUtility::findCounter(
@@ -642,6 +643,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   stream->encodeHeaders(response_headers, false);
   std::string response(32 * 1024 + 1, 'a');
   Buffer::OwnedImpl buffer(response);
+  EXPECT_CALL(stream_callbacks, onStreamEnd());
   stream->encodeData(buffer, true);
   // Stream become write blocked.
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
@@ -955,12 +957,14 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   quic::QuicWindowUpdateFrame window_update1(quic::kInvalidControlFrameId, stream1->id(),
                                              32 * 1024);
   stream1->OnWindowUpdateFrame(window_update1);
-  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([stream1]() {
-    // Write rest response to stream1.
-    std::string rest_response(1, 'a');
-    Buffer::OwnedImpl buffer(rest_response);
-    stream1->encodeData(buffer, true);
-  }));
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark())
+      .WillOnce(Invoke([stream1, &stream_callbacks]() {
+        // Write rest response to stream1.
+        std::string rest_response(1, 'a');
+        Buffer::OwnedImpl buffer(rest_response);
+        EXPECT_CALL(stream_callbacks, onStreamEnd());
+        stream1->encodeData(buffer, true);
+      }));
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(stream1->IsFlowControlBlocked());
 
@@ -968,12 +972,14 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   quic::QuicWindowUpdateFrame window_update2(quic::kInvalidControlFrameId, stream2->id(),
                                              32 * 1024);
   stream2->OnWindowUpdateFrame(window_update2);
-  EXPECT_CALL(stream_callbacks2, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([stream2]() {
-    // Write rest response to stream2.
-    std::string rest_response(1, 'a');
-    Buffer::OwnedImpl buffer(rest_response);
-    stream2->encodeData(buffer, true);
-  }));
+  EXPECT_CALL(stream_callbacks2, onBelowWriteBufferLowWatermark())
+      .WillOnce(Invoke([stream2, &stream_callbacks2]() {
+        // Write rest response to stream2.
+        std::string rest_response(1, 'a');
+        Buffer::OwnedImpl buffer(rest_response);
+        EXPECT_CALL(stream_callbacks2, onStreamEnd());
+        stream2->encodeData(buffer, true);
+      }));
   // Writing out another 16k on stream2 will trigger connection's send buffer
   // come down below low watermark.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark)
@@ -982,15 +988,17 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
         // end of stream.
         http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
-  EXPECT_CALL(stream_callbacks3, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([=]() {
-    std::string super_large_response(40 * 1024, 'a');
-    Buffer::OwnedImpl buffer(super_large_response);
-    // This call will buffer 24k on stream3, raise the buffered bytes above
-    // high watermarks of the stream and connection.
-    // But callback will not propagate to stream_callback3 as the steam is
-    // ended locally.
-    stream3->encodeData(buffer, true);
-  }));
+  EXPECT_CALL(stream_callbacks3, onBelowWriteBufferLowWatermark())
+      .WillOnce(Invoke([stream3, &stream_callbacks3]() {
+        std::string super_large_response(40 * 1024, 'a');
+        Buffer::OwnedImpl buffer(super_large_response);
+        // This call will buffer 24k on stream3, raise the buffered bytes above
+        // high watermarks of the stream and connection.
+        // But callback will not propagate to stream_callback3 as the steam is
+        // ended locally.
+        EXPECT_CALL(stream_callbacks3, onStreamEnd());
+        stream3->encodeData(buffer, true);
+      }));
   EXPECT_CALL(network_connection_callbacks_, onAboveWriteBufferHighWatermark());
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(stream2->IsFlowControlBlocked());

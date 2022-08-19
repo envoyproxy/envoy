@@ -154,6 +154,7 @@ protected:
 };
 
 TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
 
@@ -173,6 +174,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   quic_stream_->encodeData(request_body_, false);
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(request_trailers_);
 
   size_t offset = receiveResponse(response_body_, false);
@@ -210,6 +212,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
             quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(request_trailers_);
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
@@ -254,6 +257,7 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
       .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers) {
         EXPECT_EQ("100", headers->getStatusValue());
         EXPECT_EQ("0", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());
+        EXPECT_CALL(stream_callbacks_, onStreamEnd());
         quic_stream_->encodeData(request_body_, true);
       }));
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -332,6 +336,7 @@ TEST_F(EnvoyQuicClientStreamTest, WatermarkSendBuffer) {
   EXPECT_CALL(stream_callbacks_, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([this]() {
     std::string rest_request(1, 'a');
     Buffer::OwnedImpl buffer(rest_request);
+    EXPECT_CALL(stream_callbacks_, onStreamEnd());
     quic_stream_->encodeData(buffer, true);
   }));
   quic_session_.OnCanWrite();
@@ -413,6 +418,7 @@ TEST_F(EnvoyQuicClientStreamTest, HeadersContributeToWatermark) {
   quic_stream_->encodeData(buffer1, false);
   // Buffering more trailers will cause stream to reach high watermark, but
   // because trailers closes the stream, no callback should be triggered.
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeTrailers(request_trailers_);
 
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
@@ -434,6 +440,7 @@ TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -453,6 +460,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
@@ -472,6 +480,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithEndStream
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeData(request_body_, true);
 
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false));
@@ -492,6 +501,7 @@ TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingDataWithTrailer) 
 }
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   const auto result = quic_stream_->encodeHeaders(request_headers_, true);
   EXPECT_TRUE(result.ok());
 
@@ -520,6 +530,7 @@ TEST_F(EnvoyQuicClientStreamTest, MetadataNotSupported) {
 
 // Tests that posted stream block callback won't cause use-after-free crash.
 TEST_F(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
 
@@ -545,6 +556,7 @@ TEST_F(EnvoyQuicClientStreamTest, MaxIncomingHeadersCount) {
   quic_session_.setMaxIncomingHeadersCount(100);
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
+  EXPECT_CALL(stream_callbacks_, onStreamEnd());
   quic_stream_->encodeData(request_body_, true);
 
   // Receive more response headers than allowed. Such response headers shouldn't be delivered to
