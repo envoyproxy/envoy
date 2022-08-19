@@ -85,7 +85,7 @@ public:
   void onSocketAccepted(std::unique_ptr<ActiveTcpSocket> active_socket) {
     // Create and run the filters
     if (config_->filterChainFactory().createListenerFilterChain(*active_socket)) {
-      active_socket->continueFilterChain(true);
+      active_socket->startFilterChain();
     } else {
       // If create listener filter chain failed, it means the listener is missing
       // config due to the ECDS. Then close the connection directly.

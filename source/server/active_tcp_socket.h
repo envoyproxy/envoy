@@ -83,7 +83,17 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
+
+  /**
+   * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
+   * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
+   * should be called if the filter returned `FilterStatus::StopIteration` and closed
+   * the socket.
+   * @param success boolean telling whether the filter execution was successful or not.
+   */
   void continueFilterChain(bool success);
+  void startFilterChain() { continueFilterChain(true); }
+
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_->dynamicMetadata();

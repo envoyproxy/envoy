@@ -312,15 +312,21 @@ public:
 
   /**
    * Called when a new connection is accepted, but before a Connection is created.
-   * Filter chain iteration can be stopped if needed.
+   * Filter chain iteration can be stopped if need more data from the connection
+   * by returning `FilterStatus::StopIteration`, or continue the filter chain iteration
+   * by returning `FilterStatus::ContinueIteration`. Reject the connection by closing
+   * the socket and returning `FilterStatus::StopIteration`.
    * @param cb the callbacks the filter instance can use to communicate with the filter chain.
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 
   /**
-   * Called when data read from the connection. If the filter chain doesn't get
-   * enough data, the filter chain can be stopped, then waiting for more data.
+   * Called when data read from the connection. If the filter doesn't get
+   * enough data, filter chain iteration can be stopped if needed by returning
+   * `FilterStatus::StopIteration`. Or continue the filter chain iteration by returning
+   * `FilterStatus::ContinueIteration` if the filter get enough data. Reject the connection
+   * by closing the socket and returning `FilterStatus::StopIteration`.
    * @param buffer the buffer of data.
    * @return status used by the filter manager to manage further filter iteration.
    */
