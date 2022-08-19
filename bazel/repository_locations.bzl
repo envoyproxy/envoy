@@ -730,13 +730,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Google Test",
         project_desc = "Google's C++ test framework",
         project_url = "https://github.com/google/googletest",
-        # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
-        # see https://github.com/google/googletest/issues/2490
-        version = "a4ab0abb93620ce26efad9de9296b73b16e88588",
-        sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
+        version = "0498660ea575bfeb4b3b0879fa6aa6904d1df373",
+        sha256 = "63222f9431a512cf8c82fc9953876bf3c9c23c7074096f029a3213501d210b2a",
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
-        release_date = "2020-09-10",
+        release_date = "2022-04-26",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:google:google_test:*",
     ),
