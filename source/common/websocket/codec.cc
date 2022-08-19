@@ -56,19 +56,18 @@ void Decoder::frameDataStart() {
   if (length_ == 0) {
     state_ = State::FrameFinished;
   } else {
-    frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
+    if (decode_payload_) {
+      frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
+    }
     state_ = State::FramePayload;
   }
 }
 
 void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
 
-void Decoder::frameDataEnd(uint64_t& bytes_consumed_by_frame, Buffer::Instance& input,
-                           absl::optional<std::vector<Frame>>& output) {
+void Decoder::frameDataEnd(absl::optional<std::vector<Frame>>& output) {
   output->push_back(std::move(frame_));
   resetDecoder();
-  input.drain(bytes_consumed_by_frame);
-  bytes_consumed_by_frame = 0;
 }
 
 void Decoder::resetDecoder() {
@@ -114,10 +113,13 @@ uint8_t Decoder::doDecodeExtendedLength(absl::Span<const uint8_t>& data) {
   uint64_t bytes_to_decode = data.length() <= num_remaining_extended_length_bytes_
                                  ? data.length()
                                  : num_remaining_extended_length_bytes_;
-  uint8_t* destination = reinterpret_cast<uint8_t*>(&length_) +
-                         (state_ == State::FrameHeaderExtendedLength16Bit ? kPayloadLength16Bit
-                                                                          : kPayloadLength64Bit) -
-                         num_remaining_extended_length_bytes_;
+  uint8_t size_of_extended_length =
+      state_ == State::FrameHeaderExtendedLength16Bit ? kPayloadLength16Bit : kPayloadLength64Bit;
+  uint8_t shift_of_bytes = size_of_extended_length - num_remaining_extended_length_bytes_;
+  uint8_t* destination = reinterpret_cast<uint8_t*>(&length_) + shift_of_bytes;
+
+  ASSERT(shift_of_bytes >= 0);
+  ASSERT(shift_of_bytes < size_of_extended_length);
   memcpy(destination, data.data(), bytes_to_decode); // NOLINT(safe-memcpy)
   num_remaining_extended_length_bytes_ -= bytes_to_decode;
 
@@ -139,8 +141,11 @@ uint8_t Decoder::doDecodeMaskingKey(absl::Span<const uint8_t>& data) {
   uint64_t bytes_to_decode = data.length() <= num_remaining_masking_key_bytes_
                                  ? data.length()
                                  : num_remaining_masking_key_bytes_;
-  uint8_t* destination = reinterpret_cast<uint8_t*>(&(frame_.masking_key_.value())) +
-                         kMaskingKeyLength - num_remaining_masking_key_bytes_;
+  uint8_t shift_of_bytes = kMaskingKeyLength - num_remaining_masking_key_bytes_;
+  uint8_t* destination =
+      reinterpret_cast<uint8_t*>(&(frame_.masking_key_.value())) + shift_of_bytes;
+  ASSERT(shift_of_bytes >= 0);
+  ASSERT(shift_of_bytes < kMaskingKeyLength);
   memcpy(destination, data.data(), bytes_to_decode); // NOLINT(safe-memcpy)
   num_remaining_masking_key_bytes_ -= bytes_to_decode;
 
@@ -155,11 +160,15 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
   uint64_t remain_in_buffer = data.length();
   uint64_t bytes_decoded = 0;
   if (remain_in_buffer <= length_) {
-    frameData(data.data(), remain_in_buffer);
+    if (decode_payload_) {
+      frameData(data.data(), remain_in_buffer);
+    }
     bytes_decoded += remain_in_buffer;
     length_ -= remain_in_buffer;
   } else {
-    frameData(data.data(), length_);
+    if (decode_payload_) {
+      frameData(data.data(), length_);
+    }
     bytes_decoded += length_;
     length_ = 0;
   }
@@ -169,9 +178,8 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
   return bytes_decoded;
 }
 
-absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
+absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input) {
   absl::optional<std::vector<Frame>> output = std::vector<Frame>();
-  uint64_t bytes_consumed_by_frame = 0;
   resetDecoder();
   for (const Buffer::RawSlice& slice : input.getRawSlices()) {
     absl::Span<const uint8_t> data(reinterpret_cast<uint8_t*>(slice.mem_), slice.len_);
@@ -198,11 +206,10 @@ absl::optional<std::vector<Frame>> Decoder::decode(Buffer::Instance& input) {
         bytes_decoded = doDecodePayload(data);
         break;
       case State::FrameFinished:
-        frameDataEnd(bytes_consumed_by_frame, input, output);
+        frameDataEnd(output);
         break;
       }
       data.remove_prefix(bytes_decoded);
-      bytes_consumed_by_frame += bytes_decoded;
     }
   }
   return !output->empty() ? std::move(output) : absl::nullopt;

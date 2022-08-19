@@ -80,21 +80,22 @@ public:
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
 class Decoder : public Logger::Loggable<Logger::Id::websocket> {
 public:
+  Decoder(bool decode_payload) : decode_payload_{decode_payload} {};
+  Decoder() = default;
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
   // complete WebSocket frame, it will be buffered in the decoder. If a decoding
   // error happened, the input buffer remains unchanged.
   // @param input supplies the binary octets wrapped in a WebSocket frame.
   // @return the decoded frames.
-  absl::optional<std::vector<Frame>> decode(Buffer::Instance& input);
+  absl::optional<std::vector<Frame>> decode(const Buffer::Instance& input);
 
 private:
   void resetDecoder();
   void frameMaskFlag(uint8_t mask_and_length);
   void frameDataStart();
   void frameData(const uint8_t* mem, uint64_t length);
-  void frameDataEnd(uint64_t& bytes_consumed_by_frame, Buffer::Instance& input,
-                    absl::optional<std::vector<Frame>>& output);
+  void frameDataEnd(absl::optional<std::vector<Frame>>& output);
 
   uint8_t doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data);
   uint8_t doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data);
@@ -121,6 +122,7 @@ private:
     // Frame has finished decoding.
     FrameFinished
   };
+  bool decode_payload_ = true;
   // Current frame that is being decoded.
   Frame frame_;
   State state_ = State::FrameHeaderFlagsAndOpcode;
