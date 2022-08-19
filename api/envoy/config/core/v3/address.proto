@@ -133,6 +133,16 @@ message BindConfig {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
+
+  // Additional source addresses appended to the address specified in the `source_address`
+  // field. This enables to specify multiple source addresses. Currently, only one additional
+  // address can be supported, and the additional address should have a different IP version
+  // with the address in the `source_address` field. The address which has the same IP
+  // version with the target host's address IP version will be used as bind address. If more
+  // than one additional address specified, only the first address matched IP version will be
+  // returned. If there is no same IP version address found, the address in the `source_address`
+  // will be returned.
+  repeated SocketAddress additional_source_addresses = 4;
 }
 
 // Addresses specify either a logical or physical address and port, which are

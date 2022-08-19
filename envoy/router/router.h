@@ -1351,9 +1351,9 @@ public:
    */
   virtual const Route& route() const PURE;
   /**
-   * @return return the connection for the downstream stream.
+   * @return return the connection for the downstream stream if it exists.
    */
-  virtual const Network::Connection& connection() const PURE;
+  virtual OptRef<const Network::Connection> connection() const PURE;
   /**
    * @return returns the options to be consulted with for upstream stream creation.
    */

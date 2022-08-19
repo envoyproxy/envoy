@@ -126,6 +126,7 @@ envoy_cc_library(
         ":connection_base_lib",
         ":connection_lib",
         ":multi_connection_base_impl_lib",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 
