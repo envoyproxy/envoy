@@ -116,6 +116,6 @@ message HeaderValidatorConfig {
   // By default methods with arbitrary names are accepted.
   bool restrict_http_methods = 3;
 
-  // Determines whether headers that contain underscores in their names should be accepted or not
+  // Determines whether headers that contain underscores in their names should be accepted or not.
   bool reject_headers_with_underscores = 4;
 }
