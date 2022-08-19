@@ -87,8 +87,7 @@ bool isValidVariableName(absl::string_view variable);
  *  portion of the pattern in |unparsed_pattern|.
  */
 template <typename T> struct ParsedResult {
-  ParsedResult(T val, absl::string_view pattern)
-      : parsed_value_(val), unparsed_pattern_(pattern) {}
+  ParsedResult(T val, absl::string_view pattern) : parsed_value_(val), unparsed_pattern_(pattern) {}
 
   T parsed_value_;
   absl::string_view unparsed_pattern_;

@@ -38,7 +38,8 @@ absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url
   return Internal::toRegexPattern(*status);
 }
 
-absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view url_pattern) {
+absl::StatusOr<std::vector<RewritePatternSegment>>
+parseRewritePattern(absl::string_view url_pattern) {
   std::vector<RewritePatternSegment> result;
 
   // The pattern should start with a '/' and thus the first segment should
@@ -124,8 +125,7 @@ absl::Status isValidRewritePattern(absl::string_view path_template_rewrite) {
   return parseRewritePattern(path_template_rewrite).status();
 }
 
-absl::Status isValidSharedVariableSet(absl::string_view pattern,
-                                      absl::string_view capture_regex) {
+absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_view capture_regex) {
   absl::StatusOr<std::string> status = convertURLPatternSyntaxToRegex(capture_regex).value();
   if (!status.ok()) {
     return status.status();
@@ -158,7 +158,8 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
       if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
-      absl::StrAppend(&rewritten_url, absl::string_view(captures[segment.capture_index()].as_string()));
+      absl::StrAppend(&rewritten_url,
+                      absl::string_view(captures[segment.capture_index()].as_string()));
     }
   }
 

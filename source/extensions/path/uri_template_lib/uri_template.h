@@ -26,7 +26,8 @@ absl::StatusOr<std::string> convertURLPatternSyntaxToRegex(absl::string_view url
 
 // Parses the specified pattern into a sequence of segments (which are
 // either literals or variable names).
-absl::StatusOr<std::vector<RewritePatternSegment>> parseRewritePattern(absl::string_view url_pattern);
+absl::StatusOr<std::vector<RewritePatternSegment>>
+parseRewritePattern(absl::string_view url_pattern);
 
 // Returns the parsed Url rewrite pattern and processes variables.
 absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments>
@@ -40,8 +41,7 @@ absl::Status isValidRewritePattern(absl::string_view path_template_rewrite);
 // For example:
 // Match: /foo/{bar}/{var} and Rewrite: /goo/{var} is valid.
 // Match: /foo/{bar} and Rewrite: /goo/{bar}/{var} is invalid. Match is missing {var}.
-absl::Status isValidSharedVariableSet(absl::string_view pattern,
-                                      absl::string_view capture_regex);
+absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_view capture_regex);
 
 // Returns is the match_pattern is valid.
 // Validation attempts to parse pattern into literals and variables.

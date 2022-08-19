@@ -87,8 +87,8 @@ std::string toString(const Variable val) {
     return absl::StrCat("{", val.name_, "}");
   }
 
-  return absl::StrCat("{", val.name_, "=",
-                      absl::StrJoin(val.match_, "/", ToStringFormatter()), "}");
+  return absl::StrCat("{", val.name_, "=", absl::StrJoin(val.match_, "/", ToStringFormatter()),
+                      "}");
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
@@ -96,9 +96,9 @@ template <typename T> std::string ToStringVisitor::operator()(const T& val) cons
 }
 
 template <typename T>
-absl::StatusOr<T> alsoUpdatePattern(
-    absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string_view)> parse_func,
-    absl::string_view* patt) {
+absl::StatusOr<T>
+alsoUpdatePattern(absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string_view)> parse_func,
+                  absl::string_view* patt) {
 
   absl::StatusOr<ParsedResult<T>> status = parse_func(*patt);
   if (!status.ok()) {
