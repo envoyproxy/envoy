@@ -75,7 +75,7 @@ public:
 
   // UpstreamToDownstream
   const Route& route() const override;
-  const Network::Connection& connection() const override;
+  OptRef<const Network::Connection> connection() const override;
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return stream_options_;
   }

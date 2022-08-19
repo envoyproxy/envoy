@@ -124,7 +124,8 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address = host()->cluster().sourceAddress();
+  auto source_address_fn = host()->cluster().sourceAddressFn();
+  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
   if (!source_address.get()) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());

@@ -37,8 +37,8 @@ std::vector<absl::string_view> LogsHandler::levelStrings() {
   return strings;
 }
 
-Http::Code LogsHandler::handlerLogging(absl::string_view, Http::ResponseHeaderMap&,
-                                       Buffer::Instance& response, AdminStream& admin_stream) {
+Http::Code LogsHandler::handlerLogging(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                       AdminStream& admin_stream) {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
 
   Http::Code rc = Http::Code::OK;
@@ -75,8 +75,8 @@ Http::Code LogsHandler::handlerLogging(absl::string_view, Http::ResponseHeaderMa
   return rc;
 }
 
-Http::Code LogsHandler::handlerReopenLogs(absl::string_view, Http::ResponseHeaderMap&,
-                                          Buffer::Instance& response, AdminStream&) {
+Http::Code LogsHandler::handlerReopenLogs(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                          AdminStream&) {
   server_.accessLogManager().reopen();
   response.add("OK\n");
   return Http::Code::OK;

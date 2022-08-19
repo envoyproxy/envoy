@@ -86,6 +86,9 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: upstream
+  change: |
+    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
 - area: admin
   change: |
     added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
@@ -104,6 +107,10 @@ new_features:
 - area: access_log
   change: |
     added support for number values in substitution format string in json_format.
+- area: http
+  change: |
+    added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check for HTTP health check.
+    Added :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP health check response buffer size.
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.

@@ -86,7 +86,7 @@ void AdminFilter::onComplete() {
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Admin::RequestPtr handler = admin_handler_fn_(path, *this);
+  Admin::RequestPtr handler = admin_handler_fn_(*this);
   Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,
