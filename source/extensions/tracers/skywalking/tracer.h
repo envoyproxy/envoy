@@ -62,8 +62,8 @@ public:
       // TraceContext.protocol of http is parsed from http message, which value could be HTTP/1.1,
       // etc.
       layer = skywalking::v3::SpanLayer::Http;
-    } else {
-      skywalking::v3::SpanLayer_Parse(std::string(protocol), &layer);
+    } else if (!skywalking::v3::SpanLayer_Parse(std::string(protocol), &layer)) {
+      layer = skywalking::v3::SpanLayer::Unknown;
     }
     span_entity_->setSpanLayer(layer);
   }
