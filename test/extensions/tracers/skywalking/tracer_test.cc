@@ -137,6 +137,23 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   }
 
   {
+    Envoy::Tracing::SpanPtr org_span =
+        tracer_->startSpan("io.envoyproxy.rpc.demo.Service", "RPCFramework", segment_context);
+    Span* span = dynamic_cast<Span*>(org_span.get());
+    EXPECT_TRUE(span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::RPCFramework);
+    EXPECT_EQ(span->spanEntity()->operationName(), "io.envoyproxy.rpc.demo.Service");
+  }
+
+  {
+    // When protocol is not known by "skywalking", the span layer will be Unknown
+    Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
+        "com.company.department.business.Service", "InternalPrivateFramework", segment_context);
+    Span* span = dynamic_cast<Span*>(org_span.get());
+    EXPECT_TRUE(span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::Unknown);
+    EXPECT_EQ(span->spanEntity()->operationName(), "com.company.department.business.Service");
+  }
+
+  {
     Envoy::Tracing::SpanPtr org_first_child_span =
         org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
 

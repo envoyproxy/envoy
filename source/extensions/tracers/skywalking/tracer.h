@@ -67,7 +67,7 @@ public:
     }
     span_entity_->setSpanLayer(layer);
   }
-  Span(absl::string_view name, const skywalking::v3::SpanLayer& span_layer, Span& parent_span,
+  Span(absl::string_view name, skywalking::v3::SpanLayer span_layer, Span& parent_span,
        TracingContextPtr tracing_context, Tracer& parent_tracer)
       : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
         span_entity_(tracing_context_->createExitSpan(parent_span.spanEntity())) {
