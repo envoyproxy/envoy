@@ -14,7 +14,7 @@
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/spdy/core/spdy_header_block.h"
+#include "quiche/spdy/core/http2_header_block.h"
 #include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
@@ -54,7 +54,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent = WriteHeaders(envoyHeadersToSpdyHeaderBlock(headers), end_stream, nullptr);
+    size_t bytes_sent = WriteHeaders(envoyHeadersToHttp2HeaderBlock(headers), end_stream, nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
 
@@ -86,7 +86,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
     // TODO(danzh): investigate the cost of allocating one buffer per slice.
     // If it turns out to be expensive, add a new function to free data in the middle in buffer
     // interface and re-design QuicheMemSliceImpl.
-    quic_slices.emplace_back(quiche::QuicheMemSliceImpl(data, slice.len_));
+    quic_slices.emplace_back(quiche::QuicheMemSlice::InPlace(), data, slice.len_);
   }
   quic::QuicConsumedData result{0, false};
   absl::Span<quiche::QuicheMemSlice> span(quic_slices);
@@ -120,7 +120,7 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent = WriteTrailers(envoyHeadersToSpdyHeaderBlock(trailers), nullptr);
+    size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
   }
   onLocalEndStream();
@@ -288,7 +288,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       return;
     }
     quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
-    auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
+    auto trailers = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
         rst);
     if (trailers == nullptr) {
@@ -455,7 +455,7 @@ void EnvoyQuicServerStream::onPendingFlushTimer() {
 bool EnvoyQuicServerStream::hasPendingData() {
   // Quic stream sends headers and trailers on the same stream, and buffers them in the same sending
   // buffer if needed. So checking this buffer is sufficient.
-  return BufferedDataBytes() > 0;
+  return (!write_side_closed()) && BufferedDataBytes() > 0;
 }
 
 } // namespace Quic

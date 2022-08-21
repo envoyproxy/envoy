@@ -1,21 +1,31 @@
+import argparse
+
 import pathlib
 import sys
 
+from yaml.scanner import ScannerError
+
 from google.protobuf.json_format import ParseError
 
-sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
+from envoy.base.utils import ProtobufValidator
 
-from tools.config_validation.validate_fragment import validate_yaml
+# TODO (phlax): move this to `envoy.code.check`
 
 
 def main():
     errors = []
-    for arg in sys.argv[1:]:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('paths', nargs="+")
+    parser.add_argument('--descriptor_path')
+    parsed = parser.parse_args(sys.argv[1:])
+    protobuf = ProtobufValidator(parsed.descriptor_path)
+
+    for example in parsed.paths:
         try:
-            validate_yaml("envoy.config.bootstrap.v3.Bootstrap", pathlib.Path(arg).read_text())
-        except (ParseError, KeyError) as e:
-            errors.append(arg)
-            print(f"\nERROR (validation failed): {arg}\n{e}\n\n")
+            protobuf.validate_yaml(pathlib.Path(example).read_text())
+        except (ParseError, KeyError, ScannerError) as e:
+            errors.append(example)
+            print(f"\nERROR (validation failed): {example}\n{e}\n\n")
 
     if errors:
         raise SystemExit(f"ERROR: some configuration files ({len(errors)}) failed to validate")

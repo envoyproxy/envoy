@@ -204,7 +204,7 @@ public:
    * Create transport socket factory for Quic upstream transport socket.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
-  static Network::TransportSocketFactoryPtr
+  static Network::UpstreamTransportSocketFactoryPtr
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                            Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);

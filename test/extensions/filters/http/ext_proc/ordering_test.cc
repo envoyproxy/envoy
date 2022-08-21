@@ -201,8 +201,8 @@ protected:
   std::unique_ptr<Filter> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Router::RouteConstSharedPtr route_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
@@ -273,7 +273,7 @@ TEST_F(OrderingTest, DefaultOrderingGetWithTimer) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   sendRequestHeadersReply();
 
   MockTimer* response_timer = new MockTimer(&dispatcher_);
@@ -281,7 +281,7 @@ TEST_F(OrderingTest, DefaultOrderingGetWithTimer) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
-  EXPECT_CALL(*response_timer, disableTimer());
+  EXPECT_CALL(*response_timer, disableTimer()).Times(2);
   sendResponseHeadersReply();
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(req_body, true));
@@ -547,7 +547,7 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
 }
@@ -562,7 +562,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   sendRequestHeadersReply();
 
   MockTimer* response_timer = new MockTimer(&dispatcher_);
@@ -571,7 +571,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*response_timer, disableTimer());
+  EXPECT_CALL(*response_timer, disableTimer()).Times(2);
   sendImmediateResponse500();
   Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
@@ -710,8 +710,7 @@ TEST_F(OrderingTest, GrpcErrorInline) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   sendGrpcError();
   // The rest of the filter isn't called after this.
 }
@@ -729,8 +728,7 @@ TEST_F(OrderingTest, GrpcErrorInlineIgnored) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   sendGrpcError();
 
   // After that we ignore the processor
@@ -750,11 +748,10 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   sendRequestHeadersReply();
 
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*request_timer, enabled()).WillOnce(Return(false));
   sendGrpcError();
 }
 
@@ -785,6 +782,7 @@ TEST_F(OrderingTest, GrpcErrorAfterTimeout) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
   request_timer->invokeCallback();
   // Nothing should happen now despite the gRPC error
   sendGrpcError();
@@ -814,7 +812,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   sendRequestBodyReply();
 
@@ -829,7 +827,7 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  EXPECT_CALL(*response_timer, disableTimer());
+  EXPECT_CALL(*response_timer, disableTimer()).Times(3);
   sendResponseHeadersReply();
   EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -853,7 +851,7 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersPost(true);
-  EXPECT_CALL(*request_timer, disableTimer());
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   sendRequestHeadersReply();
 
   Buffer::OwnedImpl req_body;

@@ -295,6 +295,7 @@ envoy_cc_library(
     name = "thrift_lib",
     hdrs = ["thrift.h"],
     deps = [
+        "//envoy/tcp:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
     ],

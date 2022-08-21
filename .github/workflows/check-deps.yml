@@ -15,13 +15,15 @@ jobs:
         uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
         with:
           ref: ${{ github.head_ref }}
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@d09bd5e6005b175076f227b13d9730d56e9dcfcb
+      - name: Set up Python (3.10)
+        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
 
       - name: Run dependency checker
         run: |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          bazel run //tools/dependency:check -- -c release_issues --fix
-          bazel run //tools/dependency:check -- -c cves -w error
+          TODAY_DATE=$(date -u -I"date")
+          export TODAY_DATE
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error

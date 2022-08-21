@@ -273,11 +273,6 @@ static_resources:
                   {% endif %}
             {% endfor %}
           http_filters:
-          {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
-          - name: envoy.filters.http.dynamo
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.dynamo.v3.Dynamo
-          {% endif -%}
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -508,38 +503,6 @@ static_resources:
                 port_value: 8125
                 protocol: TCP
     dns_lookup_family: V4_ONLY
-  - name: lightstep_saas
-    connect_timeout: 1s
-    type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: lightstep_saas
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: collector-grpc.lightstep.com
-                port_value: 443
-                protocol: TCP
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options:
-            max_concurrent_streams: 100
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          validation_context:
-            trusted_ca:
-              filename: certs/cacert.pem
-            match_typed_subject_alt_names:
-            - san_type: DNS
-              matcher:
-                exact: "collector-grpc.lightstep.com"
   - name: cds_cluster
     connect_timeout: 0.25s
     type: STRICT_DNS

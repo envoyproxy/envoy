@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -78,7 +79,7 @@ Config::SharedConfig::SharedConfig(
   }
   if (config.has_tunneling_config()) {
     tunneling_config_helper_ =
-        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config());
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config(), context);
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -400,7 +401,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(filter_state);
+  transport_socket_options_ =
+      Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 
   if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key());
@@ -537,6 +539,26 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   } else {
     return route_criteria;
   }
+}
+
+TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
+        config_message,
+    Server::Configuration::FactoryContext& context)
+    : use_post_(config_message.use_post()),
+      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
+  envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
+  substitution_format_config.mutable_text_format_source()->set_inline_string(
+      config_message.hostname());
+  hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+      substitution_format_config, context);
+}
+
+std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
+  return hostname_fmt_->format(*Http::StaticEmptyHeaders::get().request_headers,
+                               *Http::StaticEmptyHeaders::get().response_headers,
+                               *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                               absl::string_view());
 }
 
 void Filter::onConnectTimeout() {

@@ -1,6 +1,7 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@base_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data")
 
@@ -12,12 +13,16 @@ py_binary(
     name = "generate_empty",
     srcs = ["generate_empty.py"],
     visibility = ["//visibility:public"],
-    deps = [":protodoc"],
+    deps = [
+        ":jinja",
+        ":protodoc",
+    ],
 )
 
-envoy_proto_library(
+py_proto_library(
     name = "manifest_proto",
     srcs = ["manifest.proto"],
+    deps = ["@com_google_protobuf//:protobuf_python"],
 )
 
 envoy_py_data(
@@ -28,23 +33,24 @@ envoy_py_data(
 py_binary(
     name = "manifest_to_json",
     srcs = ["manifest_to_json.py"],
+    args = ["$(location @envoy_api//:v3_proto_set)"],
+    data = ["@envoy_api//:v3_proto_set"],
     deps = [
-        ":manifest_proto_py_proto",
-        ":protodoc_manifest_untyped",
-        "//tools/config_validation:validate_fragment",
-        "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
-        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
-        "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
-        "@com_google_protobuf//:protobuf_python",
         requirement("envoy.base.utils"),
+        ":manifest_proto",
+        ":protodoc_manifest_untyped",
+        "@com_google_protobuf//:protobuf_python",
     ],
 )
 
 genrule(
     name = "manifest",
     outs = ["manifest.json"],
-    cmd = """$(location :manifest_to_json) $@""",
-    tools = [":manifest_to_json"],
+    cmd = """$(location :manifest_to_json) $(location @envoy_api//:v3_proto_set) $@""",
+    tools = [
+        ":manifest_to_json",
+        "@envoy_api//:v3_proto_set",
+    ],
 )
 
 envoy_genjson(
@@ -106,19 +112,16 @@ py_binary(
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
-        "@com_google_protobuf//:protobuf_python",
         requirement("envoy.code.check"),
     ],
 )
 
 protodoc_rule(
     name = "api_v3_protodoc",
-    deps = ["@envoy_api//:v3_protos"],
-)
-
-protodoc_rule(
-    name = "xds_protodoc",
-    deps = ["@envoy_api//:xds_protos"],
+    deps = [
+        "@envoy_api//:v3_protos",
+        "@envoy_api//:xds_protos",
+    ],
 )
 
 py_library(
@@ -128,16 +131,26 @@ py_library(
 
 envoy_jinja_env(
     name = "jinja",
+    env_kwargs = {
+        "trim_blocks": True,
+        "lstrip_blocks": True,
+    },
     filters = {
         "rst_anchor": "tools.protodoc.rst_filters.rst_anchor",
         "rst_header": "tools.protodoc.rst_filters.rst_header",
     },
     templates = [
+        "templates/comment.rst.tpl",
+        "templates/content.rst.tpl",
+        "templates/contrib_message.rst.tpl",
         "templates/empty.rst.tpl",
+        "templates/enum.rst.tpl",
         "templates/extension.rst.tpl",
         "templates/extension_category.rst.tpl",
+        "templates/file.rst.tpl",
+        "templates/header.rst.tpl",
+        "templates/message.rst.tpl",
+        "templates/security.rst.tpl",
     ],
-    deps = [
-        ":rst_filters",
-    ],
+    deps = [":rst_filters"],
 )

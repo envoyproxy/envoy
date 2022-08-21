@@ -54,12 +54,12 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
       [(validate.rules).uint32 = {gte: 1}];
 
-  // Configure which implementation of `quic::QuicCryptoClientStreamBase` to be used for this listener.
+  // Configure which implementation of ``quic::QuicCryptoClientStreamBase`` to be used for this listener.
   // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.crypto_stream.v3.CryptoServerStreamConfig>` will be used.
   // [#extension-category: envoy.quic.server.crypto_stream]
   core.v3.TypedExtensionConfig crypto_stream_config = 6;
 
-  // Configure which implementation of `quic::ProofSource` to be used for this listener.
+  // Configure which implementation of ``quic::ProofSource`` to be used for this listener.
   // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
   // [#extension-category: envoy.quic.proof_source]
   core.v3.TypedExtensionConfig proof_source_config = 7;

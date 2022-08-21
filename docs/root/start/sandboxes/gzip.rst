@@ -14,11 +14,12 @@ By enabling compression in Envoy you can save some network bandwidth, at the exp
 
 Envoy supports compression and decompression for both requests and responses.
 
-This sandbox provides an example of response compression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
+This sandbox provides examples of response compression and request decompression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
 
-The sandbox covers two scenarios:
+The sandbox covers three scenarios:
 
 - compression of files from an upstream server
+- decompression of files from a downstream client
 - compression of Envoy's own statistics
 
 Step 1: Start all of our containers
@@ -30,8 +31,8 @@ Change to the ``examples/gzip`` directory and bring up the docker composition.
 
     $ pwd
     envoy/examples/gzip
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
     Name                 Command                        State   Ports
     --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -63,7 +64,29 @@ As only files with a content-type of ``application/json`` are configured to be g
 
     $ curl -si -H "Accept-Encoding: gzip" localhost:10000/file.txt | grep "content-encoding"
 
-Step 3: Test compression of Envoy’s statistics
+Step 3: Test Envoy’s decompression of downstream files
+******************************************************
+
+The sandbox is configured with an endpoint for uploading downstream files:
+
+- ``/upload``
+
+Use ``curl`` to get the compressed file ``file.gz``
+
+.. code-block:: console
+
+    $ curl -s -H "Accept-Encoding: gzip" -o file.gz localhost:10000/file.json
+
+Use ``curl`` to check that the response from uploading ``file.gz`` contains the ``decompressed-size`` header.
+
+You will need to add the ``content-encoding: gzip`` request header.
+
+.. code-block:: console
+
+    $ curl -si -H "Content-Encoding: gzip" localhost:10000/upload --data-binary "@file.gz" | grep "decompressed-size"
+    decompressed-size: 10485760
+
+Step 4: Test compression of Envoy’s statistics
 **********************************************
 
 The sandbox is configured with two ports serving Envoy’s admin and statistics interface:
@@ -85,11 +108,17 @@ Now, use ``curl`` to make a request for the compressed statistics:
     content-encoding: gzip
 
 .. seealso::
-   :ref:`Gzip API <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
-      API and configuration reference for Envoy's gzip compression.
+    :ref:`Gzip Compression API <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+        API and configuration reference for Envoy's gzip compression.
 
-   :ref:`Compression configuration <config_http_filters_compressor>`
-      Reference documentation for Envoy's compressor filter.
+    :ref:`Gzip Decompression API <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`
+        API and configuration reference for Envoy's gzip decompression.
 
-   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
-      Quick start guide to the Envoy admin interface.
+    :ref:`Compression configuration <config_http_filters_compressor>`
+        Reference documentation for Envoy's compressor filter.
+
+    :ref:`Decompression configuration <config_http_filters_decompressor>`
+        Reference documentation for Envoy's decompressor filter.
+
+    :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+        Quick start guide to the Envoy admin interface.

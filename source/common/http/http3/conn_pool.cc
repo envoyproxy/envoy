@@ -4,13 +4,13 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -23,7 +23,7 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 }
 
 const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::TransportSocketFactory& transport_socket_factory) {
+getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
       .clientContextConfig();
 }
@@ -124,15 +124,17 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address = host()->cluster().sourceAddress();
+  auto source_address_fn = host()->cluster().sourceAddressFn();
+  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
   if (!source_address.get()) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-
+  Network::ConnectionSocket::OptionsSharedPtr socket_options =
+      Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, socketOptions(), transportSocketOptions());
+      source_address, quic_stat_names, rtt_cache, scope, socket_options, transportSocketOptions());
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -190,10 +192,10 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                 "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
                 ? std::make_unique<NoConnectCodecClientProd>(
                       CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator())
-                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
-                                                    data.host_description_, pool->dispatcher(),
-                                                    pool->randomGenerator());
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())
+                : std::make_unique<CodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

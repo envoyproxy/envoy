@@ -56,6 +56,30 @@ private:
   std::unique_ptr<Checker> rule_checker_;
 };
 
+void ExtProcLoggingInfo::recordGrpcCall(
+    std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+    ProcessorState::CallbackState callback_state,
+    envoy::config::core::v3::TrafficDirection traffic_direction) {
+  ASSERT(callback_state != ProcessorState::CallbackState::Idle);
+  grpcCalls(traffic_direction).emplace_back(latency, call_status, callback_state);
+}
+
+ExtProcLoggingInfo::GrpcCalls&
+ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_grpc_calls_
+             : encoding_processor_grpc_calls_;
+}
+
+const ExtProcLoggingInfo::GrpcCalls&
+ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const {
+  ASSERT(traffic_direction != envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+  return traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND
+             ? decoding_processor_grpc_calls_
+             : encoding_processor_grpc_calls_;
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()) {
   if (config.has_overrides()) {
@@ -77,6 +101,14 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& src) {
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      callbacks.streamInfo().filterState();
+  if (!filter_state->hasData<ExtProcLoggingInfo>(ExtProcLoggingInfoName)) {
+    filter_state->setData(ExtProcLoggingInfoName, std::make_shared<ExtProcLoggingInfo>(),
+                          Envoy::StreamInfo::FilterState::StateType::Mutable,
+                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  }
+  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(ExtProcLoggingInfoName);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -116,6 +148,8 @@ void Filter::onDestroy() {
   // per the filter contract.
   processing_complete_ = true;
   closeStream();
+  decoding_state_.stopMessageTimer();
+  encoding_state_.stopMessageTimer();
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
@@ -136,8 +170,8 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
   headers_req->set_end_of_stream(end_stream);
-  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -487,8 +521,8 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
                            ProcessorState::CallbackState new_state, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  state.setCallbackState(new_state);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             new_state);
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);
   body_req->set_end_of_stream(end_stream);
@@ -501,8 +535,8 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   ProcessingRequest req;
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, *trailers_req->mutable_trailers());
-  state.setCallbackState(ProcessorState::CallbackState::TrailersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                             ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
@@ -553,7 +587,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_LOG(debug, "Sending immediate response");
     processing_complete_ = true;
     closeStream();
-    cleanUpTimers();
+    onFinishProcessorCalls(Grpc::Status::Ok);
     sendImmediateResponse(response->immediate_response());
     processing_status = absl::OkStatus();
     break;
@@ -586,7 +620,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.stream_msgs_received_.inc();
     processing_complete_ = true;
     closeStream();
-    cleanUpTimers();
+    onFinishProcessorCalls(processing_status.raw_code());
     ImmediateResponse invalid_mutation_response;
     invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
     invalid_mutation_response.set_details(std::string(processing_status.message()));
@@ -612,7 +646,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
-    cleanUpTimers();
+    onFinishProcessorCalls(status);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -647,8 +681,8 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
-    encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
+    decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
+    encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -665,9 +699,9 @@ void Filter::clearAsyncState() {
 
 // Regardless of the current state, ensure that the timers won't fire
 // again.
-void Filter::cleanUpTimers() {
-  decoding_state_.cleanUpTimer();
-  encoding_state_.cleanUpTimer();
+void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
+  decoding_state_.onFinishProcessorCall(call_status);
+  encoding_state_.onFinishProcessorCall(call_status);
 }
 
 static const ImmediateMutationChecker& immediateResponseChecker() {
@@ -709,7 +743,7 @@ static ProcessingMode allDisabledMode() {
 
 void Filter::mergePerRouteConfig() {
   auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-      FilterName, decoder_callbacks_->route(),
+      decoder_callbacks_,
       [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
   if (!merged_config) {
     return;

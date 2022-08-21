@@ -614,18 +614,12 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
 }
 
 TEST_P(DecompressorFilterTest, DecompressionLibraryNotRegistered) {
-  EXPECT_THROW_WITH_MESSAGE(
-      setUpFilter(R"EOF(
+  EXPECT_THROW(setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
     "@type": "type.googleapis.com/envoy.extensions.compression.does_not_exist"
 )EOF"),
-      EnvoyException,
-      "Unable to parse JSON as proto (INVALID_ARGUMENT:(decompressor_library.typed_config): "
-      "invalid value Invalid type URL, unknown type: envoy.extensions.compression.does_not_exist "
-      "for type Any): "
-      "{\"decompressor_library\":{\"typed_config\":{\"@type\":\"type.googleapis.com/"
-      "envoy.extensions.compression.does_not_exist\"}}}");
+               EnvoyException);
 }
 
 } // namespace
