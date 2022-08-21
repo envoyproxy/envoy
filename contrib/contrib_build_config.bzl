@@ -57,4 +57,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.xds_delegates.kv_store":                            "//contrib/xds/source:kv_store_xds_delegate",
 }

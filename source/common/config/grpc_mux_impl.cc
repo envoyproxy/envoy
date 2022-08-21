@@ -90,6 +90,15 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
     }
   }
 
+  if (starting_) {
+    // On the initialization of the gRPC mux, load the persisted config, if available. If the xDS
+    // server cannot be reached, the locally persisted config will be used until connectivity is
+    // established with the xDS server.
+    loadConfigFromDelegate(
+        std::string(type_url),
+        std::vector<std::string>{request.resource_names().begin(), request.resource_names().end()});
+  }
+
   if (api_state.must_send_node_ || !skip_subsequent_node_ || first_stream_request_) {
     // Node may have been cleared during a previous request.
     request.mutable_node()->CopyFrom(local_info_.node());
@@ -100,10 +109,56 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
+  starting_ = false;
 
   // clear error_detail after the request is sent if it exists.
   if (apiStateFor(type_url).request_.has_error_detail()) {
     apiStateFor(type_url).request_.clear_error_detail();
+  }
+}
+
+void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
+                                         const std::vector<std::string>& resource_names) {
+  if (!xds_resources_delegate_.has_value()) {
+    return;
+  }
+  ApiState& api_state = apiStateFor(type_url);
+  if (api_state.watches_.empty()) {
+    // No watches, so exit without loading config from storage.
+    return;
+  }
+
+  TRY_ASSERT_MAIN_THREAD {
+    std::vector<envoy::service::discovery::v3::Resource> resources =
+        xds_resources_delegate_->getResources(XdsConfigSourceId{target_xds_authority_, type_url},
+                                              resource_names);
+    if (resources.empty()) {
+      // There are no persisted resources, so nothing to process.
+      return;
+    }
+
+    std::vector<DecodedResourcePtr> decoded_resources;
+    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    std::string version_info;
+    for (const auto& resource : resources) {
+      if (version_info.empty()) {
+        version_info = resource.version();
+      } else {
+        ASSERT(resource.version() == version_info);
+      }
+
+      decoded_resources.emplace_back(
+          std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
+    }
+
+    processDiscoveryResources(decoded_resources, api_state, type_url, version_info,
+                              /*call_delegate=*/false);
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
+    // TODO(abeyad): do something more than just logging the error?
+    ENVOY_LOG(warn, "Failed to load locally-persisted xDS configuration for {}, type url {}: {}",
+              target_xds_authority_, type_url, e.what());
   }
 }
 
@@ -212,17 +267,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
-    // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
-    // build a map here from resource name to resource and then walk watches_.
-    // We have to walk all watches (and need an efficient map as a result) to
-    // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
-    // for test determinism.
     std::vector<DecodedResourcePtr> resources;
-    absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
-    std::vector<DecodedResourceRef> all_resource_refs;
     OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
-
-    const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -236,58 +282,13 @@ void GrpcMuxImpl::onDiscoveryResponse(
       auto decoded_resource =
           DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
 
-      if (decoded_resource->ttl()) {
-        api_state.ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
-      } else {
-        api_state.ttl_.clear(decoded_resource->name());
-      }
-
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
         resources.emplace_back(std::move(decoded_resource));
-        all_resource_refs.emplace_back(*resources.back());
-        resource_ref_map.emplace(resources.back()->name(), *resources.back());
       }
     }
 
-    // Execute external config validators if there are any watches.
-    if (!api_state.watches_.empty()) {
-      config_validators_->executeValidators(type_url, resources);
-    }
-
-    for (auto watch : api_state.watches_) {
-      // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
-      // Listener) even if the message does not have resources so that update_empty stat
-      // is properly incremented and state-of-the-world semantics are maintained.
-      if (watch->resources_.empty()) {
-        watch->callbacks_.onConfigUpdate(all_resource_refs, message->version_info());
-        continue;
-      }
-      std::vector<DecodedResourceRef> found_resources;
-      for (const auto& watched_resource_name : watch->resources_) {
-        auto it = resource_ref_map.find(watched_resource_name);
-        if (it != resource_ref_map.end()) {
-          found_resources.emplace_back(it->second);
-        }
-      }
-
-      // onConfigUpdate should be called only on watches(clusters/listeners) that have
-      // updates in the message for EDS/RDS.
-      if (!found_resources.empty()) {
-        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
-      }
-    }
-
-    // All config updates have been applied without throwing an exception, so we'll call the xDS
-    // resources delegate, if any.
-    if (xds_resources_delegate_.has_value()) {
-      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
-                                               all_resource_refs);
-    }
-
-    // TODO(mattklein123): In the future if we start tracking per-resource versions, we
-    // would do that tracking here.
-    api_state.request_.set_version_info(message->version_info());
-    Memory::Utils::tryShrinkHeap();
+    processDiscoveryResources(resources, api_state, type_url, message->version_info(),
+                              /*call_delegate=*/true);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -302,6 +303,73 @@ void GrpcMuxImpl::onDiscoveryResponse(
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
+}
+
+void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
+                                            ApiState& api_state, const std::string& type_url,
+                                            const std::string& version_info,
+                                            const bool call_delegate) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // To avoid O(n^2) explosion (e.g. when we have 1000s of EDS watches), we
+  // build a map here from resource name to resource and then walk watches_.
+  // We have to walk all watches (and need an efficient map as a result) to
+  // ensure we deliver empty config updates when a resource is dropped. We make the map ordered
+  // for test determinism.
+  absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
+  std::vector<DecodedResourceRef> all_resource_refs;
+
+  const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
+
+  for (const auto& resource : resources) {
+    if (resource->ttl()) {
+      api_state.ttl_.add(*resource->ttl(), resource->name());
+    } else {
+      api_state.ttl_.clear(resource->name());
+    }
+
+    all_resource_refs.emplace_back(*resource);
+    resource_ref_map.emplace(resource->name(), *resource);
+  }
+
+  // Execute external config validators if there are any watches.
+  if (!api_state.watches_.empty()) {
+    config_validators_->executeValidators(type_url, resources);
+  }
+
+  for (auto watch : api_state.watches_) {
+    // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
+    // Listener) even if the message does not have resources so that update_empty stat
+    // is properly incremented and state-of-the-world semantics are maintained.
+    if (watch->resources_.empty()) {
+      watch->callbacks_.onConfigUpdate(all_resource_refs, version_info);
+      continue;
+    }
+    std::vector<DecodedResourceRef> found_resources;
+    for (const auto& watched_resource_name : watch->resources_) {
+      auto it = resource_ref_map.find(watched_resource_name);
+      if (it != resource_ref_map.end()) {
+        found_resources.emplace_back(it->second);
+      }
+    }
+
+    // onConfigUpdate should be called only on watches(clusters/listeners) that have
+    // updates in the message for EDS/RDS.
+    if (!found_resources.empty()) {
+      watch->callbacks_.onConfigUpdate(found_resources, version_info);
+    }
+  }
+
+  // All config updates have been applied without throwing an exception, so we'll call the xDS
+  // resources delegate, if any.
+  if (call_delegate && xds_resources_delegate_.has_value()) {
+    xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
+                                             all_resource_refs);
+  }
+
+  // TODO(mattklein123): In the future if we start tracking per-resource versions, we
+  // would do that tracking here.
+  api_state.request_.set_version_info(version_info);
+  Memory::Utils::tryShrinkHeap();
 }
 
 void GrpcMuxImpl::onWriteable() { drainRequests(); }

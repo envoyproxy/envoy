@@ -325,9 +325,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (bootstrap.has_xds_delegate_extension()) {
     auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
         bootstrap.xds_delegate_extension());
-    xds_resources_delegate_ =
-        factory.createXdsResourcesDelegate(bootstrap.xds_delegate_extension().typed_config(),
-                                           validation_context.dynamicValidationVisitor(), api);
+    xds_resources_delegate_ = factory.createXdsResourcesDelegate(
+        bootstrap.xds_delegate_extension().typed_config(),
+        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(

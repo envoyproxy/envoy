@@ -71,6 +71,7 @@ void SotwSubscriptionState::handleGoodResponse(
   // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
   // support passing of decoded resources. This would also avoid a resource copy above.
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
+  // TODO(abeyad): Add support for calling the Config::UpdateListener registered listeners.
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();

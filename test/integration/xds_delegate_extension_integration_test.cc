@@ -80,9 +80,9 @@ public:
 
   std::string name() const override { return "envoy.config.xds.test_delegate"; };
 
-  Config::XdsResourcesDelegatePtr createXdsResourcesDelegate(const ProtobufWkt::Any&,
-                                                             ProtobufMessage::ValidationVisitor&,
-                                                             Api::Api&) override {
+  Config::XdsResourcesDelegatePtr
+  createXdsResourcesDelegate(const ProtobufWkt::Any&, ProtobufMessage::ValidationVisitor&,
+                             Api::Api&, Event::Dispatcher& dispatcher) override {
     return std::make_unique<TestXdsResourcesDelegate>();
   }
 };

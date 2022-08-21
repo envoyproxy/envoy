@@ -84,14 +84,15 @@ public:
    * @param config Configuration of the XdsResourcesDelegate to create.
    * @param validation_visitor Validates the configuration.
    * @param api The APIs that can be used by the delegate.
+   * @param dispatcher The dispatcher for the thread.
    * @return The created XdsResourcesDelegate instance
    */
   virtual XdsResourcesDelegatePtr
   createXdsResourcesDelegate(const ProtobufWkt::Any& config,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Api::Api& api) PURE;
+                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                             Event::Dispatcher& dispatcher) PURE;
 
-  std::string category() const override { return "envoy.config.xds"; }
+  std::string category() const override { return "envoy.xds_delegates"; }
 };
 
 } // namespace Config
