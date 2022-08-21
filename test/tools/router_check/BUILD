@@ -15,7 +15,11 @@ envoy_package()
 envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
-    deps = [":router_check_main_lib"],
+    deps = [":router_check_main_lib"] + select({
+        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
+        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//conditions:default": envoy_all_extensions(),
+    }),
 )
 
 envoy_cc_test_library(
@@ -50,11 +54,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ] + select({
-        "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
-        "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
-        "//conditions:default": envoy_all_extensions(),
-    }),
+    ],
 )
 
 envoy_proto_library(

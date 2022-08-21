@@ -208,9 +208,7 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
 def envoy_proto_library(name, **kwargs):
     api_cc_py_proto_library(
         name,
-        # Avoid generating .so, we don't need it, can interfere with builds
-        # such as OSS-Fuzz.
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         visibility = ["//visibility:public"],
         **kwargs
     )

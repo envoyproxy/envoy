@@ -5,6 +5,7 @@ load(
     "envoy_copts",
     "envoy_dbg_linkopts",
     "envoy_external_dep_path",
+    "envoy_linkstatic",
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
 )
@@ -40,7 +41,7 @@ def envoy_cc_binary(
         copts = envoy_copts(repository),
         linkopts = linkopts,
         testonly = testonly,
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
         stamp = 1,
