@@ -22,8 +22,8 @@ const uint64_t RecentLookupsCapacity = 100;
 
 StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseHeaderMap&,
-                                              Buffer::Instance& response, AdminStream&) {
+Http::Code StatsHandler::handlerResetCounters(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                              AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -32,7 +32,7 @@ Http::Code StatsHandler::handlerResetCounters(absl::string_view, Http::ResponseH
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStatsRecentLookups(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code StatsHandler::handlerStatsRecentLookups(Http::ResponseHeaderMap&,
                                                    Buffer::Instance& response, AdminStream&) {
   Stats::SymbolTable& symbol_table = server_.stats().symbolTable();
   std::string table;
@@ -49,15 +49,14 @@ Http::Code StatsHandler::handlerStatsRecentLookups(absl::string_view, Http::Resp
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStatsRecentLookupsClear(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code StatsHandler::handlerStatsRecentLookupsClear(Http::ResponseHeaderMap&,
                                                         Buffer::Instance& response, AdminStream&) {
   server_.stats().symbolTable().clearRecentLookups();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStatsRecentLookupsDisable(absl::string_view,
-                                                          Http::ResponseHeaderMap&,
+Http::Code StatsHandler::handlerStatsRecentLookupsDisable(Http::ResponseHeaderMap&,
                                                           Buffer::Instance& response,
                                                           AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(0);
@@ -65,18 +64,17 @@ Http::Code StatsHandler::handlerStatsRecentLookupsDisable(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
-                                                         Http::ResponseHeaderMap&,
+Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap&,
                                                          Buffer::Instance& response, AdminStream&) {
   server_.stats().symbolTable().setRecentLookupCapacity(RecentLookupsCapacity);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Admin::RequestPtr StatsHandler::makeRequest(absl::string_view path, AdminStream& /*admin_stream*/) {
+Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
   StatsParams params;
   Buffer::OwnedImpl response;
-  Http::Code code = params.parse(path, response);
+  Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
   if (code != Http::Code::OK) {
     return Admin::makeStaticTextRequest(response, code);
   }
@@ -107,10 +105,10 @@ Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsPara
   return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
 }
 
-Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
-                                                Http::ResponseHeaderMap&,
-                                                Buffer::Instance& response, AdminStream&) {
-  return prometheusStats(path_and_query, response);
+Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
+                                                Buffer::Instance& response,
+                                                AdminStream& admin_stream) {
+  return prometheusStats(admin_stream.getRequestHeaders().getPathValue(), response);
 }
 
 Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
@@ -147,8 +145,7 @@ void StatsHandler::prometheusRender(Stats::Store& stats,
                                               custom_namespaces);
 }
 
-Http::Code StatsHandler::handlerContention(absl::string_view,
-                                           Http::ResponseHeaderMap& response_headers,
+Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_headers,
                                            Buffer::Instance& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
@@ -170,9 +167,7 @@ Admin::UrlHandler StatsHandler::statsHandler() {
   return {
       "/stats",
       "print server stats",
-      [this](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-        return makeRequest(path, admin_stream);
-      },
+      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
       false,
       false,
       {{Admin::ParamDescriptor::Type::Boolean, "usedonly",

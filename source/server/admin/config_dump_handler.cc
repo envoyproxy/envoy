@@ -157,8 +157,7 @@ buildNameMatcher(const Http::Utility::QueryParams& params) {
 ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
     : HandlerContextBase(server), config_tracker_(config_tracker) {}
 
-Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view,
-                                                Http::ResponseHeaderMap& response_headers,
+Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& response_headers,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) const {
   Http::Utility::QueryParams query_params = admin_stream.queryParams();
