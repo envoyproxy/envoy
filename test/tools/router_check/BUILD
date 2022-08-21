@@ -30,10 +30,7 @@ envoy_cc_test_library(
         "router.cc",
         "router.h",
     ],
-    copts = [
-        "-DHAVE_LONG_LONG",
-        "-fPIC",
-    ],
+    copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
     deps = [
         ":validation_proto_cc_proto",
