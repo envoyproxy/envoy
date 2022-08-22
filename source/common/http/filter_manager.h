@@ -61,7 +61,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Buffers provided_data.
   void commonHandleBufferData(Buffer::Instance& provided_data);
 
-  // If i,teration has stopped for all frame types, calls this function to buffer the data before
+  // If iteration has stopped for all frame types, calls this function to buffer the data before
   // the filter processes data. The function also updates streaming state.
   void commonBufferDataIfStopAll(Buffer::Instance& provided_data, bool& buffer_was_streaming);
 
