@@ -597,6 +597,23 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
+class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
+public:
+  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
+                                 Init::Manager& init_manager)
+      : server_context_(context), init_manager_(init_manager) {}
+
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_context_;
+  }
+
+  Init::Manager& initManager() override { return init_manager_; }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  Init::Manager& init_manager_;
+};
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -606,7 +623,7 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Server::Configuration::ServerFactoryContext& server_context,
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -723,9 +740,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
+  AddressSelectFn sourceAddressFn() const override { return source_address_fn_; };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
@@ -825,7 +840,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  AddressSelectFn source_address_fn_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
@@ -856,7 +871,7 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
-  Server::Configuration::ServerFactoryContext& server_factory_context_;
+  UpstreamHttpFactoryContextImpl upstream_context_;
 };
 
 /**

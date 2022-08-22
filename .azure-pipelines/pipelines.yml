@@ -10,6 +10,18 @@ trigger:
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
+variables:
+- name: isDev
+  # This must be checked/set in a `step` from the VERSION.txt file, in order to be useful
+  value: true
+- name: isMain
+  value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+- name: isRelease
+  value: $[startsWith(variables['Build.SourceBranch'], 'refs/heads/release/v')]
+- name: isStableBranch
+  # A release branch can be either `main` or a `release/v1.x` stable branch
+  value: $[or(eq(variables['isMain'], 'true'), eq(variables['isRelease'], 'true'))]
+
 stages:
 - stage: precheck
   jobs:
@@ -425,11 +437,11 @@ stages:
       timeoutInMinutes: 10
       condition: always()
 
-- stage: docs
+- stage: publish
   dependsOn: ["docker"]
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
   jobs:
-  - job: publish
+  - job: docs
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -458,7 +470,7 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-      condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      condition: eq(variables['isMain'], 'true')
 
     - task: InstallSSHKey@0
       inputs:
@@ -473,6 +485,26 @@ stages:
       env:
         AZP_BRANCH: $(Build.SourceBranch)
         NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
+
+  - job: github
+    dependsOn: ["docs"]
+    condition: eq(variables['isStableBranch'], 'true')
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        if [[ $VERSION_DEV != "dev" ]]; then
+            echo "##vso[task.setvariable variable=isDev]false"
+        fi
+      displayName: Set development/release env
+
+    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+      displayName: "Publish release to Github"
+      workingDirectory: $(Build.SourcesDirectory)
+      condition: eq(variables['isDev'], 'false')
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
 
 - stage: verify
   dependsOn: ["docker"]
