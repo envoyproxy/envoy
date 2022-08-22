@@ -1145,6 +1145,20 @@ typed_config:
   }
 }
 
+TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
+  config_helper_.addNetworkFilter(R"EOF(
+      name: envoy.test.test_network_filter 
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
+)EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  test_server_->waitForCounterEq("test_network_filter.on_new_connection", 1);
+  EXPECT_EQ(test_server_->counter("test_network_filter.on_data")->value(), 0);
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
