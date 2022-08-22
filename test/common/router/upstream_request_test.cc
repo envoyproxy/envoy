@@ -107,8 +107,8 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
         callbacks->upstreamToDownstream().dumpState(out, 0);
         std::string state = out.str();
         EXPECT_THAT(state, testing::HasSubstr("UpstreamRequest"));
-        EXPECT_EQ(&callbacks->upstreamToDownstream().connection(),
-                  router_filter_interface_.callbacks_.connection());
+        EXPECT_EQ(callbacks->upstreamToDownstream().connection().ptr(),
+                  router_filter_interface_.callbacks_.connection().ptr());
         return nullptr;
       }));
 
