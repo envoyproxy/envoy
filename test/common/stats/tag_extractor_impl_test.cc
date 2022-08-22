@@ -32,7 +32,8 @@ TEST(TagExtractorTest, TwoSubexpressions) {
 }
 
 TEST(TagExtractorTest, IstioResponseCode) {
-  TagExtractorStdRegexImpl tag_extractor("response_code", "(response_code=\\.=(.+?);\\.;)|_rq(_(\\d{3}))$");
+  TagExtractorStdRegexImpl tag_extractor("response_code",
+                                         "(response_code=\\.=(.+?);\\.;)|_rq(_(\\d{3}))$");
   EXPECT_EQ("response_code", tag_extractor.name());
   std::string name = "cluster.xds-grpc.upstream_rq_200";
   TagVector tags;
