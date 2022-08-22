@@ -17,7 +17,6 @@ void SipHeader::parseHeader() {
   }
 
   std::size_t pos = 0;
-  std::string pattern = "(.*)=(.*?)>*";
   absl::string_view& header = raw_text_;
   bool isHost = true;
 
@@ -44,9 +43,8 @@ void SipHeader::parseHeader() {
       str = header.substr(pos, found - pos);
     }
 
-    std::string param = "";
-    std::string value = "";
-    if (!re2::RE2::FullMatch(std::string(str), pattern, &param, &value)) {
+    std::size_t value_pos = str.find("=");
+    if (value_pos == absl::string_view::npos) {
       // First as host
       if (isHost) {
         if (str.find("sip:") != absl::string_view::npos) {
@@ -70,6 +68,9 @@ void SipHeader::parseHeader() {
         isHost = false;
       }
     } else {
+      auto param = str.substr(0, value_pos);
+      value_pos += 1;
+      auto value = str.substr(value_pos);
       if (!param.empty() && !value.empty()) {
         if (value.find("sip:") != absl::string_view::npos) {
           value = value.substr(std::strlen("sip:"));

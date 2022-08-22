@@ -258,9 +258,11 @@ class Router : public Upstream::LoadBalancerContextBase,
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope, Server::Configuration::FactoryContext& context)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
+      : cluster_manager_(cluster_manager), // stats_(generateStats(stat_prefix, scope)),
         context_(context) {
     UNREFERENCED_PARAMETER(context_);
+    UNREFERENCED_PARAMETER(stat_prefix);
+    UNREFERENCED_PARAMETER(scope);
   }
 
   // SipFilters::DecoderFilter
@@ -306,7 +308,7 @@ private:
                                        const std::string& key, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
-  RouterStats stats_;
+  // RouterStats stats_;
 
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};

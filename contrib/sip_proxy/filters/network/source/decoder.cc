@@ -152,6 +152,9 @@ int Decoder::reassemble(Buffer::Instance& data) {
       Buffer::OwnedImpl message{};
       message.move(remaining_data, full_msg_len);
       onDataReady(message);
+
+      // Even the handle of current sip message hasn't finished(async handle),
+      // we use string of this buffer, so it can be drain safely.
       message.drain(message.length());
       full_msg_len = 0;
     }

@@ -281,7 +281,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
-  stats_.counterFromElements("", "local-generated-response").inc();
+  // stats_.counterFromElements("", "local-generated-response").inc();
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
@@ -330,7 +330,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+  // stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
@@ -395,7 +395,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
-  cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
+  // cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
 
   return FilterStatus::Continue;
 }
