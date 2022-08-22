@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
@@ -63,13 +64,14 @@ public:
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         connection_handler_(*dispatcher_, absl::nullopt),
+        connection_id_generator_(quic::kQuicDefaultConnectionIdLength),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
             listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
-            crypto_stream_factory_),
+            crypto_stream_factory_, connection_id_generator_),
         connection_id_(quic::test::TestConnectionId(1)),
         transport_socket_factory_(true, listener_config_.listenerScope(),
                                   std::make_unique<NiceMock<Ssl::MockServerContextConfig>>()) {
@@ -229,6 +231,7 @@ protected:
   QuicStatNames quic_stat_names_;
   Server::ConnectionHandlerImpl connection_handler_;
   EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   const quic::QuicConnectionId connection_id_;
   QuicServerTransportSocketFactory transport_socket_factory_;
