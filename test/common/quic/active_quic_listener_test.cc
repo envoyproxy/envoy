@@ -354,9 +354,11 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
                                            ->config()
                                            ->max_time_before_crypto_handshake()
                                            .ToMilliseconds());
-  EXPECT_TRUE(quic::test::QuicConnectionPeer::GetSendAlarm(
-                  const_cast<quic::QuicSession*>(session)->connection())
-                  ->IsSet());
+  EXPECT_EQ(Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.quic_defer_send_in_response_to_packet"),
+            quic::test::QuicConnectionPeer::GetSendAlarm(
+                const_cast<quic::QuicSession*>(session)->connection())
+                ->IsSet());
   readFromClientSockets();
 }
 

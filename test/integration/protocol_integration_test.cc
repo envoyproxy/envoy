@@ -1971,6 +1971,7 @@ name: local-reply-during-encode-data
   // Wait for the upstream request and begin sending a response with end_stream = false.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Finish sending response headers before aborting the response.
   response->waitForHeaders();
   upstream_request_->encodeData(size_, false);
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
@@ -3077,6 +3078,7 @@ TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeData) {
   waitForNextUpstreamRequest(0);
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
+  // Finish sending response headers before aborting the response.
   response->waitForHeaders();
   // This much data should cause the add-body-filter to overflow response buffer
   upstream_request_->encodeData(16 * 1024, false);
@@ -3746,7 +3748,7 @@ public:
   bool supportsUdpGso() const override { return false; }
 };
 
-TEST_P(DownstreamProtocolIntegrationTest, DISABLED_HandleDownstreamSocketFail) {
+TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
