@@ -114,13 +114,19 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
                                                      regex_) &&
       match.size() > 1) {
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
-    const auto& remove_subexpr = match[1];
+    uint idx;
+    for (idx = 1; idx < match.size(); idx++) {
+      if (match[idx].str() != "") {
+        break;
+      }
+    }
+    const auto& remove_subexpr = match[idx];
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch
     // (remove_subexpr) to allow the expression to strip off extra characters that should be removed
     // from the string but also not necessary in the tag value ("." for example). If there is no
     // second submatch, then the value_subexpr is the same as the remove_subexpr.
-    const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
+    const auto& value_subexpr = idx + 1 < match.size() ? match[idx + 1] : remove_subexpr;
     addTag(tags) = value_subexpr.str();
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
