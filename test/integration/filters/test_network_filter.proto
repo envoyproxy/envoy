@@ -2,4 +2,5 @@ syntax = "proto3";
 
 package test.integration.filters;
 
-message TestNetworkFilterConfig {}
+message TestNetworkFilterConfig {
+}
