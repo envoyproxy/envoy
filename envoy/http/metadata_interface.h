@@ -8,7 +8,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/escaping.h"
-#include "fmt/ranges.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
