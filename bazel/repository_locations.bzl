@@ -120,12 +120,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "1.9.2",
-        sha256 = "e034e4aea098c91ac05ac7e08f01a302275378a0bc0814c4939e96552c912212",
+        version = "1.10.0",
+        sha256 = "33332c0cd7b5238b5162b5177da7f45a05641f342cf6d04080b9775233900acf",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2022-08-01",
+        release_date = "2022-08-12",
         cpe = "N/A",
     ),
     com_google_absl = dict(
@@ -318,12 +318,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        version = "a3ae8e00a2c5553c806e83fae83e33f0198913f0",
-        sha256 = "1ccc2056b68b81ada8df61310e03dfa0541c34821fd711654d0590a7321db9c8",
+        version = "1.40.0",
+        sha256 = "13e7c6460cd979726e5b3b129bb01c34532f115883ac696a75eb7f1d6a9765ed",
         strip_prefix = "grpc-{version}",
-        urls = ["https://github.com/grpc/grpc/archive/{version}.tar.gz"],
+        urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-06-07",
+        release_date = "2021-09-07",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_unicode_org_icu = dict(
@@ -510,20 +510,47 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-07-28",
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
-    net_colm_open_source_ragel = dict(
-        project_name = "Ragel",
-        project_desc = "Ragel State Machine Compiler",
-        project_url = "https://www.colm.net/open-source/ragel/",
-        version = "6.10",
-        sha256 = "5f156edb65d20b856d638dd9ee2dfb43285914d9aa2b6ec779dac0270cd56c3f",
-        strip_prefix = "ragel-{version}",
-        urls = ["https://www.colm.net/files/ragel/ragel-{version}.tar.gz"],
+    net_colm_open_source_colm = dict(
+        project_name = "Colm",
+        project_desc = "The Colm Programming Language",
+        project_url = "https://www.colm.net/open-source/colm/",
+        # The latest release version v0.14.7 prevents building statically (see
+        # https://github.com/adrian-thurston/colm/issues/146). The latest SHA includes the fix (see
+        # https://github.com/adrian-thurston/colm/commit/fc61ecb3a22b89864916ec538eaf04840e7dd6b5).
+        # TODO(zhxie): Update to the next release version when it is released.
+        version = "2d8ba76ddaf6634f285d0a81ee42d5ee77d084cf",
+        sha256 = "0399e9bef7603a8f3d94acd0b0af6b5944cc3103e586734719379d3ec09620c0",
+        strip_prefix = "colm-{version}",
+        urls = ["https://github.com/adrian-thurston/colm/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.matching.input_matchers.hyperscan",
             "envoy.regex_engines.hyperscan",
         ],
-        release_date = "2017-03-24",
+        release_date = "2021-12-28",
+        cpe = "N/A",
+    ),
+    net_colm_open_source_ragel = dict(
+        project_name = "Ragel",
+        project_desc = "Ragel State Machine Compiler",
+        project_url = "https://www.colm.net/open-source/ragel/",
+        # We used the stable release Ragel 6.10 previously and it is under GPLv2 license (see
+        # http://www.colm.net/open-source/ragel). Envoy uses its binary only as a tool for
+        # compiling contrib extension Hyperscan. For copyright consideration, we update Ragel to
+        # its development release which is under MIT license.
+        # The latest release version v7.0.4 is not compatible with its dependency Colm we use. The
+        # latest SHA includes fix for compatibility.
+        # TODO(zhxie): Update to the next release version when it is released.
+        version = "d4577c924451b331c73c8ed0af04f6efd35ac0b4",
+        sha256 = "fa3474d50da9c870b79b51ad43f8d11cdf05268f5ec05a602ecd5b1b5f5febb0",
+        strip_prefix = "ragel-{version}",
+        urls = ["https://github.com/adrian-thurston/ragel/archive/{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.matching.input_matchers.hyperscan",
+            "envoy.regex_engines.hyperscan",
+        ],
+        release_date = "2021-12-28",
         cpe = "N/A",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
@@ -672,14 +699,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
         project_url = "https://nlohmann.github.io/json",
-        version = "3.11.1",
-        sha256 = "598becb62ee0e01cf32795073c8ae09b6e95335cd43a4417b785d93ce105b0d0",
+        version = "3.11.2",
+        sha256 = "d69f9deb6a75e2580465c6c4c5111b89c4dc2fa94e3a85fcd2ffcd9a143d9273",
         strip_prefix = "json-{version}",
         urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
         # This will be a replacement for rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-08-01",
+        release_date = "2022-08-12",
         cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
@@ -943,12 +970,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "04136b82d0b3df4387e608d756cae593b90038c3",
-        sha256 = "dde751b01e9c2050ad6b76a925b286fb00282719bba20f438176ecb90ceff43e",
+        version = "9b5aac9172d4a50b53b557c86ee7715cf70740d1",
+        sha256 = "56c05cca8fca316f7626f1b775ef20044ebfede511f6a250e14eefe7c8eb47c4",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-08-09",
+        release_date = "2022-08-17",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -968,8 +995,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "1adb61321cf1975bee8e1df3300984166f45cb1d",
-        sha256 = "32b57e5c8b6ad95e58cf2fc7d2ac8a79f106ddb88285d06974ef62b1474594b7",
+        version = "593d03f8f7b11b4bb5272cc0b71598864c6c3883",
+        sha256 = "00e3031a53100b0269abcb6bfa5a28b2003455d98e1d253fdb1dcd6dc56b7b23",
         strip_prefix = "cel-cpp-{version}",
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -985,7 +1012,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2022-06-02",
+        release_date = "2022-07-21",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
