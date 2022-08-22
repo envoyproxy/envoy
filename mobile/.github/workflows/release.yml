@@ -47,7 +47,7 @@ jobs:
     name: android_release_deploy
     if: startsWith(github.ref, 'refs/tags/v')
     needs: android_release_artifacts
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v1
