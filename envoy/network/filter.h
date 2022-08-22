@@ -322,7 +322,7 @@ public:
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 
   /**
-   * Called when data read from the connection. If the filter doesn't get
+   * Called when data is read from the connection. If the filter doesn't get
    * enough data, filter chain iteration can be stopped if needed by returning
    * `FilterStatus::StopIteration`. Or continue the filter chain iteration by returning
    * `FilterStatus::ContinueIteration` if the filter get enough data. Reject the connection
