@@ -63,7 +63,7 @@ public:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
   FilterConfig config_;
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
   std::list<UpstreamRequestPtr> requests_;
 };
 
