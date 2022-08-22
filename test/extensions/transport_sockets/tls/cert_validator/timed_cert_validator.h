@@ -32,8 +32,8 @@ public:
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl_ctx,
-                    const CertValidator::ExtraValidationContext& validation_context,
-                    bool is_server) override;
+                    const CertValidator::ExtraValidationContext& validation_context, bool is_server,
+                    absl::string_view host_name) override;
 
   bool validationPending() const { return validation_timer_->enabled(); }
 

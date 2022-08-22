@@ -518,7 +518,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
   // validation is async.
   ValidationResults result = cert_validator_->doVerifyCertChain(
       *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
-      {host_name == nullptr ? "" : host_name}, SSL_is_server(ssl));
+      {}, SSL_is_server(ssl), (host_name == nullptr ? "" : host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful);
@@ -1266,7 +1266,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates
 ValidationResults ContextImpl::customVerifyCertChainForQuic(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    const CertValidator::ExtraValidationContext& validation_context) {
+    const CertValidator::ExtraValidationContext& validation_context, const std::string& host_name) {
   ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same cert validation
@@ -1278,7 +1278,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   }
   ValidationResults result = cert_validator_->doVerifyCertChain(
       cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
-      *ssl_ctx, validation_context, is_server);
+      *ssl_ctx, validation_context, is_server, host_name);
   return result;
 }
 
