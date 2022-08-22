@@ -124,10 +124,9 @@ void Tracer::flushSpans() {
   key_value.set_key(std::string{kServiceNameKey});
   *key_value.mutable_value() = value_proto;
   (*resource_span->mutable_resource()->add_attributes()) = key_value;
-  ::opentelemetry::proto::trace::v1::InstrumentationLibrarySpans* instrumentation_library_span =
-      resource_span->add_instrumentation_library_spans();
+  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
   for (const auto& pending_span : span_buffer_) {
-    (*instrumentation_library_span->add_spans()) = pending_span;
+    (*scope_span->add_spans()) = pending_span;
   }
   tracing_stats_.spans_sent_.add(span_buffer_.size());
   if (!exporter_->log(request)) {
