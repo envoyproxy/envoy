@@ -16,6 +16,7 @@ envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
     deps = [":router_check_main_lib"] + select({
+        "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
