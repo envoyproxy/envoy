@@ -97,7 +97,7 @@ public:
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
   StreamInfo::StreamInfo* streamInfo() const { return stream_info_.get(); }
   bool connected() const { return connected_; }
-  bool endListenerFilterIteration() const { return accept_filters_.end() == iter_; }
+  bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
 
 private:
   /**
