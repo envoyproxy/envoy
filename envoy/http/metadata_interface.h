@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <vector>
 
@@ -74,30 +75,10 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
 
   template <typename FormatContext>
   auto format(const Envoy::Http::MetadataMap& map, FormatContext& ctx) -> decltype(ctx.out()) {
-    auto out = ctx.out();
-    *out++ = '{';
-    int i = 0;
-    for (const auto& item : map) {
-      if (i > 0) {
-        *out++ = ',';
-        *out++ = ' ';
-      }
-      *out++ = '"';
-      for (const auto& ch : absl::CEscape(item.first)) {
-        *out++ = ch;
-      }
-      *out++ = '"';
-      *out++ = ':';
-      *out++ = ' ';
-      *out++ = '"';
-      for (const auto& ch : absl::CEscape(item.second)) {
-        *out++ = ch;
-      }
-      *out++ = '"';
-      ++i;
-    }
-    *out++ = '}';
-    return out;
+    std::ostringstream out;
+    out << map;
+    auto str = out.str();
+    return fmt::formatter<std::string_view>().format({str.data(), str.size()}, ctx);
   }
 };
 
