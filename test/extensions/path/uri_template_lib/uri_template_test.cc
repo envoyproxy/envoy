@@ -103,47 +103,47 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
                              {"/static", R"EOF(segments: {literal: "/static"} )EOF"},
                              {"/{var1}", R"EOF(segments:
                           - literal: "/"
-                          - var_index: 1)EOF"},
+                          - capture_index: 1)EOF"},
                              {"/{var1}", R"EOF(segments:
                           - literal: "/"
-                          - var_index: 1)EOF"},
+                          - capture_index: 1)EOF"},
                              {"/{var1}/{var1}/{var1}", R"EOF(segments:
                                         - literal: "/"
-                                        - var_index: 1
+                                        - capture_index: 1
                                         - literal: "/"
-                                        - var_index: 1
+                                        - capture_index: 1
                                         - literal: "/"
-                                        - var_index: 1)EOF"},
+                                        - capture_index: 1)EOF"},
                              {"/{var3}/{var1}/{var2}", R"EOF(segments
                                         - literal: "/"
-                                        - var_index: 3
+                                        - capture_index: 3
                                         - literal: "/"
-                                        - var_index: 1
+                                        - capture_index: 1
                                         - literal: "/"
-                                        - var_index: 2)EOF"},
+                                        - capture_index: 2)EOF"},
                              {"/{var3}/abc/def/{var2}.suffix", R"EOF(segments:
                                                 - literal: "/"
-                                                - var_index: 3
+                                                - capture_index: 3
                                                 - literal: "/abc/def/"
-                                                - var_index: 2
+                                                - capture_index: 2
                                                 - literal: ".suffix")EOF"},
                              {"/abc/{var1}/{var2}/def", R"EOF(segments
                                          - literal: "/abc/"
-                                         - var_index: 1
+                                         - capture_index: 1
                                          - literal: "/"
-                                         - var_index: 2
+                                         - capture_index: 2
                                          - literal: "/def")EOF"},
                              {"/{var1}{var2}", R"EOF(segments
                                 - literal: "/"
-                                - var_index: 1
+                                - capture_index: 1
                                 - ar_index: 2)EOF"},
                              {"/{var1}-{var2}/bucket-{var3}.suffix", R"EOF(segments
                                                       - literal: "/"
-                                                      - var_index: 1
+                                                      - capture_index: 1
                                                       - literal: "-"
-                                                      - var_index: 2
+                                                      - capture_index: 2
                                                       - literal: "/bucket-"
-                                                      - var_index: 3
+                                                      - capture_index: 3
                                                       - literal: ".suffix")EOF"},
                          })));
 
@@ -184,47 +184,47 @@ INSTANTIATE_TEST_SUITE_P(RewriteUrlTemplateSuccessTestSuite, RewriteUrlTemplateS
                              {{R"EOF(segments: { literal: "/static" })EOF", "/static"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 1)EOF",
+              - capture_index: 1)EOF",
                                "/val1"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 1)EOF",
+              - capture_index: 1)EOF",
                                "/val1"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 1
+              - capture_index: 1
               - literal: "/"
-              - var_index: 1
+              - capture_index: 1
               - literal: "/"
-              - var_index: 1)EOF",
+              - capture_index: 1)EOF",
                                "/val1/val1/val1"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 3
+              - capture_index: 3
               - literal: "/"
-              - var_index: 1
+              - capture_index: 1
               - literal: "/"
-              - var_index: 2)EOF",
+              - capture_index: 2)EOF",
                                "/val3/val1/val2"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 3
+              - capture_index: 3
               - literal: "/abc/def/"
-              - var_index: 2
+              - capture_index: 2
               - literal: ".suffix")EOF",
                                "/val3/abc/def/val2.suffix"},
                               {R"EOF(segments:
               - literal: "/"
-              - var_index: 3
-              - var_index: 2
+              - capture_index: 3
+              - capture_index: 2
               - literal: "."
-              - var_index: 1)EOF",
+              - capture_index: 1)EOF",
                                "/val3val2.val1"},
                               {R"EOF(segments:
               - literal: "/abc/"
-              - var_index: 1
+              - capture_index: 1
               - literal: "/"
-              - var_index: 5
+              - capture_index: 5
               - literal: "/def")EOF",
                                "/abc/val1/val5/def"}})));
 
@@ -241,7 +241,7 @@ TEST(RewriteUrlTemplateFailure, BadRegex) {
   const std::string yaml = R"EOF(
 segments:
 - literal: "/"
-- var_index: 1
+- capture_index: 1
   )EOF";
 
   Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
@@ -256,7 +256,7 @@ TEST(RewriteUrlTemplateFailure, RegexNoMatch) {
   const std::string yaml = R"EOF(
 segments:
 - literal: "/"
-- var_index: 1
+- capture_index: 1
   )EOF";
 
   Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
@@ -271,7 +271,7 @@ TEST(RewriteUrlTemplateFailure, RegexCaptureIndexZero) {
   const std::string yaml = R"EOF(
 segments:
 - literal: "/"
-- var_index: 0
+- capture_index: 0
   )EOF";
   Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
 
@@ -285,7 +285,7 @@ TEST(RewriteUrlTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
   const std::string yaml = R"EOF(
 segments:
 - literal: "/"
-- var_index: 6
+- capture_index: 6
   )EOF";
 
   Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
