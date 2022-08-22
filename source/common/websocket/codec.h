@@ -92,7 +92,6 @@ public:
 
 private:
   void resetDecoder();
-  void frameMaskFlag(uint8_t mask_and_length);
   void frameDataStart();
   void frameData(const uint8_t* mem, uint64_t length);
   void frameDataEnd(absl::optional<std::vector<Frame>>& output);

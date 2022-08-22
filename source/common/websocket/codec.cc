@@ -25,30 +25,28 @@ absl::optional<std::vector<uint8_t>> Encoder::encodeFrameHeader(const Frame& fra
   // Set payload length
   if (frame.payload_length_ <= 125) {
     // Set mask bit and 7-bit length
-    pushScalarToByteVector(frame.masking_key_ ? static_cast<uint8_t>(frame.payload_length_ | 0x80)
-                                              : static_cast<uint8_t>(frame.payload_length_),
+    pushScalarToByteVector(frame.masking_key_.has_value()
+                               ? static_cast<uint8_t>(frame.payload_length_ | 0x80)
+                               : static_cast<uint8_t>(frame.payload_length_),
                            output);
   } else if (frame.payload_length_ <= 65535) {
     // Set mask bit and 16-bit length indicator
-    pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_ ? 0xfe : 0x7e), output);
+    pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_.has_value() ? 0xfe : 0x7e),
+                           output);
     // Set 16-bit length
     pushScalarToByteVector(htobe16(frame.payload_length_), output);
   } else {
     // Set mask bit and 64-bit length indicator
-    pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_ ? 0xff : 0x7f), output);
+    pushScalarToByteVector(static_cast<uint8_t>(frame.masking_key_.has_value() ? 0xff : 0x7f),
+                           output);
     // Set 64-bit length
     pushScalarToByteVector(htobe64(frame.payload_length_), output);
   }
   // Set masking key
-  if (frame.masking_key_) {
+  if (frame.masking_key_.has_value()) {
     pushScalarToByteVector(htobe32(frame.masking_key_.value()), output);
   }
   return output;
-}
-
-void Decoder::frameMaskFlag(uint8_t mask_and_length) {
-  num_remaining_masking_key_bytes_ = mask_and_length & 0x80 ? kMaskingKeyLength : 0;
-  length_ = mask_and_length & 0x7F;
 }
 
 void Decoder::frameDataStart() {
@@ -92,13 +90,16 @@ uint8_t Decoder::doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data) {
 }
 
 uint8_t Decoder::doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data) {
-  frameMaskFlag(data.front());
+  num_remaining_masking_key_bytes_ = data.front() & 0x80 ? kMaskingKeyLength : 0;
+  length_ = data.front() & 0x7f;
   if (length_ == 0x7e) {
     num_remaining_extended_length_bytes_ = kPayloadLength16Bit;
+    // Reset the length indicator to read the 16 bit actual length
     length_ = 0;
     state_ = State::FrameHeaderExtendedLength16Bit;
   } else if (length_ == 0x7f) {
     num_remaining_extended_length_bytes_ = kPayloadLength64Bit;
+    // Reset the length indicator to read the 64 bit actual length
     length_ = 0;
     state_ = State::FrameHeaderExtendedLength64Bit;
   } else if (num_remaining_masking_key_bytes_ > 0) {
