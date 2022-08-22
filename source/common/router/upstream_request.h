@@ -123,7 +123,7 @@ public:
   void onBelowWriteBufferLowWatermark() override { enableDataFromDownstreamForFlowControl(); }
   // UpstreamToDownstream
   const Route& route() const override;
-  const Network::Connection& connection() const override;
+  OptRef<const Network::Connection> connection() const override;
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return stream_options_;
   }
@@ -408,7 +408,9 @@ public:
     }
     // UpstreamToDownstream
     const Route& route() const override { return filter_.request_.route(); }
-    const Network::Connection& connection() const override { return filter_.request_.connection(); }
+    OptRef<const Network::Connection> connection() const override {
+      return filter_.request_.connection();
+    }
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
       return filter_.request_.upstreamStreamOptions();
     }

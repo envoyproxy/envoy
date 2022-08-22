@@ -83,7 +83,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
-  const Network::Connection* connection() override;
+  OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
   Router::RouteConstSharedPtr route() override;
@@ -605,7 +605,7 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection* connection, uint64_t stream_id,
+                OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, const FilterChainFactory& filter_chain_factory)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
@@ -806,8 +806,7 @@ public:
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
 
-  // TODO(alyssawilk) this should probably be an optional reference.
-  const Network::Connection* connection() const { return connection_; }
+  OptRef<const Network::Connection> connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
@@ -965,9 +964,9 @@ private:
 
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
-  // This is null if there is no downstream connection, e.g. for health check or
+  // This is unset if there is no downstream connection, e.g. for health check or
   // async requests.
-  const Network::Connection* connection_;
+  OptRef<const Network::Connection> connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
@@ -1028,7 +1027,7 @@ private:
 class DownstreamFilterManager : public FilterManager {
 public:
   DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
-                          Event::Dispatcher& dispatcher, const Network::Connection* connection,
+                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
                           uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                           bool proxy_100_continue, uint32_t buffer_limit,
                           FilterChainFactory& filter_chain_factory,
@@ -1038,7 +1037,7 @@ public:
                           StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
-        stream_info_(protocol, time_source, connection->connectionInfoProviderSharedPtr(),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
         local_reply_(local_reply) {}
 

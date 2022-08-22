@@ -643,7 +643,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       stream_id_(connection_manager.random_generator_.random()),
       filter_manager_(*this, connection_manager_.read_callbacks_->connection().dispatcher(),
-                      &connection_manager_.read_callbacks_->connection(), stream_id_,
+                      connection_manager_.read_callbacks_->connection(), stream_id_,
                       std::move(account), connection_manager_.config_.proxy100Continue(),
                       buffer_limit, connection_manager_.config_.filterFactory(),
                       connection_manager_.config_.localReply(),

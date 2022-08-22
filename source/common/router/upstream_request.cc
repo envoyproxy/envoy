@@ -179,7 +179,7 @@ void CodecFilter::CodecBridge::dumpState(std::ostream& os, int indent_level) con
 class UpstreamFilterManager : public Http::FilterManager {
 public:
   UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
-                        Event::Dispatcher& dispatcher, const Network::Connection* connection,
+                        Event::Dispatcher& dispatcher, OptRef<const Network::Connection> connection,
                         uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
                         bool proxy_100_continue, uint32_t buffer_limit,
                         const Http::FilterChainFactory& filter_chain_factory,
@@ -431,9 +431,11 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
+  if (connection()) {
+    const auto addressProvider = connection()->connectionInfoProviderSharedPtr();
+    DUMP_DETAILS(addressProvider);
+  }
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
-  DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
   if (filter_manager_) {
     filter_manager_->dumpState(os, indent_level);
@@ -442,8 +444,8 @@ void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
 
 const Route& UpstreamRequest::route() const { return *parent_.route(); }
 
-const Network::Connection& UpstreamRequest::connection() const {
-  return *parent_.callbacks()->connection();
+OptRef<const Network::Connection> UpstreamRequest::connection() const {
+  return parent_.callbacks()->connection();
 }
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
