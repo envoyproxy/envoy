@@ -5,6 +5,7 @@
 #include "envoy/filesystem/filesystem.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/ttl.h"
 
 #include "quiche/common/quiche_linked_hash_map.h"
 
@@ -31,6 +32,7 @@ public:
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
+  TtlManager ttlManager_;
 
 protected:
   const uint32_t max_entries_;

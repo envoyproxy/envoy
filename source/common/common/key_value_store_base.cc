@@ -31,14 +31,20 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 } // namespace
 
 KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher, 
-                                     std::chrono::milliseconds flush_interval, uint32_t max_entries)
-  : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
+                                     std::chrono::milliseconds flush_interval, 
+                                     uint32_t max_entries, 
+                                     )
+  : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval](), ttlManager(callback, dispatcher, dispatcher.timeSource()) {
         flush();
         flush_timer_->enableTimer(flush_interval);
       })) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
   }
+}
+
+void KeyValueStoreBase::ttlCallback(absl::string_view key, const std::vector<std::string>& expired) {
+  
 }
 
 bool KeyValueStoreBase::parseContents(absl::string_view contents) {
@@ -58,7 +64,7 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
   return true;
 }
 
-void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view, absl::optional<std::chrono::seconds> ttl) {
+void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view, const absl::optional<std::chrono::seconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
@@ -71,6 +77,9 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   }
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
+  }
+  if (ttl) {
+    ttlManager.add(ttl, key);
   }
   if (!flush_timer_->enabled()) {
     flush();
