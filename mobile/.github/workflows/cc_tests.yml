@@ -9,7 +9,7 @@ on:
 jobs:
   cctests:
     name: cc_tests
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682

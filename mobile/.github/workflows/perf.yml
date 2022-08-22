@@ -9,7 +9,7 @@ on:
 jobs:
   sizecurrent:
     name: size_current
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
@@ -37,7 +37,7 @@ jobs:
           path: bazel-bin/test/performance/test_binary_size
   sizemain:
     name: size_main
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
@@ -69,7 +69,7 @@ jobs:
   sizecompare:
     name: size_compare
     needs: [sizecurrent, sizemain]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
