@@ -86,6 +86,20 @@ protected:
   void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
                                             BytesCountExpectation h2_expectation,
                                             BytesCountExpectation h3_expectation, const int id = 0);
+
+  enum class SkipOnStream { Upstream, Downstream, AnyStream };
+
+  bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
+#ifdef ENVOY_ENABLE_UHV
+    return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+           (stream == SkipOnStream::AnyStream ||
+            (stream == SkipOnStream::Downstream &&
+             downstreamProtocol() == Http::CodecType::HTTP2) ||
+            (stream == SkipOnStream::Upstream && upstreamProtocol() == Http::CodecType::HTTP2));
+#endif
+
+    return false;
+  }
 };
 
 } // namespace Envoy

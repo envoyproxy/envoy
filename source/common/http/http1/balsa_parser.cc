@@ -52,11 +52,17 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
   // If method is not CONNECT, parse scheme.
   if (!is_connect) {
-    // Scheme must be alpha and non-empty.
-    auto it = std::find_if_not(url.begin(), url.end(), [](char c) { return std::isalpha(c); });
-    if (it == url.begin()) {
+    // Scheme must start with alpha and be non-empty.
+    auto it = url.begin();
+    if (!std::isalpha(*it)) {
       return false;
     }
+    ++it;
+    // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'.
+    const auto is_scheme_suffix = [](char c) {
+      return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
+    };
+    it = std::find_if_not(it, url.end(), is_scheme_suffix);
     url.remove_prefix(it - url.begin());
     if (!absl::StartsWith(url, kColonSlashSlash)) {
       return false;
@@ -95,6 +101,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_balsa_trailer(&trailers_);
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
+  framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
 
   switch (type) {
   case MessageType::Request:
@@ -273,6 +280,9 @@ void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
     break;
   case BalsaFrameEnums::TRAILER_MISSING_COLON:
     error_message_ = "HPE_INVALID_HEADER_TOKEN";
+    break;
+  case BalsaFrameEnums::INVALID_HEADER_CHARACTER:
+    error_message_ = "header value contains invalid chars";
     break;
   default:
     error_message_ = BalsaFrameEnums::ErrorCodeToString(error_code);
