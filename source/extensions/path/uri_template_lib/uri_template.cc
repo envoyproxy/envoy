@@ -154,7 +154,7 @@ absl::StatusOr<std::string> rewriteURLTemplatePattern(
        rewrite_pattern.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&rewritten_url, segment.literal());
-    } else if (segment.capture_index()) {
+    } else if (segment.has_capture_index()) {
       if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
