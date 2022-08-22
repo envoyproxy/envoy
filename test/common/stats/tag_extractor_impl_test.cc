@@ -31,6 +31,21 @@ TEST(TagExtractorTest, TwoSubexpressions) {
   EXPECT_EQ("cluster_name", tags.at(0).name_);
 }
 
+TEST(TagExtractorTest, IstioResponseCode) {
+  TagExtractorStdRegexImpl tag_extractor("response_code", "(response_code=\\.=(.+?);\\.;)|_rq(_(\\d{3}))$");
+  EXPECT_EQ("response_code", tag_extractor.name());
+  std::string name = "cluster.xds-grpc.upstream_rq_200";
+  TagVector tags;
+  IntervalSetImpl<size_t> remove_characters;
+  TagExtractionContext tag_extraction_context(name);
+  ASSERT_TRUE(tag_extractor.extractTag(tag_extraction_context, tags, remove_characters));
+  std::string tag_extracted_name = StringUtil::removeCharacters(name, remove_characters);
+  EXPECT_EQ("cluster.xds-grpc.upstream_rq", tag_extracted_name);
+  ASSERT_EQ(1, tags.size());
+  EXPECT_EQ("200", tags.at(0).value_);
+  EXPECT_EQ("response_code", tags.at(0).name_);
+}
+
 TEST(TagExtractorTest, RE2Variants) {
   TagExtractorRe2Impl tag_extractor("cluster_name", "^cluster\\.(([^\\.]+)\\.).*");
   EXPECT_EQ("cluster_name", tag_extractor.name());
