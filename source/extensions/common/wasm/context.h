@@ -282,15 +282,6 @@ public:
   FindValue(absl::string_view name, Protobuf::Arena* arena) const override {
     return findValue(name, arena, false);
   }
-  bool IsPathUnknown(absl::string_view) const override { return false; }
-  const std::vector<google::api::expr::runtime::CelAttributePattern>&
-  unknown_attribute_patterns() const override {
-    static const std::vector<google::api::expr::runtime::CelAttributePattern> empty;
-    return empty;
-  }
-  const Protobuf::FieldMask& unknown_paths() const override {
-    return Protobuf::FieldMask::default_instance();
-  }
 
   // Foreign function state
   virtual void setForeignData(absl::string_view data_name, std::unique_ptr<StorageObject> data) {

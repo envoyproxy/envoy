@@ -340,7 +340,7 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
-  instrumentation_library_spans:
+  scope_spans:
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -360,9 +360,8 @@ resource_spans:
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
   TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
-  auto* expected_span = request_proto.mutable_resource_spans(0)
-                            ->mutable_instrumentation_library_spans(0)
-                            ->mutable_spans(0);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
   expected_span->set_trace_id(
       absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
   expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
@@ -424,7 +423,7 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "test-service-name"
-  instrumentation_library_spans:
+  scope_spans:
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -437,9 +436,8 @@ resource_spans:
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
   TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
-  auto* expected_span = request_proto.mutable_resource_spans(0)
-                            ->mutable_instrumentation_library_spans(0)
-                            ->mutable_spans(0);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
   expected_span->set_trace_id(
       absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
   expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));

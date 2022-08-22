@@ -1973,6 +1973,11 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
 
+#ifdef ENVOY_ENABLE_UHV
+  // UHV - disable header validations in oghttp2
+  og_options_.validate_http_headers = false;
+#endif
+
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
