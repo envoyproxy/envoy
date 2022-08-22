@@ -1076,7 +1076,7 @@ if __name__ == "__main__":
     def check_visibility(error_messages):
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % [f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]])
+            % "".join([f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]]))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
