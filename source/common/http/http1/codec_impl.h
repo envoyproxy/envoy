@@ -316,10 +316,10 @@ private:
   virtual void allocTrailers() PURE;
 
   /**
-   * Called in order to complete an in progress header decode.
+   * Called for each header in order to complete an in progress header decode.
    * @return A status representing success.
    */
-  Status completeLastHeader();
+  Status completeCurrentHeader();
 
   /**
    * Check if header name contains underscore character.

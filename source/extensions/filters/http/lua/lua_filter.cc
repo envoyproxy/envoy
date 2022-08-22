@@ -688,8 +688,10 @@ StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager, Api::Api& api)
-    : cluster_manager_(cluster_manager) {
+                           Upstream::ClusterManager& cluster_manager, Api::Api& api,
+                           Stats::Scope& scope, const std::string& stats_prefix)
+    : cluster_manager_(cluster_manager),
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
       throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
@@ -793,6 +795,7 @@ Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::Hea
 }
 
 void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
+  stats_.errors_.inc();
   scriptLog(spdlog::level::err, e.what());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
@@ -831,8 +834,17 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.lua_respond_with_send_local_reply")) {
     uint64_t status = Http::Utility::getResponseStatus(*headers);
+    auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
+      headers->iterate(
+          [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+            response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                     header.value().getStringView());
+            return Http::HeaderMap::Iterate::Continue;
+          });
+    };
     callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                               nullptr, absl::nullopt, HttpResponseCodeDetails::get().LuaResponse);
+                               modify_headers, absl::nullopt,
+                               HttpResponseCodeDetails::get().LuaResponse);
   } else {
     callbacks_->encodeHeaders(std::move(headers), body == nullptr,
                               HttpResponseCodeDetails::get().LuaResponse);

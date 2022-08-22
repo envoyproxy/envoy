@@ -587,6 +587,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
 
 // Verifies small metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
+  // Make sure we have metadata coverage of the new style code.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -616,6 +618,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
 
 // Verifies large metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
+  // Make sure we have metadata coverage of the old style code.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -2015,45 +2019,14 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-static std::string on_local_reply_filter = R"EOF(
-name: on-local-reply-filter
-)EOF";
-
-TEST_P(MultiplexedIntegrationTest, OnLocalReply) {
-  config_helper_.prependFilter(on_local_reply_filter);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // The filter will send a local reply when receiving headers, the client
-  // should get a complete response.
-  {
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("original_reply", response->body());
-  }
-  // The filter will send a local reply when receiving headers, and interrupt
-  // that with a second reply sent from the encoder chain. The client will see
-  // the second response.
-  {
-    default_request_headers_.addCopy("dual-local-reply", "yes");
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("second_reply", response->body());
-  }
-  // The filter will send a local reply when receiving headers and reset the
-  // stream onLocalReply. The client will get a reset and no response even if
-  // dual local replies are on (from the prior request).
-  {
-    default_request_headers_.addCopy("reset", "yes");
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_FALSE(response->complete());
-  }
-}
-
 TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
@@ -2075,6 +2048,13 @@ TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
 }
 
 TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2111,6 +2091,13 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
 // HTTP/2 and HTTP/3 don't support 101 SwitchProtocol response code, the client should
 // reset the request.
 TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });

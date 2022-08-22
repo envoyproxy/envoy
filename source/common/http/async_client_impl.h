@@ -341,7 +341,7 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  const Network::Connection* connection() override { return nullptr; }
+  OptRef<const Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
@@ -420,6 +420,7 @@ private:
   }
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
