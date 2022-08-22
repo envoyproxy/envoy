@@ -78,7 +78,7 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
     std::ostringstream out;
     out << map;
     auto str = out.str();
-    return fmt::formatter<std::string_view>().format({str.data(), str.size()}, ctx);
+    return fmt::formatter<std::string>().format(str, ctx);
   }
 };
 

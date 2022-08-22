@@ -6,10 +6,10 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/utility.h"
 
 #include "test/test_common/logging.h"
 
+#include "fmt/ranges.h" // This makes spdlog call the formatter<Envoy::Http::MetadataMap> when logging.
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
