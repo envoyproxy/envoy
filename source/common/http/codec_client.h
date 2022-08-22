@@ -219,9 +219,10 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public ResponseDecoderWrapper {
+                         public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), parent_(parent) {}
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {}
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -234,8 +235,19 @@ private:
     void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    RequestEncoder* encoder_{};
+    // RequestEncoderWrapper
+    void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
+
+    void setEncoder(RequestEncoder& encoder) {
+      inner_encoder_ = &encoder;
+      inner_encoder_->getStream().addCallbacks(*this);
+    }
+
+    void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
+
     CodecClient& parent_;
+    bool decode_complete_{false};
+    bool encode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
@@ -245,6 +257,8 @@ private:
    * wrapped decoder.
    */
   void responsePreDecodeComplete(ActiveRequest& request);
+  void requestEncodeComplete(ActiveRequest& request);
+  void completeRequest(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);

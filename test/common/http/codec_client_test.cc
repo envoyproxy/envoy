@@ -21,6 +21,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -105,8 +106,11 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
@@ -123,8 +127,11 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
@@ -168,11 +175,14 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
