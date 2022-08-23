@@ -228,10 +228,12 @@ message FilterChain {
   // processed sequentially as connection events happen. Note: If the filter
   // list is empty, the connection will close by default.
   //
-  // For QUIC listeners, network filters can be created, but due to differences
-  // in the connection implementation compared to TCP, the onData() method will
-  // never be called. Therefore network filters for QUIC listeners should only
-  // expect to do work at the start of a new connection (i.e. in onNewConnection()).
+  // For QUIC listeners, network filters other than HTTP Connection Manager (HCM)
+  // can be created, but due to differences in the connection implementation compared
+  // to TCP, the onData() method will never be called. Therefore, network filters
+  // for QUIC listeners should only expect to do work at the start of a new connection
+  // (i.e. in onNewConnection()). If there are multiple network filters, HCM must be
+  // the last filter in the chain.
   repeated Filter filters = 3;
 
   // Whether the listener should expect a PROXY protocol V1 header on new
