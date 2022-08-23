@@ -5,12 +5,10 @@ on:
 
 jobs:
   retest:
+    name: Retest
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-
-      - name: Re-Test Action
-        uses: ./.github/actions/retest-action
+      #       jpsim/retest@v1
+      - uses: jpsim/retest@c158dec0a7f67cb85f8367468dc8a9a75308bb7f
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
