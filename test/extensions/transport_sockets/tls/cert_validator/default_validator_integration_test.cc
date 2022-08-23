@@ -97,7 +97,6 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithTrustRootOnly) 
 }
 
 // With only root ca trusted, certificate validation is expected to fail with max depth,
-// but it succeeds
 TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
