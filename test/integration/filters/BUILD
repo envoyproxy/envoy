@@ -318,6 +318,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "reset_stream_filter_config_lib",
+    srcs = [
+        "reset_stream_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "passthrough_filter_config_lib",
     srcs = [
         "passthrough_filter.cc",
