@@ -42,10 +42,10 @@ TEST(InternalParsing, ParsedPathDebugString) {
   EXPECT_EQ(patt1.debugString(), "/abc/def/*/{var=*/ghi/**}.test");
 
   ParsedPathPattern patt2 = {{
-                                Variable("var", {}),
-                            },
-                            "",
-                            {}};
+                                 Variable("var", {}),
+                             },
+                             "",
+                             {}};
   EXPECT_EQ(patt2.debugString(), "/{var}");
 }
 
@@ -376,7 +376,9 @@ class GenPatternRegexWithMatch : public testing::TestWithParam<struct GenPattern
 protected:
   const std::string& requestPath() const { return GetParam().path_; }
   const std::string& path_pattern() const { return GetParam().path_pattern_; }
-  std::vector<std::pair<std::string, std::string>> const varValues() { return GetParam().captures_; }
+  std::vector<std::pair<std::string, std::string>> const varValues() {
+    return GetParam().captures_;
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(

@@ -33,8 +33,7 @@ absl::StatusOr<std::string> convertPathPatternSyntaxToRegex(absl::string_view pa
   return Internal::toRegexPattern(*status);
 }
 
-absl::StatusOr<std::vector<ParsedSegment>>
-parseRewritePattern(absl::string_view path_pattern) {
+absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view path_pattern) {
   std::vector<ParsedSegment> result;
 
   // The pattern should start with a '/' and thus the first segment should
@@ -50,7 +49,8 @@ parseRewritePattern(absl::string_view path_pattern) {
   }
 
   while (!path_pattern.empty()) {
-    std::vector<absl::string_view> segments1 = absl::StrSplit(path_pattern, absl::MaxSplits('{', 1));
+    std::vector<absl::string_view> segments1 =
+        absl::StrSplit(path_pattern, absl::MaxSplits('{', 1));
     if (!segments1[0].empty()) {
       if (!Internal::isValidRewriteLiteral(segments1[0])) {
         return absl::InvalidArgumentError("Invalid rewrite literal pattern");

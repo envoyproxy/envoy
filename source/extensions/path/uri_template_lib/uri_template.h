@@ -12,9 +12,10 @@ namespace Envoy {
 namespace Extensions {
 namespace UriTemplate {
 
-// This library provides functionality to rewrite paths based on templates (https://www.rfc-editor.org/rfc/rfc6570.html).
-// Paths are matches against "match patterns" which capture matched tokens. For example:
-// The match pattern "/foo/{bar}" will match "/foo/cat" and will capture "cat" in the variable "bar".
+// This library provides functionality to rewrite paths based on templates
+// (https://www.rfc-editor.org/rfc/rfc6570.html). Paths are matches against "match patterns" which
+// capture matched tokens. For example: The match pattern "/foo/{bar}" will match "/foo/cat" and
+// will capture "cat" in the variable "bar".
 //
 // A matched path can then be rewritten with a rewrite pattern.
 // For example: rewrite pattern "/pat/hat/{bar}" would use the captured variable "bar" from above
@@ -23,8 +24,7 @@ namespace UriTemplate {
 enum class RewriteStringKind { Variable, Literal };
 
 struct ParsedSegment {
-  ParsedSegment(absl::string_view value, RewriteStringKind kind)
-      : value_(value), kind_(kind) {}
+  ParsedSegment(absl::string_view value, RewriteStringKind kind) : value_(value), kind_(kind) {}
   absl::string_view value_;
   RewriteStringKind kind_;
 };
@@ -37,8 +37,7 @@ absl::StatusOr<std::string> convertPathPatternSyntaxToRegex(absl::string_view pa
 /** Parses the specified pattern into a sequence of segments (which are
 / * either literals or variable names).
  **/
-absl::StatusOr<std::vector<ParsedSegment>>
-parseRewritePattern(absl::string_view path_pattern);
+absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view path_pattern);
 
 /**
  * Returns the parsed path rewrite pattern and processes variables.
@@ -74,9 +73,9 @@ absl::Status isValidMatchPattern(absl::string_view match_pattern);
  * capture_regex: "(1)/(2)"
  * Rewrite would result in rewrite of "/var/cat".
  */
-absl::StatusOr<std::string> rewritePathTemplatePattern(
-    absl::string_view path, absl::string_view capture_regex,
-    const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern);
+absl::StatusOr<std::string>
+rewritePathTemplatePattern(absl::string_view path, absl::string_view capture_regex,
+                           const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern);
 
 } // namespace UriTemplate
 } // namespace Extensions
