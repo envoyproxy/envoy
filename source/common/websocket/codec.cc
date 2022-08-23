@@ -63,8 +63,8 @@ void Decoder::frameDataStart() {
 
 void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
 
-void Decoder::frameDataEnd(absl::optional<std::vector<Frame>>& output) {
-  output->push_back(std::move(frame_));
+void Decoder::frameDataEnd(std::vector<Frame>& output) {
+  output.push_back(std::move(frame_));
   resetDecoder();
 }
 
@@ -91,20 +91,18 @@ uint8_t Decoder::doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data) {
 
 uint8_t Decoder::doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data) {
   num_remaining_masking_key_bytes_ = data.front() & 0x80 ? kMaskingKeyLength : 0;
-  length_ = data.front() & 0x7f;
-  if (length_ == 0x7e) {
+  uint8_t length_indicator = data.front() & 0x7f;
+  if (length_indicator == 0x7e) {
     num_remaining_extended_length_bytes_ = kPayloadLength16Bit;
-    // Reset the length indicator to read the 16 bit actual length
-    length_ = 0;
     state_ = State::FrameHeaderExtendedLength16Bit;
-  } else if (length_ == 0x7f) {
+  } else if (length_indicator == 0x7f) {
     num_remaining_extended_length_bytes_ = kPayloadLength64Bit;
-    // Reset the length indicator to read the 64 bit actual length
-    length_ = 0;
     state_ = State::FrameHeaderExtendedLength64Bit;
   } else if (num_remaining_masking_key_bytes_ > 0) {
+    length_ = length_indicator;
     state_ = State::FrameHeaderMaskingKey;
   } else {
+    length_ = length_indicator;
     frameDataStart();
   }
   return 1;
@@ -181,7 +179,6 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
 
 absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input) {
   absl::optional<std::vector<Frame>> output = std::vector<Frame>();
-  resetDecoder();
   for (const Buffer::RawSlice& slice : input.getRawSlices()) {
     absl::Span<const uint8_t> data(reinterpret_cast<uint8_t*>(slice.mem_), slice.len_);
     while (!data.empty() || state_ == State::FrameFinished) {
@@ -207,7 +204,7 @@ absl::optional<std::vector<Frame>> Decoder::decode(const Buffer::Instance& input
         bytes_decoded = doDecodePayload(data);
         break;
       case State::FrameFinished:
-        frameDataEnd(output);
+        frameDataEnd(output.value());
         break;
       }
       data.remove_prefix(bytes_decoded);

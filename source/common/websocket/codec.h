@@ -94,7 +94,7 @@ private:
   void resetDecoder();
   void frameDataStart();
   void frameData(const uint8_t* mem, uint64_t length);
-  void frameDataEnd(absl::optional<std::vector<Frame>>& output);
+  void frameDataEnd(std::vector<Frame>& output);
 
   uint8_t doDecodeFlagsAndOpcode(absl::Span<const uint8_t>& data);
   uint8_t doDecodeMaskFlagAndLength(absl::Span<const uint8_t>& data);

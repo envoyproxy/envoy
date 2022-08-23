@@ -396,40 +396,71 @@ TEST(WebSocketCodecTest, DecodeIncompleteFrameWithPartialPayload) {
 // Check frame decoding iteratively
 TEST(WebSocketCodecTest, DecodeFrameIteratively) {
   // A complete frame - 0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f
-  Buffer::OwnedImpl buffer;
   absl::optional<std::vector<Frame>> frames = absl::nullopt;
   Decoder decoder;
 
-  Buffer::addSeq(buffer, {0x81});
-  frames = decoder.decode(buffer);
+  Buffer::OwnedImpl frame_part_1;
+  Buffer::addSeq(frame_part_1, {0x81, 0x05});
+
+  Buffer::OwnedImpl frame_part_2;
+  Buffer::addSeq(frame_part_2, {0x48, 0x65, 0x6c, 0x6c});
+
+  Buffer::OwnedImpl frame_part_3;
+  Buffer::addSeq(frame_part_3, {0x6f});
+
+  frames = decoder.decode(frame_part_1);
   ASSERT_FALSE(frames.has_value());
 
-  Buffer::addSeq(buffer, {0x05});
-  frames = decoder.decode(buffer);
+  frames = decoder.decode(frame_part_2);
   ASSERT_FALSE(frames.has_value());
 
-  Buffer::addSeq(buffer, {0x48});
-  frames = decoder.decode(buffer);
-  ASSERT_FALSE(frames.has_value());
-
-  Buffer::addSeq(buffer, {0x65});
-  frames = decoder.decode(buffer);
-  ASSERT_FALSE(frames.has_value());
-
-  Buffer::addSeq(buffer, {0x6c});
-  frames = decoder.decode(buffer);
-  ASSERT_FALSE(frames.has_value());
-
-  Buffer::addSeq(buffer, {0x6c});
-  frames = decoder.decode(buffer);
-  ASSERT_FALSE(frames.has_value());
-
-  Buffer::addSeq(buffer, {0x6f});
-  frames = decoder.decode(buffer);
+  frames = decoder.decode(frame_part_3);
   ASSERT_TRUE(frames.has_value());
+
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(areFramesEqual(frames.value()[0],
                              {true, kFrameOpcodeText, absl::nullopt, 5, makeBuffer("Hello")}));
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+
+TEST(WebSocketCodecTest, DecodeTwoFramesInterleavedInDecodeCalls) {
+  // frame-1: 0x01 0x03 0x48 0x65 0x6c (contains "Hel")
+  // frame-2: 0x80 0x02 0x6c 0x6f (contains "lo")
+  absl::optional<std::vector<Frame>> frames = absl::nullopt;
+  Decoder decoder;
+
+  Buffer::OwnedImpl frame_1_part_1;
+  Buffer::addSeq(frame_1_part_1, {0x01, 0x03});
+
+  Buffer::OwnedImpl frame_1_part_2;
+  Buffer::addSeq(frame_1_part_2, {0x48, 0x65});
+
+  Buffer::OwnedImpl frame_1_part_3_and_frame_2_part_1;
+  Buffer::addSeq(frame_1_part_3_and_frame_2_part_1, {0x6c, 0x80, 0x02});
+
+  Buffer::OwnedImpl frame_2_part_2;
+  Buffer::addSeq(frame_2_part_2, {0x6c, 0x6f});
+
+  frames = decoder.decode(frame_1_part_1);
+  ASSERT_FALSE(frames.has_value());
+
+  frames = decoder.decode(frame_1_part_2);
+  ASSERT_FALSE(frames.has_value());
+
+  // frame-1 decoding completes and frame-2 partially decoded and state saved in decoder
+  frames = decoder.decode(frame_1_part_3_and_frame_2_part_1);
+  ASSERT_TRUE(frames.has_value());
+
+  EXPECT_EQ(1, frames->size());
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("Hel")}));
+
+  // frame-2 completes decoding
+  frames = decoder.decode(frame_2_part_2);
+  ASSERT_TRUE(frames.has_value());
+
+  EXPECT_EQ(1, frames->size());
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("lo")}));
 } // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 // Frame spans over two slices
