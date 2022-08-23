@@ -93,7 +93,7 @@ public:
   }
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
-  IntegrationStreamDecoderPtr response_;
+  IntegrationStreamDecoderSharedPtr response_;
   uint32_t delay_close_seconds_ = 200;
   bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
@@ -301,7 +301,7 @@ public:
 
   Http::TestRequestHeaderMapImpl connect_headers_{{":method", "CONNECT"},
                                                   {":authority", "foo.lyft.com:80"}};
-  IntegrationStreamDecoderPtr response_;
+  IntegrationStreamDecoderSharedPtr response_;
 };
 
 INSTANTIATE_TEST_SUITE_P(

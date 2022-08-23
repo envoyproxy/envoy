@@ -84,7 +84,7 @@ protected:
   void setNetworkConnectionBufferSize();
   void beginSession() override;
   void prefillOutboundDownstreamQueue(uint32_t data_frame_count, uint32_t data_frame_size = 10);
-  IntegrationStreamDecoderPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
+  IntegrationStreamDecoderSharedPtr prefillOutboundUpstreamQueue(uint32_t frame_count);
   void triggerListenerDrain();
 };
 
@@ -243,7 +243,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
 }
 
-IntegrationStreamDecoderPtr
+IntegrationStreamDecoderSharedPtr
 Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   // This complex exchange below is to ensure that the upstream outbound queue is empty before
   // forcing upstream socket to return EAGAIN. Envoy's upstream codec will send a few frames (i.e.

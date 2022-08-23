@@ -720,15 +720,15 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
-  response = std::move(encoder_decoder.second);
+  auto response1 = std::move(encoder_decoder.second);
   Http::MetadataMap metadata_map = {{"consume", "consume"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(response1->complete());
   expected_metadata_keys.insert("data");
   expected_metadata_keys.insert("metadata");
   expected_metadata_keys.insert("replace");
@@ -742,7 +742,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Sends headers, data, metadata and trailer.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_2.first;
-  response = std::move(encoder_decoder_2.second);
+  auto response2 = std::move(encoder_decoder_2.second);
   codec_client_->sendData(*request_encoder_, 10, false);
   metadata_map = {{"consume", "consume"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
@@ -751,8 +751,8 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
   expected_metadata_keys.insert("trailers");
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
   EXPECT_EQ(upstream_request_->duplicatedMetadataKeyCount().find("metadata")->second, 4);
@@ -761,15 +761,15 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // time, a "data" metadata is added.
   auto encoder_decoder_3 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_3.first;
-  response = std::move(encoder_decoder_3.second);
+  auto response3 = std::move(encoder_decoder_3.second);
   codec_client_->sendData(*request_encoder_, 100000, false);
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 100000, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
+  ASSERT_TRUE(response3->waitForEndStream());
+  ASSERT_TRUE(response3->complete());
 
   expected_metadata_keys.erase("trailers");
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
@@ -779,7 +779,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Sends multiple metadata.
   auto encoder_decoder_4 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_4.first;
-  response = std::move(encoder_decoder_4.second);
+  auto response4 = std::move(encoder_decoder_4.second);
   metadata_map = {{"metadata1", "metadata1"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   codec_client_->sendData(*request_encoder_, 10, false);
@@ -791,8 +791,8 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
+  ASSERT_TRUE(response4->waitForEndStream());
+  ASSERT_TRUE(response4->complete());
   expected_metadata_keys.insert("metadata1");
   expected_metadata_keys.insert("metadata2");
   expected_metadata_keys.insert("trailers");
@@ -1514,7 +1514,7 @@ void MultiplexedRingHashIntegrationTest::sendMultipleRequests(
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
   std::vector<Http::RequestEncoder*> encoders;
-  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<IntegrationStreamDecoderSharedPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
 
   initialize();

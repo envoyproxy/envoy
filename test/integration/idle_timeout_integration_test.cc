@@ -51,7 +51,7 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
+  IntegrationStreamDecoderSharedPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =

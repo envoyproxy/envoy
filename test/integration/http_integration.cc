@@ -496,9 +496,16 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& response_code,
                                          const Http::TestResponseHeaderMapImpl& expected_headers,
                                          const std::string& expected_body) {
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ(response_code, response->headers().getStatusValue());
-  expected_headers.iterate([response_headers = &response->headers()](
+  verifyResponse(*response, response_code, expected_headers, expected_body);
+}
+
+void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoder& response,
+                                         const std::string& response_code,
+                                         const Http::TestResponseHeaderMapImpl& expected_headers,
+                                         const std::string& expected_body) {
+  EXPECT_TRUE(response.complete());
+  EXPECT_EQ(response_code, response.headers().getStatusValue());
+  expected_headers.iterate([response_headers = &response.headers()](
                                const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const auto entry =
         response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
@@ -507,7 +514,7 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  EXPECT_EQ(response->body(), expected_body);
+  EXPECT_EQ(response.body(), expected_body);
 }
 
 absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(

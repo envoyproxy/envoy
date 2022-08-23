@@ -2195,7 +2195,7 @@ TEST_P(IntegrationTest, Preconnect) {
 
   std::list<IntegrationCodecClientPtr> clients;
   std::list<Http::RequestEncoder*> encoders;
-  std::list<IntegrationStreamDecoderPtr> responses;
+  std::list<IntegrationStreamDecoderSharedPtr> responses;
   std::vector<FakeHttpConnectionPtr> fake_connections{15};
 
   int upstream_index = 0;
@@ -2259,7 +2259,7 @@ TEST_P(IntegrationTest, RandomPreconnect) {
 
   std::list<IntegrationCodecClientPtr> clients;
   std::list<Http::RequestEncoder*> encoders;
-  std::list<IntegrationStreamDecoderPtr> responses;
+  std::list<IntegrationStreamDecoderSharedPtr> responses;
   const uint32_t num_requests = 50;
 
   for (uint32_t i = 0; i < num_requests; ++i) {

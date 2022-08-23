@@ -224,10 +224,12 @@ private:
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
         : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {
       switch (parent.protocol()) {
-      case Http10, Http11:
+      case Protocol::Http10:
+      case Protocol::Http11:
         // HTTP/1.1 codec does not support half-close on the response completion.
         wait_encode_complete_ = false;
-      case Http2, Http3:
+      case Protocol::Http2:
+      case Protocol::Http3:
         break;
       }
     }

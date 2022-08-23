@@ -209,6 +209,12 @@ protected:
                       const Http::TestResponseHeaderMapImpl& expected_headers,
                       const std::string& expected_body);
 
+  // Verifies the response_headers contains the expected_headers, and response body matches given
+  // body string.
+  void verifyResponse(IntegrationStreamDecoder& response, const std::string& response_code,
+                      const Http::TestResponseHeaderMapImpl& expected_headers,
+                      const std::string& expected_body);
+
   // Helper that sends a request to Envoy, and verifies if Envoy response headers and body size is
   // the same as the expected headers map.
   // Requires the "http" port has been registered.

@@ -245,7 +245,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t reque
                                                                   uint32_t num_requests) {
   TestRandomGenerator rand;
   std::vector<Http::RequestEncoder*> encoders;
-  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<IntegrationStreamDecoderSharedPtr> responses;
   std::vector<int> response_bytes;
   autonomous_upstream_ = true;
   initialize();
@@ -363,7 +363,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStream
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;
-  std::vector<IntegrationStreamDecoderPtr> responses;
+  std::vector<IntegrationStreamDecoderSharedPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
