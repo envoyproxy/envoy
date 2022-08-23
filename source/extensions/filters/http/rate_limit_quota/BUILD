@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":client_lib",
+        "//envoy/registry",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
@@ -23,6 +24,8 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         # Needed for bucket id, temporary.
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
     ],
 )
 

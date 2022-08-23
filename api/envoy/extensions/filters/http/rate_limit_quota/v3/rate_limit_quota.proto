@@ -25,7 +25,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#not-implemented-hide:]
 // [#protodoc-title: Rate Limit Quota]
 // Rate Limit Quota :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
 // [#comment:TODO(sergiitk): extension envoy.filters.http.rate_limit_quota]
@@ -37,7 +36,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 7]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
-  config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
+  // onfig.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.GrpcService rlqs_server = 1;
 
   // The application domain to use when calling the service. This enables sharing the quota
   // server between different applications without fear of overlap.
