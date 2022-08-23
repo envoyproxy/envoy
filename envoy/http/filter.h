@@ -202,7 +202,9 @@ public:
   /**
    * Reset the underlying stream.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do

@@ -85,7 +85,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason,
+                   absl::string_view transport_failure_reason) override;
   Router::RouteConstSharedPtr route() override;
   Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
   void setRoute(Router::RouteConstSharedPtr route) override;
@@ -455,7 +456,9 @@ public:
   /**
    * Called when the stream should be reset.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the upgrade map for the current route entry.
