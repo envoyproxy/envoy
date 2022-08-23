@@ -154,7 +154,7 @@ typed_config:
 
   // Send bidirectional data for CONNECT termination with dynamic forward proxy test.
   void sendBidirectionalData(FakeRawConnectionPtr& fake_raw_upstream_connection,
-                             IntegrationStreamDecoderPtr& response,
+                             IntegrationStreamDecoder& response,
                              const char* downstream_send_data = "hello",
                              const char* upstream_received_data = "hello",
                              const char* upstream_send_data = "there!",
@@ -165,8 +165,8 @@ typed_config:
         FakeRawConnection::waitForInexactMatch(upstream_received_data)));
     // Send some data downstream.
     ASSERT_TRUE(fake_raw_upstream_connection->write(upstream_send_data));
-    response->waitForBodyData(strlen(downstream_received_data));
-    EXPECT_EQ(downstream_received_data, response->body());
+    response.waitForBodyData(strlen(downstream_received_data));
+    EXPECT_EQ(downstream_received_data, response.body());
   }
 
   void requestWithBodyTest(const std::string& typed_dns_resolver_config = "") {
@@ -612,10 +612,10 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
 
   // Start sending the request, but ensure no end stream will be sent, so the
   // stream will stay in use.
-  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr> encoder_decoder =
       codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
-  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
 
   // Make sure the headers are received.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -662,7 +662,7 @@ TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
        fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
 
   FakeRawConnectionPtr fake_raw_upstream_connection;
-  IntegrationStreamDecoderPtr response;
+  IntegrationStreamDecoderSharedPtr response;
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(connect_headers);
   request_encoder_ = &encoder_decoder.first;
@@ -670,10 +670,10 @@ TEST_P(ProxyFilterIntegrationTest, ConnectRequestWithDFPConfig) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection));
   response->waitForHeaders();
 
-  sendBidirectionalData(fake_raw_upstream_connection, response, "hello", "hello", "there!",
+  sendBidirectionalData(fake_raw_upstream_connection, *response, "hello", "hello", "there!",
                         "there!");
   // Send a second set of data to make sure for example headers are only sent once.
-  sendBidirectionalData(fake_raw_upstream_connection, response, ",bye", "hello,bye", "ack",
+  sendBidirectionalData(fake_raw_upstream_connection, *response, ",bye", "hello,bye", "ack",
                         "there!ack");
 
   // Send an end stream. This should result in half close upstream.
@@ -704,10 +704,10 @@ TEST_P(ProxyFilterIntegrationTest, TestQueueingBasedOnCircuitBreakers) {
 
   // Start sending the request, but ensure no end stream will be sent, so the
   // stream will stay in use.
-  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr> encoder_decoder =
       codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
-  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
 
   // Make sure the headers are received.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));

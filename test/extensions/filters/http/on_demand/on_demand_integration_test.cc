@@ -613,7 +613,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
                                                  {"x-lyft-user-id", "123"}};
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::RequestEncoder& encoder = encoder_decoder.first;
-  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 

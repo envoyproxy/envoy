@@ -44,7 +44,7 @@ public:
     return nullptr;
   }
 
-  std::pair<Http::RequestEncoder*, IntegrationStreamDecoderPtr>
+  std::pair<Http::RequestEncoder*, IntegrationStreamDecoderSharedPtr>
   startRequest(const Http::TestRequestHeaderMapImpl& request_headers,
                const std::vector<std::string>& request_body_chunks,
                const Http::TestRequestTrailerMapImpl* request_trailers,
@@ -81,7 +81,7 @@ public:
   void encodeResponse(const Http::TestResponseHeaderMapImpl& response_headers,
                       const std::vector<std::string>& response_body_chunks,
                       const Http::TestResponseTrailerMapImpl* response_trailers,
-                      FakeStream* upstream_request, IntegrationStreamDecoderPtr& decoder) {
+                      FakeStream* upstream_request, IntegrationStreamDecoderSharedPtr& decoder) {
     upstream_request->encodeHeaders(response_headers,
                                     !response_trailers && response_body_chunks.empty());
 
@@ -519,7 +519,7 @@ tap_config:
   startAdminRequest(fmt::format(admin_request_yaml, num_streams));
 
   FakeStreamPtr upstream_reqs[num_streams];
-  IntegrationStreamDecoderPtr decoders[num_streams];
+  IntegrationStreamDecoderSharedPtr decoders[num_streams];
   Http::RequestEncoder* encoders[num_streams];
 
   for (int i = 0; i < num_streams; i++) {
