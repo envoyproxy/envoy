@@ -1697,6 +1697,50 @@ response_headers_to_remove: ["x-baz-header"]
   }
 }
 
+TEST(HeaderParserTest, DEPRECATED_FEATURE_TEST(EvaluateRequestHeadersAddWithDeprecatedAppend)) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append: true
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append: false
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    Http::TestResponseHeaderMapImpl header_map;
+    req_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "exist-foo"}};
+    req_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl header_map{{"x-bar-header", "exist-bar"}};
+    req_header_parser->evaluateHeaders(header_map, stream_info);
+    EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+    EXPECT_EQ("bar", header_map.get_("x-bar-header"));
+    EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
+  }
+}
+
 TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
