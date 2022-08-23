@@ -15,9 +15,10 @@ namespace Envoy {
 namespace Router {
 
 class HeaderParser;
-using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
-using HeaderAppendOption = envoy::config::core::v3::HeaderValueOption;
 using HeaderParserPtr = std::unique_ptr<HeaderParser>;
+
+using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 
 /**
  * HeaderParser manipulates Http::HeaderMap instances. Headers to be added are pre-parsed to select
@@ -31,7 +32,7 @@ public:
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
   static HeaderParserPtr
-  configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add);
+  configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add);
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.
@@ -48,7 +49,7 @@ public:
    * @return HeaderParserPtr a configured HeaderParserPtr
    */
   static HeaderParserPtr
-  configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add,
+  configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
   void evaluateHeaders(Http::HeaderMap& headers,
@@ -70,10 +71,10 @@ protected:
 
 private:
   struct HeadersToAddEntry {
-    const HeaderFormatterPtr formatter_;
-    const std::string original_value_;
-    const HeaderAppendAction append_action_;
-    const bool add_if_empty_ = false;
+    HeaderFormatterPtr formatter_;
+    std::string original_value_;
+    HeaderAppendAction append_action_;
+    bool add_if_empty_ = false;
   };
 
   std::vector<std::pair<Http::LowerCaseString, HeadersToAddEntry>> headers_to_add_;

@@ -217,7 +217,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 } // namespace
 
 HeaderParserPtr
-HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add) {
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -225,13 +225,13 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& he
 
     if (header_value_option.has_append()) {
       // 'append' is set and ensure the 'append_action' value is equal to the default value.
-      if (header_value_option.append_action() != HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD) {
+      if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
         throw EnvoyException("Both append and append_action are set and it's not allowed");
       }
 
       append_action = header_value_option.append().value()
-                          ? HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD
-                          : HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD;
+                          ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                          : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
     } else {
       append_action = header_value_option.append_action();
     }
@@ -262,7 +262,7 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 HeaderParserPtr
-HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderAppendOption>& headers_to_add,
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
                         const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 
@@ -297,19 +297,19 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
     if (!value.empty() || entry.add_if_empty_) {
       switch (entry.append_action_) {
-      case HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD:
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         headers.addReferenceKey(key, value);
         break;
-      case HeaderAppendOption::ADD_IF_ABSENT:
+      case HeaderValueOption::ADD_IF_ABSENT:
         if (auto header_entry = headers.get(key); header_entry.empty()) {
           headers.addReferenceKey(key, value);
         }
         break;
-      case HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD:
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers.setReferenceKey(key, value);
         break;
       default:
-        break;
+        PANIC_DUE_TO_CORRUPT_ENUM;
       }
     }
   }
@@ -324,13 +324,13 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
       const std::string value = entry.formatter_->format(stream_info);
       if (!value.empty() || entry.add_if_empty_) {
         switch (entry.append_action_) {
-        case HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD:
+        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
           transforms.headers_to_append_or_add.push_back({key, value});
           break;
-        case HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
           transforms.headers_to_overwrite_or_add.push_back({key, value});
           break;
-        case HeaderAppendOption::ADD_IF_ABSENT:
+        case HeaderValueOption::ADD_IF_ABSENT:
           transforms.headers_to_add_if_absent.push_back({key, value});
           break;
         default:
@@ -339,13 +339,13 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
       }
     } else {
       switch (entry.append_action_) {
-      case HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD:
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         transforms.headers_to_append_or_add.push_back({key, entry.original_value_});
         break;
-      case HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD:
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         transforms.headers_to_overwrite_or_add.push_back({key, entry.original_value_});
         break;
-      case HeaderAppendOption::ADD_IF_ABSENT:
+      case HeaderValueOption::ADD_IF_ABSENT:
         transforms.headers_to_add_if_absent.push_back({key, entry.original_value_});
         break;
       default:

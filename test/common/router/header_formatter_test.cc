@@ -1281,7 +1281,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
 
   HeaderParserPtr req_header_parser_add =
-      HeaderParser::configure(headers_values, HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD);
+      HeaderParser::configure(headers_values, HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
@@ -1292,7 +1292,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   set_entry.set_value("great");
 
   HeaderParserPtr req_header_parser_set =
-      HeaderParser::configure(headers_values, HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      HeaderParser::configure(headers_values, HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
@@ -1303,7 +1303,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   empty_entry.set_value("");
 
   HeaderParserPtr req_header_parser_empty =
-      HeaderParser::configure(headers_values, HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      HeaderParser::configure(headers_values, HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   req_header_parser_empty->evaluateHeaders(header_map, nullptr);
   EXPECT_FALSE(header_map.has("empty"));
 }
@@ -1655,17 +1655,16 @@ response_headers_to_add:
       key: "x-per-header"
       value: "per"
     append_action: ADD_IF_ABSENT
-response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
   const auto route = parseRouteFromV3Yaml(yaml);
-  HeaderParserPtr req_header_parser =
-      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
@@ -1673,7 +1672,7 @@ response_headers_to_remove: ["x-baz-header"]
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "exist-foo"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
@@ -1681,7 +1680,7 @@ response_headers_to_remove: ["x-baz-header"]
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-bar-header", "exist-bar"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
@@ -1690,7 +1689,7 @@ response_headers_to_remove: ["x-baz-header"]
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-per-header", "exist-per"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("exist-per", header_map.get_("x-per-header"));
@@ -1714,27 +1713,27 @@ response_headers_to_add:
 )EOF";
 
   const auto route = parseRouteFromV3Yaml(yaml);
-  HeaderParserPtr req_header_parser =
-      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
     Http::TestResponseHeaderMapImpl header_map;
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
   }
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "exist-foo"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
   }
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-bar-header", "exist-bar"}};
-    req_header_parser->evaluateHeaders(header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
