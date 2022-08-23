@@ -189,9 +189,10 @@ public:
   virtual ~StreamFilterCallbacks() = default;
 
   /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   * @return OptRef<const Network::Connection> the downstream connection, or nullptr if there is
+   * none.
    */
-  virtual const Network::Connection* connection() PURE;
+  virtual OptRef<const Network::Connection> connection() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.

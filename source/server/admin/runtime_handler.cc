@@ -15,8 +15,7 @@ namespace Server {
 
 RuntimeHandler::RuntimeHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code RuntimeHandler::handlerRuntime(absl::string_view,
-                                          Http::ResponseHeaderMap& response_headers,
+Http::Code RuntimeHandler::handlerRuntime(Http::ResponseHeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream& admin_stream) {
   const Http::Utility::QueryParams params = admin_stream.queryParams();
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -77,7 +76,7 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code RuntimeHandler::handlerRuntimeModify(Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response,
                                                 AdminStream& admin_stream) {
   Http::Utility::QueryParams params = admin_stream.queryParams();

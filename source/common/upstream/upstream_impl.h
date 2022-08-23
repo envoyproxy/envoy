@@ -740,9 +740,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
+  AddressSelectFn sourceAddressFn() const override { return source_address_fn_; };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
@@ -842,7 +840,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  AddressSelectFn source_address_fn_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
