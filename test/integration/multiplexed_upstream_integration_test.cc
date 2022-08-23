@@ -534,13 +534,13 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   EXPECT_TRUE(response->complete());
 }
 
-// Tests that HTTP/2 response headers over 60 kB are rejected and result in a stream reset.
+// Tests that HTTP/2 response headers over 80KB are rejected and result in a stream reset.
 TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
-  large_headers.addCopy("large", std::string(60 * 1024, 'a'));
+  large_headers.addCopy("large", std::string(80 * 1024, 'a'));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
 

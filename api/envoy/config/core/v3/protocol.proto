@@ -173,7 +173,7 @@ message AlternateProtocolsCacheOptions {
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -223,6 +223,11 @@ message HttpProtocolOptions {
   // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
+
+  // The maximum response headers size allowed from the upstream server. If not set, the default max response headers
+  // size allowed is 80 KiB. Response that exceed this limit would fail with a protocol error.
+  google.protobuf.UInt32Value max_response_headers_kb = 7
+      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // The maximum number of headers. If unconfigured, the default
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive

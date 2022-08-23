@@ -861,6 +861,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
           config.max_requests_per_connection().value())),
+      max_response_headers_size_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_response_headers_kb,
+          Http::DEFAULT_MAX_RESPONSE_HEADERS_KB)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,

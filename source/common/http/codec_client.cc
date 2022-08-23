@@ -192,13 +192,14 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount(), proxied);
+        host->cluster().maxResponseHeadersSizeKb(), host->cluster().maxResponseHeadersCount(),
+        proxied);
     break;
   }
   case CodecType::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-        host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        host->cluster().http2Options(), host->cluster().maxResponseHeadersSizeKb(),
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
@@ -207,7 +208,7 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
         quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+        host->cluster().maxResponseHeadersSizeKb(), host->cluster().maxResponseHeadersCount());
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
     quic_session.Initialize();

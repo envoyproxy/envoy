@@ -74,6 +74,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, commonHttpProtocolOptions())
       .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
+  ON_CALL(*this, maxResponseHeadersSizeKb())
+      .WillByDefault(ReturnPointee(&max_response_headers_kb_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
   ON_CALL(*this, maxRequestsPerConnection())

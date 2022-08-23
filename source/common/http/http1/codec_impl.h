@@ -564,7 +564,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
-                       const uint32_t max_response_headers_count,
+                       uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
                        bool passing_through_proxy = false);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -655,9 +655,6 @@ private:
   // detected while parsing the first trailer field (if trailers are enabled). The variant is reset
   // to null headers on message complete for assertion purposes.
   absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
-
-  // The default limit of 80 KiB is the vanilla http_parser behaviour.
-  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.

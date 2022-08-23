@@ -1349,9 +1349,10 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
+                                           uint32_t max_response_headers_kb,
                                            const uint32_t max_response_headers_count,
                                            bool passing_through_proxy)
-    : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
+    : ConnectionImpl(connection, stats, settings, MessageType::Response, max_response_headers_kb,
                      max_response_headers_count),
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },

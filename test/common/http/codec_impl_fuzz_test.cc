@@ -556,6 +556,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<MockConnectionManagerConfig> conn_manager_config;
   uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
+  uint32_t max_response_headers_kb = Http::DEFAULT_MAX_RESPONSE_HEADERS_KB;
   uint32_t max_response_headers_count = Http::DEFAULT_MAX_HEADERS_COUNT;
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
@@ -593,12 +594,12 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
-        random, client_http2_options, max_request_headers_kb, max_response_headers_count,
+        random, client_http2_options, max_response_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
         client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,
-        client_http1settings, max_response_headers_count);
+        client_http1settings, max_response_headers_kb, max_response_headers_count);
   }
 
   if (http2) {

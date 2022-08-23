@@ -913,6 +913,11 @@ public:
   virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
+   * @return uint32_t the maximum size of the response headers in KB. The default value is 80.
+   */
+  virtual uint32_t maxResponseHeadersSizeKb() const PURE;
+
+  /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
    * reset if the number of headers exceeds this value.
    */

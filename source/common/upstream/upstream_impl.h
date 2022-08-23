@@ -712,6 +712,7 @@ public:
   }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxResponseHeadersSizeKb() const override { return max_response_headers_size_kb_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
   const std::string& observabilityName() const override { return observability_name_; }
@@ -824,6 +825,7 @@ private:
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const uint64_t max_requests_per_connection_;
+  const uint32_t max_response_headers_size_kb_;
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;

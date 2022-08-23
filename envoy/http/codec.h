@@ -36,6 +36,8 @@ struct CodecStats;
 
 // Legacy default value of 60K is safely under both codec default limits.
 static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
+// The default limit of 80KiB is the vanilla http_parser behaviour.
+static constexpr uint32_t DEFAULT_MAX_RESPONSE_HEADERS_KB = 80;
 // Default maximum number of headers.
 static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
 
