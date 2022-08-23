@@ -116,7 +116,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     uint32_t idx;
     for (idx = 1; idx < match.size(); idx++) {
-      if (match[idx].str() != "") {
+      if (!match[idx].str().empty()) {
         break;
       }
     }
