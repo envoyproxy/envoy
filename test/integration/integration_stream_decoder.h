@@ -85,5 +85,6 @@ private:
 };
 
 using IntegrationStreamDecoderPtr = std::unique_ptr<IntegrationStreamDecoder>;
+using IntegrationStreamDecoderSharedPtr = std::shared_ptr<IntegrationStreamDecoder>;
 
 } // namespace Envoy

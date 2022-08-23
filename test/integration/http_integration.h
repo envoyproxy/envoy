@@ -51,7 +51,7 @@ public:
   void sendReset(Http::RequestEncoder& encoder);
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
-  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>
   startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
   waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
@@ -104,6 +104,7 @@ private:
   bool saw_goaway_{};
   bool stream_gone_{};
   Network::ConnectionEvent last_connection_event_;
+  std::vector<IntegrationStreamDecoderSharedPtr> response_decoders_;
 };
 
 using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;

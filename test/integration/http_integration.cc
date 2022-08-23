@@ -169,15 +169,16 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
   flushWrite();
 }
 
-std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
+std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>
 IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
                                      bool header_only_request) {
-  auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
+  auto response = std::make_shared<IntegrationStreamDecoder>(dispatcher_);
+  response_decoders_.push_back(response);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
-  return {encoder, std::move(response)};
+  return {encoder, response};
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
