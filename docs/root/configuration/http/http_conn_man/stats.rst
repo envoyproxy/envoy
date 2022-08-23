@@ -88,7 +88,7 @@ the following statistics:
 Per listener statistics
 -----------------------
 
-Per listener statistics are rooted at ``listener.<address>``.
+Per listener statistics are rooted at ``listener.<address>.``.
 
 HTTP per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
