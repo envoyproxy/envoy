@@ -57,7 +57,7 @@ struct ParsedPathPattern {
   // Pattern: /foo/bar/**
   // Path: /foo/bar/some/more/stuff
   // Suffix: some/more/stuff
-  absl::optional<absl::string_view> suffix_;
+  absl::string_view suffix_;
   absl::flat_hash_set<absl::string_view> captured_variables_;
 
   std::string debugString() const;

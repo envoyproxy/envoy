@@ -116,7 +116,7 @@ std::string Variable::debugString() const { return toString(*this); }
 
 std::string ParsedPathPattern::debugString() const {
   return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()),
-                      suffix_.value_or(""));
+                      suffix_);
 }
 
 bool isValidLiteral(absl::string_view literal) {
@@ -371,7 +371,7 @@ std::string toRegexPattern(const Variable& pattern) {
 
 std::string toRegexPattern(const struct ParsedPathPattern& pattern) {
   return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments_, "/", ToRegexPatternFormatter()),
-                      toRegexPattern(pattern.suffix_.value_or("")));
+                      toRegexPattern(pattern.suffix_));
 }
 
 } // namespace Internal
