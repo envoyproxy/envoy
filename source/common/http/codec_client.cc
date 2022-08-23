@@ -72,8 +72,7 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
 }
 
 RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
-  ActiveRequestPtr request(
-      new ActiveRequest(*this, response_decoder, codec_->awaitEncodeCompletion()));
+  ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
   request->setEncoder(codec_->newStream(*request));
   LinkedList::moveIntoList(std::move(request), active_requests_);
 
@@ -129,7 +128,7 @@ void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
     codec_client_callbacks_->onStreamPreDecodeComplete();
   }
   request.decode_complete_ = true;
-  if (request.encode_complete_) {
+  if (request.encode_complete_ || !request.wait_encode_complete_) {
     completeRequest(request);
   } else {
     ENVOY_CONN_LOG(debug, "waiting for encode to complete", *connection_);

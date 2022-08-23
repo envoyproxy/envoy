@@ -733,7 +733,6 @@ public:
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
-  bool awaitEncodeCompletion() override { return true; }
 
 private:
   // ConnectionImpl

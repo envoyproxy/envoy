@@ -55,7 +55,6 @@ public:
             Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
-    EXPECT_CALL(*codec_, awaitEncodeCompletion()).WillRepeatedly(Return(true));
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
@@ -310,7 +309,6 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    EXPECT_CALL(*codec_, awaitEncodeCompletion()).WillRepeatedly(Return(true));
     client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(client_connection),
                                                    codec_, nullptr, host_, *dispatcher_);
 

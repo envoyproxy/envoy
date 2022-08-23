@@ -221,9 +221,16 @@ private:
                          public StreamCallbacks,
                          public ResponseDecoderWrapper,
                          public RequestEncoderWrapper {
-    ActiveRequest(CodecClient& parent, ResponseDecoder& inner, bool await_encode_complete)
-        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
-          encode_complete_(!await_encode_complete) {}
+    ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {
+      switch (parent.protocol()) {
+      case Http10, Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+      case Http2, Http3:
+        break;
+      }
+    }
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -247,7 +254,8 @@ private:
     void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
 
     CodecClient& parent_;
-    bool encode_complete_;
+    bool wait_encode_complete_{true};
+    bool encode_complete_{false};
     bool decode_complete_{false};
   };
 

@@ -70,7 +70,6 @@ public:
 
   // Http::ClientConnection
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
-  bool awaitEncodeCompletion() override { return true; }
 
   // Http::Connection
   void goAway() override;
