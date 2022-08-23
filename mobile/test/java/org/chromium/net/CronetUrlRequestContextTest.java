@@ -1321,6 +1321,17 @@ public class CronetUrlRequestContextTest {
     assertFalse(loader.wasCalled());
   }
 
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  @OnlyRunNativeCronet
+  public void testNativeCronetEngineBuilderImplSetsCorrectVersionString() throws Exception {
+    CronetEngine.Builder builder =
+        new CronetEngine.Builder(new NativeCronetEngineBuilderImpl(getContext()));
+    CronetEngine engine = builder.build();
+    assertTrue(engine.getVersionString().startsWith("Cronet/"));
+  }
+
   // Creates a CronetEngine on another thread and then one on the main thread. This shouldn't
   // crash.
   @Test
