@@ -221,8 +221,9 @@ private:
                          public StreamCallbacks,
                          public ResponseDecoderWrapper,
                          public RequestEncoderWrapper {
-    ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {}
+    ActiveRequest(CodecClient& parent, ResponseDecoder& inner, bool await_encode_complete)
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
+          encode_complete_(!await_encode_complete) {}
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -246,8 +247,8 @@ private:
     void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
 
     CodecClient& parent_;
+    bool encode_complete_;
     bool decode_complete_{false};
-    bool encode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;

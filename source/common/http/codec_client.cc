@@ -72,7 +72,8 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
 }
 
 RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
-  ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
+  ActiveRequestPtr request(
+      new ActiveRequest(*this, response_decoder, codec_->awaitEncodeCompletion()));
   request->setEncoder(codec_->newStream(*request));
   LinkedList::moveIntoList(std::move(request), active_requests_);
 

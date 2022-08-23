@@ -568,6 +568,12 @@ public:
    * @return RequestEncoder& supplies the encoder to write the request into.
    */
   virtual RequestEncoder& newStream(ResponseDecoder& response_decoder) PURE;
+
+  /**
+   * True if the codec should await for the request encoding completion in addition
+   * to the response decoding completion before the stream can be closed.
+   */
+  virtual bool awaitEncodeCompletion() PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

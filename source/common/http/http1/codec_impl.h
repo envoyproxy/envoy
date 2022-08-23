@@ -568,6 +568,7 @@ public:
                        bool passing_through_proxy = false);
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
+  bool awaitEncodeCompletion() override { return false; }
 
 private:
   struct PendingResponse {

@@ -169,6 +169,7 @@ public:
 
   // Http::ClientConnection
   MOCK_METHOD(RequestEncoder&, newStream, (ResponseDecoder & response_decoder));
+  MOCK_METHOD(bool, awaitEncodeCompletion, ());
 };
 
 class MockFilterChainFactoryCallbacks : public Http::FilterChainFactoryCallbacks {
