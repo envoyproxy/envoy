@@ -323,7 +323,8 @@ public:
   const Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
   Tracing::Span& activeSpan() override;
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason,
+                   absl::string_view transport_failure_reason) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
