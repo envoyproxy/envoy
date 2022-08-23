@@ -255,7 +255,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
 
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+      transaction.isActive() ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
 
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
@@ -264,7 +264,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   }
 
   // If there is an active transaction, establish a new connection if necessary.
-  if (transaction.active_ && !transaction.connection_established_) {
+  if (transaction.isActive() && !transaction.connection_established_) {
     transaction.client_ =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
@@ -275,7 +275,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   pending_requests_.emplace_back(*this, std::move(request), callbacks);
   PendingRequest& pending_request = pending_requests_.back();
 
-  if (!transaction.active_) {
+  if (!transaction.isActive()) {
     pending_request.request_handler_ =
         this->threadLocalActiveClient(host)->redis_client_->makeRequest(
             getRequest(pending_request.incoming_request_), pending_request);

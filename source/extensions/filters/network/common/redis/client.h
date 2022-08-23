@@ -229,9 +229,9 @@ public:
 class Transaction {
 public:
   Transaction(Network::ConnectionCallbacks& parent)
-      : active_(false), connection_established_(false), should_close_(false), client_(nullptr),
-        parent_(parent) {}
-  ~Transaction() {
+      : connection_established_(false), should_close_(false), client_(nullptr),
+        parent_(parent), active_(false) {}
+  virtual ~Transaction() {
     if (connection_established_) {
       client_->close();
       connection_established_ = false;
@@ -250,12 +250,31 @@ public:
     should_close_ = false;
   }
 
-  bool active_;
+  virtual bool isActive() { return active_; }
+
   bool connection_established_;
   bool should_close_;
   std::string key_;
   ClientPtr client_;
   Network::ConnectionCallbacks& parent_;
+
+private:
+  bool active_;
+};
+
+class NoOpConnectionCallbacks : public Network::ConnectionCallbacks {
+  public:
+    void onEvent(Network::ConnectionEvent) override {}
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+};
+
+class NoOpTransaction : public Transaction {
+  public:
+    NoOpTransaction() : Transaction(callbacks_) {}
+    bool isActive() override { return false; }
+  private:
+    NoOpConnectionCallbacks callbacks_;
 };
 
 } // namespace Client
