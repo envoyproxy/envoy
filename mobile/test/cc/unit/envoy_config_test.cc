@@ -119,6 +119,21 @@ TEST(TestConfig, SetBrotli) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
 }
 
+TEST(TestConfig, SetSocketTag) {
+  auto engine_builder = EngineBuilder();
+
+  engine_builder.enableSocketTagging(false);
+  auto config_str = engine_builder.generateConfigStr();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("http.socket_tag.SocketTag")));
+
+  engine_builder.enableSocketTagging(true);
+  config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("http.socket_tag.SocketTag"));
+}
+
 TEST(TestConfig, SetAltSvcCache) {
   auto engine_builder = EngineBuilder();
 

@@ -73,6 +73,10 @@ extern const char* gzip_config_insert;
  */
 extern const char* brotli_config_insert;
 
+/* Insert that enables a socket tagging filter.
+ */
+extern const char* socket_tag_config_insert;
+
 /**
  * Insert that enables the route cache reset filter in the filter chain.
  * Should only be added when the route cache should be cleared on every request

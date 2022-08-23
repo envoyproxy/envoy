@@ -59,6 +59,7 @@ class MainActivity : Activity() {
       .enableInterfaceBinding(true)
       .enableDNSUseSystemResolver(true)
       .forceIPv6(true)
+      .enableSocketTagging(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
       .addKeyValueStore("demo-kv-store", SharedPreferencesStore(preferences))
@@ -117,6 +118,7 @@ class MainActivity : Activity() {
       RequestMethod.GET, REQUEST_SCHEME, REQUEST_AUTHORITY, REQUEST_PATH
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
+      .addSocketTag(1,2)
       .build()
     engine
       .streamClient()

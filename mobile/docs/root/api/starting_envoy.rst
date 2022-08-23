@@ -426,6 +426,17 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
   // Swift
   builder.enableBrotli(true)
 
+~~~~~~~~~~~~~~~~~~~~~~~
+``enableSocketTagging``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable support for Android socket tagging. Unavailable on iOS. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableSocketTagging(true)
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableInterfaceBinding``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

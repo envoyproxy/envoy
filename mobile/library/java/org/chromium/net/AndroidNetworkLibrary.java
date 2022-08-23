@@ -1,5 +1,25 @@
 package org.chromium.net;
 
+import android.net.TrafficStats;
+import android.os.ParcelFileDescriptor;
+import android.os.Build;
+import android.os.Build.VERSION_CODES;
+
+import java.io.FileDescriptor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketException;
+import java.net.SocketImpl;
+import java.net.URLConnection;
+import java.net.Socket;
+
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
@@ -81,6 +101,153 @@ public final class AndroidNetworkLibrary {
       FakeX509Util.clearTestRootCertificates();
     } else {
       X509Util.clearTestRootCertificates();
+    }
+  }
+
+  /**
+   * Class to wrap FileDescriptor.setInt$() which is hidden and so must be accessed via
+   * reflection.
+   */
+  private static class SetFileDescriptor {
+    // Reference to FileDescriptor.setInt$(int fd).
+    private static final Method sFileDescriptorSetInt;
+
+    // Get reference to FileDescriptor.setInt$(int fd) via reflection.
+    static {
+      try {
+        sFileDescriptorSetInt = FileDescriptor.class.getMethod("setInt$", Integer.TYPE);
+      } catch (NoSuchMethodException | SecurityException e) {
+        throw new RuntimeException("Unable to get FileDescriptor.setInt$", e);
+      }
+    }
+
+    /** Creates a FileDescriptor and calls FileDescriptor.setInt$(int fd) on it. */
+    public static FileDescriptor createWithFd(int fd) {
+      try {
+        FileDescriptor fileDescriptor = new FileDescriptor();
+        sFileDescriptorSetInt.invoke(fileDescriptor, fd);
+        return fileDescriptor;
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException("FileDescriptor.setInt$() failed", e);
+      } catch (InvocationTargetException e) {
+        throw new RuntimeException("FileDescriptor.setInt$() failed", e);
+      }
+    }
+  }
+
+  /**
+   * This class provides an implementation of {@link java.net.Socket} that serves only as a
+   * conduit to pass a file descriptor integer to {@link android.net.TrafficStats#tagSocket}
+   * when called by {@link #tagSocket}. This class does not take ownership of the file descriptor,
+   * so calling {@link #close} will not actually close the file descriptor.
+   */
+  private static class SocketFd extends Socket {
+    /**
+     * This class provides an implementation of {@link java.net.SocketImpl} that serves only as
+     * a conduit to pass a file descriptor integer to {@link android.net.TrafficStats#tagSocket}
+     * when called by {@link #tagSocket}. This class does not take ownership of the file
+     * descriptor, so calling {@link #close} will not actually close the file descriptor.
+     */
+    private static class SocketImplFd extends SocketImpl {
+      /**
+       * Create a {@link java.net.SocketImpl} that sets {@code fd} as the underlying file
+       * descriptor. Does not take ownership of the file descriptor, so calling {@link #close}
+       * will not actually close the file descriptor.
+       */
+      SocketImplFd(FileDescriptor fd) { this.fd = fd; }
+
+      protected void accept(SocketImpl s) { throw new RuntimeException("accept not implemented"); }
+      protected int available() { throw new RuntimeException("accept not implemented"); }
+      protected void bind(InetAddress host, int port) {
+        throw new RuntimeException("accept not implemented");
+      }
+      protected void close() {}
+      protected void connect(InetAddress address, int port) {
+        throw new RuntimeException("connect not implemented");
+      }
+      protected void connect(SocketAddress address, int timeout) {
+        throw new RuntimeException("connect not implemented");
+      }
+      protected void connect(String host, int port) {
+        throw new RuntimeException("connect not implemented");
+      }
+      protected void create(boolean stream) {}
+      protected InputStream getInputStream() {
+        throw new RuntimeException("getInputStream not implemented");
+      }
+      protected OutputStream getOutputStream() {
+        throw new RuntimeException("getOutputStream not implemented");
+      }
+      protected void listen(int backlog) { throw new RuntimeException("listen not implemented"); }
+      protected void sendUrgentData(int data) {
+        throw new RuntimeException("sendUrgentData not implemented");
+      }
+      public Object getOption(int optID) {
+        throw new RuntimeException("getOption not implemented");
+      }
+      public void setOption(int optID, Object value) {
+        throw new RuntimeException("setOption not implemented");
+      }
+    }
+
+    /**
+     * Create a {@link java.net.Socket} that sets {@code fd} as the underlying file
+     * descriptor. Does not take ownership of the file descriptor, so calling {@link #close}
+     * will not actually close the file descriptor.
+     */
+    SocketFd(FileDescriptor fd) throws IOException { super(new SocketImplFd(fd)); }
+  }
+
+  /**
+   * Tag socket referenced by {@code ifd} with {@code tag} for UID {@code uid}.
+   *
+   * Assumes thread UID tag isn't set upon entry, and ensures thread UID tag isn't set upon exit.
+   * Unfortunately there is no TrafficStatis.getThreadStatsUid().
+   */
+  private static void tagSocket(int ifd, int uid, int tag) throws IOException {
+    // Set thread tags.
+    int oldTag = TrafficStats.getThreadStatsTag();
+    if (tag != oldTag) {
+      TrafficStats.setThreadStatsTag(tag);
+    }
+    if (uid != -1) {
+      ThreadStatsUid.set(uid);
+    }
+
+    // Apply thread tags to socket.
+
+    // First, convert integer file descriptor (ifd) to FileDescriptor.
+    final ParcelFileDescriptor pfd;
+    final FileDescriptor fd;
+    // The only supported way to generate a FileDescriptor from an integer file
+    // descriptor is via ParcelFileDescriptor.adoptFd(). Unfortunately prior to Android
+    // Marshmallow ParcelFileDescriptor.detachFd() didn't actually detach from the
+    // FileDescriptor, so use reflection to set {@code fd} into the FileDescriptor for
+    // versions prior to Marshmallow. Here's the fix that went into Marshmallow:
+    // https://android.googlesource.com/platform/frameworks/base/+/b30ad6f
+    if (Build.VERSION.SDK_INT < VERSION_CODES.M) {
+      pfd = null;
+      fd = SetFileDescriptor.createWithFd(ifd);
+    } else {
+      pfd = ParcelFileDescriptor.adoptFd(ifd);
+      fd = pfd.getFileDescriptor();
+    }
+    // Second, convert FileDescriptor to Socket.
+    Socket s = new SocketFd(fd);
+    // Third, tag the Socket.
+    TrafficStats.tagSocket(s);
+    s.close(); // No-op but always good to close() Closeables.
+    // Have ParcelFileDescriptor relinquish ownership of the file descriptor.
+    if (pfd != null) {
+      pfd.detachFd();
+    }
+
+    // Restore prior thread tags.
+    if (tag != oldTag) {
+      TrafficStats.setThreadStatsTag(oldTag);
+    }
+    if (uid != -1) {
+      ThreadStatsUid.clear();
     }
   }
 }

@@ -75,6 +75,12 @@ const char* brotli_config_insert = R"(
           ignore_no_transform_header: true
 )";
 
+const char* socket_tag_config_insert = R"(
+  - name: envoy.filters.http.socket_tag
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.filters.http.socket_tag.SocketTag
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:

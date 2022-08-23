@@ -46,12 +46,17 @@ public final class RequestScenario {
   private RequestMethod method = null;
   private final List<ByteBuffer> bodyChunks = new ArrayList<>();
   private final List<Map.Entry<String, String>> headers = new ArrayList<>();
+  private int trafficStatsUid = 0;
+  private int trafficStatsTag = 0;
 
   public RequestHeaders getHeaders() {
     RequestHeadersBuilder requestHeadersBuilder =
         new RequestHeadersBuilder(method, url.getProtocol(), url.getAuthority(), url.getPath());
     headers.forEach(entry -> requestHeadersBuilder.add(entry.getKey(), entry.getValue()));
     // HTTP1 is the only way to send HTTP requests (not HTTPS)
+    if (trafficStatsUid != 0) {
+      requestHeadersBuilder.addSocketTag(trafficStatsUid, trafficStatsTag);
+    }
     return requestHeadersBuilder.addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP1).build();
   }
 
@@ -134,6 +139,12 @@ public final class RequestScenario {
 
   public RequestScenario useByteBufferPosition() {
     useByteBufferPosition = true;
+    return this;
+  }
+
+  public RequestScenario addSocketTag(int uid, int tag) {
+    trafficStatsUid = uid;
+    trafficStatsTag = tag;
     return this;
   }
 }

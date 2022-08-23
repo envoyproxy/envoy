@@ -33,3 +33,17 @@ bool is_cleartext_permitted(absl::string_view hostname) {
   return true;
 #endif
 }
+
+void tag_socket(int ifd, int uid, int tag) {
+#if defined(__ANDROID_API__)
+  JNIEnv* env = get_env();
+  jclass jcls_AndroidNetworkLibrary = find_class("org/chromium/net/AndroidNetworkLibrary");
+  jmethodID jmid_tagSocket =
+      env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "tagSocket", "(III)V");
+  env->CallStaticVoidMethod(jcls_AndroidNetworkLibrary, jmid_tagSocket, ifd, uid, tag);
+#else
+  UNREFERENCED_PARAMETER(ifd);
+  UNREFERENCED_PARAMETER(uid);
+  UNREFERENCED_PARAMETER(tag);
+#endif
+}
