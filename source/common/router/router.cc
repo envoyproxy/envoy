@@ -37,7 +37,6 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
-#include "source/common/router/upstream_request.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -805,8 +804,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   // a backoff timer.
   ASSERT(upstream_requests_.size() <= 1);
   downstream_trailers_ = &trailers;
-  for (auto& upstream_request : upstream_requests_) {
-    upstream_request->acceptTrailersFromRouter(trailers);
+  if (!upstream_requests_.empty()) {
+    upstream_requests_.front()->acceptTrailersFromRouter(trailers);
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
@@ -1602,7 +1601,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     }
   }
 
-  upstream_request.removeFromList(upstream_requests_);
+  // Defer deletion as this is generally called under the stack of the upstream
+  // request, and immediate deletion is dangerous.
+  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
   cleanup();
 }
 
