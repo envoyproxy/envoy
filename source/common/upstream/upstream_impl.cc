@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/codec/v3/codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
@@ -1024,11 +1025,21 @@ ClusterInfoImpl::ClusterInfoImpl(
     filter_factories_.push_back(std::move(callback));
   }
 
-  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+  if (http_protocol_options_) {
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+    if (http_filters.empty()) {
+      auto* codec_filter = http_filters.Add();
+      codec_filter->set_name("envoy.filters.http.codec");
+      codec_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::codec::v3::Codec::default_instance());
+    }
+    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.codec") {
+      throw EnvoyException(
+          fmt::format("The codec filter is the only valid terminal upstream filter"));
+    }
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             upstream_context_.getServerFactoryContext());
-    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
@@ -1036,7 +1047,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
                upstream_context_, prefix);
     // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
-    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+    helper.processFilters(http_filters, "http", "http", http_filter_factories_);
   }
 }
 

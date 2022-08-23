@@ -14,6 +14,7 @@ HTTP filters
   buffer_filter
   cache_filter
   cdn_loop_filter
+  codec_filter
   compressor_filter
   composite_filter
   cors_filter

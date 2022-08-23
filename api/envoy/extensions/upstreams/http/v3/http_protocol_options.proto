@@ -150,7 +150,11 @@ message HttpProtocolOptions {
     AutoHttpConfig auto_config = 5;
   }
 
-  // [#not-implemented-hide:]
+  // .. warning::
+  //   HTTP filters are not supported by default.
+  //   This warning will be removed as support moves beyond alpha.
+  //
   // Optional HTTP filters for the upstream filter chain.
+  // [#extension-category: envoy.filters.http.upstream]
   repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
 }
