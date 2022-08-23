@@ -231,7 +231,6 @@ void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
 bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   // Only called in IETF Quic to close read side.
   ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
-  stats_.rx_reset_.inc();
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
   if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
