@@ -12,6 +12,11 @@ behavior_changes:
 - area: tls
   change: |
     Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+- area: http
+  change: |
+    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
+    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
+    streaming calls.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
