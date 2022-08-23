@@ -1001,7 +1001,8 @@ Tracing::Span& UpstreamRequestFilterManagerCallbacks::activeSpan() {
   return upstream_request_.parent_.callbacks()->activeSpan();
 }
 
-void UpstreamRequestFilterManagerCallbacks::resetStream() {
+void UpstreamRequestFilterManagerCallbacks::resetStream(Http::StreamResetReason,
+                                                        absl::string_view) {
   return upstream_request_.parent_.callbacks()->resetStream();
 }
 
