@@ -253,7 +253,7 @@ void ActiveStreamFilterBase::restoreContextOnContinue(
   parent_.contextOnContinue(tracked_object_stack);
 }
 
-Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
+const Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
@@ -865,7 +865,7 @@ void DownstreamFilterManager::sendLocalReply(
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
-    filter_manager_callbacks_.resetStream();
+    filter_manager_callbacks_.resetStream(Http::StreamResetReason::LocalReset, "");
     return;
   }
 
@@ -1455,10 +1455,6 @@ void ActiveStreamDecoderFilter::requestRouteConfigUpdate(
   parent_.filter_manager_callbacks_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
-absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.filter_manager_callbacks_.routeConfig();
-}
-
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },
@@ -1587,7 +1583,10 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
   onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
-void ActiveStreamFilterBase::resetStream() { parent_.filter_manager_callbacks_.resetStream(); }
+void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
+                                         absl::string_view transport_failure_reason) {
+  parent_.filter_manager_callbacks_.resetStream(reset_reason, transport_failure_reason);
+}
 
 uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 
