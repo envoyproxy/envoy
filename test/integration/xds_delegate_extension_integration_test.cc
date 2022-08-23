@@ -12,7 +12,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/mutex.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {

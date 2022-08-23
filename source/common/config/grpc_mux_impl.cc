@@ -280,8 +280,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // All config updates have been applied without throwing an exception, so we'll call the xDS
     // resources delegate, if any.
     if (xds_resources_delegate_.has_value()) {
-      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId(target_xds_authority_, type_url),
-                                               all_resource_refs);
+      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId(target_xds_authority_, type_url), all_resource_refs);
     }
 
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
