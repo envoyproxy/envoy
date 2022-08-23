@@ -53,6 +53,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_tag_socket_option_lib",
+    srcs = ["socket_tag_socket_option_impl.cc"],
+    hdrs = ["socket_tag_socket_option_impl.h"],
+    repository = "@envoy",
+    deps = [
+        "//library/common/jni:android_jni_utility_lib",
+        "@envoy//envoy/network:address_interface",
+        "@envoy//source/common/common:scalar_to_byte_vector_lib",
+        "@envoy//source/common/network:socket_option_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "synthetic_address_lib",
     hdrs = ["synthetic_address_impl.h"],
     repository = "@envoy",

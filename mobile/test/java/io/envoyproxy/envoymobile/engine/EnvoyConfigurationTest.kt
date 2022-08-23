@@ -39,6 +39,11 @@ private const val BROTLI_INSERT =
   - name: BrotliFilter
 """
 
+private const val SOCKET_TAG_INSERT =
+"""
+  - name: SocketTag
+"""
+
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
@@ -59,6 +64,7 @@ class EnvoyConfigurationTest {
     enableHttp3: Boolean = false,
     enableGzip: Boolean = true,
     enableBrotli: Boolean = false,
+    enableSocketTagging: Boolean = false,
     enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     forceIPv6: Boolean = false,
@@ -93,6 +99,7 @@ class EnvoyConfigurationTest {
       enableHttp3,
       enableGzip,
       enableBrotli,
+      enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
       forceIPv6,
@@ -120,8 +127,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
-
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
     assertThat(resolvedTemplate).contains("&connect_timeout 123s")
 
@@ -204,7 +210,7 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
 
     // DNS
@@ -239,7 +245,7 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
 
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}")
@@ -251,7 +257,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "")
+      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "")
       fail("Unresolved configuration keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")
@@ -266,7 +272,7 @@ class EnvoyConfigurationTest {
     )
 
     try {
-      envoyConfiguration.resolveTemplate("", "", "", "", "", "")
+      envoyConfiguration.resolveTemplate("", "", "", "", "", "", "")
       fail("Conflicting stats keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("cannot enable both statsD and gRPC metrics sink")
@@ -280,7 +286,7 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
 
     assertThat(resolvedTemplate).contains("&h2_raw_domains [\"h2-raw.example.com\",\"h2-raw.example.com2\"]")
@@ -293,7 +299,7 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
 
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}},{\"socket_address\":{\"address\":\"1.1.1.1\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")

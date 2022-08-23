@@ -119,6 +119,11 @@ EngineBuilder& EngineBuilder::enableBrotli(bool brotli_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
+  this->socket_tagging_filter_ = socket_tagging_on;
+  return *this;
+}
+
 std::string EngineBuilder::generateConfigStr() {
 #if defined(__APPLE__)
   std::string dns_resolver_name = "envoy.network.dns_resolver.apple";
@@ -181,6 +186,12 @@ std::string EngineBuilder::generateConfigStr() {
   if (this->brotli_filter_) {
     absl::StrReplaceAll(
         {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", brotli_config_insert)}},
+        &config_template_);
+  }
+
+  if (this->socket_tagging_filter_) {
+    absl::StrReplaceAll(
+        {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", socket_tag_config_insert)}},
         &config_template_);
   }
 

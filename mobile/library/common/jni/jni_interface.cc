@@ -169,6 +169,12 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env,
   return result;
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_socketTagConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(socket_tag_config_insert);
+  return result;
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class

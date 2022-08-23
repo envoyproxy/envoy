@@ -95,6 +95,28 @@ class RequestHeadersBuilder : HeadersBuilder {
     }
 
   /**
+   * Add a socket tag to be applied to the socket.
+   *
+   * @param uid: Traffic stats UID to be applied.
+   * @param tag: Traffic stats tag to be applied.
+   *
+   * See: https://source.android.com/devices/tech/datausage/tags-explained
+   * See: https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsTag(int)
+   * See: https://developer.android.com/reference/android/net/TrafficStats#setThreadStatsUid(int)
+   * See: https://developer.android.com/reference/android/net/TrafficStats#tagSocket(java.net.Socket)
+   *
+   * @return RequestHeadersBuilder, This builder.
+   */
+  fun addSocketTag(uid: Int, tag: Int):
+    RequestHeadersBuilder {
+      internalSet(
+        "x-envoy-mobile-socket-tag",
+        mutableListOf(uid.toString() + "," + tag.toString())
+      )
+      return this
+    }
+
+  /**
    * Build the request headers using the current builder.
    *
    * @return RequestHeaders, New instance of request headers.

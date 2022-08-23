@@ -316,6 +316,11 @@ public class JniLibrary {
   public static native String brotliConfigInsert();
 
   /**
+   * Provides a configuration insert that may be used to enable socket tagging.
+   */
+  public static native String socketTagConfigInsert();
+
+  /**
    * Register a platform-provided key-value store implementation.
    *
    * @param name,    unique name identifying this key-value store.
