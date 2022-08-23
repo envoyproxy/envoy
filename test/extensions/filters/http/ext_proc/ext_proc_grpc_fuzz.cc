@@ -140,7 +140,7 @@ public:
     return codec_client_->makeRequestWithBody(headers, std::string(body));
   }
 
-  IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
+  IntegrationStreamDecoderSharedPtr sendDownstreamRequestWithChunks(
       FuzzedDataProvider* fdp, ExtProcFuzzHelper* fh,
       absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
@@ -152,7 +152,7 @@ public:
       (*modify_headers)(headers);
     }
     auto encoder_decoder = codec_client_->startRequest(headers);
-    IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+    IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
     auto& encoder = encoder_decoder.first;
 
     const uint32_t num_chunks =
@@ -192,8 +192,8 @@ public:
     return response;
   }
 
-  IntegrationStreamDecoderPtr randomDownstreamRequest(FuzzedDataProvider* fdp,
-                                                      ExtProcFuzzHelper* fh) {
+  IntegrationStreamDecoderSharedPtr randomDownstreamRequest(FuzzedDataProvider* fdp,
+                                                            ExtProcFuzzHelper* fh) {
     // From the external processor's view each of these requests
     // are handled the same way. They only differ in what the server should
     // send back to the client.
