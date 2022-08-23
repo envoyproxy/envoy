@@ -228,6 +228,7 @@ private:
       case Protocol::Http11:
         // HTTP/1.1 codec does not support half-close on the response completion.
         wait_encode_complete_ = false;
+        break;
       case Protocol::Http2:
       case Protocol::Http3:
         break;
