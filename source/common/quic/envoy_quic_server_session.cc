@@ -135,6 +135,7 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
+  streamInfo().downstreamTiming().onDownstreamHandshakeComplete(dispatcher_.timeSource());
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 

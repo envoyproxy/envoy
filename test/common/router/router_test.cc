@@ -1133,12 +1133,16 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
                         absl::optional<uint64_t>(absl::nullopt)));
+  bool upstream_filters =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters");
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
+      .Times(!upstream_filters);
+  // The reset will be converted into a local reply.
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
@@ -2056,6 +2060,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
+  EXPECT_EQ(0U, router_.upstreamRequests().size());
+  EXPECT_TRUE(router_.finalUpstreamRequest() == nullptr);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2088,6 +2094,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   router_.retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(2U, router_.upstreamRequests().size());
+  EXPECT_TRUE(router_.finalUpstreamRequest() == nullptr);
 
   // We should not have updated any stats yet because no requests have been
   // canceled
@@ -2112,6 +2120,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   ASSERT(response_decoder1);
   response_decoder1->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(0U, router_.upstreamRequests().size());
+  EXPECT_FALSE(router_.finalUpstreamRequest() == nullptr);
 
   // TODO: Verify hedge stats here once they are implemented.
 }
@@ -3490,6 +3500,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
 }
 
 // The router filter is responsible for not propagating 100-continue headers after the initial 100.
+// TODO(alyssawilk) remove coalescing with old code deprecation.
 TEST_F(RouterTest, Coalesce1xxHeaders) {
   // Setup.
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3525,9 +3536,16 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
-  EXPECT_EQ(
-      2U,
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")) {
+    // With the filter manager coalescing, the router only sees 1 100.
+    EXPECT_EQ(
+        1U,
+        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  } else {
+    EXPECT_EQ(
+        2U,
+        cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
+  }
 
   // Reset stream and cleanup.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -5674,11 +5692,14 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
         return Http::okStatus();
       }));
 
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([] {}));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.route_->route_entry_, appendXfh()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, AutoHostRewriteDisabled) {
@@ -5708,6 +5729,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+  router_.onDestroy();
 }
 
 TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {
@@ -5831,7 +5853,9 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   EXPECT_CALL(encoder, encodeData(_, _));
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  // Now end the stream.
+  response_decoder->decodeData(data, true);
 }
 
 // Invalid upstream will fail over to generic in opt mode, but crash in debug mode.

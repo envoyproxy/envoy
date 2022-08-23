@@ -28,6 +28,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -4592,6 +4593,26 @@ TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   auto cluster = makeCluster(yaml);
 
   EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
+}
+
+TEST_F(ClusterInfoImplTest, FilterChain) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster = makeCluster(yaml);
+  Http::MockFilterChainManager manager;
+  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager));
+
+  cluster->info()->createFilterChain(manager);
 }
 
 } // namespace

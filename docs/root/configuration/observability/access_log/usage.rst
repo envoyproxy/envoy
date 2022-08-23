@@ -397,6 +397,18 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%DOWNSTREAM_HANDSHAKE_DURATION%
+  HTTP
+    Not implemented ("-").
+
+  TCP
+    Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS%
