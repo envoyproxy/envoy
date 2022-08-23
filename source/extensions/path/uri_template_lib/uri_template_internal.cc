@@ -115,8 +115,7 @@ alsoUpdatePattern(absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string
 std::string Variable::debugString() const { return toString(*this); }
 
 std::string ParsedPathPattern::debugString() const {
-  return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()),
-                      suffix_);
+  return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()), suffix_);
 }
 
 bool isValidLiteral(absl::string_view literal) {
