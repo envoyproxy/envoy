@@ -15,12 +15,10 @@ class ProfilingHandler {
 public:
   ProfilingHandler(const std::string& profile_path);
 
-  Http::Code handlerCpuProfiler(absl::string_view path_and_query,
-                                Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerCpuProfiler(Http::ResponseHeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerHeapProfiler(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerHeapProfiler(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
 
 private:
@@ -31,8 +29,7 @@ class TcmallocProfilingHandler {
 public:
   TcmallocProfilingHandler() = default;
 
-  Http::Code handlerHeapDump(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerHeapDump(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&);
 };
 

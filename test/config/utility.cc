@@ -1167,20 +1167,44 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& v
 
 void ConfigHelper::addFilter(const std::string& config) { prependFilter(config); }
 
-void ConfigHelper::prependFilter(const std::string& config) {
+void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      hcm_config;
-  loadHttpConnectionManager(hcm_config);
+  if (downstream) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
 
-  auto* filter_list_back = hcm_config.add_http_filters();
-  TestUtility::loadFromYaml(config, *filter_list_back);
+    auto* filter_list_back = hcm_config.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
 
-  // Now move it to the front.
-  for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
-    hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    // Now move it to the front.
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    storeHttpConnectionManager(hcm_config);
+    return;
   }
-  storeHttpConnectionManager(hcm_config);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+
+    HttpProtocolOptions old_protocol_options;
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    auto* filter_list_back = old_protocol_options.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
+    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(old_protocol_options);
+  }
 }
 
 void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::

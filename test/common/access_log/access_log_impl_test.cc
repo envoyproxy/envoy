@@ -70,7 +70,7 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -519,7 +519,7 @@ typed_config:
 }
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   {
     const std::string yaml = R"EOF(

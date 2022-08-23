@@ -544,6 +544,39 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "filter_integration_test",
+    srcs = [
+        "filter_integration_test.cc",
+    ],
+    shard_count = 12,
+    deps = [
+        ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
+        "//envoy/network:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/integration/filters:add_body_filter_config_lib",
+        "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:buffer_continue_filter_lib",
+        "//test/integration/filters:continue_after_local_reply_filter_lib",
+        "//test/integration/filters:continue_headers_only_inject_body",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
+        "//test/integration/filters:local_reply_with_metadata_filter_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
+        "//test/integration/filters:remove_response_headers_lib",
+        "//test/integration/filters:reset_stream_filter_config_lib",
+        "//test/integration/filters:stop_iteration_and_continue",
+        "//test/integration/filters:stop_iteration_headers_inject_body",
+        "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "protocol_integration_test_lib",
     srcs = [
@@ -1927,6 +1960,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "typed_metadata_integration_proto",
+    srcs = ["typed_metadata_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "typed_metadata_integration_test",
     srcs = [
@@ -1934,9 +1972,11 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        ":typed_metadata_integration_proto_cc_proto",
         "//source/common/protobuf",
         "//test/integration/filters:listener_typed_metadata_filter_lib",
         "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

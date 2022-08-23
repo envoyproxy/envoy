@@ -1,3 +1,5 @@
+#include "envoy/upstream/upstream.h"
+
 #include "source/common/network/multi_connection_base_impl.h"
 
 namespace Envoy {
@@ -13,7 +15,7 @@ class HappyEyeballsConnectionProvider : public ConnectionProvider,
 public:
   HappyEyeballsConnectionProvider(Event::Dispatcher& dispatcher,
                                   const std::vector<Address::InstanceConstSharedPtr>& address_list,
-                                  Address::InstanceConstSharedPtr source_address,
+                                  Upstream::AddressSelectFn source_address_fn,
                                   UpstreamTransportSocketFactory& socket_factory,
                                   TransportSocketOptionsConstSharedPtr transport_socket_options,
                                   const Upstream::HostDescriptionConstSharedPtr& host,
@@ -32,9 +34,9 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  const std::vector<Address::InstanceConstSharedPtr> address_list_;
   // List of addresses to attempt to connect to.
-  Address::InstanceConstSharedPtr source_address_;
+  const std::vector<Address::InstanceConstSharedPtr> address_list_;
+  Upstream::AddressSelectFn source_address_fn_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
   const Upstream::HostDescriptionConstSharedPtr host_;
@@ -63,14 +65,14 @@ class HappyEyeballsConnectionImpl : public MultiConnectionBaseImpl,
 public:
   HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
                               const std::vector<Address::InstanceConstSharedPtr>& address_list,
-                              Address::InstanceConstSharedPtr source_address,
+                              Upstream::AddressSelectFn source_address_fn,
                               UpstreamTransportSocketFactory& socket_factory,
                               TransportSocketOptionsConstSharedPtr transport_socket_options,
                               const Upstream::HostDescriptionConstSharedPtr& host,
                               const ConnectionSocket::OptionsSharedPtr options)
       : MultiConnectionBaseImpl(dispatcher,
                                 std::make_unique<Network::HappyEyeballsConnectionProvider>(
-                                    dispatcher, address_list, source_address, socket_factory,
+                                    dispatcher, address_list, source_address_fn, socket_factory,
                                     transport_socket_options, host, options)) {}
 };
 
