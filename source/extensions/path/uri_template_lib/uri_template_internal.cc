@@ -33,7 +33,7 @@ namespace {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-constexpr unsigned long kPatternMatchingMaxVariablesPerUrl = 5;
+constexpr unsigned long kPatternMatchingMaxVariablesPerPath = 5;
 constexpr unsigned long kPatternMatchingMaxVariableNameLen = 16;
 constexpr unsigned long kPatternMatchingMinVariableNameLen = 1;
 
@@ -114,7 +114,7 @@ alsoUpdatePattern(absl::FunctionRef<absl::StatusOr<ParsedResult<T>>(absl::string
 
 std::string Variable::debugString() const { return toString(*this); }
 
-std::string ParsedUrlPattern::debugString() const {
+std::string ParsedPathPattern::debugString() const {
   return absl::StrCat("/", absl::StrJoin(parsed_segments_, "/", ToStringFormatter()),
                       suffix_.value_or(""));
 }
@@ -214,14 +214,14 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
 }
 
 absl::StatusOr<absl::flat_hash_set<absl::string_view>>
-gatherCaptureNames(const struct ParsedUrlPattern& pattern) {
+gatherCaptureNames(const struct ParsedPathPattern& pattern) {
   absl::flat_hash_set<absl::string_view> captured_variables;
 
   for (const ParsedSegment& segment : pattern.parsed_segments_) {
     if (!absl::holds_alternative<Variable>(segment)) {
       continue;
     }
-    if (captured_variables.size() >= kPatternMatchingMaxVariablesPerUrl) {
+    if (captured_variables.size() >= kPatternMatchingMaxVariablesPerPath) {
       return absl::InvalidArgumentError("Exceeded variable count limit");
     }
     absl::string_view name = absl::get<Variable>(segment).name_;
@@ -239,7 +239,7 @@ gatherCaptureNames(const struct ParsedUrlPattern& pattern) {
   return captured_variables;
 }
 
-absl::Status validateNoOperatorAfterTextGlob(const struct ParsedUrlPattern& pattern) {
+absl::Status validateNoOperatorAfterTextGlob(const struct ParsedPathPattern& pattern) {
   bool seen_text_glob = false;
   for (const ParsedSegment& segment : pattern.parsed_segments_) {
     if (absl::holds_alternative<Operator>(segment)) {
@@ -270,34 +270,34 @@ absl::Status validateNoOperatorAfterTextGlob(const struct ParsedUrlPattern& patt
   return absl::OkStatus();
 }
 
-absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pattern) {
-  struct ParsedUrlPattern parsed_pattern;
+absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path) {
+  struct ParsedPathPattern parsed_pattern;
 
   static const LazyRE2 printable_regex = {"^/[[:graph:]]*$"};
-  if (!RE2::FullMatch(toStringPiece(url_pattern), *printable_regex)) {
+  if (!RE2::FullMatch(toStringPiece(path), *printable_regex)) {
     return absl::InvalidArgumentError("Invalid pattern");
   }
 
   // Parse the leading '/'
-  url_pattern = url_pattern.substr(1);
+  path = path.substr(1);
 
   // Do the initial lexical parsing.
-  while (!url_pattern.empty()) {
+  while (!path.empty()) {
     ParsedSegment segment;
-    if (url_pattern[0] == '*') {
-      absl::StatusOr<Operator> status = alsoUpdatePattern<Operator>(parseOperator, &url_pattern);
+    if (path[0] == '*') {
+      absl::StatusOr<Operator> status = alsoUpdatePattern<Operator>(parseOperator, &path);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
-    } else if (url_pattern[0] == '{') {
-      absl::StatusOr<Variable> status = alsoUpdatePattern<Variable>(parseVariable, &url_pattern);
+    } else if (path[0] == '{') {
+      absl::StatusOr<Variable> status = alsoUpdatePattern<Variable>(parseVariable, &path);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else {
-      absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &url_pattern);
+      absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &path);
       if (!status.ok()) {
         return status.status();
       }
@@ -306,23 +306,23 @@ absl::StatusOr<ParsedUrlPattern> parseURLPatternSyntax(absl::string_view url_pat
     parsed_pattern.parsed_segments_.push_back(segment);
 
     // Deal with trailing '/' or suffix.
-    if (!url_pattern.empty()) {
-      if (url_pattern == "/") {
+    if (!path.empty()) {
+      if (path == "/") {
         // Single trailing '/' at the end, mark this with empty literal.
         parsed_pattern.parsed_segments_.emplace_back("");
         break;
-      } else if (url_pattern[0] == '/') {
+      } else if (path[0] == '/') {
         // Have '/' followed by more text, parse the '/'.
-        url_pattern = url_pattern.substr(1);
+        path = path.substr(1);
       } else {
         // Not followed by '/', treat as suffix.
-        absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &url_pattern);
+        absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &path);
         if (!status.ok()) {
           return status.status();
         }
         parsed_pattern.suffix_ = *std::move(status);
-        if (!url_pattern.empty()) {
-          // Suffix didn't parse whole remaining pattern ('/' in url_pattern).
+        if (!path.empty()) {
+          // Suffix didn't parse whole remaining pattern ('/' in path).
           return absl::InvalidArgumentError("Prefix match not supported.");
         }
         break;
@@ -369,7 +369,7 @@ std::string toRegexPattern(const Variable& pattern) {
                       ")");
 }
 
-std::string toRegexPattern(const struct ParsedUrlPattern& pattern) {
+std::string toRegexPattern(const struct ParsedPathPattern& pattern) {
   return absl::StrCat("/", absl::StrJoin(pattern.parsed_segments_, "/", ToRegexPatternFormatter()),
                       toRegexPattern(pattern.suffix_.value_or("")));
 }

@@ -28,8 +28,8 @@ namespace {
 
 using ::Envoy::StatusHelpers::StatusIs;
 
-TEST(InternalParsing, ParsedUrlDebugString) {
-  ParsedUrlPattern patt1 = {
+TEST(InternalParsing, ParsedPathDebugString) {
+  ParsedPathPattern patt1 = {
       {
           "abc",
           "def",
@@ -41,7 +41,7 @@ TEST(InternalParsing, ParsedUrlDebugString) {
   };
   EXPECT_EQ(patt1.debugString(), "/abc/def/*/{var=*/ghi/**}.test");
 
-  ParsedUrlPattern patt2 = {{
+  ParsedPathPattern patt2 = {{
                                 Variable("var", {}),
                             },
                             "",
@@ -161,10 +161,10 @@ TEST_P(ParseVariableFailure, ParseVariableFailureTest) {
   EXPECT_THAT(parseVariable(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class ParseURLPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
+class ParsePathPatternSyntaxSuccess : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    ParseURLPatternSyntaxSuccessTestSuite, ParseURLPatternSyntaxSuccess,
+    ParsePathPatternSyntaxSuccessTestSuite, ParsePathPatternSyntaxSuccess,
     testing::Values("/**.m3u8", "/**.mpd", "/*_suf", "/{path=**}.m3u8", "/{foo}/**.ts",
                     "/media/*.m4s", "/media/{contentId=*}/**", "/media/*", "/api/*/*/**",
                     "/api/*/v1/**", "/api/*/v1/*", "/{version=api/*}/*", "/api/*/*/",
@@ -177,19 +177,19 @@ INSTANTIATE_TEST_SUITE_P(
                     "/api/{version=*}/{url=**}", "/api/{VERSION}/{version}/{verSION}",
                     "/api/1234/abcd", "/media/abcd/%10%20%30/{v1=*/%10%20}_suffix", "/"));
 
-TEST_P(ParseURLPatternSyntaxSuccess, ParseURLPatternSyntaxSuccessTest) {
+TEST_P(ParsePathPatternSyntaxSuccess, ParsePathPatternSyntaxSuccessTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  absl::StatusOr<ParsedUrlPattern> parsed_patt = parseURLPatternSyntax(pattern);
+  absl::StatusOr<ParsedPathPattern> parsed_patt = parsePathPatternSyntax(pattern);
   ASSERT_OK(parsed_patt);
   EXPECT_EQ(parsed_patt->debugString(), pattern);
 }
 
-class ParseURLPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
+class ParsePathPatternSyntaxFailure : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(
-    ParseURLPatternSyntaxFailureTestSuite, ParseURLPatternSyntaxFailure,
+    ParsePathPatternSyntaxFailureTestSuite, ParsePathPatternSyntaxFailure,
     testing::Values("/api/v*/1234", "/api/{version=v*}/1234", "/api/v{versionNum=*}/1234",
                     "/api/{version=*beta}/1234", "/media/eff456/ll-sd-out.{ext}",
                     "/media/eff456/ll-sd-out.{ext=*}", "/media/eff456/ll-sd-out.**",
@@ -201,11 +201,11 @@ INSTANTIATE_TEST_SUITE_P(
                     "/{var1}/{var2}/{var3}/{var4}/{var5}/{var6}", "/{=*}",
                     "/{var12345678901234=*}"));
 
-TEST_P(ParseURLPatternSyntaxFailure, ParseURLPatternSyntaxFailureTest) {
+TEST_P(ParsePathPatternSyntaxFailure, ParsePathPatternSyntaxFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(parseURLPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(parsePathPatternSyntax(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(InternalRegexGen, LiteralEscapes) {
@@ -350,9 +350,9 @@ TEST(InternalRegexGen, VariableRegexNamedCapture) {
   EXPECT_EQ(kPattern, captures.at(regex.NamedCapturingGroups().at("var")));
 }
 
-TEST(InternalRegexGen, ParsedURLPatternToRegex) {
-  absl::StatusOr<ParsedUrlPattern> pattern =
-      parseURLPatternSyntax("/abc/*/{var1}/def/{var2=*/ghi/**}.jkl");
+TEST(InternalRegexGen, ParsedPathPatternToRegex) {
+  absl::StatusOr<ParsedPathPattern> pattern =
+      parsePathPatternSyntax("/abc/*/{var1}/def/{var2=*/ghi/**}.jkl");
   ASSERT_OK(pattern);
 
   std::string var1_capture;
@@ -364,19 +364,19 @@ TEST(InternalRegexGen, ParsedURLPatternToRegex) {
 }
 
 struct GenPatternTestCase {
-  GenPatternTestCase(std::string request_path, std::string url_pattern,
+  GenPatternTestCase(std::string request_path, std::string path_pattern,
                      std::vector<std::pair<std::string, std::string>> capture_pairs)
-      : path(request_path), pattern(url_pattern), captures(capture_pairs) {}
-  std::string path;
-  std::string pattern;
-  std::vector<std::pair<std::string, std::string>> captures;
+      : path_(request_path), path_pattern_(path_pattern), captures_(capture_pairs) {}
+  std::string path_;
+  std::string path_pattern_;
+  std::vector<std::pair<std::string, std::string>> captures_;
 };
 
 class GenPatternRegexWithMatch : public testing::TestWithParam<struct GenPatternTestCase> {
 protected:
-  const std::string& requestPath() const { return GetParam().path; }
-  const std::string& urlPattern() const { return GetParam().pattern; }
-  std::vector<std::pair<std::string, std::string>> const varValues() { return GetParam().captures; }
+  const std::string& requestPath() const { return GetParam().path_; }
+  const std::string& path_pattern() const { return GetParam().path_pattern_; }
+  std::vector<std::pair<std::string, std::string>> const varValues() { return GetParam().captures_; }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -419,7 +419,7 @@ INSTANTIATE_TEST_SUITE_P(
                            {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}})));
 
 TEST_P(GenPatternRegexWithMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(urlPattern());
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(path_pattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));
@@ -445,7 +445,7 @@ class GenPatternRegexWithoutMatch
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   const std::string& requestPath() const { return std::get<0>(GetParam()); }
-  const std::string& urlPattern() const { return std::get<1>(GetParam()); }
+  const std::string& path_pattern() const { return std::get<1>(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWithoutMatch,
@@ -458,7 +458,7 @@ INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWi
                               {"/api/*/1234/", "/api/*/1234/"}})));
 
 TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
-  absl::StatusOr<ParsedUrlPattern> pattern = parseURLPatternSyntax(urlPattern());
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(path_pattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));
