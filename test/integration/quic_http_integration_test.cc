@@ -1157,6 +1157,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
   waitForNextUpstreamRequest();
   test_server_->waitForCounterEq("test_network_filter.on_new_connection", 1);
   EXPECT_EQ(test_server_->counter("test_network_filter.on_data")->value(), 0);
+  codec_client_->close();
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
