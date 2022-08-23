@@ -477,9 +477,10 @@ message CertificateValidationContext {
   // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
   bool only_verify_leaf_cert_crl = 14;
 
-  // Config for the max number of intermediate certificates in chain that are parsed during verification.
-  // This does not include the leaf certificate. If configured, certificate chain must reach a trusted issuer no longer than allowed.
-  // Otherwise, certificate validation will fail. The default limit is 100, though this can be system-dependent.
-  // https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html
+  // Defines the max number of intermediate certificates in the chain that are parsed during verification.
+  // This does not include the leaf certificate. If a trusted issuer appears in the chain, but in a depth larger than configured, the certificate validation will fail.
+  // The default limit is 100, though this can be system-dependent. See
+  // `SSL set_verify_depth
+  // <https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_verify_depth.html>`_.
   google.protobuf.UInt32Value max_verify_depth = 16 [(validate.rules).uint32 = {lte: 100}];
 }
