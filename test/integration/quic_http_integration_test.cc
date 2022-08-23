@@ -1147,7 +1147,7 @@ typed_config:
 
 TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
   config_helper_.addNetworkFilter(R"EOF(
-      name: envoy.test.test_network_filter 
+      name: envoy.test.test_network_filter
       typed_config:
         "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
 )EOF");
