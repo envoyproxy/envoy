@@ -163,6 +163,7 @@ envoy_cc_library(
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
+        ":xds_source_id_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -370,6 +371,16 @@ envoy_cc_library(
     deps = [
         "//source/common/http:utility_lib",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_source_id_lib",
+    srcs = ["xds_source_id.cc"],
+    hdrs = ["xds_source_id.h"],
+    deps = [
+        "//envoy/config:xds_resources_delegate_interface",
+        "//source/common/common:base64_lib",
     ],
 )
 

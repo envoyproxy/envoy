@@ -4,6 +4,7 @@
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_source_id.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -279,7 +280,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // All config updates have been applied without throwing an exception, so we'll call the xDS
     // resources delegate, if any.
     if (xds_resources_delegate_.has_value()) {
-      xds_resources_delegate_->onConfigUpdated(target_xds_authority_, type_url, all_resource_refs);
+      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId(target_xds_authority_, type_url),
+                                               all_resource_refs);
     }
 
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we

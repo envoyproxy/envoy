@@ -580,3 +580,11 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "xds_source_id_test",
+    srcs = ["xds_source_id_test.cc"],
+    deps = [
+        "//source/common/config:xds_source_id_lib",
+    ],
+)

@@ -12,6 +12,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/mutex.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -22,15 +23,13 @@ constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
 // A test implementation of the XdsResourcesDelegate extension.
 class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
 public:
-  void onConfigUpdated(const std::string& /*authority_id*/,
-                       const std::string& /*resource_type_url*/,
+  void onConfigUpdated(const Config::XdsSourceId& /*source_id*/,
                        const std::vector<Config::DecodedResourceRef>& /*resources*/) override {
     OnConfigUpdatedCount++;
   }
 
   std::vector<envoy::service::discovery::v3::Resource>
-  getResources(const std::string& /*authority_id*/,
-               const std::string& /*resource_type_url*/) override {
+  getResources(const Config::XdsSourceId& /*source_id*/) override {
     // TODO(abeyad): implement this and test for it when we add support for loading config from the
     // delegate in a subsequent PR.
     return {};

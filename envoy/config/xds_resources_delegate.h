@@ -11,6 +11,22 @@
 namespace Envoy {
 namespace Config {
 
+/*
+ * An abstract class that represents an xDS source. The toKey() function provides a unique
+ * identifier for the source for a group of xDS resources in a DiscoveryResponse.
+ */
+class XdsSourceId {
+public:
+  virtual ~XdsSourceId() = default;
+
+  /**
+   * Returns a unique string representation of the source. The string can be used as an identifier
+   * for the source (e.g. as a key in a hash map).
+   * @return string representation of the source.
+   */
+  virtual std::string toKey() const PURE;
+};
+
 /**
  * An interface for hooking into xDS resource fetch and update events.
  * Currently, this interface only supports the SotW (state-of-the-world) xDS protocol.
@@ -32,25 +48,20 @@ public:
    * implementation to return a set of resources to be loaded and used by the Envoy instance
    * (e.g. persisted resources in local storage).
    *
-   * @param authority_id Unique id for the authority/control plane from which the resources are
-   *   obtained. Typically either a cluster name or a host name.
-   * @param resource_type_url The URL for the type of the resource (e.g. Secrets, Clusters, etc).
+   * @param source_id The xDS source for the requested resources.
    * @return A set of xDS resources for the given authority and type.
    */
   virtual std::vector<envoy::service::discovery::v3::Resource>
-  getResources(const std::string& authority_id, const std::string& resource_type_url) PURE;
+  getResources(const XdsSourceId& source_id) PURE;
 
   /**
    * Invoked when SotW xDS configuration updates have been received from an xDS authority, have been
    * applied on the Envoy instance, and are about to be ACK'ed.
    *
-   * @param authority_id Unique id for the authority/control plane from which the resources are
-   *   obtained. Typically either a cluster name or a host name.
-   * @param resource_type_url The URL for the type of the resource (e.g. Secrets, Clusters, etc).
-   * @param resources The resources sent by the authority for the given type.
+   * @param source_id The xDS source for the requested resources.
+   * @param resources The resources for the given source received on the DiscoveryResponse.
    */
-  virtual void onConfigUpdated(const std::string& authority_id,
-                               const std::string& resource_type_url,
+  virtual void onConfigUpdated(const XdsSourceId& source_id,
                                const std::vector<DecodedResourceRef>& resources) PURE;
 };
 
