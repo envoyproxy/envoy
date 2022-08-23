@@ -358,7 +358,8 @@ message HeaderValueOption {
   // existing values. Otherwise it replaces any existing values.
   // This field is deprecated and please use
   // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
-  google.protobuf.BoolValue append = 2 [deprecated = true];
+  google.protobuf.BoolValue append = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Describes the action taken to append/overwrite the given value for an existing header
   // or to only add this header if it's absent.
