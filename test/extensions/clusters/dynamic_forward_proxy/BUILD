@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     args = [
+        "--",
         # Force creation of c-ares DnsResolverImpl when running test on macOS.
         "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
     ],
