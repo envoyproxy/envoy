@@ -332,8 +332,13 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
   ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
   stats_.rx_reset_.inc();
+  bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
+  // This closes read side in IETF Quic, but doesn't close write side.
   quic::QuicSpdyClientStream::OnStreamReset(frame);
-  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  ASSERT(read_side_closed());
+  if (write_side_closed() && !end_stream_decoded_and_encoded) {
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  }
 }
 
 void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
