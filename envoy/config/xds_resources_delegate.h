@@ -63,6 +63,15 @@ public:
    */
   virtual void onConfigUpdated(const XdsSourceId& source_id,
                                const std::vector<DecodedResourceRef>& resources) PURE;
+
+  /**
+   * Reset the delegate for the given xDS source. Reset in the context of this interface means that
+   * for the given config source and type, a new subscription was initiated or an existing
+   * subscription reset for a set of resources.
+   *
+   * @param source_id The xDS source being reset.
+   */
+  virtual void reset(const XdsSourceId& source_id) PURE;
 };
 
 using XdsResourcesDelegatePtr = std::unique_ptr<XdsResourcesDelegate>;

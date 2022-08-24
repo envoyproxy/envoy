@@ -34,6 +34,8 @@ public:
     return {};
   }
 
+  void reset(const Config::XdsSourceId& /*source_id*/) override { OnConfigUpdatedCount = 0; }
+
   static int getOnConfigUpdatedCount() { return OnConfigUpdatedCount; }
 
 private:

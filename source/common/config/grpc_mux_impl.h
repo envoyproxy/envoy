@@ -177,6 +177,7 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
+  bool mux_started_{true};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);
