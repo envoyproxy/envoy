@@ -526,7 +526,7 @@ tap_config:
     auto [encoder, decoder] =
         startRequest(request_headers_no_tap_, {{std::to_string(i)}}, nullptr, codec_client_.get());
     encoders[i] = encoder;
-    decoders[i] = std::move(decoder);
+    decoders[i] = decoder;
   }
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
