@@ -97,6 +97,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     } else {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
+    std::cerr << "========= danzh: delay close\n";
   } else if (hasDataToWrite()) {
     // Quic connection has unsent data but caller wants to close right away.
     ASSERT(type == Network::ConnectionCloseType::NoFlush);
@@ -149,12 +150,14 @@ void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
+    std::cerr << "============ danzh: still has data to send, update timer\n";
     if (delayed_close_timer_ != nullptr) {
       // Re-arm delay close timer on every write event if there are still data
       // buffered or the connection close is supposed to be delayed.
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
   } else {
+    std::cerr << "============ danzh: actual close connection\n";
     closeConnectionImmediately();
   }
 }
