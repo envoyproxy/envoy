@@ -49,12 +49,8 @@ public:
                const std::vector<std::string>& request_body_chunks,
                const Http::TestRequestTrailerMapImpl* request_trailers,
                IntegrationCodecClient* codec_client) {
-    if (!request_trailers && request_body_chunks.empty()) {
-      // Headers only request - no encoder needed as no data
-      return {nullptr, codec_client->makeHeaderOnlyRequest(request_headers)};
-    }
-
-    auto encoder_decoder = codec_client->startRequest(request_headers);
+    const bool header_only = !request_trailers && request_body_chunks.empty();
+    auto encoder_decoder = codec_client->startRequest(request_headers, header_only);
     return {&encoder_decoder.first, std::move(encoder_decoder.second)};
   }
 
