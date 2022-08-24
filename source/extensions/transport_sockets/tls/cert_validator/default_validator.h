@@ -32,7 +32,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
+class DefaultCertValidator : public CertValidator,
+                             protected Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                        SslStats& stats, TimeSource& time_source);
@@ -107,18 +108,21 @@ public:
   static bool matchSubjectAltName(X509* cert,
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
+protected:
+  // Increment failure stats and update validation state in ssl_extended_info if not nullptr.
+  void onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error);
+
+  bool allow_untrusted_certificate_{false};
+
 private:
   bool verifyCertAndUpdateStatus(Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  std::string* error_details, uint8_t* out_alert);
 
-  void onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error);
-
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   TimeSource& time_source_;
 
-  bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
