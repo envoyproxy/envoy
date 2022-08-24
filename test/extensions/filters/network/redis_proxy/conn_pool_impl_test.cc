@@ -599,7 +599,8 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   Common::Redis::Client::MockPoolRequest active_request2;
   EXPECT_CALL(*host2, address()).WillRepeatedly(Return(test_address_));
   EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
-  Common::Redis::Client::PoolRequest* request2 = conn_pool_->makeRequest("bar", value, callbacks, transaction_);
+  Common::Redis::Client::PoolRequest* request2 =
+      conn_pool_->makeRequest("bar", value, callbacks, transaction_);
   EXPECT_NE(nullptr, request2);
 
   EXPECT_CALL(*client2, close());
