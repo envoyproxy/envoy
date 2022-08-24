@@ -26,7 +26,7 @@ void set_class_loader(jobject class_loader);
  * The method works on Android targets only as the `set_class_loader` method is not
  * called by JVM-only targets.
  *
- * @param class_name, the name of the class to find (i.e. "org.chromium.net.AndroidNetworkLibrary").
+ * @param class_name, the name of the class to find (i.e. "org/chromium/net/AndroidNetworkLibrary").
  *
  * @return jclass, the class with a provided `class_name` or NULL if
  *         it couldn't be found.
