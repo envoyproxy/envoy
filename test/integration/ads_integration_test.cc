@@ -1,3 +1,4 @@
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -20,6 +21,7 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
@@ -53,6 +55,56 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+}
+
+TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
+  initialize();
+  registerTestServerPorts({});
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+
+  auto cluster_0 = buildCluster("cluster_0");
+  auto cluster_1 = buildCluster("cluster_1");
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster_0, cluster_1},
+                                                             {cluster_0, cluster_1}, {}, "1");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {cluster_0.name(), cluster_1.name()},
+                                      {cluster_0.name(), cluster_1.name()}, {}));
+  auto cluster_la_0 = buildClusterLoadAssignment(cluster_0.name());
+  auto cluster_la_1 = buildClusterLoadAssignment(cluster_1.name());
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {cluster_la_0, cluster_la_1}, {cluster_la_0, cluster_la_1}, {}, "1");
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+  // Send an update for one of the ClusterLoadAssignments only.
+  cluster_la_0.mutable_endpoints(0)
+      ->mutable_lb_endpoints(0)
+      ->mutable_load_balancing_weight()
+      ->set_value(2);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {cluster_la_0}, {cluster_la_0}, {}, "2");
+
+  // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
+  // delete the other.
+  absl::Mutex lock;
+  absl::MutexLock l(&lock);
+  const auto load_assignment_updated = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
+    auto response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", "/config_dump?include_eds&resource=dynamic_endpoint_configs",
+        "", downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
+    envoy::admin::v3::ConfigDump config_dump;
+    TestUtility::loadFromJson(loader->asJsonString(), config_dump);
+    return config_dump.configs_size() == 2;
+  };
+  EXPECT_TRUE(timeSystem().waitFor(lock, absl::Condition(&load_assignment_updated),
+                                   TestUtility::DefaultTimeout));
 }
 
 // Update the only warming cluster. Verify that the new cluster is still warming and the cluster
