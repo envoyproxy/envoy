@@ -713,7 +713,7 @@ TEST(WebSocketCodecTest, Decode16BitFrameWhenMaxPayloadBufferLengthSet) {
   EXPECT_TRUE(
       areFramesEqual(frames.value()[0], {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
                                          makeBuffer("\x75\xe6\x2e\x56\x91\x66\xb4\x89\x66\xa3")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, Decode64BitFrameWhenMaxPayloadBufferLengthSet) {
   Buffer::OwnedImpl buffer;
@@ -736,7 +736,7 @@ TEST(WebSocketCodecTest, Decode64BitFrameWhenMaxPayloadBufferLengthSet) {
       {true, kFrameOpcodeBinary, 0x96418d54, 1048576,
        makeBuffer(
            "\xe7\x4c\xdf\x16\x9a\x30\xa0\x26\x1c\xc4\x2c\x4e\x8e\x3b\x25\x1e\xe7\x4c\xdf\x16")}));
-}
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 
 TEST(WebSocketCodecTest, DecodeClosingFrame) {
   Encoder encoder;
