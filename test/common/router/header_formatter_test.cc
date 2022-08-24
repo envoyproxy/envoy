@@ -1658,8 +1658,7 @@ response_headers_to_add:
 )EOF";
 
   const auto route = parseRouteFromV3Yaml(yaml);
-  HeaderParserPtr resp_header_parser =
-      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  HeaderParserPtr resp_header_parser = HeaderParser::configure(route.response_headers_to_add());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
@@ -1713,8 +1712,7 @@ response_headers_to_add:
 )EOF";
 
   const auto route = parseRouteFromV3Yaml(yaml);
-  HeaderParserPtr resp_header_parser =
-      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  HeaderParserPtr resp_header_parser = HeaderParser::configure(route.response_headers_to_add());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   {
@@ -1738,6 +1736,31 @@ response_headers_to_add:
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
   }
+}
+
+TEST(HeaderParserTest,
+     DEPRECATED_FEATURE_TEST(EvaluateRequestHeadersAddWithDeprecatedAppendAndAction)) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append: true
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append: false
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+
+  EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(route.response_headers_to_add()),
+                            EnvoyException,
+                            "Both append and append_action are set and it's not allowed");
 }
 
 TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {

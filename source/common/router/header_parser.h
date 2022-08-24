@@ -36,7 +36,8 @@ public:
 
   /*
    * @param headers_to_add defines headers to add during calls to evaluateHeaders.
-   * @param append defines whether headers will be appended or replaced.
+   * @param append_action defines action taken to append/overwrite the given value for an existing
+   * header or to only add this header if it's absent.
    * @return HeaderParserPtr a configured HeaderParserPtr.
    */
   static HeaderParserPtr
