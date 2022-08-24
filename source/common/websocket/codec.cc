@@ -54,14 +54,19 @@ void Decoder::frameDataStart() {
   if (length_ == 0) {
     state_ = State::FrameFinished;
   } else {
-    if (decode_payload_) {
+    if (max_payload_buffer_length_ > 0) {
       frame_.payload_ = std::make_unique<Buffer::OwnedImpl>();
     }
     state_ = State::FramePayload;
   }
 }
 
-void Decoder::frameData(const uint8_t* mem, uint64_t length) { frame_.payload_->add(mem, length); }
+void Decoder::frameData(const uint8_t* mem, uint64_t length) {
+  if (max_payload_buffer_length_ > 0) {
+    uint64_t allowed_length = max_payload_buffer_length_ - frame_.payload_->length();
+    frame_.payload_->add(mem, length <= allowed_length ? length : allowed_length);
+  }
+}
 
 void Decoder::frameDataEnd(std::vector<Frame>& output) {
   output.push_back(std::move(frame_));
@@ -159,15 +164,11 @@ uint64_t Decoder::doDecodePayload(absl::Span<const uint8_t>& data) {
   uint64_t remain_in_buffer = data.length();
   uint64_t bytes_decoded = 0;
   if (remain_in_buffer <= length_) {
-    if (decode_payload_) {
-      frameData(data.data(), remain_in_buffer);
-    }
+    frameData(data.data(), remain_in_buffer);
     bytes_decoded += remain_in_buffer;
     length_ -= remain_in_buffer;
   } else {
-    if (decode_payload_) {
-      frameData(data.data(), length_);
-    }
+    frameData(data.data(), length_);
     bytes_decoded += length_;
     length_ = 0;
   }

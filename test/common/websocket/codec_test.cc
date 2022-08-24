@@ -113,7 +113,7 @@ TEST(WebSocketCodecTest, DecodeSingleUnmaskedFrameExceptPayload) {
   Buffer::OwnedImpl buffer;
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
-  Decoder decoder(false);
+  Decoder decoder(0);
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
   EXPECT_TRUE(
       areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 5, nullptr}));
@@ -172,7 +172,7 @@ TEST(WebSocketCodecTest, DecodeThreeFramesExceptPayload) {
   Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
   Buffer::addSeq(buffer, {0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f});
 
-  Decoder decoder(false);
+  Decoder decoder(0);
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
@@ -316,7 +316,7 @@ TEST(WebSocketCodecTest, Decode16BitBinaryMaskedFrameExceptPayload) {
        0x4c, 0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0xad, 0xfd, 0xd0, 0x2a, 0x16,
        0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c, 0xde, 0xa8, 0x35});
 
-  Decoder decoder(false);
+  Decoder decoder(0);
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
@@ -578,7 +578,7 @@ TEST(WebSocketCodecTest, Decode64BitBinaryMaskedFrameExceptPayload) {
                             0x8e, 0x3b, 0x25, 0x1e});
   }
 
-  Decoder decoder(false);
+  Decoder decoder(0);
   absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
 
   ASSERT_TRUE(frames.has_value());
@@ -667,6 +667,75 @@ TEST(WebSocketCodecTest, DecodeFramesWithNoPayloadNonMasked64BitLength) {
   EXPECT_EQ(1, frames->size());
   EXPECT_TRUE(
       areFramesEqual(frames.value()[0], {true, kFrameOpcodeText, absl::nullopt, 0, nullptr}));
+}
+
+TEST(WebSocketCodecTest, DecodeFramesWhenMaxPayloadBufferLengthSet) {
+  Buffer::OwnedImpl buffer;
+  // contains "Hel"
+  Buffer::addSeq(buffer, {0x01, 0x03, 0x48, 0x65, 0x6c});
+  // contains "lo"
+  Buffer::addSeq(buffer, {0x80, 0x02, 0x6c, 0x6f});
+
+  Decoder decoder(1);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  ASSERT_TRUE(frames.has_value());
+  EXPECT_EQ(2, frames->size());
+  EXPECT_TRUE(areFramesEqual(frames.value()[0],
+                             {false, kFrameOpcodeText, absl::nullopt, 3, makeBuffer("H")}));
+  EXPECT_TRUE(areFramesEqual(frames.value()[1],
+                             {true, kFrameOpcodeContinuation, absl::nullopt, 2, makeBuffer("l")}));
+} // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
+
+TEST(WebSocketCodecTest, Decode16BitFrameWhenMaxPayloadBufferLengthSet) {
+  Buffer::OwnedImpl buffer;
+  Buffer::addSeq(buffer, {0x82, 0xfe, 0x00, 0x7e, 0xa1, 0xe8, 0xd7, 0xb0});
+
+  std::initializer_list<uint8_t> payload = {
+      0x75, 0xe6, 0x2e, 0x56, 0x91, 0x66, 0xb4, 0x89, 0x66, 0xa3, 0xd4, 0xaf, 0x15, 0x3e,
+      0x7d, 0xa0, 0xd6, 0xca, 0xf9, 0xc7, 0xd9, 0x5d, 0xc6, 0x33, 0x9d, 0xd5, 0x41, 0x22,
+      0x0f, 0x18, 0xc1, 0xe7, 0xff, 0x8f, 0x2e, 0x6c, 0xaa, 0x81, 0x0f, 0x4e, 0xa5, 0xb6,
+      0x25, 0x4e, 0x8e, 0x3b, 0x25, 0x1e, 0x14, 0x58, 0x12, 0x5f, 0xfc, 0xe8, 0xb8, 0xc8,
+      0xc9, 0xd0, 0xa1, 0x53, 0x04, 0xdb, 0x91, 0xd6, 0x9a, 0xc6, 0x49, 0x6d, 0x96, 0x41,
+      0x8d, 0x9a, 0xd8, 0x00, 0x96, 0x41, 0x8d, 0x54, 0xdf, 0x0a, 0x87, 0xea, 0xe7, 0x4c,
+      0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0xad, 0xfd, 0xd0, 0x2a, 0x16,
+      0xc5, 0xb4, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2, 0x1d, 0xe1, 0x8c, 0xde, 0xa8, 0x35,
+      0xd7, 0xda, 0x3a, 0x07, 0xb2, 0xf7, 0x71, 0x54, 0xd7, 0x26, 0xa8, 0xca, 0x78, 0xe2,
+  };
+  Buffer::addSeq(buffer, payload);
+
+  // Only 10 bytes length
+  Decoder decoder(10);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  ASSERT_TRUE(frames.has_value());
+  EXPECT_EQ(1, frames->size());
+  EXPECT_TRUE(
+      areFramesEqual(frames.value()[0], {true, kFrameOpcodeBinary, 0xa1e8d7b0, 126,
+                                         makeBuffer("\x75\xe6\x2e\x56\x91\x66\xb4\x89\x66\xa3")}));
+}
+
+TEST(WebSocketCodecTest, Decode64BitFrameWhenMaxPayloadBufferLengthSet) {
+  Buffer::OwnedImpl buffer;
+  Buffer::addSeq(
+      buffer, {0x82, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x96, 0x41, 0x8d, 0x54});
+
+  // Add test payload 1048576 bytes
+  for (uint32_t i = 0; i < 65536; ++i) {
+    Buffer::addSeq(buffer, {0xe7, 0x4c, 0xdf, 0x16, 0x9a, 0x30, 0xa0, 0x26, 0x1c, 0xc4, 0x2c, 0x4e,
+                            0x8e, 0x3b, 0x25, 0x1e});
+  }
+
+  Decoder decoder(20);
+  absl::optional<std::vector<Frame>> frames = decoder.decode(buffer);
+
+  ASSERT_TRUE(frames.has_value());
+  EXPECT_EQ(1, frames->size());
+  EXPECT_TRUE(areFramesEqual(
+      frames.value()[0],
+      {true, kFrameOpcodeBinary, 0x96418d54, 1048576,
+       makeBuffer(
+           "\xe7\x4c\xdf\x16\x9a\x30\xa0\x26\x1c\xc4\x2c\x4e\x8e\x3b\x25\x1e\xe7\x4c\xdf\x16")}));
 }
 
 TEST(WebSocketCodecTest, DecodeClosingFrame) {

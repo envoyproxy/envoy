@@ -28,6 +28,8 @@ constexpr uint8_t kMaskingKeyLength = 4;
 constexpr uint8_t kPayloadLength16Bit = 2;
 // 64 bit payload length
 constexpr uint8_t kPayloadLength64Bit = 8;
+// Maximum payload buffer length
+constexpr uint64_t kMaxPayloadBufferLength = 0x7fffffffffffffff;
 
 // Wire format (https://datatracker.ietf.org/doc/html/rfc6455#section-5.2)
 // of WebSocket frame:
@@ -80,8 +82,8 @@ public:
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
 class Decoder : public Logger::Loggable<Logger::Id::websocket> {
 public:
-  Decoder(bool decode_payload) : decode_payload_{decode_payload} {};
-  Decoder() = default;
+  Decoder(uint64_t max_payload_length = kMaxPayloadBufferLength)
+      : max_payload_buffer_length_{std::min(max_payload_length, kMaxPayloadBufferLength)} {};
   // Decodes the given buffer with WebSocket frame. Drains the input buffer when
   // decoding succeeded (returns true). If the input is not sufficient to make a
   // complete WebSocket frame, it will be buffered in the decoder. If a decoding
@@ -121,7 +123,7 @@ private:
     // Frame has finished decoding.
     FrameFinished
   };
-  bool decode_payload_ = true;
+  uint64_t max_payload_buffer_length_;
   // Current frame that is being decoded.
   Frame frame_;
   State state_ = State::FrameHeaderFlagsAndOpcode;
