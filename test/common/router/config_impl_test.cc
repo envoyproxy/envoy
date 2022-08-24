@@ -269,11 +269,11 @@ most_specific_header_mutations_wins: {0}
 
     std::string action_string;
 
-    if (action == HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD) {
+    if (action == HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
       action_string = "APPEND_IF_EXISTS_OR_ADD";
-    } else if (action == HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD) {
+    } else if (action == HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD) {
       action_string = "OVERWRITE_IF_EXISTS_OR_ADD";
-    } else if (action == HeaderAppendOption::ADD_IF_ABSENT) {
+    } else if (action == HeaderValueOption::ADD_IF_ABSENT) {
       action_string = "ADD_IF_ABSENT";
     }
 
@@ -1726,7 +1726,7 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 // and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false,
-                                                 HeaderAppendOption::APPEND_IF_EXISTS_OR_ADD);
+                                                 HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1820,7 +1820,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersOverwriteIfExistOrAdd) {
   const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false,
-                                                 HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD);
+                                                 HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1849,7 +1849,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersOverwriteIfExistOrAdd) {
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAddIfAbsent) {
   const std::string yaml =
-      responseHeadersConfig(/*most_specific_wins=*/false, HeaderAppendOption::ADD_IF_ABSENT);
+      responseHeadersConfig(/*most_specific_wins=*/false, HeaderValueOption::ADD_IF_ABSENT);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1859,8 +1859,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAddIfAbsent) {
   const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-route-header", "exist-value"}};
   route->finalizeResponseHeaders(headers, stream_info);
-  EXPECT_EQ("global1", headers.get_("x-global-header1"));
-  EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
   // If related header is exist in the headers then do nothing.
   EXPECT_EQ("exist-value", headers.get_("x-route-header"));
 
@@ -1880,7 +1880,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAddIfAbsent) {
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/true,
-                                                 HeaderAppendOption::OVERWRITE_IF_EXISTS_OR_ADD);
+                                                 HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
