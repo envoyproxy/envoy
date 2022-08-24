@@ -33,15 +33,14 @@ enum class Operator { PathGlob, TextGlob };
  * Represents a pattern variable. Variables are included in both path match and rewrite paths.
  */
 struct Variable {
-  absl::string_view name_;
-
-  // replacement value for the rewrite
-  std::vector<absl::variant<Operator, Literal>> match_;
-
   Variable(absl::string_view name, std::vector<absl::variant<Operator, Literal>> match)
       : name_(name), match_(match) {}
 
   std::string debugString() const;
+
+  absl::string_view name_;
+  // replacement value for the rewrite.
+  std::vector<absl::variant<Operator, Literal>> match_;
 };
 
 using ParsedSegment = absl::variant<Operator, Variable, Literal>;
@@ -65,7 +64,7 @@ struct ParsedPathPattern {
 
 /**
  * Returns true if `literal` is valid for pattern match.
- * (does not contain wildcards or curly brackets).
+ * (does not contain wildcards, forwards slashes, or curly brackets).
  */
 bool isValidLiteral(absl::string_view literal);
 

@@ -375,7 +375,7 @@ struct GenPatternTestCase {
 class GenPatternRegexWithMatch : public testing::TestWithParam<struct GenPatternTestCase> {
 protected:
   const std::string& requestPath() const { return GetParam().path_; }
-  const std::string& path_pattern() const { return GetParam().path_pattern_; }
+  const std::string& pathPattern() const { return GetParam().path_pattern_; }
   std::vector<std::pair<std::string, std::string>> const varValues() {
     return GetParam().captures_;
   }
@@ -421,7 +421,7 @@ INSTANTIATE_TEST_SUITE_P(
                            {{"VERSION", "v1"}, {"version", "v2"}, {"verSION", "v3"}})));
 
 TEST_P(GenPatternRegexWithMatch, WithCapture) {
-  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(path_pattern());
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(pathPattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));
@@ -447,7 +447,7 @@ class GenPatternRegexWithoutMatch
     : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   const std::string& requestPath() const { return std::get<0>(GetParam()); }
-  const std::string& path_pattern() const { return std::get<1>(GetParam()); }
+  const std::string& pathPattern() const { return std::get<1>(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWithoutMatch,
@@ -460,7 +460,7 @@ INSTANTIATE_TEST_SUITE_P(GenPatternRegexWithoutMatchTestSuite, GenPatternRegexWi
                               {"/api/*/1234/", "/api/*/1234/"}})));
 
 TEST_P(GenPatternRegexWithoutMatch, WithCapture) {
-  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(path_pattern());
+  absl::StatusOr<ParsedPathPattern> pattern = parsePathPatternSyntax(pathPattern());
   ASSERT_OK(pattern);
 
   RE2 regex = RE2(toRegexPattern(pattern.value()));

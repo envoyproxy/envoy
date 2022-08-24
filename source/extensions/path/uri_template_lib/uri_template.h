@@ -34,8 +34,9 @@ struct ParsedSegment {
  */
 absl::StatusOr<std::string> convertPathPatternSyntaxToRegex(absl::string_view path_pattern);
 
-/** Parses the specified pattern into a sequence of segments (which are
-/ * either literals or variable names).
+/**
+ * Parses the specified pattern into a sequence of segments (which are
+ * either literals or variable names).
  **/
 absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view path_pattern);
 
