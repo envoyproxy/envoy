@@ -3,6 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "source/server/backtrace.h"
+
 #include "quic_ssl_connection_info.h"
 
 namespace Envoy {
@@ -150,7 +152,9 @@ void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    std::cerr << "============ danzh: still has data to send, update timer\n";
+    std::cerr << "============ danzh: still has " << bytes_to_send_
+              << " bytes of data to send, update timer\n";
+    BACKTRACE_LOG();
     if (delayed_close_timer_ != nullptr) {
       // Re-arm delay close timer on every write event if there are still data
       // buffered or the connection close is supposed to be delayed.
