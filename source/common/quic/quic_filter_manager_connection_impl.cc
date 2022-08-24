@@ -74,7 +74,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     return;
   }
   if (!initialized_) {
-    // Delay close till the first OnCanWrite() call.
+    // Delay close till the first ProcessUdpPacket() call.
     close_type_during_initialize_ = type;
     return;
   }
