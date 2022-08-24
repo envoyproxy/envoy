@@ -244,7 +244,7 @@ TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainWithEmptyChain) {
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
             validator()
                 .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                   /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                   /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                 .status);
   EXPECT_EQ(1, stats().fail_verify_error_.value());
   EXPECT_EQ(info.certificateValidationStatus(), Envoy::Ssl::ClientValidationStatus::NotValidated);
@@ -263,7 +263,7 @@ TEST_P(TestSPIFFEValidator, TestDoVerifyCertChainPrecheckFailure) {
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -296,7 +296,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -313,7 +313,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -331,7 +331,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -370,7 +370,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -386,7 +386,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -404,7 +404,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -422,7 +422,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -460,7 +460,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
@@ -504,7 +504,8 @@ typed_config:
       EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
                 validator()
                     .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                       /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                       /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false,
+                                       "")
                     .status);
     } else {
       EXPECT_TRUE(validator().doSynchronousVerifyCertChain(store_ctx.get(), &info, *cert, nullptr));
@@ -520,7 +521,8 @@ typed_config:
       EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
                 validator()
                     .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                       /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                       /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false,
+                                       "")
                     .status);
     } else {
       EXPECT_FALSE(
@@ -560,7 +562,7 @@ typed_config:
     EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
               validator()
                   .doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &info,
-                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                   .status);
   } else {
     X509StorePtr store = X509_STORE_new();
