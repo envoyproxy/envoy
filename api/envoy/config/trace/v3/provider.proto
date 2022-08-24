@@ -21,9 +21,9 @@ message Provider {
 
   reserved "config";
 
-  // The name of the HTTP trace driver to instantiate. The name must match a
-  // supported HTTP trace driver.
-  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.tracers>` for the default list of the HTTP trace driver.
+  // The name of the trace driver to instantiate. The name must match a
+  // supported trace driver.
+  // See the :ref:`extensions listed in typed_config below <extension_category_envoy.tracers>` for the default list of the trace driver.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Trace driver specific configuration which must be set according to the driver being instantiated.

@@ -22,10 +22,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 10]
 message Tracing {
   enum OperationName {
-    // The HTTP listener is used for ingress/incoming requests.
+    // The listener is used for ingress/incoming requests.
     INGRESS = 0;
 
-    // The HTTP listener is used for egress/outgoing requests.
+    // The listener is used for egress/outgoing requests.
     EGRESS = 1;
   }
 
@@ -33,7 +33,7 @@ message Tracing {
 
   reserved "operation_name", "request_headers_for_tags";
 
-  // Target percentage of requests managed by this HTTP connection manager that will be force
+  // Target percentage of requests managed by this proxy that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
   // header is set. This field is a direct analog for the runtime variable
   // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
@@ -41,14 +41,14 @@ message Tracing {
   // Default: 100%
   type.v3.Percent client_sampling = 3;
 
-  // Target percentage of requests managed by this HTTP connection manager that will be randomly
+  // Target percentage of requests managed by this proxy that will be randomly
   // selected for trace generation, if not requested by the client or not forced. This field is
   // a direct analog for the runtime variable 'tracing.random_sampling' in the
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
   type.v3.Percent random_sampling = 4;
 
-  // Target percentage of requests managed by this HTTP connection manager that will be traced
+  // Target percentage of requests managed by this proxy that will be traced
   // after all other sampling checks have been applied (client-directed, force tracing, random
   // sampling). This field functions as an upper limit on the total configured sampling rate. For
   // instance, setting client_sampling to 100% but overall_sampling to 1% will result in only 1%
@@ -62,7 +62,7 @@ message Tracing {
   // events.
   bool verbose = 6;
 
-  // Maximum length of the request path to extract and include in the HttpUrl tag. Used to
+  // Maximum length of the request path to extract and include in the url tag. Used to
   // truncate lengthy request paths to meet the needs of a tracing backend.
   // Default: 256
   google.protobuf.UInt32Value max_path_tag_length = 7;
