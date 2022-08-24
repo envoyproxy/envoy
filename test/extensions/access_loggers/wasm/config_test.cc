@@ -2,6 +2,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/wasm/config.h"
 #include "source/extensions/access_loggers/wasm/wasm_access_log_impl.h"
@@ -16,24 +18,48 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::ReturnRef;
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-class TestFactoryContext : public NiceMock<Server::Configuration::MockServerFactoryContext> {
-public:
-  TestFactoryContext(Api::Api& api, Stats::Scope& scope) : api_(api), scope_(scope) {}
-  Api::Api& api() override { return api_; }
-  Stats::Scope& scope() override { return scope_; }
-
-private:
-  Api::Api& api_;
-  Stats::Scope& scope_;
-};
-
 class WasmAccessLogConfigTest
-    : public testing::TestWithParam<std::tuple<std::string, std::string>> {};
+    : public testing::TestWithParam<std::tuple<std::string, std::string>> {
+protected:
+  WasmAccessLogConfigTest() : api_(Api::createApiForTest(stats_store_)) {
+    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
+    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
+    ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
+    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  }
+
+  void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
+
+  void initializeForRemote() {
+    retry_timer_ = new Event::MockTimer();
+
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+      retry_timer_cb_ = timer_cb;
+      return retry_timer_;
+    }));
+  }
+
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
+  envoy::config::core::v3::Metadata listener_metadata_;
+  Init::ManagerImpl init_manager_{"init_manager"};
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  Init::ExpectableWatcherImpl init_watcher_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  Event::MockTimer* retry_timer_;
+  Event::TimerCb retry_timer_cb_;
+};
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
                          Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
@@ -49,11 +75,10 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
   ASSERT_NE(nullptr, message);
 
   AccessLog::FilterPtr filter;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   AccessLog::InstanceSharedPtr instance;
   EXPECT_THROW_WITH_MESSAGE(
-      instance = factory->createAccessLogInstance(*message, std::move(filter), context),
+      instance = factory->createAccessLogInstance(*message, std::move(filter), context_),
       Common::Wasm::WasmException, "Unable to create Wasm access log ");
 }
 
@@ -80,16 +105,13 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
 
   AccessLog::FilterPtr filter;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
-  TestFactoryContext context(*api, stats_store);
 
   AccessLog::InstanceSharedPtr instance =
-      factory->createAccessLogInstance(config, std::move(filter), context);
+      factory->createAccessLogInstance(config, std::move(filter), context_);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<WasmAccessLog*>(instance.get()));
   // Check if the custom stat namespace is registered during the initialization.
-  EXPECT_TRUE(api->customStatNamespaces().registered("wasmcustom"));
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -99,7 +121,162 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
 
   filter = std::make_unique<NiceMock<AccessLog::MockFilter>>();
   AccessLog::InstanceSharedPtr filter_instance =
-      factory->createAccessLogInstance(config, std::move(filter), context);
+      factory->createAccessLogInstance(config, std::move(filter), context_);
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+}
+
+TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
+          "envoy.access_loggers.wasm");
+  ASSERT_NE(factory, nullptr);
+
+  const std::string invalid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "invalid"
+  )EOF"));
+
+  envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
+  TestUtility::loadFromYaml(invalid_yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(factory->createAccessLogInstance(proto_config, nullptr, context_),
+                            Envoy::Extensions::Common::Wasm::WasmException,
+                            "Unable to create Wasm access log ");
+  const std::string valid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "valid"
+  )EOF"));
+  TestUtility::loadFromYaml(valid_yaml, proto_config);
+  AccessLog::InstanceSharedPtr filter_instance =
+      factory->createAccessLogInstance(proto_config, nullptr, context_);
+  StreamInfo::MockStreamInfo log_stream_info;
+  filter_instance = factory->createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+}
+
+TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"));
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  WasmAccessLogFactory factory;
+  envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            if (!async_callbacks) {
+              async_callbacks = &callbacks;
+            }
+            return &request;
+          }));
+  StreamInfo::MockStreamInfo log_stream_info;
+  AccessLog::InstanceSharedPtr filter_instance =
+      factory.createAccessLogInstance(proto_config, nullptr, context_);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+  EXPECT_CALL(init_watcher_, ready());
+  context_.initManager().initialize(init_watcher_);
+  auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
+  response->body().add(code);
+  async_callbacks->onSuccess(request, std::move(response));
+  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  filter_instance->log(nullptr, nullptr, nullptr, log_stream_info);
+}
+
+TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
+          "envoy.access_loggers.wasm");
+  ASSERT_NE(factory, nullptr);
+
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "valid"
+  )EOF"));
+
+  envoy::extensions::access_loggers::wasm::v3::WasmAccessLog proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  threadlocal.registered_ = true;
+  AccessLog::InstanceSharedPtr filter_instance =
+      factory->createAccessLogInstance(proto_config, nullptr, context_);
+  ASSERT_EQ(threadlocal.current_slot_, 1);
+
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  StreamInfo::MockStreamInfo log_stream_info;
+
+  filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
+  // Even if the thread local plugin handle returns nullptr, `log` should not raise error or
+  // exception.
+  threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
   filter_instance->log(&request_header, &response_header, &response_trailer, log_stream_info);
 }
 

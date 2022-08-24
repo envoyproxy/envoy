@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener_filter_buffer.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
@@ -271,20 +272,6 @@ public:
   virtual ConnectionSocket& socket() PURE;
 
   /**
-   * @return the Dispatcher for issuing events.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * If a filter stopped filter iteration by returning FilterStatus::StopIteration,
-   * the filter should call continueFilterChain(true) when complete to continue the filter chain,
-   * or continueFilterChain(false) if the filter execution failed and the connection must be
-   * closed.
-   * @param success boolean telling whether the filter execution was successful or not.
-   */
-  virtual void continueFilterChain(bool success) PURE;
-
-  /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value the struct to set on the namespace. A merge will be performed with new values for
@@ -325,11 +312,33 @@ public:
 
   /**
    * Called when a new connection is accepted, but before a Connection is created.
-   * Filter chain iteration can be stopped if needed.
+   * Filter chain iteration can be stopped if need more data from the connection
+   * by returning `FilterStatus::StopIteration`, or continue the filter chain iteration
+   * by returning `FilterStatus::ContinueIteration`. Reject the connection by closing
+   * the socket and returning `FilterStatus::StopIteration`.
    * @param cb the callbacks the filter instance can use to communicate with the filter chain.
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
+
+  /**
+   * Called when data is read from the connection. If the filter doesn't get
+   * enough data, filter chain iteration can be stopped if needed by returning
+   * `FilterStatus::StopIteration`. Or continue the filter chain iteration by returning
+   * `FilterStatus::ContinueIteration` if the filter get enough data. Reject the connection
+   * by closing the socket and returning `FilterStatus::StopIteration`.
+   * @param buffer the buffer of data.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
+
+  /**
+   * Return the size of data the filter want to inspect from the connection.
+   * The size can be increased after filter need to inspect more data.
+   * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not
+   * need any data.
+   */
+  virtual size_t maxReadBytes() const PURE;
 };
 
 using ListenerFilterPtr = std::unique_ptr<ListenerFilter>;
@@ -372,7 +381,7 @@ public:
    * @return const TransportSocketFactory& a transport socket factory to be used by the new
    * connection.
    */
-  virtual const TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual const DownstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return std::chrono::milliseconds the amount of time to wait for the transport socket to report
@@ -529,6 +538,18 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
+
+  const ConnectionInfoProvider& connectionInfoProvider() const {
+    return socket().connectionInfoProvider();
+  }
+
+  const Address::Instance& localAddress() const { return *connectionInfoProvider().localAddress(); }
+
+  const Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl() const { return connectionInfoProvider().sslConnection(); }
 };
 
 /**

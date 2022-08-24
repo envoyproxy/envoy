@@ -13,6 +13,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/common/linked_object.h"
+#include "source/common/network/listener_filter_buffer_impl.h"
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {
@@ -23,11 +24,12 @@ class ActiveStreamListenerBase;
 /**
  * Wrapper for an active accepted socket owned by the active tcp listener.
  */
-struct ActiveTcpSocket : public Network::ListenerFilterManager,
-                         public Network::ListenerFilterCallbacks,
-                         LinkedObject<ActiveTcpSocket>,
-                         public Event::DeferredDeletable,
-                         Logger::Loggable<Logger::Id::conn_handler> {
+class ActiveTcpSocket : public Network::ListenerFilterManager,
+                        public Network::ListenerFilterCallbacks,
+                        public LinkedObject<ActiveTcpSocket>,
+                        public Event::DeferredDeletable,
+                        Logger::Loggable<Logger::Id::conn_handler> {
+public:
   ActiveTcpSocket(ActiveStreamListenerBase& listener, Network::ConnectionSocketPtr&& socket,
                   bool hand_off_restored_destination_connections);
   ~ActiveTcpSocket() override;
@@ -48,6 +50,13 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
       }
       return listener_filter_->onAccept(cb);
     }
+
+    Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
+      return listener_filter_->onData(buffer);
+    }
+
+    size_t maxReadBytes() const override { return listener_filter_->maxReadBytes(); }
+
     /**
      * Check if this filter filter should be disabled on the incoming socket.
      * @param cb the callbacks the filter instance can use to communicate with the filter chain.
@@ -75,8 +84,9 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
-  Event::Dispatcher& dispatcher() override;
-  void continueFilterChain(bool success) override;
+
+  void startFilterChain() { continueFilterChain(true); }
+
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
     return stream_info_->dynamicMetadata();
@@ -84,8 +94,22 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
     return stream_info_->dynamicMetadata();
   };
-
   StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
+  StreamInfo::StreamInfo* streamInfo() const { return stream_info_.get(); }
+  bool connected() const { return connected_; }
+  bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
+
+private:
+  /**
+   * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
+   * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
+   * should be called if the filter returned `FilterStatus::StopIteration` and closed
+   * the socket.
+   * @param success boolean telling whether the filter execution was successful or not.
+   */
+  void continueFilterChain(bool success);
+
+  void createListenerFilterBuffer();
 
   // The owner of this ActiveTcpSocket.
   ActiveStreamListenerBase& listener_;
@@ -96,6 +120,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   Event::TimerPtr timer_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool connected_{false};
+
+  Network::ListenerFilterBufferImplPtr listener_filter_buffer_;
 };
 
 } // namespace Server

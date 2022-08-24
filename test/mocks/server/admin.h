@@ -23,10 +23,10 @@ public:
   // Server::Admin
   MOCK_METHOD(bool, addHandler,
               (const std::string& prefix, const std::string& help_text, HandlerCb callback,
-               bool removable, bool mutates_server_state));
+               bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
   MOCK_METHOD(bool, addStreamingHandler,
               (const std::string& prefix, const std::string& help_text, GenRequestFn callback,
-               bool removable, bool mutates_server_state));
+               bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
   MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
@@ -35,7 +35,7 @@ public:
                const std::string& address_out_path,
                Network::Address::InstanceConstSharedPtr address,
                const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopePtr&& listener_scope));
+               Stats::ScopeSharedPtr&& listener_scope));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
                Http::ResponseHeaderMap& response_headers, std::string& body));

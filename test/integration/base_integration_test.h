@@ -9,24 +9,37 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/common/thread.h"
-#include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration_tcp_client.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/types/optional.h"
-#include "spdlog/spdlog.h"
+
+#if defined(ENVOY_CONFIG_COVERAGE)
+#define DISABLE_UNDER_COVERAGE return
+#else
+#define DISABLE_UNDER_COVERAGE                                                                     \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifdef WIN32
+#define DISABLE_UNDER_WINDOWS return
+#else
+#define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
 
 namespace Envoy {
 
@@ -61,6 +74,9 @@ public:
   // Set up the fake upstream connections. This is called by initialize() and
   // is virtual to allow subclass overrides.
   virtual void createUpstreams();
+  // Create a single upstream, based on the supplied config.
+  void createUpstream(Network::Address::InstanceConstSharedPtr endpoint,
+                      FakeUpstreamConfig& config);
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
@@ -127,8 +143,10 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the nth access log entry, defaulting to log entry 0.
-  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false);
 
   std::string listener_access_log_name_;
 
@@ -338,13 +356,28 @@ public:
     return *fake_upstreams_.back();
   }
 
-  FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                                Http::CodecType type) {
+  // Adds a fake upstream to the integration test setup. If `autonomous_upstream` is true, then a
+  // AutonomousUpstream instance will be created instead of a FakeUpstream instance. If
+  // `autonomous_upstream` is true, then `autonomous_allow_incomplete_streams` determines whether
+  // an end-of-stream is required on connections between the Envoy and the fake upstream. If
+  // `autonomous_upstream` is false, then `autonomous_allow_incomplete_streams` is ignored.
+  FakeUpstream&
+  addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                  Http::CodecType type, bool autonomous_upstream,
+                  bool autonomous_allow_incomplete_streams = false) {
     auto config = configWithType(type);
-    fake_upstreams_.emplace_back(
-        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    if (autonomous_upstream) {
+      fake_upstreams_.emplace_back(
+          std::make_unique<AutonomousUpstream>(std::move(transport_socket_factory), 0, version_,
+                                               config, autonomous_allow_incomplete_streams));
+    } else {
+      fake_upstreams_.emplace_back(
+          std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    }
     return *fake_upstreams_.back();
   }
+
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
@@ -382,6 +415,8 @@ protected:
   void mergeOptions(envoy::config::listener::v3::QuicProtocolOptions& options) {
     upstream_config_.quic_options_.MergeFrom(options);
   }
+
+  void checkForMissingTagExtractionRules();
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
@@ -423,7 +458,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr
+  Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
@@ -463,6 +498,9 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
+
+  // If true, skip checking stats for missing tag-extraction rules.
+  bool skip_tag_extraction_rule_check_{};
 
 private:
   // Configuration for the fake upstream.

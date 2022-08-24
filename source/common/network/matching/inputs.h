@@ -5,6 +5,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
 
+#include "source/common/network/utility.h"
+
 namespace Envoy {
 namespace Network {
 namespace Matching {
@@ -32,7 +34,15 @@ private:
 template <class MatchingDataType>
 class DestinationIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.localAddress();
+
+    if (address.type() != Network::Address::Type::Ip) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            address.ip()->addressAsString()};
+  }
 };
 
 template <class MatchingDataType>
@@ -48,14 +58,17 @@ public:
                     MatchingDataType>("destination_ip") {}
 };
 
-class DestinationIPInputFactory : public DestinationIPInputBaseFactory<MatchingData> {};
-
-class UdpDestinationIPInputFactory : public DestinationIPInputBaseFactory<UdpMatchingData> {};
-
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.localAddress();
+    if (address.type() != Network::Address::Type::Ip) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            absl::StrCat(address.ip()->port())};
+  }
 };
 
 template <class MatchingDataType>
@@ -71,14 +84,17 @@ public:
                     MatchingDataType>("destination_port") {}
 };
 
-class DestinationPortInputFactory : public DestinationPortInputBaseFactory<MatchingData> {};
-
-class UdpDestinationPortInputFactory : public DestinationPortInputBaseFactory<UdpMatchingData> {};
-
 template <class MatchingDataType>
 class SourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.remoteAddress();
+    if (address.type() != Network::Address::Type::Ip) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            address.ip()->addressAsString()};
+  }
 };
 
 template <class MatchingDataType>
@@ -93,14 +109,17 @@ public:
                     MatchingDataType>("source_ip") {}
 };
 
-class SourceIPInputFactory : public SourceIPInputBaseFactory<MatchingData> {};
-
-class UdpSourceIPInputFactory : public SourceIPInputBaseFactory<UdpMatchingData> {};
-
 template <class MatchingDataType>
 class SourcePortInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingDataType& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.remoteAddress();
+    if (address.type() != Network::Address::Type::Ip) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            absl::StrCat(address.ip()->port())};
+  }
 };
 
 template <class MatchingDataType>
@@ -115,48 +134,80 @@ public:
                     MatchingDataType>("source_port") {}
 };
 
-class SourcePortInputFactory : public SourcePortInputBaseFactory<MatchingData> {};
-
-class UdpSourcePortInputFactory : public SourcePortInputBaseFactory<UdpMatchingData> {};
-
-class DirectSourceIPInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class DirectSourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto& address = data.connectionInfoProvider().directRemoteAddress();
+    if (address->type() != Network::Address::Type::Ip) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+            address->ip()->addressAsString()};
+  }
 };
 
-class DirectSourceIPInputFactory
+template <class MatchingDataType>
+class DirectSourceIPInputBaseFactory
     : public BaseFactory<
-          DirectSourceIPInput,
+          DirectSourceIPInput<MatchingDataType>,
           envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput,
-          MatchingData> {
+          MatchingDataType> {
 public:
-  DirectSourceIPInputFactory() : BaseFactory("direct_source_ip") {}
+  DirectSourceIPInputBaseFactory()
+      : BaseFactory<DirectSourceIPInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::DirectSourceIPInput,
+                    MatchingDataType>("direct_source_ip") {}
 };
 
-class SourceTypeInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const bool is_local_connection =
+        Network::Utility::isSameIpOrLoopback(data.connectionInfoProvider());
+    if (is_local_connection) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, "local"};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
 };
 
-class SourceTypeInputFactory
-    : public BaseFactory<SourceTypeInput,
+template <class MatchingDataType>
+class SourceTypeInputBaseFactory
+    : public BaseFactory<SourceTypeInput<MatchingDataType>,
                          envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
-                         MatchingData> {
+                         MatchingDataType> {
 public:
-  SourceTypeInputFactory() : BaseFactory("source_type") {}
+  SourceTypeInputBaseFactory()
+      : BaseFactory<SourceTypeInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
+                    MatchingDataType>("source_type") {}
 };
 
-class ServerNameInput : public Matcher::DataInput<MatchingData> {
+template <class MatchingDataType>
+class ServerNameInput : public Matcher::DataInput<MatchingDataType> {
 public:
-  Matcher::DataInputGetResult get(const MatchingData& data) const override;
+  Matcher::DataInputGetResult get(const MatchingDataType& data) const override {
+    const auto server_name = data.connectionInfoProvider().requestedServerName();
+    if (!server_name.empty()) {
+      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
+              std::string(server_name)};
+    }
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
+  }
 };
 
-class ServerNameInputFactory
-    : public BaseFactory<ServerNameInput,
+template <class MatchingDataType>
+class ServerNameInputBaseFactory
+    : public BaseFactory<ServerNameInput<MatchingDataType>,
                          envoy::extensions::matching::common_inputs::network::v3::ServerNameInput,
-                         MatchingData> {
+                         MatchingDataType> {
 public:
-  ServerNameInputFactory() : BaseFactory("server_name") {}
+  ServerNameInputBaseFactory()
+      : BaseFactory<ServerNameInput<MatchingDataType>,
+                    envoy::extensions::matching::common_inputs::network::v3::ServerNameInput,
+                    MatchingDataType>("server_name") {}
 };
 
 class TransportProtocolInput : public Matcher::DataInput<MatchingData> {

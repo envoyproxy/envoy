@@ -9,6 +9,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -148,6 +149,30 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
+                                         StreamInfo::StreamInfo& stream_info) override {
+    return header_validator_factory_.create(protocol, stream_info);
+  }
+
+  // Simple helper to wrapper filter to the factory function.
+  FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamDecoderFilter(filter);
+    };
+  }
+  FilterFactoryCb createEncoderFilterFactoryCb(StreamEncoderFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamEncoderFilter(filter);
+    };
+  }
+  FilterFactoryCb createStreamFilterFactoryCb(StreamFilterSharedPtr filter) {
+    return [filter](FilterChainFactoryCallbacks& callbacks) { callbacks.addStreamFilter(filter); };
+  }
+  FilterFactoryCb createLogHandlerFactoryCb(AccessLog::InstanceSharedPtr handler) {
+    return [handler](FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addAccessLogHandler(handler);
+    };
+  }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -230,6 +255,7 @@ public:
               KEEP_UNCHANGED};
   bool strip_trailing_host_dot_ = false;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
 };
 
 } // namespace Http

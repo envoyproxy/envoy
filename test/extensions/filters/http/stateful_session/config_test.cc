@@ -40,6 +40,10 @@ stateful_session:
     typed_config: {}
 )EOF";
 
+constexpr absl::string_view EmptyStatefulSessionRouteYaml = R"EOF(
+stateful_session: {}
+)EOF";
+
 TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   testing::NiceMock<Http::MockSessionStateFactoryConfig> config_factory;
   Registry::InjectFactory<Http::SessionStateFactoryConfig> registration(config_factory);
@@ -48,11 +52,15 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   PerRouteProtoConfig proto_route_config;
   PerRouteProtoConfig disabled_config;
   PerRouteProtoConfig not_exist_config;
+  ProtoConfig empty_proto_config;
+  PerRouteProtoConfig empty_proto_route_config;
 
   TestUtility::loadFromYamlAndValidate(std::string(ConfigYaml), proto_config);
   TestUtility::loadFromYamlAndValidate(std::string(RouteConfigYaml), proto_route_config);
   TestUtility::loadFromYamlAndValidate(std::string(DisableYaml), disabled_config);
   TestUtility::loadFromYamlAndValidate(std::string(NotExistYaml), not_exist_config);
+  TestUtility::loadFromYamlAndValidate(std::string(EmptyStatefulSessionRouteYaml),
+                                       empty_proto_route_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -72,6 +80,10 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
                                               context.messageValidationVisitor()),
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
+
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context));
+  EXPECT_NO_THROW(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
+                                                          context.messageValidationVisitor()));
 }
 
 } // namespace

@@ -38,7 +38,9 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
-  callbacks_.dispatcher_.delete_immediately_ = true;
+
+  EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
+      .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
@@ -227,7 +229,8 @@ void RouterTestBase::enableRedirects(uint32_t max_internal_redirects) {
       .WillByDefault(Return(max_internal_redirects));
   ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, isCrossSchemeRedirectAllowed())
       .WillByDefault(Return(false));
-  ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
 }
 
 void RouterTestBase::setNumPreviousRedirect(uint32_t num_previous_redirects) {

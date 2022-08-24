@@ -18,6 +18,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -1561,12 +1562,16 @@ protected:
 };
 
 TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
-
-  auto client_conn = dispatcher_->createClientConnection(
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10911),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
-  EXPECT_NE(nullptr, client_conn);
-  client_conn->close(Network::ConnectionCloseType::NoFlush);
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    SCOPED_TRACE(Network::Test::addressVersionAsString(ip_version));
+    auto client_addr_port = Network::Utility::parseInternetAddressAndPort(
+        fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), 10911));
+    auto client_conn = dispatcher_->createClientConnection(
+        client_addr_port, Network::Address::InstanceConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
+    EXPECT_NE(nullptr, client_conn);
+    client_conn->close(Network::ConnectionCloseType::NoFlush);
+  }
 }
 
 // If the internal connection factory is not linked, envoy will be dead when creating connection to
@@ -1576,7 +1581,7 @@ TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExis
       dispatcher_->createClientConnection(
           std::make_shared<Network::Address::EnvoyInternalInstance>("listener_internal_address"),
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
-          nullptr),
+          nullptr, nullptr),
       "");
 }
 

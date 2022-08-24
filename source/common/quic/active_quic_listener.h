@@ -13,6 +13,8 @@
 #include "source/server/active_udp_listener.h"
 #include "source/server/connection_handler_impl.h"
 
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+
 #if defined(__linux__)
 #include <linux/filter.h>
 #endif
@@ -30,17 +32,7 @@ public:
 
   ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
                      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
-                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
-                     bool kernel_worker_routing,
-                     const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-                     QuicStatNames& quic_stat_names,
-                     uint32_t packets_to_read_to_connection_count_ratio,
-                     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
-                     EnvoyQuicProofSourceFactoryInterface& proof_source_factory);
-
-  ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
-                     Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
-                     Network::SocketSharedPtr listen_socket,
+                     Network::SocketSharedPtr&& listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
@@ -94,6 +86,7 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
@@ -108,8 +101,9 @@ public:
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
   createActiveUdpListener(Runtime::Loader& runtime, uint32_t worker_index,
-                          Network::UdpConnectionHandler& parent, Event::Dispatcher& disptacher,
-                          Network::ListenerConfig& config) override;
+                          Network::UdpConnectionHandler& parent,
+                          Network::SocketSharedPtr&& listen_socket_ptr,
+                          Event::Dispatcher& disptacher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
 

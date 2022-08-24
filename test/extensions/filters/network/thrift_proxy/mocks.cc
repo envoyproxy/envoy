@@ -92,13 +92,97 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 
-MockFilterConfigFactory::MockFilterConfigFactory() : name_("envoy.filters.thrift.mock_filter") {
+MockEncoderFilter::MockEncoderFilter() {
+  ON_CALL(*this, transportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, transportEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, messageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, messageEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, structBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, structEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, fieldBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, fieldEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, boolValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, byteValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int16Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int32Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, int64Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, doubleValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, stringValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, mapBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, mapEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, listBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, listEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setEnd()).WillByDefault(Return(FilterStatus::Continue));
+}
+MockEncoderFilter::~MockEncoderFilter() = default;
+
+MockEncoderFilterCallbacks::MockEncoderFilterCallbacks() {
+  route_ = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
+  ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(*this, route()).WillByDefault(Return(route_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+}
+MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
+
+MockBidirectionalFilter::MockBidirectionalFilter() {
+  ON_CALL(*this, decodeTransportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeTransportEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeMessageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeMessageEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeStructBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeStructEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeFieldBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeFieldEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeBoolValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeByteValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeInt16Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeInt32Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeInt64Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeDoubleValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeStringValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeMapBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeMapEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeListBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeListEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeSetBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, decodeSetEnd()).WillByDefault(Return(FilterStatus::Continue));
+
+  ON_CALL(*this, encodeTransportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeTransportEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeMessageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeMessageEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeStructBegin(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeStructEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeFieldBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeFieldEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeBoolValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeByteValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeInt16Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeInt32Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeInt64Value(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeDoubleValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeStringValue(_)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeMapBegin(_, _, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeMapEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeListBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeListEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeSetBegin(_, _)).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, encodeSetEnd()).WillByDefault(Return(FilterStatus::Continue));
+}
+MockBidirectionalFilter::~MockBidirectionalFilter() = default;
+
+// MockDecoderFilterConfigFactory
+MockDecoderFilterConfigFactory::MockDecoderFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_decoder_filter") {
   mock_filter_ = std::make_shared<NiceMock<MockDecoderFilter>>();
 }
 
-MockFilterConfigFactory::~MockFilterConfigFactory() = default;
+MockDecoderFilterConfigFactory::~MockDecoderFilterConfigFactory() = default;
 
-FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProto(
+FilterFactoryCb MockDecoderFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
@@ -108,6 +192,46 @@ FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProto(
 
   return [this](FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(mock_filter_);
+  };
+}
+
+MockEncoderFilterConfigFactory::MockEncoderFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_encoder_filter") {
+  mock_filter_ = std::make_shared<NiceMock<MockEncoderFilter>>();
+}
+
+MockEncoderFilterConfigFactory::~MockEncoderFilterConfigFactory() = default;
+
+FilterFactoryCb MockEncoderFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& proto_config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
+  UNREFERENCED_PARAMETER(context);
+
+  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_stat_prefix_ = stats_prefix;
+
+  return [this](FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addEncoderFilter(mock_filter_);
+  };
+}
+
+MockBidirectionalFilterConfigFactory::MockBidirectionalFilterConfigFactory()
+    : name_("envoy.filters.thrift.mock_bidirectional_filter") {
+  mock_filter_ = std::make_shared<NiceMock<MockBidirectionalFilter>>();
+}
+
+MockBidirectionalFilterConfigFactory::~MockBidirectionalFilterConfigFactory() = default;
+
+FilterFactoryCb MockBidirectionalFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& proto_config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
+  UNREFERENCED_PARAMETER(context);
+
+  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_stat_prefix_ = stats_prefix;
+
+  return [this](FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addBidirectionalFilter(mock_filter_);
   };
 }
 

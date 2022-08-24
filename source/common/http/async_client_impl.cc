@@ -25,6 +25,8 @@ const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
+const AsyncStreamImpl::NullPathMatchCriterion
+    AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
     AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
@@ -241,7 +243,7 @@ void AsyncStreamImpl::cleanup() {
   }
 }
 
-void AsyncStreamImpl::resetStream() {
+void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
   stream_callbacks_.onReset();
   cleanup();
 }
@@ -268,7 +270,7 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
 }
 
 void AsyncRequestImpl::initialize() {
-  child_span_->injectContext(request_->headers());
+  child_span_->injectContext(request_->headers(), nullptr);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in

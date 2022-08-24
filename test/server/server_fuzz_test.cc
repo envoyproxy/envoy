@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/core/v3/address.pb.h"
 
 #include "source/common/common/random_generator.h"
@@ -103,9 +103,30 @@ bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input
   return true;
 }
 
+bool validateUpstreamConfig(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  for (auto const& cluster : input.static_resources().clusters()) {
+    if (Envoy::Config::Utility::getFactory<Envoy::Router::GenericConnPoolFactory>(
+            cluster.upstream_config()) == nullptr) {
+      ENVOY_LOG_MISC(debug, "upstream_config: typed config {} invalid",
+                     cluster.upstream_config().DebugString());
+      return false;
+    }
+  }
+  return true;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+    return;
+  }
 
   if (!validateLbSubsetConfig(input)) {
+    return;
+  }
+  if (!validateUpstreamConfig(input)) {
     return;
   }
 
@@ -140,6 +161,10 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
     return;
   }
+  // Ensure the event loop gets at least one event to end the test.
+  auto end_timer =
+      server->dispatcher().createTimer([]() { ENVOY_LOG_MISC(trace, "server timer fired"); });
+  end_timer->enableTimer(std::chrono::milliseconds(5000));
   // If we were successful, run any pending events on the main thread's dispatcher loop. These might
   // be, for example, pending DNS resolution callbacks. If they generate exceptions, we want to
   // explode and fail the test, hence we do this outside of the try-catch above.

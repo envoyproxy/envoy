@@ -31,7 +31,7 @@
 
 namespace Envoy {
 
-std::string ConfigHelper::baseConfig() {
+std::string ConfigHelper::baseConfigNoListeners() {
   return fmt::format(R"EOF(
 admin:
   access_log:
@@ -69,18 +69,39 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                     Platform::null_device_path, Platform::null_device_path);
+}
+
+std::string ConfigHelper::baseConfig(bool multiple_addresses) {
+  if (multiple_addresses) {
+    return absl::StrCat(baseConfigNoListeners(), R"EOF(
   listeners:
   - name: listener_0
     address:
       socket_address:
         address: 127.0.0.1
         port_value: 0
-)EOF",
-                     Platform::null_device_path, Platform::null_device_path);
+    additional_addresses:
+    - address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+)EOF");
+  }
+  return absl::StrCat(baseConfigNoListeners(), R"EOF(
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+)EOF");
 }
 
-std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address) {
-  return fmt::format(R"EOF(
+std::string ConfigHelper::baseUdpListenerConfig(std::string listen_address,
+                                                bool multiple_addresses) {
+  std::string config = fmt::format(R"EOF(
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -103,6 +124,28 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+                                   Platform::null_device_path);
+
+  if (multiple_addresses) {
+    return absl::StrCat(config, fmt::format(R"EOF(
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: {}
+        port_value: 0
+        protocol: udp
+    additional_addresses:
+    - address:
+        socket_address:
+          address: {}
+          port_value: 0
+          protocol: udp
+)EOF",
+                                            listen_address, listen_address));
+  }
+  return absl::StrCat(config, fmt::format(R"EOF(
   listeners:
     name: listener_0
     address:
@@ -111,7 +154,7 @@ static_resources:
         port_value: 0
         protocol: udp
 )EOF",
-                     Platform::null_device_path, listen_address);
+                                          listen_address));
 }
 
 std::string ConfigHelper::tcpProxyConfig() {
@@ -121,7 +164,7 @@ std::string ConfigHelper::tcpProxyConfig() {
         name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
+          stat_prefix: tcpproxy_stats
           cluster: cluster_0
 )EOF");
 }
@@ -172,11 +215,11 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
+std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic, bool multiple_addresses) {
   if (downstream_use_quic) {
-    return quicHttpProxyConfig();
+    return quicHttpProxyConfig(multiple_addresses);
   }
-  return absl::StrCat(baseConfig(), fmt::format(R"EOF(
+  return absl::StrCat(baseConfig(multiple_addresses), fmt::format(R"EOF(
     filter_chains:
       filters:
         name: http
@@ -208,14 +251,15 @@ std::string ConfigHelper::httpProxyConfig(bool downstream_use_quic) {
               domains: "*"
             name: route_config_0
 )EOF",
-                                                Platform::null_device_path));
+                                                                  Platform::null_device_path));
 }
 
 // TODO(danzh): For better compatibility with HTTP integration test framework,
 // it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
 // specify quic specific things.
-std::string ConfigHelper::quicHttpProxyConfig() {
-  return absl::StrCat(baseUdpListenerConfig("127.0.0.1"), fmt::format(R"EOF(
+std::string ConfigHelper::quicHttpProxyConfig(bool multiple_addresses) {
+  return absl::StrCat(baseUdpListenerConfig("127.0.0.1", multiple_addresses),
+                      fmt::format(R"EOF(
     filter_chains:
       transport_socket:
         name: envoy.transport_sockets.quic
@@ -251,7 +295,7 @@ std::string ConfigHelper::quicHttpProxyConfig() {
     udp_listener_config:
       quic_options: {{}}
 )EOF",
-                                                                      Platform::null_device_path));
+                                  Platform::null_device_path));
 }
 
 std::string ConfigHelper::defaultBufferFilter() {
@@ -698,6 +742,16 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
     } else {
       listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
     }
+
+    for (int i = 0; i < listener->additional_addresses_size(); i++) {
+      auto* listener_socket_addr =
+          listener->mutable_additional_addresses(i)->mutable_address()->mutable_socket_address();
+      if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
+        listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+      } else {
+        listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+      }
+    }
   }
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
@@ -876,6 +930,7 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    ASSERT(!old_options.has_auto_config());
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
   }
@@ -1112,20 +1167,44 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& v
 
 void ConfigHelper::addFilter(const std::string& config) { prependFilter(config); }
 
-void ConfigHelper::prependFilter(const std::string& config) {
+void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      hcm_config;
-  loadHttpConnectionManager(hcm_config);
+  if (downstream) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
 
-  auto* filter_list_back = hcm_config.add_http_filters();
-  TestUtility::loadFromYaml(config, *filter_list_back);
+    auto* filter_list_back = hcm_config.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
 
-  // Now move it to the front.
-  for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
-    hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    // Now move it to the front.
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    storeHttpConnectionManager(hcm_config);
+    return;
   }
-  storeHttpConnectionManager(hcm_config);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+
+    HttpProtocolOptions old_protocol_options;
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    auto* filter_list_back = old_protocol_options.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
+    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(old_protocol_options);
+  }
 }
 
 void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
@@ -1524,7 +1603,7 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   uint64_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(*route, timeout, 15000u);
   auto* timeout = route->mutable_timeout();
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
-  // upstream_response_timeout.
+  // response_timeout.
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
 }
 

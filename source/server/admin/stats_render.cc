@@ -1,18 +1,24 @@
 #include "source/server/admin/stats_render.h"
 
-#include "source/common/html/utility.h"
+#include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
 namespace {
-// This value found by iterating in stats_handler_speed_test.cc, maximizing the
-// performance of the Json tests, and then rounding to a power of 2.
-constexpr uint64_t JsonStatsFlushCount = 64;
+constexpr absl::string_view JsonNameTag = "{\"name\":\"";
+constexpr absl::string_view JsonValueTag = "\",\"value\":";
+constexpr absl::string_view JsonValueTagQuote = "\",\"value\":\"";
+constexpr absl::string_view JsonCloseBrace = "}";
+constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
 } // namespace
+
 namespace Envoy {
 
 using ProtoMap = Protobuf::Map<std::string, ProtobufWkt::Value>;
 
 namespace Server {
+
+StatsTextRender::StatsTextRender(const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {}
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
@@ -21,7 +27,7 @@ void StatsTextRender::generate(Buffer::Instance& response, const std::string& na
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  response.addFragments({name, ": \"", Html::Utility::sanitize(value), "\"\n"});
+  response.addFragments({name, ": \"", value, "\"\n"});
 }
 
 void StatsTextRender::generate(Buffer::Instance& response, const std::string& name,
@@ -79,9 +85,8 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
 }
 
 StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
-                                 Buffer::Instance& response,
-                                 Utility::HistogramBucketsMode histogram_buckets_mode)
-    : histogram_buckets_mode_(histogram_buckets_mode) {
+                                 Buffer::Instance& response, const StatsParams& params)
+    : histogram_buckets_mode_(params.histogram_buckets_mode_) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   // We don't create a JSON data model for the entire stats output, as that
   // makes streaming difficult. Instead we emit the preamble in the
@@ -94,14 +99,18 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                uint64_t value) {
-  addScalar(response, name, ValueUtil::numberValue(value));
+  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTag,
+                         std::to_string(value), JsonCloseBrace});
+  delim_ = ",";
 }
 
 // Buffers a JSON fragment for a text-readout stat, flushing to the response
 // buffer once we exceed JsonStatsFlushCount stats.
 void StatsJsonRender::generate(Buffer::Instance& response, const std::string& name,
                                const std::string& value) {
-  addScalar(response, name, ValueUtil::stringValue(value));
+  response.addFragments({delim_, JsonNameTag, Json::sanitize(name_buffer_, name), JsonValueTagQuote,
+                         Json::sanitize(value_buffer_, value), JsonQuoteCloseBrace});
+  delim_ = ",";
 }
 
 // In JSON we buffer all histograms and don't write them immediately, so we
@@ -142,9 +151,6 @@ void StatsJsonRender::generate(Buffer::Instance&, const std::string& name,
 // Since histograms are buffered (see above), the finalize() method generates
 // all of them.
 void StatsJsonRender::finalize(Buffer::Instance& response) {
-  if (!stats_array_.empty()) {
-    flushStats(response);
-  }
   if (histogram_array_->values_size() > 0) {
     ProtoMap& histograms_obj_container_fields = *histograms_obj_container_.mutable_fields();
     if (found_used_histogram_) {
@@ -165,69 +171,10 @@ void StatsJsonRender::finalize(Buffer::Instance& response) {
     // untrappable error message to stdout) if it receives an invalid input, so
     // we exclude that here.
     if (!str.empty()) {
-      addStatAsRenderedJson(response, str);
+      response.addFragments({delim_, str});
     }
   }
   response.add("]}");
-}
-
-// Collects a scalar metric (text-readout, counter, or gauge) into an array of
-// stats, so they can all be serialized in one shot when a threshold is
-// reached. Serializing each one individually results in much worse
-// performance (see stats_handler_speed_test.cc).
-template <class Value>
-void StatsJsonRender::addScalar(Buffer::Instance& response, const std::string& name,
-                                const Value& value) {
-  ProtobufWkt::Struct stat_obj;
-  ProtoMap& stat_obj_fields = *stat_obj.mutable_fields();
-  stat_obj_fields["name"] = ValueUtil::stringValue(name);
-  stat_obj_fields["value"] = value;
-  addJson(response, ValueUtil::structValue(stat_obj));
-}
-
-// Adds a JSON stat to our buffer, flushing to response every JsonStatsFlushCount stats.
-void StatsJsonRender::addJson(Buffer::Instance& response, const ProtobufWkt::Value& json) {
-  stats_array_.push_back(json);
-
-  // We build up stats_array to a certain size so we can amortize the overhead
-  // of entering into the JSON serialization infrastructure. If we set the
-  // threshold too high we buffer too much memory, likely impacting processor
-  // cache. The optimum threshold found after a few experiments on a local
-  // host appears to be between 50 and 100.
-  if (stats_array_.size() >= JsonStatsFlushCount) {
-    flushStats(response);
-  }
-}
-
-// Flushes all stats that were buffered in addJson() above.
-void StatsJsonRender::flushStats(Buffer::Instance& response) {
-  ASSERT(!stats_array_.empty());
-  // TODO(jmarantz): when #20428 lands we can serialize the scalar stat
-  // values without using the slow protobuf serializer.
-  const std::string json_array = MessageUtil::getJsonStringFromMessageOrDie(
-      ValueUtil::listValue(stats_array_), false /* pretty */, true);
-  stats_array_.clear();
-
-  // We are going to wind up with multiple flushes which have to serialize as
-  // a single array, rather than a concatenation of multiple arrays, so we add
-  // those in the constructor and finalize() method, strip off the "[" and "]"
-  // from each buffered serialization.
-  ASSERT(json_array.size() >= 3);
-  ASSERT(json_array[0] == '[');
-  ASSERT(json_array[json_array.size() - 1] == ']');
-  addStatAsRenderedJson(response, absl::string_view(json_array).substr(1, json_array.size() - 2));
-}
-
-// Adds a json fragment of scalar stats to the response buffer, including a
-// "," delimiter if this is not the first fragment.
-void StatsJsonRender::addStatAsRenderedJson(Buffer::Instance& response, absl::string_view json) {
-  ASSERT(!json.empty());
-  if (first_) {
-    response.add(json);
-    first_ = false;
-  } else {
-    response.addFragments({",", json});
-  }
 }
 
 // Summarizes the buckets in the specified histogram, collecting JSON objects.

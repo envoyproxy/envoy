@@ -2,6 +2,7 @@
 
 #include "envoy/server/admin.h"
 
+#include "source/server/admin/stats_params.h"
 #include "source/server/admin/stats_render.h"
 #include "source/server/admin/utils.h"
 
@@ -34,9 +35,12 @@ class StatsRequest : public Admin::Request {
   };
 
 public:
-  StatsRequest(Stats::Store& stats, bool used_only, bool json,
-               Utility::HistogramBucketsMode histogram_buckets_mode,
-               absl::optional<std::regex> regex);
+  using UrlHandlerFn = std::function<Admin::UrlHandler()>;
+
+  static constexpr uint64_t DefaultChunkSize = 2 * 1000 * 1000;
+
+  StatsRequest(Stats::Store& stats, const StatsParams& params,
+               UrlHandlerFn url_handler_fn = nullptr);
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
@@ -97,20 +101,17 @@ public:
   void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
 
 private:
-  const bool used_only_;
-  const bool json_;
-  const Utility::HistogramBucketsMode histogram_buckets_mode_;
-  absl::optional<std::regex> regex_;
-  absl::optional<std::string> format_value_;
-
+  StatsParams params_;
   std::unique_ptr<StatsRender> render_;
-
   Stats::Store& stats_;
   ScopeVec scopes_;
   absl::btree_map<std::string, StatOrScopes> stat_map_;
   Phase phase_{Phase::TextReadouts};
+  uint64_t phase_stat_count_{0};
+  absl::string_view phase_string_{"text readouts"};
   Buffer::OwnedImpl response_;
-  uint64_t chunk_size_{2 * 1000 * 1000};
+  UrlHandlerFn url_handler_fn_;
+  uint64_t chunk_size_{DefaultChunkSize};
 };
 
 } // namespace Server

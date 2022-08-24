@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
@@ -42,43 +44,72 @@ public:
     return nullptr;
   }
 
+  std::pair<Http::RequestEncoder*, IntegrationStreamDecoderPtr>
+  startRequest(const Http::TestRequestHeaderMapImpl& request_headers,
+               const std::vector<std::string>& request_body_chunks,
+               const Http::TestRequestTrailerMapImpl* request_trailers,
+               IntegrationCodecClient* codec_client) {
+    if (!request_trailers && request_body_chunks.empty()) {
+      // Headers only request - no encoder needed as no data
+      return {nullptr, codec_client->makeHeaderOnlyRequest(request_headers)};
+    }
+
+    auto encoder_decoder = codec_client->startRequest(request_headers);
+    return {&encoder_decoder.first, std::move(encoder_decoder.second)};
+  }
+
+  void encodeRequest(const std::vector<std::string>& request_body_chunks,
+                     const Http::TestRequestTrailerMapImpl* request_trailers,
+                     Http::RequestEncoder* encoder) {
+    if (!encoder || (!request_trailers && request_body_chunks.empty())) {
+      return;
+    }
+
+    // Encode each chunk of body data
+    for (size_t i = 0; i < request_body_chunks.size(); i++) {
+      Buffer::OwnedImpl data(request_body_chunks[i]);
+      bool endStream = i == (request_body_chunks.size() - 1) && !request_trailers;
+      encoder->encodeData(data, endStream);
+    }
+
+    // Encode trailers if they exist
+    if (request_trailers) {
+      encoder->encodeTrailers(*request_trailers);
+    }
+  }
+
+  void encodeResponse(const Http::TestResponseHeaderMapImpl& response_headers,
+                      const std::vector<std::string>& response_body_chunks,
+                      const Http::TestResponseTrailerMapImpl* response_trailers,
+                      FakeStream* upstream_request, IntegrationStreamDecoderPtr& decoder) {
+    upstream_request->encodeHeaders(response_headers,
+                                    !response_trailers && response_body_chunks.empty());
+
+    for (size_t i = 0; i < response_body_chunks.size(); i++) {
+      Buffer::OwnedImpl data(response_body_chunks[i]);
+      bool endStream = i == (response_body_chunks.size() - 1) && !response_trailers;
+      upstream_request->encodeData(data, endStream);
+    }
+
+    if (response_trailers) {
+      upstream_request->encodeTrailers(*response_trailers);
+    }
+
+    ASSERT_TRUE(decoder->waitForEndStream());
+  }
+
   void makeRequest(const Http::TestRequestHeaderMapImpl& request_headers,
                    const std::vector<std::string>& request_body_chunks,
                    const Http::TestRequestTrailerMapImpl* request_trailers,
                    const Http::TestResponseHeaderMapImpl& response_headers,
                    const std::vector<std::string>& response_body_chunks,
                    const Http::TestResponseTrailerMapImpl* response_trailers) {
-    IntegrationStreamDecoderPtr decoder;
-    if (request_trailers == nullptr && request_body_chunks.empty()) {
-      decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
-    } else {
-      auto result = codec_client_->startRequest(request_headers);
-      decoder = std::move(result.second);
-
-      for (uint64_t index = 0; index < request_body_chunks.size(); index++) {
-        Buffer::OwnedImpl data(request_body_chunks[index]);
-        result.first.encodeData(data, index == request_body_chunks.size() - 1 &&
-                                          request_trailers == nullptr);
-      }
-      if (request_trailers != nullptr) {
-        result.first.encodeTrailers(*request_trailers);
-      }
-    }
-
+    auto [encoder, decoder] =
+        startRequest(request_headers, request_body_chunks, request_trailers, codec_client_.get());
+    encodeRequest(request_body_chunks, request_trailers, encoder);
     waitForNextUpstreamRequest();
-
-    upstream_request_->encodeHeaders(response_headers,
-                                     response_trailers == nullptr && response_body_chunks.empty());
-    for (uint64_t index = 0; index < response_body_chunks.size(); index++) {
-      Buffer::OwnedImpl data(response_body_chunks[index]);
-      upstream_request_->encodeData(data, index == response_body_chunks.size() - 1 &&
-                                              response_trailers == nullptr);
-    }
-    if (response_trailers != nullptr) {
-      upstream_request_->encodeTrailers(*response_trailers);
-    }
-
-    ASSERT_TRUE(decoder->waitForEndStream());
+    encodeResponse(response_headers, response_body_chunks, response_trailers,
+                   upstream_request_.get(), decoder);
   }
 
   void startAdminRequest(const std::string& admin_request_yaml) {
@@ -117,6 +148,30 @@ public:
     envoy::data::tap::v3::TraceWrapper trace;
     TestUtility::loadFromFile(*pb_file, trace, *api_);
     EXPECT_TRUE(trace.has_http_buffered_trace());
+  }
+
+  /**
+   * parseLengthDelimited parses a PROTO_BINARY_LENGTH_DELIMITED format admin response body
+   * containing consecutive messages of type T into a vector of messages of type T.
+   */
+  template <typename T>
+  void parseLengthDelimited(IntegrationStreamDecoder* admin_response, std::vector<T>& messages) {
+    const uint8_t* body_data = reinterpret_cast<const uint8_t*>(admin_response->body().data());
+    uint64_t body_size = admin_response->body().size();
+    Protobuf::io::CodedInputStream coded_stream(body_data, body_size);
+
+    while (true) {
+      uint64_t message_size;
+      if (!coded_stream.ReadVarint64(&message_size)) {
+        break;
+      }
+
+      messages.emplace_back();
+
+      auto limit = coded_stream.PushLimit(message_size);
+      EXPECT_TRUE(messages.back().ParseFromCodedStream(&coded_stream));
+      coded_stream.PopLimit(limit);
+    }
   }
 
   const Http::TestRequestHeaderMapImpl request_headers_tap_{{":method", "GET"},
@@ -386,7 +441,449 @@ tap_config:
             findHeader("foo_trailer", trace.http_buffered_trace().request().trailers())->value());
   EXPECT_EQ("baz",
             findHeader("bar_trailer", trace.http_buffered_trace().response().trailers())->value());
+  admin_client_->close();
+}
 
+// Verify the content and ordering of buffered tap traces
+TEST_P(TapIntegrationTest, AdminBufferedTapContent) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  const int num_req = 4; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+  for (int i = 0; i < num_req; i++) {
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_req);
+
+  for (size_t i = 0; i < traces.size(); i++) {
+    const auto& trace = traces[i].http_buffered_trace();
+    EXPECT_FALSE(trace.request().body().truncated());
+    EXPECT_FALSE(trace.response().body().truncated());
+    EXPECT_EQ(std::to_string(i) + "request", std::string(trace.request().body().as_bytes()));
+    EXPECT_EQ(std::to_string(i) + "response", std::string(trace.response().body().as_bytes()));
+  }
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify handling of concurrent requests once tap is listening
+TEST_P(TapIntegrationTest, AdminBufferedTapConcurrent) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  const int num_streams = 4;
+
+  initializeFilter(admin_filter_config_);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_streams));
+
+  FakeStreamPtr upstream_reqs[num_streams];
+  IntegrationStreamDecoderPtr decoders[num_streams];
+  Http::RequestEncoder* encoders[num_streams];
+
+  for (int i = 0; i < num_streams; i++) {
+    auto [encoder, decoder] =
+        startRequest(request_headers_no_tap_, {{std::to_string(i)}}, nullptr, codec_client_.get());
+    encoders[i] = encoder;
+    decoders[i] = std::move(decoder);
+  }
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  for (int i = 0; i < num_streams; i++) {
+    encodeRequest({{std::to_string(i)}}, nullptr, encoders[i]);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_reqs[i]));
+
+    // Wait for the request to be fully sent
+    auto result = upstream_reqs[i]->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  for (int i = 0; i < num_streams; i++) {
+    encodeResponse(response_headers_no_tap_, {{std::to_string(i)}}, nullptr, upstream_reqs[i].get(),
+                   decoders[i]);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_streams);
+
+  bool received[num_streams]{false};
+  for (const auto& traceproto : traces) {
+    const auto& trace = traceproto.http_buffered_trace();
+    int response_idx = std::stoi(std::string(trace.response().body().as_bytes()));
+    int request_idx = std::stoi(std::string(trace.request().body().as_bytes()));
+
+    EXPECT_EQ(response_idx, request_idx);
+    EXPECT_LT(response_idx, num_streams);
+    EXPECT_GE(response_idx, 0);
+    EXPECT_FALSE(received[response_idx]);
+    received[response_idx] = true; // record the trace number we received
+  }
+
+  for (bool el : received) {
+    EXPECT_TRUE(el);
+  }
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify handling of timeout expiry
+TEST_P(TapIntegrationTest, AdminBufferedTapTimeout) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  const int num_req = 4;    // # of requests to buffer before responding
+  const int timeout = 1000; // milliseconds
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+          timeout: {}s
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req, static_cast<double>(timeout) / 1000));
+
+  for (int i = 0; i < num_req; i++) {
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+    timeSystem().advanceTimeWaitImpl(
+        std::chrono::milliseconds(timeout * 2)); // force the timeout to expire
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered at most one trace
+  EXPECT_LE(traces.size(), 1);
+
+  // check data in buffer is the first data sent
+  const auto& trace = traces[0].http_buffered_trace();
+  EXPECT_FALSE(trace.request().body().truncated());
+  EXPECT_FALSE(trace.response().body().truncated());
+  EXPECT_EQ("0request", std::string(trace.request().body().as_bytes()));
+  EXPECT_EQ("0response", std::string(trace.response().body().as_bytes()));
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify filling the buffer before the timeout expires
+TEST_P(TapIntegrationTest, AdminBufferedTapLongTimeout) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  using namespace std::chrono_literals;
+  const int num_req = 4; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          timeout: 60s
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+  // Make num_req tapped requests
+  for (size_t i = 0; i < num_req; i++) {
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_req);
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify that consecutive tap requests use fresh buffers
+TEST_P(TapIntegrationTest, AdminBufferedTapConsecutive) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  const int num_req = 1; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  {
+    startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+    for (int i = 0; i < num_req; i++) {
+      makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                  response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+    }
+
+    auto result = admin_response_->waitForEndStream();
+    RELEASE_ASSERT(result, result.message());
+
+    std::vector<TraceWrapper> traces;
+    parseLengthDelimited(admin_response_.get(), traces);
+
+    // Assert we buffered num_req traces as required
+    EXPECT_EQ(traces.size(), num_req);
+
+    for (size_t i = 0; i < traces.size(); i++) {
+      const auto& trace = traces[i].http_buffered_trace();
+      EXPECT_FALSE(trace.request().body().truncated());
+      EXPECT_FALSE(trace.response().body().truncated());
+      EXPECT_EQ(std::to_string(i) + "request", std::string(trace.request().body().as_bytes()));
+      EXPECT_EQ(std::to_string(i) + "response", std::string(trace.response().body().as_bytes()));
+    }
+
+    admin_response_->clearBody();
+    admin_client_->close();
+  }
+  {
+    startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+    for (int i = 0; i < num_req; i++) {
+      makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request2"}}, nullptr,
+                  response_headers_no_tap_, {{std::to_string(i) + "response2"}}, nullptr);
+    }
+
+    auto result = admin_response_->waitForEndStream();
+    RELEASE_ASSERT(result, result.message());
+    std::vector<TraceWrapper> traces;
+    parseLengthDelimited(admin_response_.get(), traces);
+
+    // Assert we buffered num_req traces as required
+    EXPECT_EQ(traces.size(), num_req);
+
+    for (size_t i = 0; i < traces.size(); i++) {
+      const auto& trace = traces[i].http_buffered_trace();
+      EXPECT_FALSE(trace.request().body().truncated());
+      EXPECT_FALSE(trace.response().body().truncated());
+      EXPECT_EQ(std::to_string(i) + "request2", std::string(trace.request().body().as_bytes()));
+      EXPECT_EQ(std::to_string(i) + "response2", std::string(trace.response().body().as_bytes()));
+    }
+
+    admin_response_->clearBody();
+    admin_client_->close();
+  }
+}
+
+// Verify that no data is returned until the buffer is filled
+TEST_P(TapIntegrationTest, AdminBufferedTapBuffering) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  using namespace std::chrono_literals;
+  const int num_req = 4; // # of requests to buffer before responding
+  const auto sleep_duration = 100ms;
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+  // Make num_req tapped requests
+  for (size_t i = 0; i < num_req; i++) {
+    // Verify that no body data has been received yet
+    EXPECT_EQ(std::string(""), admin_response_->body());
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+    timeSystem().advanceTimeWaitImpl(sleep_duration);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_req);
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify that a response is returned on timeout if no traces are matched
+TEST_P(TapIntegrationTest, AdminBufferedTapEmptyResponse) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  using namespace std::chrono_literals;
+  const int num_req = 2; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+          timeout: {}s
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req, "1"));
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered no traces
+  EXPECT_EQ(traces.size(), 0);
+
+  admin_response_->clearBody();
+  admin_client_->close();
+}
+
+// Verify Sending more traces than expected still returns the expected size buffer
+TEST_P(TapIntegrationTest, AdminBufferedTapOverBuffering) {
+  using TraceWrapper = envoy::data::tap::v3::TraceWrapper;
+  using namespace std::chrono_literals;
+  const int num_req = 4; // # of requests to buffer before responding
+
+  initializeFilter(admin_filter_config_);
+
+  // Initial request / response with no tap
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+
+  const std::string admin_request_yaml = R"EOF(
+config_id: test_config_id
+tap_config:
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY_LENGTH_DELIMITED
+        buffered_admin:
+          max_traces: {}
+  )EOF";
+
+  startAdminRequest(fmt::format(admin_request_yaml, num_req));
+
+  // Make num_req tapped requests
+  for (size_t i = 0; i < num_req * 2; i++) {
+    makeRequest(request_headers_no_tap_, {{std::to_string(i) + "request"}}, nullptr,
+                response_headers_no_tap_, {{std::to_string(i) + "response"}}, nullptr);
+  }
+
+  auto result = admin_response_->waitForEndStream();
+  RELEASE_ASSERT(result, result.message());
+
+  std::vector<TraceWrapper> traces;
+  parseLengthDelimited(admin_response_.get(), traces);
+
+  // Assert we buffered num_req traces as required
+  EXPECT_EQ(traces.size(), num_req);
+
+  admin_response_->clearBody();
   admin_client_->close();
 }
 

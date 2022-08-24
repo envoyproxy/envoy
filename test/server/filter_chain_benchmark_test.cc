@@ -227,11 +227,12 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 
   initialize(state);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   for (auto _ : state) {
-    FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
-        init_manager_};
-    filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+    UNREFERENCED_PARAMETER(_);
+    FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
+    filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                          filter_chain_manager);
   }
 }
@@ -251,11 +252,11 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
         10000 + i, "127.0.0.1", "", "", "tls", {}, "8.8.8.8", 111)));
   }
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
-      init_manager_};
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+  FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
-  filter_chain_manager.addFilterChains(filter_chains_, nullptr, dummy_builder_,
+  filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                        filter_chain_manager);
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

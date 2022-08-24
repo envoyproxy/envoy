@@ -81,9 +81,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    *config_.mutable_log_name() = "test_log_name";
-    config_.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
-    config_.mutable_buffer_flush_interval()->set_nanos(
+    *config_.mutable_common_config()->mutable_log_name() = "test_log_name";
+    config_.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+    config_.mutable_common_config()->mutable_buffer_flush_interval()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(FlushInterval).count());
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, local_info_, stats_store_);
@@ -96,7 +96,7 @@ public:
   Event::MockTimer* timer_;
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
-  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
 };
 
 TEST_F(GrpcAccessLoggerImplTest, Log) {
@@ -116,8 +116,8 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
-      - logs:
+    scope_logs:
+      - log_records:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;
@@ -154,11 +154,12 @@ public:
 
 // Test that the logger is created according to the config (by inspecting the generated log).
 TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
-  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config;
-  config.set_log_name("test-log");
-  config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_common_config()->set_log_name("test-log");
+  config.mutable_common_config()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
   // Force a flush for every log entry.
-  config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+  config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
@@ -178,8 +179,68 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
-      - logs:
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF");
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+}
+
+TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreationResourceAttributes) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_common_config()->set_log_name("test_log");
+  config.mutable_common_config()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  // Force a flush for every log entry.
+  config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+
+  opentelemetry::proto::common::v1::KeyValueList keyValueList;
+  const auto kv_yaml = R"EOF(
+values:
+- key: host_name
+  value:
+    string_value: test_host_name
+- key: k8s.pod.uid
+  value:
+    string_value: xxxx-xxxx-xxxx-xxxx
+- key: k8s.pod.createtimestamp
+  value:
+     int_value: 1655429509
+  )EOF";
+  TestUtility::loadFromYaml(kv_yaml, keyValueList);
+  *config.mutable_resource_attributes() = keyValueList;
+
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+        - key: "host_name"
+          value:
+            string_value: "test_host_name"
+        - key: k8s.pod.uid
+          value:
+            string_value: xxxx-xxxx-xxxx-xxxx
+        - key: k8s.pod.createtimestamp
+          value:
+            int_value: 1655429509
+    scope_logs:
+      - log_records:
           - severity_text: "test-severity-text"
   )EOF");
   opentelemetry::proto::logs::v1::LogRecord entry;

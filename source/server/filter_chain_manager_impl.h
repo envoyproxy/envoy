@@ -6,7 +6,9 @@
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/matcher/matcher.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -100,7 +102,7 @@ private:
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory,
                   std::chrono::milliseconds transport_socket_connect_timeout,
                   absl::string_view name)
@@ -109,7 +111,7 @@ public:
         transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
+  const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
   std::chrono::milliseconds transportSocketConnectTimeout() const override {
@@ -130,7 +132,7 @@ public:
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
   const std::string name_;
@@ -197,12 +199,12 @@ public:
   using FcContextMap =
       absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
-      : address_(address), parent_context_(factory_context), init_manager_(init_manager) {}
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
 
-  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
 
@@ -217,6 +219,7 @@ public:
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
   void addFilterChains(
+      const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
@@ -237,6 +240,8 @@ public:
 
 private:
   void convertIPsToTries();
+  const Network::FilterChain*
+  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
@@ -374,7 +379,7 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
 
-  const Network::Address::InstanceConstSharedPtr address_;
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
   // This is the reference to a factory context which all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
@@ -387,6 +392,9 @@ private:
   // init manager owned by the corresponding listener. The reference is valid when building the
   // filter chain.
   Init::Manager& init_manager_;
+
+  // Matcher selecting the filter chain name.
+  Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 };
 } // namespace Server
 } // namespace Envoy

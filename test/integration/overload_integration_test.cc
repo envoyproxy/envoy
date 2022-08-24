@@ -247,6 +247,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ(response->headers().getConnectionValue(), "close");
   } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
   codec_client_->close();
@@ -336,7 +337,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
       Ssl::getSslAddress(version_, lookupPort("http"));
   auto bad_ssl_client =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          std::move(bad_transport_socket), nullptr);
+                                          std::move(bad_transport_socket), nullptr, nullptr);
   bad_ssl_client->addConnectionCallbacks(connect_callbacks);
   bad_ssl_client->enableHalfClose(true);
   bad_ssl_client->connect();

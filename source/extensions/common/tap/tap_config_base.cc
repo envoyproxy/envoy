@@ -51,23 +51,39 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
       streaming_(proto_config.output_config().streaming()) {
-  ASSERT(proto_config.output_config().sinks().size() == 1);
+  using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
+  auto& sinks = proto_config.output_config().sinks();
+  ASSERT(sinks.size() == 1);
   // TODO(mattklein123): Add per-sink checks to make sure format makes sense. I.e., when using
   // streaming, we should require the length delimited version of binary proto, etc.
-  sink_format_ = proto_config.output_config().sinks()[0].format();
-  switch (proto_config.output_config().sinks()[0].output_sink_type_case()) {
-  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingAdmin:
+  sink_format_ = sinks[0].format();
+  sink_type_ = sinks[0].output_sink_type_case();
+
+  switch (sink_type_) {
+  case ProtoOutputSink::OutputSinkTypeCase::kBufferedAdmin:
     ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
     // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
     // admin stream output with the wrong format.
-    RELEASE_ASSERT(sink_format_ == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES ||
-                       sink_format_ == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING,
-                   "admin output only supports JSON formats");
+    RELEASE_ASSERT(
+        sink_format_ == ProtoOutputSink::JSON_BODY_AS_BYTES ||
+            sink_format_ == ProtoOutputSink::JSON_BODY_AS_STRING ||
+            sink_format_ == ProtoOutputSink::PROTO_BINARY_LENGTH_DELIMITED,
+        "buffered admin output only supports JSON or length delimited proto binary formats");
     sink_to_use_ = admin_streamer;
     break;
-  case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kFilePerTap:
-    sink_ =
-        std::make_unique<FilePerTapSink>(proto_config.output_config().sinks()[0].file_per_tap());
+  case ProtoOutputSink::OutputSinkTypeCase::kStreamingAdmin:
+    ASSERT(admin_streamer != nullptr, "admin output must be configured via admin");
+    // TODO(mattklein123): Graceful failure, error message, and test if someone specifies an
+    // admin stream output with the wrong format.
+    // TODO(davidpeet8): Simple change to enable PROTO_BINARY_LENGTH_DELIMITED format -
+    // functionality already implemented for kBufferedAdmin
+    RELEASE_ASSERT(sink_format_ == ProtoOutputSink::JSON_BODY_AS_BYTES ||
+                       sink_format_ == ProtoOutputSink::JSON_BODY_AS_STRING,
+                   "streaming admin output only supports JSON formats");
+    sink_to_use_ = admin_streamer;
+    break;
+  case ProtoOutputSink::OutputSinkTypeCase::kFilePerTap:
+    sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
   case envoy::config::tap::v3::OutputSink::OutputSinkTypeCase::kStreamingGrpc:

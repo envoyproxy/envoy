@@ -29,9 +29,9 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/subscription_factory_impl.h"
-#include "source/common/http/alternate_protocols_cache_impl.h"
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
+#include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/load_stats_reporter.h"
@@ -48,19 +48,18 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
-  ProdClusterManagerFactory(Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info,
-                            Secret::SecretManager& secret_manager,
-                            ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                            Http::Context& http_context, Grpc::Context& grpc_context,
-                            Router::Context& router_context,
-                            AccessLog::AccessLogManager& log_manager,
-                            Singleton::Manager& singleton_manager, const Server::Options& options,
-                            Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
-      : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
+  ProdClusterManagerFactory(
+      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
+      Singleton::Manager& singleton_manager, const Server::Options& options,
+      Quic::QuicStatNames& quic_stat_names, const Server::Instance& server)
+      : server_context_(server_context),
+        context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
@@ -99,6 +98,7 @@ public:
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 protected:
+  Server::Configuration::ServerFactoryContext& server_context_;
   Server::FactoryContextBaseImpl context_;
   ProtobufMessage::ValidationContext& validation_context_;
   Http::Context& http_context_;
@@ -114,8 +114,8 @@ protected:
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
   Quic::QuicStatNames& quic_stat_names_;
-  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
-  Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
+  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
+  Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
   const Server::Instance& server_;
 };
 
@@ -339,9 +339,10 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
 
-  void drainConnections(const std::string& cluster) override;
+  void drainConnections(const std::string& cluster,
+                        DrainConnectionsHostPredicate predicate) override;
 
-  void drainConnections() override;
+  void drainConnections(DrainConnectionsHostPredicate predicate) override;
 
   void checkActiveStaticCluster(const std::string& cluster) override;
 
@@ -512,7 +513,7 @@ private:
       // Drains idle clients in connection pools for all hosts.
       void drainConnPools();
       // Drain all clients in connection pools for all hosts.
-      void drainAllConnPools();
+      void drainAllConnPools(DrainConnectionsHostPredicate predicate);
 
     private:
       Http::ConnectionPool::Instance*

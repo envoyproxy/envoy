@@ -19,14 +19,11 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
 std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::TransportSocketFactory& transport_socket_factory) {
+                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  auto* quic_socket_factory =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory*>(&transport_socket_factory);
-  ASSERT(quic_socket_factory != nullptr);
-  return quic_socket_factory->clientContextConfig().serverNameIndication();
+  return std::string(transport_socket_factory.defaultServerNameIndication());
 }
 
 } // namespace
@@ -128,7 +125,7 @@ ConnectivityGrid::StreamCreationResult ConnectivityGrid::WrapperCallbacks::newSt
 
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
-    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
@@ -163,7 +160,7 @@ void ConnectivityGrid::WrapperCallbacks::maybeMarkHttp3Broken() {
 
 void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolReady(
     RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-    const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   cancellable_ = nullptr; // Attempt succeeded and can no longer be cancelled.
   parent_.onConnectionAttemptReady(this, encoder, host, info, protocol);
 }
@@ -211,16 +208,20 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
-    AlternateProtocolsCacheSharedPtr alternate_protocols, ConnectivityOptions connectivity_options,
-    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
+    HttpServerPropertiesCacheSharedPtr alternate_protocols,
+    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
+      // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
               host_->address()->ip()->port()),
       quic_info_(quic_info) {
+  // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
+  // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
   std::chrono::milliseconds rtt =
@@ -264,7 +265,8 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
         makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
-                                                   options_, transport_socket_options_, state_);
+                                                   options_, transport_socket_options_, state_,
+                                                   origin_, alternate_protocols_);
   }
 
   setupPool(*pool);
@@ -299,7 +301,14 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (!shouldAttemptHttp3() || !options.can_use_http3_) {
+  Instance::StreamOptions overriding_options = options;
+  bool delay_tcp_attempt = true;
+  if (shouldAttemptHttp3() && options.can_use_http3_) {
+    if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
+      overriding_options.can_send_early_data_ = false;
+      delay_tcp_attempt = false;
+    }
+  } else {
     ASSERT(options.can_use_http3_ ||
            Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3));
 
@@ -308,7 +317,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     ++pool;
   }
   auto wrapped_callback =
-      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, options);
+      std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks, overriding_options);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {
@@ -316,6 +325,10 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object has also been deleted.
     return nullptr;
+  }
+  if (!delay_tcp_attempt) {
+    // Immediately start TCP attempt if HTTP/3 failed recently.
+    wrapped_callbacks_.front()->tryAnotherConnection();
   }
   return ret;
 }
@@ -361,17 +374,17 @@ bool ConnectivityGrid::isPoolHttp3(const ConnectionPool::Instance& pool) {
   return &pool == pools_.begin()->get();
 }
 
-AlternateProtocolsCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
+HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusTracker() const {
   ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
-  // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-  AlternateProtocolsCache::Origin origin("https", host_->hostname(),
-                                         host_->address()->ip()->port());
-  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin);
+  return alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
 }
 
 bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
-void ConnectivityGrid::markHttp3Broken() { getHttp3StatusTracker().markHttp3Broken(); }
+void ConnectivityGrid::markHttp3Broken() {
+  host_->cluster().stats().upstream_http3_broken_.inc();
+  getHttp3StatusTracker().markHttp3Broken();
+}
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }
 
@@ -399,12 +412,11 @@ void ConnectivityGrid::onIdleReceived() {
 
 bool ConnectivityGrid::shouldAttemptHttp3() {
   if (host_->address()->type() != Network::Address::Type::Ip) {
-    ENVOY_LOG(error, "Address is not an IP address");
-    ASSERT(false);
+    IS_ENVOY_BUG("Address is not an IP address");
     return false;
   }
   uint32_t port = host_->address()->ip()->port();
-  OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
+  OptRef<const std::vector<HttpServerPropertiesCache::AlternateProtocol>> protocols =
       alternate_protocols_->findAlternatives(origin_);
   if (!protocols.has_value()) {
     ENVOY_LOG(trace, "No alternate protocols available for host '{}', skipping HTTP/3.",
@@ -415,7 +427,7 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
   }
-  for (const AlternateProtocolsCache::AlternateProtocol& protocol : protocols.ref()) {
+  for (const HttpServerPropertiesCache::AlternateProtocol& protocol : protocols.ref()) {
     // TODO(RyanTheOptimist): Handle alternate protocols which change hostname or port.
     if (!protocol.hostname_.empty() || protocol.port_ != port) {
       ENVOY_LOG(trace,
@@ -447,6 +459,12 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
 void ConnectivityGrid::onHandshakeComplete() {
   ENVOY_LOG(trace, "Marking HTTP/3 confirmed for host '{}'.", origin_.hostname_);
   markHttp3Confirmed();
+}
+
+void ConnectivityGrid::onZeroRttHandshakeFailed() {
+  ENVOY_LOG(trace, "Marking HTTP/3 failed for host '{}'.", host_->hostname());
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"));
+  getHttp3StatusTracker().markHttp3FailedRecently();
 }
 
 } // namespace Http

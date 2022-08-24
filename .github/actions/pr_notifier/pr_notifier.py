@@ -23,7 +23,6 @@ from slack_sdk.errors import SlackApiError
 
 MAINTAINERS = {
     'alyssawilk': 'U78RP48V9',
-    'dio': 'U79S2DFV1',
     'mattklein123': 'U5CALEVSL',
     'lizan': 'U79E51EQ6',
     'snowp': 'U93KTPQP6',
@@ -35,11 +34,11 @@ MAINTAINERS = {
     'antoniovicente': 'UKVNCQ212',
     'wrowe': 'UBQR8NGBS',
     'yanavlasov': 'UJHLR5KFS',
-    'rojkov': 'UH5EXLYQK',
     'RyanTheOptimist': 'U01SW3JC8GP',
     'adisuissa': 'UT17EMMTP',
     'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
+    'kyessenov': 'U7KTRAA8M',
 }
 
 # First pass reviewers who are not maintainers should get

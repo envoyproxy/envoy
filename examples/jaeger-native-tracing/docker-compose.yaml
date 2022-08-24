@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   # base images
@@ -7,12 +7,16 @@ services:
       context: ../shared/flask
     image: flask_service:python-3.10-slim-bullseye
     restart: "no"
+    deploy:
+      replicas: 0
 
   tracing:
     build:
       context: ../shared/tracing
     image: envoyproxy:tracing
     restart: "no"
+    deploy:
+      replicas: 0
 
   # jaeger
   front-envoy:
@@ -20,7 +24,7 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - "8000:8000"
+    - "${PORT_PROXY:-10000}:8000"
     dns:
     - 8.8.8.8
     - 8.8.4.4
@@ -50,8 +54,10 @@ services:
     - 8.8.4.4
 
   jaeger:
-    image: jaegertracing/all-in-one
+    build:
+      context: .
+      dockerfile: Dockerfile-jaeger
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:
-    - "16686:16686"
+    - "${PORT_UI:-10000}:16686"

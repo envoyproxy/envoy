@@ -61,6 +61,7 @@ public:
   // Network::DnsResolver
   MOCK_METHOD(ActiveDnsQuery*, resolve,
               (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
+  MOCK_METHOD(void, resetNetworking, ());
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };
@@ -196,11 +197,16 @@ public:
 
 class MockListenerFilter : public ListenerFilter {
 public:
-  MockListenerFilter();
+  MockListenerFilter(size_t max_read_bytes = 0) : listener_filter_max_read_bytes_(max_read_bytes) {}
   ~MockListenerFilter() override;
+
+  size_t maxReadBytes() const override { return listener_filter_max_read_bytes_; }
 
   MOCK_METHOD(void, destroy_, ());
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
+  MOCK_METHOD(Network::FilterStatus, onData, (Network::ListenerFilterBuffer&));
+
+  size_t listener_filter_max_read_bytes_{0};
 };
 
 class MockListenerFilterManager : public ListenerFilterManager {
@@ -223,7 +229,7 @@ public:
   ~MockFilterChain() override;
 
   // Network::DrainableFilterChain
-  MOCK_METHOD(const TransportSocketFactory&, transportSocketFactory, (), (const));
+  MOCK_METHOD(const DownstreamTransportSocketFactory&, transportSocketFactory, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, transportSocketConnectTimeout, (), (const));
   MOCK_METHOD(const std::vector<FilterFactoryCb>&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
@@ -401,12 +407,12 @@ public:
 
 class MockUdpListenerConfig : public UdpListenerConfig {
 public:
-  MockUdpListenerConfig();
+  MockUdpListenerConfig(uint32_t concurrency = 1);
   ~MockUdpListenerConfig() override;
 
   MOCK_METHOD(ActiveUdpListenerFactory&, listenerFactory, ());
   MOCK_METHOD(UdpPacketWriterFactory&, packetWriterFactory, ());
-  MOCK_METHOD(UdpListenerWorkerRouter&, listenerWorkerRouter, ());
+  MOCK_METHOD(UdpListenerWorkerRouter&, listenerWorkerRouter, (const Network::Address::Instance&));
   MOCK_METHOD(const envoy::config::listener::v3::UdpListenerConfig&, config, ());
 
   UdpListenerWorkerRouterPtr udp_listener_worker_router_;
@@ -420,8 +426,8 @@ public:
 
   MOCK_METHOD(FilterChainManager&, filterChainManager, ());
   MOCK_METHOD(FilterChainFactory&, filterChainFactory, ());
-  MOCK_METHOD(ListenSocketFactory&, listenSocketFactory, ());
-  MOCK_METHOD(bool, bindToPort, ());
+  MOCK_METHOD(std::vector<ListenSocketFactoryPtr>&, listenSocketFactories, ());
+  MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, listenerFiltersTimeout, (), (const));
@@ -431,7 +437,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(Network::UdpListenerConfigOptRef, udpListenerConfig, ());
   MOCK_METHOD(InternalListenerConfigOptRef, internalListenerConfig, ());
-  MOCK_METHOD(ConnectionBalancer&, connectionBalancer, ());
+  MOCK_METHOD(ConnectionBalancer&, connectionBalancer, (const Network::Address::Instance&));
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
@@ -446,7 +452,7 @@ public:
   }
 
   testing::NiceMock<MockFilterChainFactory> filter_chain_factory_;
-  MockListenSocketFactory socket_factory_;
+  std::vector<ListenSocketFactoryPtr> socket_factories_;
   SocketSharedPtr socket_;
   Stats::IsolatedStoreImpl scope_;
   std::string name_;
@@ -487,6 +493,15 @@ public:
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
 
   uint64_t num_handler_connections_{};
+};
+
+class MockUdpListenerWorkerRouter : public UdpListenerWorkerRouter {
+public:
+  ~MockUdpListenerWorkerRouter() override;
+
+  MOCK_METHOD(void, registerWorkerForListener, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, unregisterWorkerForListener, (UdpListenerCallbacks & listener));
+  MOCK_METHOD(void, deliver, (uint32_t dest_worker_index, UdpRecvData&& data));
 };
 
 class MockIp : public Address::Ip {

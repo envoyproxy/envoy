@@ -277,7 +277,7 @@ TEST_F(ThriftRateLimitConfigurationTest, ClusterHeaderStages) {
   initialize(config);
 
   auto& metadata = genMetadata("foo");
-  metadata.headers().addCopy(Http::LowerCaseString{"header_name"}, "thrift");
+  metadata.requestHeaders().addCopy(Http::LowerCaseString{"header_name"}, "thrift");
 
   // Keep hold of route, it's a newly minted shared pointer.
   auto route = config_->route(metadata, 0);
@@ -411,7 +411,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
@@ -428,7 +428,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-not-header-name"}, "test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-not-header-name"}, "test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
@@ -494,7 +494,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
@@ -514,7 +514,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-header-name"}, "not_test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-header-name"}, "not_test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
@@ -534,7 +534,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-header-name"}, "test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);
@@ -554,7 +554,7 @@ actions:
   )EOF";
 
   initialize(yaml);
-  metadata_.headers().addCopy(Http::LowerCaseString{"x-header-name"}, "not_test_value");
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{"x-header-name"}, "not_test_value");
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
                                          default_remote_address_);

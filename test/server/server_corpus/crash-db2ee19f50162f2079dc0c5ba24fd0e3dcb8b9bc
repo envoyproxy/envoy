@@ -6,7 +6,8 @@ static_resources {
     }
     lb_policy: MAGLEV
     dns_lookup_family: V4_ONLY
-    dns_resolvers {
+    typed_dns_resolvers_config {
+      "@type": type.googleapis.com/envoy.config.core.v3.Address    
       pipe {
         path: "\014\000"
       }
@@ -14,7 +15,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "@"

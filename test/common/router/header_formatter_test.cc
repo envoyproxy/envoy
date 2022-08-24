@@ -1213,6 +1213,35 @@ request_headers_to_add:
   EXPECT_TRUE(header_map.has("x-client-port"));
 }
 
+TEST(HeaderParserTest, EvaluateHeadersAppendIfEmpty) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-upstream-remote-address"
+      value: "%UPSTREAM_REMOTE_ADDRESS%"
+    append: true
+    keep_empty_value: true
+  - header:
+      key: "x-upstream-local-port"
+      value: "%UPSTREAM_LOCAL_PORT%"
+    append: true
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  stream_info.upstreamInfo()->setUpstreamLocalAddress(nullptr);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_FALSE(header_map.has("x-upstream-local-port"));
+  EXPECT_TRUE(header_map.has("x-upstream-remote-address"));
+}
+
 TEST(HeaderParserTest, EvaluateHeadersWithNullStreamInfo) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }

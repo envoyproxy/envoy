@@ -8,7 +8,6 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
-#include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -24,27 +23,16 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
     Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
-    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+    quic::ConnectionIdGeneratorInterface& generator)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
-                           std::move(alarm_factory), expected_server_connection_id_length),
+                           std::move(alarm_factory), expected_server_connection_id_length,
+                           generator),
       connection_handler_(connection_handler), listener_config_(&listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
-      crypto_server_stream_factory_(crypto_server_stream_factory) {
-  // Set send buffer twice of max flow control window to ensure that stream send
-  // buffer always takes all the data.
-  // The max amount of data buffered is the per-stream high watermark + the max
-  // flow control window of upstream. The per-stream high watermark should be
-  // smaller than max flow control window to make sure upper stream can be flow
-  // control blocked early enough not to send more than the threshold allows.
-  // TODO(#8826) Ideally we should use the negotiated value from upstream which is not accessible
-  // for now. 512MB is way to large, but the actual bytes buffered should be bound by the negotiated
-  // upstream flow control window.
-  SetQuicFlag(
-      FLAGS_quic_buffered_data_threshold,
-      2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
-}
+      crypto_server_stream_factory_(crypto_server_stream_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,

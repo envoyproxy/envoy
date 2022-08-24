@@ -11,6 +11,8 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/type/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//xds/annotations/v3:pkg",
         "@com_github_cncf_udpa//xds/core/v3:pkg",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg",
     ],
 )

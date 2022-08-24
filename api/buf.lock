@@ -3,50 +3,29 @@ version: v1
 deps:
   - remote: buf.build
     owner: beta
-    repository: opencensus
-    branch: main
-    commit: 5f5f8259293649d68707d2e5b6285748
-    digest: b1-myYwcdM0Xu05qIwhiy4eWEcARYUuZZ1vTbYvrrHu1mU=
-    create_time: 2021-03-03T20:50:42.079743Z
-  - remote: buf.build
-    owner: beta
-    repository: opentelemetry
-    branch: main
-    commit: 549da630ffe24b53be3983fcee3bb346
-    digest: b1-HVAvWKH61BF6TdZSbHRhrD2SUuC0V7uAlZgCRimGPLI=
-    create_time: 2021-08-09T14:24:57.923964Z
-  - remote: buf.build
-    owner: beta
     repository: prometheus
-    branch: main
     commit: a91b42d18a994cd4b07b37f365f87cf9
-    digest: b1-uKmv58fyoNwJI855qg7UEagfdyUl6XNPsFAdDoi57f4=
-    create_time: 2021-06-23T20:16:58.410272Z
   - remote: buf.build
-    owner: beta
-    repository: protoc-gen-validate
-    branch: main
-    commit: 82388a0a0cb04e98a203f95dfed5e84b
-    digest: b1-lYgUMN58PxyCwvfQoopp40AJ-oHHjWXAzksF7v9U-U4=
-    create_time: 2021-06-21T22:00:30.152545Z
-  - remote: buf.build
-    owner: beta
+    owner: cncf
     repository: xds
-    branch: main
-    commit: 45f850b92541434cbde4aece01bc7d53
-    digest: b1-QZUL5DC6-nVgMMlajH_hlImwghg5HjRsqlEAOl0dZgI=
-    create_time: 2021-08-09T14:37:06.872899Z
+    commit: 0492166643854ea08814f4349286f9cb
+  - remote: buf.build
+    owner: envoyproxy
+    repository: protoc-gen-validate
+    commit: dc09a417d27241f7b069feae2cd74a0e
   - remote: buf.build
     owner: gogo
     repository: protobuf
-    branch: main
     commit: 4df00b267f944190a229ce3695781e99
-    digest: b1-sjLgsg7CzrkOrIjBDh3s-l0aMjE6oqTj85-OsoopKAw=
-    create_time: 2021-08-10T00:14:28.345069Z
   - remote: buf.build
     owner: googleapis
     repository: googleapis
-    branch: main
     commit: d1a849b8f8304950832335723096e954
-    digest: b1-zJkwX0YeOp1Wa0Jaj_RqMLa2-oEzePH6PJEK8aaMeI4=
-    create_time: 2021-08-26T15:07:19.652533Z
+  - remote: buf.build
+    owner: opencensus
+    repository: opencensus
+    commit: d1d7ccd1281e4f42ab7ce9a7d2b29e33
+  - remote: buf.build
+    owner: opentelemetry
+    repository: opentelemetry
+    commit: 187ea5573ff044faa892a5d244cb2b48

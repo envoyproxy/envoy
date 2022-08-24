@@ -178,6 +178,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
+// [#next-free-field: 6]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -195,4 +196,7 @@ message ExtProcOverrides {
   // Set different optional properties than the default setting of the
   // ``response_attributes`` field.
   repeated string response_attributes = 4;
+
+  // Set a different gRPC service for this route than the default.
+  config.core.v3.GrpcService grpc_service = 5;
 }

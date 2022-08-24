@@ -1,6 +1,9 @@
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 
+#include <openssl/ssl.h>
+
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -28,6 +31,7 @@
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "cert_validator/cert_validator.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -158,8 +162,22 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   if (!capabilities_.verifies_peer_certificates) {
     for (auto ctx : ssl_contexts) {
       if (verify_mode != SSL_VERIFY_NONE) {
-        SSL_CTX_set_verify(ctx, verify_mode, nullptr);
-        SSL_CTX_set_cert_verify_callback(ctx, verifyCallback, this);
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation")) {
+          // TODO(danzh) Envoy's use of SSL_VERIFY_NONE does not quite match the actual semantics as
+          // a client. As a client, SSL_VERIFY_NONE means to verify the certificate (which will fail
+          // without trust anchors), save the result in the session ticket, but otherwise continue
+          // with the handshake. But Envoy actually wants it to accept all certificates. The
+          // disadvantage of using SSL_VERIFY_NONE is that it records the verify_result, which Envoy
+          // never queries but gets saved in session tickets, and tries to find an anchor that isn't
+          // there. And also it differs from server side behavior of SSL_VERIFY_NONE which won't
+          // even request client certs. So, instead, we should configure a callback to skip
+          // validation and always supply the callback to boring SSL.
+          SSL_CTX_set_custom_verify(ctx, verify_mode, customVerifyCallback);
+          SSL_CTX_set_reverify_on_resume(ctx, /*reverify_on_resume_enabled)=*/1);
+        } else {
+          SSL_CTX_set_verify(ctx, verify_mode, nullptr);
+          SSL_CTX_set_cert_verify_callback(ctx, verifyCallback, this);
+        }
       }
     }
   }
@@ -417,11 +435,14 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   return out;
 }
 
-bssl::UniquePtr<SSL> ContextImpl::newSsl(const Network::TransportSocketOptions*) {
+bssl::UniquePtr<SSL>
+ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
-  return bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
+  auto ssl_con = bssl::UniquePtr<SSL>(SSL_new(tls_contexts_[0].ssl_ctx_.get()));
+  SSL_set_app_data(ssl_con.get(), &options);
+  return ssl_con;
 }
 
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
@@ -429,11 +450,80 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
   auto cert = bssl::UniquePtr<X509>(SSL_get_peer_certificate(ssl));
-  return impl->cert_validator_->doVerifyCertChain(
+  auto transport_socket_options_shared_ptr_ptr =
+      static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
+  ASSERT(transport_socket_options_shared_ptr_ptr);
+  const Network::TransportSocketOptions* transport_socket_options =
+      (*transport_socket_options_shared_ptr_ptr).get();
+  return impl->cert_validator_->doSynchronousVerifyCertChain(
       store_ctx,
       reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
           SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())),
-      *cert, static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl)));
+      *cert, transport_socket_options);
+}
+
+enum ssl_verify_result_t ContextImpl::customVerifyCallback(SSL* ssl, uint8_t* out_alert) {
+  auto* extended_socket_info = reinterpret_cast<Envoy::Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex()));
+  if (extended_socket_info->certificateValidationResult() != Ssl::ValidateStatus::NotStarted) {
+    if (extended_socket_info->certificateValidationResult() == Ssl::ValidateStatus::Pending) {
+      return ssl_verify_retry;
+    }
+    ENVOY_LOG(trace, "Already has a result: {}",
+              static_cast<int>(extended_socket_info->certificateValidationStatus()));
+    // Already has a binary result, return immediately.
+    *out_alert = extended_socket_info->certificateValidationAlert();
+    return extended_socket_info->certificateValidationResult() == Ssl::ValidateStatus::Successful
+               ? ssl_verify_ok
+               : ssl_verify_invalid;
+  }
+  // Hasn't kicked off any validation for this connection yet.
+  SSL_CTX* ssl_ctx = SSL_get_SSL_CTX(ssl);
+  ContextImpl* context_impl = static_cast<ContextImpl*>(SSL_CTX_get_app_data(ssl_ctx));
+  auto transport_socket_options_shared_ptr_ptr =
+      static_cast<const Network::TransportSocketOptionsConstSharedPtr*>(SSL_get_app_data(ssl));
+  ASSERT(transport_socket_options_shared_ptr_ptr);
+  ValidationResults result = context_impl->customVerifyCertChain(
+      extended_socket_info, *transport_socket_options_shared_ptr_ptr, ssl);
+  switch (result.status) {
+  case ValidationResults::ValidationStatus::Successful:
+    return ssl_verify_ok;
+  case ValidationResults::ValidationStatus::Pending:
+    return ssl_verify_retry;
+  case ValidationResults::ValidationStatus::Failed: {
+    if (result.tls_alert.has_value() && out_alert) {
+      *out_alert = result.tls_alert.value();
+    }
+    return ssl_verify_invalid;
+  }
+  }
+  PANIC("not reached");
+}
+
+ValidationResults ContextImpl::customVerifyCertChain(
+    Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl) {
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
+  ASSERT(extended_socket_info);
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+  if (cert_chain == nullptr) {
+    extended_socket_info->setCertificateValidationStatus(Ssl::ClientValidationStatus::NotValidated);
+    stats_.fail_verify_error_.inc();
+    ENVOY_LOG(debug, "verify cert failed: no cert chain");
+    return {ValidationResults::ValidationStatus::Failed, SSL_AD_INTERNAL_ERROR, absl::nullopt};
+  }
+  ASSERT(cert_validator_);
+  const char* host_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+  // Do not provide async callback here, but defer its creation to extended_socket_info if the
+  // validation is async.
+  ValidationResults result = cert_validator_->doVerifyCertChain(
+      *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
+      {}, SSL_is_server(ssl), absl::NullSafeStringView(host_name));
+  if (result.status != ValidationResults::ValidationStatus::Pending) {
+    extended_socket_info->onCertificateValidationCompleted(
+        result.status == ValidationResults::ValidationStatus::Successful);
+  }
+  return result;
 }
 
 void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
@@ -484,14 +574,18 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
   return providers;
 }
 
-size_t ContextImpl::daysUntilFirstCertExpires() const {
-  int daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
-  for (auto& ctx : tls_contexts_) {
-    daysUntilExpiration = std::min<int>(
-        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_), daysUntilExpiration);
+absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
+  absl::optional<uint32_t> daysUntilExpiration = cert_validator_->daysUntilFirstCertExpires();
+  if (!daysUntilExpiration.has_value()) {
+    return absl::nullopt;
   }
-  if (daysUntilExpiration < 0) { // Ensure that the return value is unsigned
-    return 0;
+  for (auto& ctx : tls_contexts_) {
+    const absl::optional<uint32_t> tmp =
+        Utility::getDaysUntilExpiration(ctx.cert_chain_.get(), time_source_);
+    if (!tmp.has_value()) {
+      return absl::nullopt;
+    }
+    daysUntilExpiration = std::min<uint32_t>(tmp.value(), daysUntilExpiration.value());
   }
   return daysUntilExpiration;
 }
@@ -588,20 +682,19 @@ bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl
   return false;
 }
 
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOptions* options) {
+bssl::UniquePtr<SSL>
+ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl(options));
 
   const std::string server_name_indication = options && options->serverNameOverride().has_value()
                                                  ? options->serverNameOverride().value()
                                                  : server_name_indication_;
-
   if (!server_name_indication.empty()) {
     const int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, Utility::getLastCryptoError().value_or(""));
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
-    SSL_set_app_data(ssl_con.get(), options);
     SSL_set_verify(ssl_con.get(), SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
 
@@ -1139,7 +1232,7 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
   return false;
 }
 
-bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
+bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates,
                                   std::string& error_details) {
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
 
@@ -1161,13 +1254,32 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
     return false;
   }
 
-  int res = cert_validator_->doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
+  int res = cert_validator_->doSynchronousVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
   // If |SSL_VERIFY_NONE|, the error is non-fatal, but we keep the error details.
   if (res <= 0 && SSL_CTX_get_verify_mode(ssl_ctx) != SSL_VERIFY_NONE) {
     error_details = Utility::getX509VerificationErrorInfo(ctx.get());
     return false;
   }
   return true;
+}
+
+ValidationResults ContextImpl::customVerifyCertChainForQuic(
+    STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    const CertValidator::ExtraValidationContext& validation_context, const std::string& host_name) {
+  ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
+  ASSERT(!tls_contexts_.empty());
+  // It doesn't matter which SSL context is used, because they share the same cert validation
+  // config.
+  SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
+  if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
+    // Skip validation if the TLS is configured SSL_VERIFY_NONE.
+    return {ValidationResults::ValidationStatus::Successful, absl::nullopt, absl::nullopt};
+  }
+  ValidationResults result = cert_validator_->doVerifyCertChain(
+      cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
+      *ssl_ctx, validation_context, is_server, host_name);
+  return result;
 }
 
 void TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path) {

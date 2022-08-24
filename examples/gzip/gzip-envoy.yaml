@@ -46,6 +46,8 @@ static_resources:
                   "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
                   window_bits: 9
                   chunk_size: 8192
+                  # If this ratio is set too low, then body data will not be decompressed completely.
+                  max_inflate_ratio: 1000
               response_direction_config:
                 common_config:
                   enabled:

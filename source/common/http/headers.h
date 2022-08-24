@@ -60,6 +60,9 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString AccessControlRequestPrviateNetwork{
+      "access-control-request-private-network"};
+  const LowerCaseString AccessControlAllowPrviateNetwork{"access-control-allow-private-network"};
   const LowerCaseString Age{"age"};
   const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};
@@ -102,6 +105,7 @@ public:
   struct {
     const std::string Brotli{"br"};
     const std::string Gzip{"gzip"};
+    const std::string Zstd{"zstd"};
   } ContentEncodingValues;
 
   struct {
@@ -319,6 +323,7 @@ public:
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
     const std::string Identity{"identity"};
+    const std::string Zstd{"zstd"};
   } TransferEncodingValues;
 
   struct {

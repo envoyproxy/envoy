@@ -290,8 +290,7 @@ HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
-Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
-                                                  Http::ResponseHeaderMap& response_headers,
+Http::Code HystrixSink::handlerHystrixEventStream(Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 

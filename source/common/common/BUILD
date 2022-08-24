@@ -155,11 +155,13 @@ envoy_cc_library(
     hdrs = ["key_value_store_base.h"],
     external_deps = [
         "abseil_cleanup",
+        "quiche_quic_platform",
     ],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
+        "@com_github_google_quiche//:quiche_common_lib",
     ],
 )
 
@@ -185,11 +187,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "minimal_logger_lib",
     srcs = [
-        "fancy_logger.cc",
+        "fine_grain_logger.cc",
         "logger.cc",
     ],
     hdrs = [
-        "fancy_logger.h",
+        "fine_grain_logger.h",
         "json_escape_string.h",
         "logger.h",
     ],
@@ -325,10 +327,12 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//envoy/common:regex_interface",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

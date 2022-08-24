@@ -54,6 +54,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
+  auth_type: "BASIC_AUTH"
     )EOF";
 
   OAuth2Config factory;

@@ -103,11 +103,13 @@ public:
   const std::multimap<std::string, std::string>& opaqueConfig() const override;
   bool includeVirtualHostRateLimits() const override;
   const TlsContextMatchCriteria* tlsContextMatchCriteria() const override;
+  const PathMatchCriterion& pathMatchCriterion() const override;
   bool includeAttemptCountInRequest() const override;
   bool includeAttemptCountInResponse() const override;
   const UpgradeMap& upgradeMap() const override;
   const absl::optional<ConnectConfig>& connectConfig() const override;
   const std::string& routeName() const override;
+  const EarlyDataPolicy& earlyDataPolicy() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;

@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_internal.bzl", "envoy_select_force_libcpp")
 load("//bazel:utils.bzl", "json_data")
@@ -17,7 +16,13 @@ exports_files([
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
+    "exported_symbols.txt",
 ])
+
+sh_library(
+    name = "volatile_env",
+    srcs = ["volatile_env.sh"],
+)
 
 genrule(
     name = "gnu_build_id",
@@ -319,6 +324,11 @@ selects.config_setting_group(
 )
 
 config_setting(
+    name = "disable_admin_html",
+    values = {"define": "admin_html=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
     visibility = ["//visibility:private"],
@@ -385,8 +395,8 @@ config_setting(
 config_setting(
     name = "boringssl_fips",
     constraint_values = [
-        "@bazel_tools//platforms:linux",
-        "@bazel_tools//platforms:x86_64",
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )
@@ -399,7 +409,7 @@ config_setting(
 config_setting(
     name = "zlib_ng",
     constraint_values = [
-        "@bazel_tools//platforms:linux",
+        "@platforms//os:linux",
     ],
     values = {"define": "zlib=ng"},
 )
@@ -430,6 +440,16 @@ config_setting(
     values = {"define": "wasm=disabled"},
 )
 
+# This config setting enables Universal Header Validator and disables
+# HTTP header compliance checks in codecs.
+# This setting is temporary to transition header validation into UHV without
+# impacting production builds of Envoy.
+# This setting is enabled for the bazel.compile_time_options CI target.
+config_setting(
+    name = "uhv_enabled",
+    values = {"define": "uhv=enabled"},
+)
+
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
@@ -438,6 +458,14 @@ alias(
     actual = select({
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
+    }),
+)
+
+alias(
+    name = "boringcrypto",
+    actual = select({
+        "//bazel:boringssl_fips": "@boringssl_fips//:crypto",
+        "//conditions:default": "@boringssl//:crypto",
     }),
 )
 
@@ -514,6 +542,11 @@ config_setting(
 )
 
 config_setting(
+    name = "ios_sim_arm64",
+    values = {"cpu": "ios_sim_arm64"},
+)
+
+config_setting(
     name = "ios_arm64e",
     values = {"cpu": "ios_arm64e"},
 )
@@ -521,6 +554,13 @@ config_setting(
 config_setting(
     name = "manual_stamp",
     values = {"define": "manual_stamp=manual_stamp"},
+)
+
+config_setting(
+    name = "android",
+    constraint_values = [
+        "@platforms//os:android",
+    ],
 )
 
 config_setting(
@@ -566,7 +606,32 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":ios_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_dbg",
+    match_all = [
+        ":apple",
+        ":dbg_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_fastbuild",
+    match_all = [
+        ":apple",
+        ":fastbuild_build",
+    ],
+)
+
+selects.config_setting_group(
+    name = "apple_non_opt",
+    match_any = [
+        ":apple_dbg",
+        ":apple_fastbuild",
     ],
 )
 
@@ -600,6 +665,7 @@ selects.config_setting_group(
         ":ios_armv7",
         ":ios_armv7s",
         ":ios_i386",
+        ":ios_sim_arm64",
         ":linux_aarch64",
         ":linux_mips64",
         ":linux_ppc",
@@ -636,4 +702,79 @@ json_data(
         load_repository_locations_spec(REPOSITORY_LOCATIONS_SPEC),
         load_repository_locations_spec(API_REPOSITORY_LOCATIONS_SPEC),
     ),
+)
+
+platform(
+    name = "android_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_armeabi",
+    constraint_values = [
+        "@platforms//cpu:armv7",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86",
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
+platform(
+    name = "macos_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:macos",
+    ],
+)
+
+platform(
+    name = "ios_x86_64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:simulator",
+    ],
+)
+
+platform(
+    name = "ios_sim_arm64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:simulator",
+    ],
+)
+
+platform(
+    name = "ios_arm64_platform",  # TODO(keith): Resolve duplicate name issue
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+        "@build_bazel_apple_support//constraints:device",
+    ],
 )

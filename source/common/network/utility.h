@@ -132,34 +132,6 @@ public:
   static bool urlIsUnixScheme(absl::string_view url);
 
   /**
-   * Parses the host from a TCP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a TCP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the host from a UDP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromUdpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a UDP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromUdpUrl(const std::string& url);
-
-  /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
    * not include a port number. Throws EnvoyException if unable to parse the address.
    * @param ip_address string to be parsed as an internet address.
@@ -227,7 +199,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isSameIpOrLoopback(const ConnectionSocket& socket);
+  static bool isSameIpOrLoopback(const ConnectionInfoProvider& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -416,6 +388,15 @@ private:
    * @return the absl::uint128 of the input having the bytes flipped.
    */
   static absl::uint128 flipOrder(const absl::uint128& input);
+};
+
+/**
+ * Log formatter for an address.
+ */
+struct AddressStrFormatter {
+  void operator()(std::string* out, const Network::Address::InstanceConstSharedPtr& instance) {
+    out->append(instance->asString());
+  }
 };
 
 } // namespace Network

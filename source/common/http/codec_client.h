@@ -127,7 +127,7 @@ public:
   CodecType type() const { return type_; }
 
   // Note this is the L4 stream info, not L7.
-  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
   /**
    * Connect to the host.
@@ -281,8 +281,8 @@ class NoConnectCodecClientProd : public CodecClient {
 public:
   NoConnectCodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                            Upstream::HostDescriptionConstSharedPtr host,
-                           Event::Dispatcher& dispatcher,
-                           Random::RandomGenerator& random_generator);
+                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                           const Network::TransportSocketOptionsConstSharedPtr& options);
 };
 
 /**
@@ -292,7 +292,8 @@ class CodecClientProd : public NoConnectCodecClientProd {
 public:
   CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  Random::RandomGenerator& random_generator);
+                  Random::RandomGenerator& random_generator,
+                  const Network::TransportSocketOptionsConstSharedPtr& options);
 };
 
 } // namespace Http

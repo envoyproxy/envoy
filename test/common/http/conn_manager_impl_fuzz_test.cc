@@ -71,10 +71,18 @@ public:
     }
     decoder_filter_ = new NiceMock<MockStreamDecoderFilter>();
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
+
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
-          callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
+        .WillOnce(Invoke([this](FilterChainManager& manager) -> void {
+          FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
+          };
+          FilterFactoryCb encoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
+            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
+          };
+
+          manager.applyFilterFactoryCb({}, decoder_filter_factory);
+          manager.applyFilterFactoryCb({}, encoder_filter_factory);
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
         .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
@@ -84,8 +92,8 @@ public:
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainFactoryCallbacks& callbacks) -> bool {
-          filter_factory_.createFilterChain(callbacks);
+                                   FilterChainManager& manager) -> bool {
+          filter_factory_.createFilterChain(manager);
           return true;
         }));
   }
@@ -206,6 +214,11 @@ public:
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
+  }
+  Http::HeaderValidatorPtr makeHeaderValidator(Protocol, StreamInfo::StreamInfo&) override {
+    // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
+    // be changed too
+    return nullptr;
   }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
@@ -400,6 +413,7 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = data_action.end_stream() ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+        decoding_done_ = false;
       }
       break;
     }
@@ -412,7 +426,8 @@ public:
                   if (trailers_action.has_decoder_filter_callback_action()) {
                     decoderFilterCallbackAction(trailers_action.decoder_filter_callback_action());
                   }
-                  return fromTrailerStatus(trailers_action.status());
+                  trailers_status_ = fromTrailerStatus(trailers_action.status());
+                  return *trailers_status_;
                 }));
         EXPECT_CALL(*config_.codec_, dispatch(_))
             .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
@@ -423,17 +438,22 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
+        decoding_done_ = false;
       }
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
-          header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
-          (header_status_ == FilterHeadersStatus::StopIteration &&
-           (data_status_ == FilterDataStatus::StopIterationAndBuffer ||
-            data_status_ == FilterDataStatus::StopIterationAndWatermark ||
-            data_status_ == FilterDataStatus::StopIterationNoBuffer))) {
+      if (!decoding_done_ &&
+          (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
+           header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
+           header_status_ == FilterHeadersStatus::StopIteration) &&
+          (!data_status_.has_value() || data_status_ == FilterDataStatus::StopIterationAndBuffer ||
+           data_status_ == FilterDataStatus::StopIterationAndWatermark ||
+           data_status_ == FilterDataStatus::StopIterationNoBuffer) &&
+          (!trailers_status_.has_value() ||
+           trailers_status_ == FilterTrailersStatus::StopIteration)) {
         decoder_filter_->callbacks_->continueDecoding();
+        decoding_done_ = true;
       }
       break;
     }
@@ -446,6 +466,7 @@ public:
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
+        decoding_done_ = true;
       }
       break;
     }
@@ -478,15 +499,11 @@ public:
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.headers()));
         // The client codec will ensure we always have a valid :status.
         // Similarly, local replies should always contain this.
-        uint64_t status;
-        try {
-          status = Utility::getResponseStatus(*headers);
-        } catch (const CodecClientException&) {
-          headers->setReferenceKey(Headers::get().Status, "200");
-        }
+        const auto status = Utility::getResponseStatusOrNullopt(*headers);
         // The only 1xx header that may be provided to encodeHeaders() is a 101 upgrade,
         // guaranteed by the codec parsers. See include/envoy/http/filter.h.
-        if (CodeUtility::is1xx(status) && status != enumToInt(Http::Code::SwitchingProtocols)) {
+        if (!status.has_value() || (CodeUtility::is1xx(status.value()) &&
+                                    status.value() != enumToInt(Http::Code::SwitchingProtocols))) {
           headers->setReferenceKey(Headers::get().Status, "200");
         }
         decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream, "details");
@@ -542,6 +559,8 @@ public:
   StreamState response_state_;
   absl::optional<Http::FilterHeadersStatus> header_status_;
   absl::optional<Http::FilterDataStatus> data_status_;
+  absl::optional<Http::FilterTrailersStatus> trailers_status_;
+  bool decoding_done_{};
 };
 
 using FuzzStreamPtr = std::unique_ptr<FuzzStream>;

@@ -8,7 +8,6 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.tra.v3alpha";
@@ -91,6 +90,8 @@ message TraServiceResponse {
 
 message CreateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message CreateResponse {
@@ -98,6 +99,8 @@ message CreateResponse {
 
 message UpdateRequest {
   map<string, string> data = 1;
+
+  map<string, string> context = 2;
 }
 
 message UpdateResponse {
@@ -105,6 +108,8 @@ message UpdateResponse {
 
 message RetrieveRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message RetrieveResponse {
@@ -113,6 +118,8 @@ message RetrieveResponse {
 
 message DeleteRequest {
   string key = 1;
+
+  map<string, string> context = 2;
 }
 
 message DeleteResponse {

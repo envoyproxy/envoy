@@ -11,7 +11,6 @@
 
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
-#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,7 +75,6 @@ State DecoderStateMachine::run() {
 Decoder::Decoder(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
 void Decoder::complete() {
-  ENVOY_LOG(trace, "sip message COMPLETE");
   request_.reset();
   metadata_.reset();
   state_machine_ = nullptr;
@@ -86,6 +84,8 @@ void Decoder::complete() {
 
   first_via_ = true;
   first_route_ = true;
+  first_record_route_ = true;
+  first_service_route_ = true;
 }
 
 FilterStatus Decoder::onData(Buffer::Instance& data, bool continue_handling) {
@@ -180,10 +180,10 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
 }
 
 auto Decoder::sipHeaderType(absl::string_view sip_line) {
-  auto header_type_str = sip_line.substr(0, sip_line.find_first_of(':'));
-  return std::tuple<HeaderType, absl::string_view>{
-      HeaderTypes::get().str2Header(header_type_str),
-      sip_line.substr(sip_line.find_first_of(':') + strlen(": "))};
+  auto header_type_str = StringUtil::trim(sip_line.substr(0, sip_line.find_first_of(':')));
+  auto header_value = StringUtil::trim(sip_line.substr(sip_line.find_first_of(':') + strlen(":")));
+  return std::tuple<HeaderType, absl::string_view>{HeaderTypes::get().str2Header(header_type_str),
+                                                   header_value};
 }
 
 MsgType Decoder::sipMsgType(absl::string_view top_line) {
@@ -242,16 +242,12 @@ int Decoder::HeaderHandler::processPath(absl::string_view& header) {
 }
 
 int Decoder::HeaderHandler::processRoute(absl::string_view& header) {
+  UNREFERENCED_PARAMETER(header);
   if (!isFirstRoute()) {
     return 0;
   }
   setFirstRoute(false);
-
-  Decoder::getParamFromHeader(header, metadata());
-
-  metadata()->setTopRoute(header);
-  // TODO
-  // metadata()->setDomain(header, parent_.parent_.getDomainMatchParamName());
+  metadata()->parseHeader(HeaderType::Route);
   return 0;
 }
 
@@ -282,7 +278,8 @@ int Decoder::HeaderHandler::processAuth(absl::string_view& header) {
   if (end == absl::string_view::npos) {
     return 0;
   }
-  metadata()->addParam("ep", header.substr(start, end - start).data());
+
+  metadata()->setOpaque(header.substr(start, end - start));
   return 0;
 }
 
@@ -298,22 +295,6 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
   metadata()->setPCookieIpMap(std::make_pair(std::string(lskpmc), std::string(ip)));
   metadata()->setOperation(Operation(OperationType::Delete, rawOffset(),
                                      DeleteOperationValue(header.length() + strlen("\r\n"))));
-  return 0;
-}
-//
-// 200 OK Header Handler
-//
-int Decoder::OK200HeaderHandler::processCseq(absl::string_view& header) {
-  if (header.find("INVITE") != absl::string_view::npos) {
-    metadata()->setRespMethodType(MethodType::Invite);
-  } else {
-    /**
-     * need to set a value, else when processRecordRoute,
-     * (metadata()->respMethodType() != MethodType::Invite) always false
-     * TODO: need to handle non-invite 200OK
-     */
-    metadata()->setRespMethodType(MethodType::NullMethod);
-  }
   return 0;
 }
 
@@ -559,24 +540,24 @@ int Decoder::decode() {
       // Sip Request Line
       absl::string_view sip_line = msg.substr(0, crlf);
 
+      metadata->addMsgHeader(HeaderType::TopLine, sip_line);
       parseTopLine(sip_line);
       current_header_ = HeaderType::Other;
 
       handler = MessageFactory::create(metadata->methodType(), *this);
 
-      metadata->addMsgHeader(HeaderType::TopLine, sip_line);
     } else {
       // Normal Header Line
       absl::string_view sip_line = msg.substr(0, crlf);
       auto [current_header, header_value] = sipHeaderType(sip_line);
-      this->current_header_ = current_header;
-      handler->parseHeader(current_header, sip_line);
+      current_header_ = current_header;
 
       if (current_header == HeaderType::Other) {
         metadata->addMsgHeader(current_header, sip_line);
       } else {
         metadata->addMsgHeader(current_header, header_value);
       }
+      handler->parseHeader(current_header, sip_line);
     }
 
     msg = msg.substr(crlf + strlen("\r\n"));
@@ -608,67 +589,9 @@ int Decoder::parseTopLine(absl::string_view& top_line) {
   auto metadata = metadata_;
   metadata->setMsgType(sipMsgType(top_line));
   metadata->setMethodType(sipMethod(top_line));
-
-  if (metadata->msgType() == MsgType::Request) {
-    metadata->setRequestURI(top_line);
-  }
-
-  Decoder::getParamFromHeader(top_line, metadata);
+  metadata->parseHeader(HeaderType::TopLine);
 
   return 0;
-}
-
-void Decoder::getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata) {
-  std::size_t pos = 0;
-  std::string pattern = "(.*)=(.*?)>*";
-
-  // If have both top line and top route, only keep one
-  metadata->resetParam();
-
-  // Has "SIP/2.0" in top line
-  // Eg: INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0
-  if (std::size_t found = header.find(" SIP"); found != absl::string_view::npos) {
-    header = static_cast<std::string>(header).substr(0, found);
-  }
-
-  ENVOY_LOG(debug, "Parameter in TopRoute/TopLine");
-  while (std::size_t found = header.find_first_of(";", pos)) {
-    std::string str;
-    if (found == absl::string_view::npos) {
-      str = static_cast<std::string>(header).substr(pos);
-    } else {
-      str = static_cast<std::string>(header).substr(pos, found - pos);
-    }
-
-    std::string param = "";
-    std::string value = "";
-    re2::RE2::FullMatch(static_cast<std::string>(str), pattern, &param, &value);
-
-    if (!param.empty() && !value.empty()) {
-      if (value.find("sip:") != absl::string_view::npos) {
-        value = value.substr(std::strlen("sip:"));
-      }
-      if (!value.empty()) {
-        std::size_t comma = value.find(':');
-        if (comma != absl::string_view::npos) {
-          value = value.substr(0, comma);
-        }
-      }
-      if (!value.empty()) {
-        ENVOY_LOG(debug, "{} = {}", param, value);
-        if (param == "opaque") {
-          metadata->addParam("ep", value);
-        } else {
-          metadata->addParam(param, value);
-        }
-      }
-    }
-
-    if (found == absl::string_view::npos) {
-      break;
-    }
-    pos = found + 1;
-  }
 }
 
 } // namespace SipProxy

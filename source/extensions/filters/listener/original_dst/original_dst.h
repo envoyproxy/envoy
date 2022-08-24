@@ -26,6 +26,12 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  size_t maxReadBytes() const override { return 0; }
+
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  };
+
 private:
   envoy::config::core::v3::TrafficDirection traffic_direction_;
 };

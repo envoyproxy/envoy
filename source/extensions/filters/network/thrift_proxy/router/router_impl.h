@@ -96,7 +96,11 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
-    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+    const Http::LowerCaseString& clusterHeader() const override {
+      // Weighted cluster entries don't have a cluster header based on proto.
+      ASSERT(parent_.clusterHeader().get().empty());
+      return parent_.clusterHeader();
+    }
     const std::vector<std::shared_ptr<RequestMirrorPolicy>>&
     requestMirrorPolicies() const override {
       return parent_.requestMirrorPolicies();
@@ -206,6 +210,7 @@ public:
     callbacks_->startUpstreamResponse(transport, protocol);
   }
   ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
+    callbacks_->streamInfo().addBytesSent(buffer.length());
     return callbacks_->upstreamData(buffer);
   }
   MessageMetadataSharedPtr responseMetadata() override { return callbacks_->responseMetadata(); }
@@ -221,9 +226,9 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public ThriftFilters::DecoderFilter {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
-         Runtime::Loader& runtime, ShadowWriter& shadow_writer)
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool close_downstream_on_error)
       : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer) {}
+        shadow_writer_(shadow_writer), close_downstream_on_error_(close_downstream_on_error) {}
 
   ~Router() override = default;
 
@@ -233,7 +238,16 @@ public:
   bool passthroughSupported() const override { return passthrough_supported_; }
 
   // RequestOwner
-  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override { return *this; }
+  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override {
+    ASSERT(callbacks_ != nullptr);
+    ASSERT(upstream_request_ != nullptr);
+
+    auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    upstream_info->setUpstreamHost(upstream_request_->upstream_host_);
+    callbacks_->streamInfo().setUpstreamInfo(std::move(upstream_info));
+
+    return *this;
+  }
   Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
   Event::Dispatcher& dispatcher() override { return callbacks_->dispatcher(); }
   void addSize(uint64_t size) override { request_size_ += size; }
@@ -242,6 +256,7 @@ public:
   void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
     callbacks_->sendLocalReply(response, end_stream);
   }
+  void onReset() override { callbacks_->onReset(); }
 
   // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
@@ -315,6 +330,8 @@ private:
   Runtime::Loader& runtime_;
   ShadowWriter& shadow_writer_;
   std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
+
+  bool close_downstream_on_error_;
 };
 
 } // namespace Router

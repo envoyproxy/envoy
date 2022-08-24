@@ -15,6 +15,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/server/admin/stats_request.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -26,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Server {
@@ -98,8 +100,9 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -124,6 +127,65 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
+TEST_P(AdminInstanceTest, Help) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
+  const std::string expected = R"EOF(admin commands are:
+  /: Admin home page
+  /certs: print certs on machine
+  /clusters: upstream cluster status
+  /config_dump: dump current Envoy configs (experimental)
+      resource: The resource to dump
+      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
+      include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
+  /contention: dump current Envoy mutex contention stats (if enabled)
+  /cpuprofiler (POST): enable/disable the CPU profiler
+      enable: enables the CPU profiler; One of (y, n)
+  /drain_listeners (POST): drain listeners
+      graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
+      inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
+  /healthcheck/fail (POST): cause the server to fail health checks
+  /healthcheck/ok (POST): cause the server to pass health checks
+  /heap_dump: dump current Envoy heap (if supported)
+  /heapprofiler (POST): enable/disable the heap profiler
+      enable: enable/disable the heap profiler; One of (y, n)
+  /help: print out list of admin commands
+  /hot_restart_version: print the hot restart compatibility version
+  /init_dump: dump current Envoy init manager information (experimental)
+      mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
+  /listeners: print listener info
+      format: File format to use; One of (text, json)
+  /logging (POST): query/change logging levels
+      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>.
+      level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
+  /memory: print current allocation/heap usage
+  /quitquitquit (POST): exit the server
+  /ready: print server state, return 200 if LIVE, otherwise return 503
+  /reopen_logs (POST): reopen access logs
+  /reset_counters (POST): reset all counters to zero
+  /runtime: print runtime values
+  /runtime_modify (POST): Adds or modifies runtime values as passed in query parameters. To delete a previously added key, use an empty string as the value. Note that deletion only applies to overrides added via this endpoint; values loaded from disk can be modified via override but not deleted. E.g. ?key1=value1&key2=value2...
+  /server_info: print server version/status information
+  /stats: print server stats
+      usedonly: Only include stats that have been written by system since restart
+      filter: Regular expression (ecmascript) for filtering stats
+      format: Format to use; One of (html, text, json)
+      type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
+  /stats/prometheus: print server stats in prometheus format
+      usedonly: Only include stats that have been written by system since restart
+      text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
+      filter: Regular expression (ecmascript) for filtering stats
+  /stats/recentlookups: Show recent stat-name lookups
+  /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
+  /stats/recentlookups/disable (POST): disable recording of reset stat-name lookup names
+  /stats/recentlookups/enable (POST): enable recording of reset stat-name lookup names
+)EOF";
+  EXPECT_EQ(expected, response.toString());
+}
+
 class ChunkedHandler : public Admin::Request {
 public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
@@ -138,7 +200,7 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+  auto callback = [](AdminStream&) -> Admin::RequestPtr {
     Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
@@ -175,9 +237,40 @@ TEST_P(AdminInstanceTest, CustomChunkedHandler) {
   }
 }
 
+TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  Stats::Store& store = server_.stats();
+
+  // Cover the case where multiple chunks are emitted by making a large number
+  // of stats with long names, based on the default chunk size. The actual
+  // chunk size can be changed in the unit test for StatsRequest, but it can't
+  // easily be changed from this test. This covers a bug fix due to
+  // AdminImpl::runRunCallback not draining the buffer after each chunk, which
+  // it is not required to do. This test ensures that StatsRequest::nextChunk
+  // writes up to StatsRequest::DefaultChunkSize *additional* bytes on each
+  // call.
+  const std::string prefix(1000, 'a');
+  uint32_t expected_size = 0;
+
+  // Declare enough counters so that we are sure to exceed the chunk size.
+  const uint32_t n = (StatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  for (uint32_t i = 0; i <= n; ++i) {
+    const std::string name = absl::StrCat(prefix, i);
+    store.counterFromString(name);
+    expected_size += name.size() + strlen(": 0\n");
+  }
+  EXPECT_EQ(Http::Code::OK, getCallback("/stats", header_map, response));
+  EXPECT_LT(expected_size, response.length());
+  EXPECT_LT(StatsRequest::DefaultChunkSize, response.length());
+  EXPECT_THAT(response.toString(), StartsWith(absl::StrCat(prefix, "0: 0\n", prefix)));
+}
+
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -185,41 +278,13 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
                                                      callback, true, false)));
-}
-
-TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
-
-  // It's OK to have help text with HTML characters in it, but when we render the home
-  // page they need to be escaped.
-  const std::string planets = "jupiter>saturn>mars";
-  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false));
-
-  Http::TestResponseHeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const Http::HeaderString& content_type = header_map.ContentType()->value();
-  EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
-  EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0, 0));
-  const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
-  EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0, 0));
-}
-
-TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
-  Http::TestResponseHeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const std::string logging_action = "<form action='logging' method='post'";
-  const std::string stats_href = "<a href='stats'";
-  EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0, 0));
-  EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0, 0));
 }
 
 class AdminTestingPeer {

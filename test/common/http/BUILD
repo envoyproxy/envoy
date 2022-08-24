@@ -81,22 +81,34 @@ envoy_proto_library(
     deps = ["//test/fuzz:common_proto"],
 )
 
-envoy_cc_fuzz_test(
-    name = "codec_impl_fuzz_test",
-    srcs = ["codec_impl_fuzz_test.cc"],
-    corpus = "codec_impl_corpus",
-    deps = [
-        ":codec_impl_fuzz_proto_cc_proto",
-        "//source/common/http:conn_manager_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/http1:codec_lib",
-        "//source/common/http/http2:codec_lib",
-        "//test/common/http/http2:codec_impl_test_util",
-        "//test/fuzz:utility_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/network:network_mocks",
-    ],
-)
+# TODO(kbaichoo): We split the fuzzer by protocol to allow the fuzzer to
+# better explore the individual protocols and catagorize failures for the
+# particular protocol that fails. In the future we might want to further
+# split out the codec fuzzer to better model the individual protocols.
+[
+    envoy_cc_fuzz_test(
+        name = "%s_codec_impl_fuzz_test" % http_protocol,
+        srcs = ["codec_impl_fuzz_test.cc"],
+        corpus = "codec_impl_corpus",
+        defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
+        deps = [
+            ":codec_impl_fuzz_proto_cc_proto",
+            "//source/common/http:conn_manager_lib",
+            "//source/common/http:header_map_lib",
+            "//source/common/http/http1:codec_lib",
+            "//source/common/http/http2:codec_lib",
+            "//test/common/http/http2:codec_impl_test_util",
+            "//test/fuzz:utility_lib",
+            "//test/mocks/http:http_mocks",
+            "//test/mocks/network:network_mocks",
+            "//test/test_common:test_runtime_lib",
+        ],
+    )
+    for http_protocol in [
+        "http1",
+        "http2",
+    ]
+]
 
 envoy_cc_test(
     name = "filter_manager_test",
@@ -224,6 +236,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -414,11 +427,13 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -458,22 +473,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_cache_impl_test",
-    srcs = ["alternate_protocols_cache_impl_test.cc"],
+    name = "http_server_properties_cache_impl_test",
+    srcs = ["http_server_properties_cache_impl_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//test/mocks:common_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )
 
 envoy_cc_test(
-    name = "alternate_protocols_cache_manager_test",
-    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    name = "http_server_properties_cache_manager_test",
+    srcs = ["http_server_properties_cache_manager_test.cc"],
     deps = [
         ":common_lib",
-        "//source/common/http:alternate_protocols_cache",
+        "//source/common/http:http_server_properties_cache",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -517,5 +532,13 @@ envoy_cc_test_library(
     hdrs = ["xff_extension.h"],
     deps = [
         "//source/extensions/http/original_ip_detection/xff:xff_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "dependency_manager_test",
+    srcs = ["dependency_manager_test.cc"],
+    deps = [
+        "//source/common/http:dependency_manager",
     ],
 )

@@ -28,8 +28,9 @@ using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : tracing_stats_{SKYWALKING_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
+    : tracing_stats_(std::make_shared<SkyWalkingTracerStats>(
+          SkyWalkingTracerStats{SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(
+              context.serverFactoryContext().scope(), "tracing.skywalking."))})),
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
@@ -45,19 +46,21 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext& trace_context,
-                                   const std::string& operation_name, Envoy::SystemTime,
+                                   const std::string&, Envoy::SystemTime,
                                    const Tracing::Decision decision) {
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
   auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
   if (!propagation_header.has_value()) {
-    tracing_context = tracing_context_factory_->create();
-    // Sampling status is always true on SkyWalking. But with disabling skip_analysis,
-    // this span can't be analyzed.
+    // Although a sampling flag can be added to the propagation header, it will be ignored by most
+    // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.
+    // So, if no propagation header is provided and sampling decision of Envoy is false, we need not
+    // propagate this sampling decision to the upstream. A null span will be used directly.
     if (!decision.traced) {
-      tracing_context->setSkipAnalysis();
+      return std::make_unique<Tracing::NullSpan>();
     }
+    tracing_context = tracing_context_factory_->create();
   } else {
     auto header_value_string = propagation_header.value();
     try {
@@ -70,7 +73,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     }
   }
 
-  return tracer.startSpan(operation_name, tracing_context);
+  return tracer.startSpan(trace_context.path(), trace_context.protocol(), tracing_context);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,

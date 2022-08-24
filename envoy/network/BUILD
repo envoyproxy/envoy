@@ -62,8 +62,11 @@ envoy_cc_library(
         ":socket_interface",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -99,6 +102,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":listen_socket_interface",
+        ":listener_filter_buffer_interface",
         ":transport_socket_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -157,6 +161,14 @@ envoy_cc_library(
         ":socket_interface",
         "//envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_filter_buffer_interface",
+    hdrs = ["listener_filter_buffer.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
     ],
 )
 

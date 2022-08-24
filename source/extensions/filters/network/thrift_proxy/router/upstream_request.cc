@@ -10,11 +10,12 @@ namespace Router {
 
 UpstreamRequest::UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                                  MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                                 ProtocolType protocol_type)
+                                 ProtocolType protocol_type, bool close_downstream_on_error)
     : parent_(parent), stats_(parent.stats()), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
-      request_complete_(false), response_started_(false), response_complete_(false) {}
+      request_complete_(false), response_underflow_(false), charged_response_timing_(false),
+      close_downstream_on_error_(close_downstream_on_error) {}
 
 UpstreamRequest::~UpstreamRequest() {
   if (conn_pool_handle_) {
@@ -43,6 +44,7 @@ FilterStatus UpstreamRequest::start() {
 }
 
 void UpstreamRequest::releaseConnection(const bool close) {
+  ENVOY_LOG(debug, "releasing connection, close: {}", close);
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
@@ -58,15 +60,21 @@ void UpstreamRequest::releaseConnection(const bool close) {
   }
 }
 
-void UpstreamRequest::resetStream() { releaseConnection(true); }
+void UpstreamRequest::resetStream() {
+  ENVOY_LOG(debug, "reset stream");
+  releaseConnection(true);
+}
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
+  ENVOY_LOG(debug, "on pool failure");
   conn_pool_handle_ = nullptr;
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reason);
+  if (!onResetStream(reason)) {
+    parent_.continueDecoding();
+  }
 }
 
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -118,16 +126,15 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
                                        UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
-  if (!response_started_) {
+  if (response_state_ == ResponseState::None) {
     callbacks.startUpstreamResponse(*transport_, *protocol_);
-    response_started_ = true;
+    response_state_ = ResponseState::Started;
   }
 
   const auto& cluster = parent_.cluster();
 
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
-    ENVOY_LOG(debug, "response complete");
 
     stats_.recordUpstreamResponseSize(cluster, response_size_);
 
@@ -155,11 +162,18 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
       break;
     }
 
+    response_state_ = ResponseState::Completed;
     if (callbacks.responseMetadata()->isDraining()) {
+      ENVOY_LOG(debug, "got draining signal");
       stats_.incCloseDrain(cluster);
+      // ResetStream triggers a local connection failure. However, we want to
+      // keep the downstream connection after the upstream connection, i.e.,
+      // `conn_data->connection()`, is closed. Therefore, introduce a new state
+      // ResponseState::Completed before ResponseState::ConnectionReleased to
+      // hint that got all the response and not to close the downstream
+      // connection, especially while we got a draining signal.
       resetStream();
     }
-
     onResponseComplete();
   } else if (status == ThriftFilters::ResponseStatus::Reset) {
     // Note: invalid responses are not accounted in the response size histogram.
@@ -174,7 +188,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
                                          UpstreamResponseCallbacks& callbacks) {
-  ASSERT(!response_complete_);
+  ASSERT(response_state_ < ResponseState::Completed);
 
   response_size_ += data.length();
 
@@ -191,6 +205,7 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
     // Response is incomplete, but no more data is coming.
     ENVOY_LOG(debug, "response underflow");
     onResponseComplete();
+    response_underflow_ = true;
     onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     return true;
   }
@@ -199,16 +214,17 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
 }
 
 void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
-  ASSERT(!response_complete_);
+  ASSERT(response_state_ != ResponseState::ConnectionReleased);
+  bool end_downstream = true;
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     ENVOY_LOG(debug, "upstream remote close");
-    onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(debug, "upstream local close");
-    onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    end_downstream = onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
   case Network::ConnectionEvent::Connected:
   case Network::ConnectionEvent::ConnectedZeroRtt:
@@ -217,6 +233,10 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
   }
 
   releaseConnection(false);
+  if (!end_downstream && request_complete_) {
+    ENVOY_LOG(debug, "reset parent callbacks");
+    parent_.onReset();
+  }
 }
 
 uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
@@ -228,7 +248,6 @@ uint64_t UpstreamRequest::encodeAndWrite(Buffer::OwnedImpl& request_buffer) {
   uint64_t size = transport_buffer.length();
 
   conn_data_->connection().write(transport_buffer, false);
-  onRequestComplete();
 
   return size;
 }
@@ -246,14 +265,16 @@ void UpstreamRequest::onRequestStart(bool continue_decoding) {
 }
 
 void UpstreamRequest::onRequestComplete() {
+  ENVOY_LOG(debug, "on request complete");
   Event::Dispatcher& dispatcher = parent_.dispatcher();
   downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
   request_complete_ = true;
 }
 
 void UpstreamRequest::onResponseComplete() {
+  ENVOY_LOG(debug, "on response complete");
   chargeResponseTiming();
-  response_complete_ = true;
+  response_state_ = ResponseState::ConnectionReleased;
   conn_state_ = nullptr;
   conn_data_.reset();
 }
@@ -262,13 +283,23 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   upstream_host_ = host;
 }
 
-void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
-  if (metadata_->messageType() == MessageType::Oneway) {
-    // For oneway requests, we should not attempt a response. Reset the downstream to signal
-    // an error.
-    parent_.resetDownstreamConnection();
-    return;
+static Upstream::Outlier::Result
+poolFailureReasonToResult(ConnectionPool::PoolFailureReason reason) {
+  switch (reason) {
+  case ConnectionPool::PoolFailureReason::Overflow:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    FALLTHRU;
+  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    return Upstream::Outlier::Result::LocalOriginConnectFailed;
+  case ConnectionPool::PoolFailureReason::Timeout:
+    return Upstream::Outlier::Result::LocalOriginTimeout;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+  bool close_downstream = true;
 
   chargeResponseTiming();
 
@@ -278,50 +309,57 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            false /* Don't close the downstream connection. */);
+    close_downstream = false;
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    upstream_host_->outlierDetector().putResult(
-        Upstream::Outlier::Result::LocalOriginConnectFailed);
-    // Should only happen if we closed the connection, due to an error condition, in which case
-    // we've already handled any possible downstream response.
-    parent_.resetDownstreamConnection();
-    break;
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+    FALLTHRU;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (reason == ConnectionPool::PoolFailureReason::Timeout) {
-      upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
-      upstream_host_->outlierDetector().putResult(
-          Upstream::Outlier::Result::LocalOriginConnectFailed);
-    }
-    stats_.incResponseLocalException(parent_.cluster());
+    upstream_host_->outlierDetector().putResult(poolFailureReasonToResult(reason));
 
-    // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
-    if (!response_started_) {
-      parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
-                                          fmt::format("connection failure '{}'",
-                                                      (upstream_host_ != nullptr)
-                                                          ? upstream_host_->address()->asString()
-                                                          : "to upstream")),
-                             true);
-      return;
+    // Error occurred after a partial or underflow response, propagate the reset to the
+    // downstream.
+    if (response_underflow_ || response_state_ == ResponseState::Started) {
+      ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
+      if (response_underflow_) {
+        stats_.incCloseUnderflowResponse(parent_.cluster());
+      } else {
+        stats_.incClosePartialResponse(parent_.cluster());
+      }
+      parent_.resetDownstreamConnection();
+    } else if (response_state_ == ResponseState::None) {
+      close_downstream = close_downstream_on_error_;
+      stats_.incResponseLocalException(parent_.cluster());
+      parent_.sendLocalReply(
+          AppException(AppExceptionType::InternalError,
+                       fmt::format("connection failure: {} '{}'",
+                                   PoolFailureReasonNames::get().fromReason(reason),
+                                   (upstream_host_ && upstream_host_->address())
+                                       ? upstream_host_->address()->asString()
+                                       : "to upstream")),
+          close_downstream);
     }
-
-    // Error occurred after a partial response, propagate the reset to the downstream.
-    parent_.resetDownstreamConnection();
     break;
   }
+
+  ENVOY_LOG(debug,
+            "upstream reset complete. reason={}, close_downstream={}, response_state={}, "
+            "response_underflow={}",
+            PoolFailureReasonNames::get().fromReason(reason), close_downstream,
+            static_cast<uint8_t>(response_state_), static_cast<bool>(response_underflow_));
+  return close_downstream;
 }
 
 void UpstreamRequest::chargeResponseTiming() {
-  if (charged_response_timing_ || !request_complete_) {
+  if (charged_response_timing_ || !downstream_request_complete_time_.has_value()) {
     return;
   }
   charged_response_timing_ = true;
   Event::Dispatcher& dispatcher = parent_.dispatcher();
   const std::chrono::milliseconds response_time =
       std::chrono::duration_cast<std::chrono::milliseconds>(
-          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_.value());
   stats_.recordUpstreamResponseTime(parent_.cluster(), upstream_host_, response_time.count());
 }
 

@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for restricting Proxy-Wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
   // The Proxy-Wasm capabilities which will be allowed. Capabilities are mapped by
-  // name. The *SanitizationConfig* which each capability maps to is currently unimplemented and ignored,
+  // name. The ``SanitizationConfig`` which each capability maps to is currently unimplemented and ignored,
   // and so should be left empty.
   //
   // The capability names are given in the
@@ -29,8 +29,8 @@ message CapabilityRestrictionConfig {
   // Additionally, the following WASI capabilities from
   // `this list <https://github.com/WebAssembly/WASI/blob/master/phases/snapshot/docs.md#modules>`_
   // are implemented and can be allowed:
-  // *fd_write*, *fd_read*, *fd_seek*, *fd_close*, *fd_fdstat_get*, *environ_get*, *environ_sizes_get*,
-  // *args_get*, *args_sizes_get*, *proc_exit*, *clock_time_get*, *random_get*.
+  // ``fd_write``, ``fd_read``, ``fd_seek``, ``fd_close``, ``fd_fdstat_get``, ``environ_get``, ``environ_sizes_get``,
+  // ``args_get``, ``args_sizes_get``, ``proc_exit``, ``clock_time_get``, ``random_get``.
   map<string, SanitizationConfig> allowed_capabilities = 1;
 }
 
@@ -45,7 +45,7 @@ message SanitizationConfig {
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
-  // *vm_id* and code will use the same VM. May be left blank. Sharing a VM between plugins can
+  // ``vm_id`` and code will use the same VM. May be left blank. Sharing a VM between plugins can
   // reduce memory utilization and make sharing of data easier which may have security implications.
   // [#comment: TODO: add ref for details.]
   string vm_id = 1;
@@ -57,7 +57,7 @@ message VmConfig {
   // .. _extension_envoy.wasm.runtime.null:
   //
   // **envoy.wasm.runtime.null**: Null sandbox, the Wasm module must be compiled and linked into the
-  // Envoy binary. The registered name is given in the *code* field as *inline_string*.
+  // Envoy binary. The registered name is given in the ``code`` field as ``inline_string``.
   //
   // .. _extension_envoy.wasm.runtime.v8:
   //
@@ -85,9 +85,9 @@ message VmConfig {
   config.core.v3.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM
-  // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before
-  // passing it to the plugin. `google.protobuf.BytesValue` and
-  // `google.protobuf.StringValue` are passed directly without the wrapper.
+  // (proxy_on_start). ``google.protobuf.Struct`` is serialized as JSON before
+  // passing it to the plugin. ``google.protobuf.BytesValue`` and
+  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
@@ -121,13 +121,13 @@ message EnvironmentVariables {
 // [#next-free-field: 7]
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
-  // multiple filters/services are handled by the same *vm_id* and *root_id* and for
+  // multiple filters/services are handled by the same ``vm_id`` and ``root_id`` and for
   // logging/debugging.
   string name = 1;
 
   // A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
   // if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
-  // filters/services with a blank root_id with the same *vm_id* will share Context(s).
+  // filters/services with a blank root_id with the same ``vm_id`` will share Context(s).
   string root_id = 2;
 
   // Configuration for finding or starting VM.
@@ -137,10 +137,10 @@ message PluginConfig {
   }
 
   // Filter/service configuration used to configure or reconfigure a plugin
-  // (proxy_on_configuration).
-  // `google.protobuf.Struct` is serialized as JSON before
-  // passing it to the plugin. `google.protobuf.BytesValue` and
-  // `google.protobuf.StringValue` are passed directly without the wrapper.
+  // (``proxy_on_configure``).
+  // ``google.protobuf.Struct`` is serialized as JSON before
+  // passing it to the plugin. ``google.protobuf.BytesValue`` and
+  // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // If there is a fatal error on the VM (e.g. exception, abort(), on_start or on_configure return false),
@@ -154,7 +154,7 @@ message PluginConfig {
   CapabilityRestrictionConfig capability_restriction_config = 6;
 }
 
-// WasmService is configured as a built-in *envoy.wasm_service* :ref:`WasmService
+// WasmService is configured as a built-in ``envoy.wasm_service`` :ref:`WasmService
 // <config_wasm_service>` This opaque configuration will be used to create a Wasm Service.
 message WasmService {
   // General plugin configuration.

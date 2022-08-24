@@ -33,10 +33,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string configType() override {
-    // Prevent registration of filters by type. This is only allowed in tests.
-    return "";
-  }
+  std::set<std::string> configTypes() override { return {}; }
 
   std::string name() const override { return name_; }
 
@@ -45,6 +42,29 @@ protected:
 
 private:
   const std::string name_;
+};
+
+class UpstreamFilterConfig : public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  virtual Http::FilterFactoryCb
+  createDualFilter(const std::string& stat_prefix,
+                   Server::Configuration::ServerFactoryContext& context) PURE;
+
+  Http::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message&, const std::string& stat_prefix,
+      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+    return createDualFilter(stat_prefix, context.getServerFactoryContext());
+  }
+};
+
+class EmptyHttpDualFilterConfig : public EmptyHttpFilterConfig, public UpstreamFilterConfig {
+public:
+  EmptyHttpDualFilterConfig(const std::string& name) : EmptyHttpFilterConfig(name) {}
+
+  Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
+                                     Server::Configuration::FactoryContext& context) override {
+    return createDualFilter(stat_prefix, context.getServerFactoryContext());
+  }
 };
 
 } // namespace Common

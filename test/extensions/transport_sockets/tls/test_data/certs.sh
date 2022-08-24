@@ -113,13 +113,20 @@ generate_cert_chain() {
         then
             ca_name="i$((x - 1))"
         fi
-        echo $x: $certname $ca_name
+        echo "$x: $certname $ca_name"
         generate_ca $certname $ca_name
     done
     for x in {1..3}; do
         cat "i${x}_cert.pem" >> test_long_cert_chain.pem
     done
     mv i4_cert.pem test_random_cert.pem
+
+    # These intermediate files are unnecessary.
+    for x in {1..4}; do
+        rm -f "i${x}_key.pem"
+        rm -f "i${x}_cert.pem"
+        rm -f "i${x}_cert_info.h"
+    done
 }
 
 # Generate ca_cert.pem.

@@ -158,12 +158,12 @@ should be replaced by backslash-double-quote (\").
 
 The following keys are supported:
 
-1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate.
+1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate. The current proxy's certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
 4. ``Chain`` The entire client certificate chain (including the leaf certificate) in URL encoded PEM format.
 5. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
-6. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
+6. ``URI`` The URI type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple URI type Subject Alternative Names, each will be a separate key-value pair.
 7. ``DNS`` The DNS type Subject Alternative Name field of the current client certificate. A client certificate may contain multiple DNS type Subject Alternative Names, each will be a separate key-value pair.
 
 A client certificate may contain multiple Subject Alternative Name types. For details on different Subject Alternative Name types, please refer `RFC 2459`_.

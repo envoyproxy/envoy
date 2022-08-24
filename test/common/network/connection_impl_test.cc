@@ -27,6 +27,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -161,7 +162,7 @@ protected:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->connectionInfoProvider().localAddress(), source_address_,
-        createTransportSocket(), socket_options_);
+        createTransportSocket(), socket_options_, transport_socket_options_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -293,6 +294,7 @@ protected:
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_ = nullptr;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -305,6 +307,15 @@ TEST_P(ConnectionImplTest, UniqueId) {
   uint64_t first_id = client_connection_->id();
   setUpBasicConnection();
   EXPECT_NE(first_id, client_connection_->id());
+  disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetSslConnection) {
+  setUpBasicConnection();
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  client_connection_->connectionInfoSetter().setSslConnection(ssl_info);
+  EXPECT_EQ(ssl_info, client_connection_->ssl());
+  EXPECT_EQ(ssl_info, client_connection_->connectionInfoProvider().sslConnection());
   disconnect(false);
 }
 
@@ -432,7 +443,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   }
 
   client_connection_ = dispatcher_->createClientConnection(
-      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection_->addConnectionCallbacks(client_callbacks_);
   client_connection_->connect();
 
@@ -550,7 +561,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
-            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -599,7 +610,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_->connectionInfoProvider().localAddress(), source_address_,
-            Network::Test::createRawBufferSocket(), server_connection_->socketOptions());
+            Network::Test::createRawBufferSocket(), server_connection_->socketOptions(), nullptr);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
 
@@ -1229,7 +1240,8 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  auto os_calls =
+      std::make_unique<TestThreadsafeSingletonInjector<Api::OsSysCallsImpl>>(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .WillRepeatedly(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
@@ -1240,7 +1252,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillOnce(Invoke([&](os_fd_t, const iovec*, int) -> Api::SysCallSizeResult {
         dispatcher_->exit();
         // Return to default os_sys_calls implementation
-        os_calls.~TestThreadsafeSingletonInjector();
+        os_calls.reset();
         return {-1, SOCKET_ERROR_AGAIN};
       }));
   // The write() call on the connection will buffer enough data to bring the connection above the
@@ -1405,7 +1417,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->connectionInfoProvider().localAddress(), source_address_,
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -2877,10 +2889,10 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, runtime_, true, false);
 
-    client_connection_ =
-        dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
-                                            Network::Address::InstanceConstSharedPtr(),
-                                            Network::Test::createRawBufferSocket(), nullptr);
+    client_connection_ = dispatcher_->createClientConnection(
+        socket_->connectionInfoProvider().localAddress(),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+        nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -2963,7 +2975,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   }
   ClientConnectionPtr connection =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                          Network::Test::createRawBufferSocket(), nullptr);
+                                          Network::Test::createRawBufferSocket(), nullptr, nullptr);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -2976,7 +2988,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+      nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2991,7 +3004,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefusedWithTransportError) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr);
+      Network::Address::InstanceConstSharedPtr(), std::move(transport_socket), nullptr, nullptr);
   connection->connect();
   connection->noDelay(true);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -3017,7 +3030,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
   options->emplace_back(option);
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), options);
+      Network::Test::createRawBufferSocket(), options, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
 
@@ -3025,7 +3038,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
 TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   ClientConnectionPtr connection = dispatcher_->createClientConnection(
       Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
 
@@ -3044,19 +3057,18 @@ protected:
 // establish connection to such address.
 TEST_F(InternalClientConnectionImplTest,
        CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
-  auto runtime = std::make_unique<TestScopedRuntime>();
-  runtime->mergeValues({{"envoy.reloadable_features.internal_address", "true"}});
 
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
 
   ASSERT_DEATH(
       {
-        ClientConnectionPtr connection =
-            dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+        ClientConnectionPtr connection = dispatcher_->createClientConnection(
+            address, Network::Address::InstanceConstSharedPtr(),
+            Network::Test::createRawBufferSocket(), nullptr, nullptr);
       },
       "");
 }
@@ -3084,10 +3096,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientConnectionWithCustomRawBufferSocketTe
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+class TestObject : public StreamInfo::FilterState::Object {};
+
 TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  auto filter_state_object = std::make_shared<TestObject>();
+  filter_state.setData("test-filter-state", filter_state_object,
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::Connection,
+                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);
   setUpBasicConnection();
 
   EXPECT_TRUE(getTransportSocket()->compareCallbacks(testClientConnection()));
+  EXPECT_TRUE(client_connection_->streamInfo().filterState()->hasDataWithName("test-filter-state"));
 
   disconnect(false);
 }

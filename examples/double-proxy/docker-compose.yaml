@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   flask_service:
@@ -6,6 +6,8 @@ services:
       context: ../shared/flask
     image: flask_service:python-3.10-slim-bullseye
     restart: "no"
+    deploy:
+      replicas: 0
 
   proxy-frontend:
     build:
@@ -47,7 +49,8 @@ services:
         - proxy-postgres-backend.example.com
 
   postgres:
-    image: postgres:latest
+    build:
+      context: ../shared/postgres
     networks:
       postgres-backend:
     environment:

@@ -121,14 +121,16 @@ protected:
                                     absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto& encoder = sendClientRequestHeaders(cb);
     Buffer::OwnedImpl post_body;
-    for (uint32_t i = 0; i < num_chunks; i++) {
+    for (uint32_t i = 0; i < num_chunks && codec_client_->streamOpen(); i++) {
       Buffer::OwnedImpl chunk;
       TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
       post_body.add(chunk.toString());
       codec_client_->sendData(encoder, chunk, false);
     }
-    Buffer::OwnedImpl empty_chunk;
-    codec_client_->sendData(encoder, empty_chunk, true);
+    if (codec_client_->streamOpen()) {
+      Buffer::OwnedImpl empty_chunk;
+      codec_client_->sendData(encoder, empty_chunk, true);
+    }
     return post_body;
   }
 

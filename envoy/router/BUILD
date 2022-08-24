@@ -134,3 +134,13 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "cluster_specifier_plugin_interface",
+    hdrs = ["cluster_specifier_plugin.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+    ],
+)

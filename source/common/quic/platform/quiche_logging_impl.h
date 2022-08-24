@@ -78,11 +78,11 @@
 #define QUICHE_CHECK_INNER_IMPL(condition, details)                                                \
   QUICHE_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << details << ". "
 
-#define QUICHE_CHECK_IMPL(condition) QUICHE_CHECK_INNER_IMPL(condition, "CHECK failed: " #condition)
+#define QUICHE_CHECK_IMPL(condition) QUICHE_CHECK_INNER_IMPL(condition, "Check failed: " #condition)
 
 #define QUICHE_CHECK_INNER_IMPL_OP(op, a, b)                                                       \
   QUICHE_CHECK_INNER_IMPL((a)op(b),                                                                \
-                          "CHECK failed: " #a " (=" << (a) << ") " #op " " #b " (=" << (b) << ")")
+                          "Check failed: " #a " (=" << (a) << ") " #op " " #b " (=" << (b) << ")")
 
 #define QUICHE_CHECK_GT_IMPL(a, b) QUICHE_CHECK_INNER_IMPL_OP(>, a, b)
 #define QUICHE_CHECK_GE_IMPL(a, b) QUICHE_CHECK_INNER_IMPL_OP(>=, a, b)

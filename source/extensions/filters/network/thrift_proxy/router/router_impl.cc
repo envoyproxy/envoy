@@ -99,7 +99,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
 
   const auto& cluster_header = clusterHeader();
   if (!cluster_header.get().empty()) {
-    const auto& headers = metadata.headers();
+    const auto& headers = metadata.requestHeaders();
     const auto entry = headers.get(cluster_header);
     if (!entry.empty()) {
       // This is an implicitly untrusted header, so per the API documentation only the first
@@ -149,7 +149,7 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                       uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
@@ -178,7 +178,7 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
 
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
                                                        uint64_t random_value) const {
-  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+  if (RouteEntryImplBase::headersMatch(metadata.requestHeaders())) {
     bool matches =
         service_name_.empty() ||
         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));
@@ -240,6 +240,7 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
 
 void Router::onDestroy() {
   if (upstream_request_ != nullptr) {
+    ENVOY_LOG(debug, "router on destroy reset stream");
     upstream_request_->resetStream();
     cleanup();
   }
@@ -264,6 +265,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
 }
 
 FilterStatus Router::transportEnd() {
+  upstream_request_->onRequestComplete();
   if (upstream_request_->metadata_->messageType() == MessageType::Oneway) {
     // No response expected
     upstream_request_->onResponseComplete();
@@ -280,7 +282,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
-        true);
+        close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -291,7 +293,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       prepareUpstreamRequest(cluster_name, metadata, callbacks_->downstreamTransportType(),
                              callbacks_->downstreamProtocolType(), this);
   if (prepare_result.exception.has_value()) {
-    callbacks_->sendLocalReply(prepare_result.exception.value(), true);
+    callbacks_->sendLocalReply(prepare_result.exception.value(), close_downstream_on_error_);
     return FilterStatus::StopIteration;
   }
 
@@ -324,9 +326,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
-  upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *upstream_req_info.conn_pool_data, metadata,
-                                        upstream_req_info.transport, upstream_req_info.protocol);
+  upstream_request_ = std::make_unique<UpstreamRequest>(
+      *this, *upstream_req_info.conn_pool_data, metadata, upstream_req_info.transport,
+      upstream_req_info.protocol, close_downstream_on_error_);
   return upstream_request_->start();
 }
 
@@ -335,6 +337,7 @@ FilterStatus Router::messageEnd() {
   const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
   addSize(encode_size);
   stats().recordUpstreamRequestSize(*cluster_, request_size_);
+  callbacks_->streamInfo().addBytesReceived(request_size_);
 
   // Dispatch shadow requests, if any.
   // Note: if connections aren't ready, the write will happen when appropriate.

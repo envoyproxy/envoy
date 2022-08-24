@@ -201,14 +201,26 @@ public:
   void insertTransaction(std::string&& transaction_id,
                          SipFilters::DecoderFilterCallbacks* active_trans,
                          std::shared_ptr<UpstreamRequest> upstream_request) {
+    if (hasTransaction(transaction_id)) {
+      return;
+    }
+
     tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.emplace(std::make_pair(
         transaction_id, std::make_shared<TransactionInfoItem>(active_trans, upstream_request)));
   }
 
   void deleteTransaction(std::string&& transaction_id) {
-    tls_->getTyped<ThreadLocalTransactionInfo>()
-        .transaction_info_map_.at(transaction_id)
-        ->toDelete();
+    if (hasTransaction(transaction_id)) {
+      tls_->getTyped<ThreadLocalTransactionInfo>()
+          .transaction_info_map_.at(transaction_id)
+          ->toDelete();
+    }
+  }
+
+  bool hasTransaction(std::string& transaction_id) {
+    return tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.find(
+               transaction_id) !=
+           tls_->getTyped<ThreadLocalTransactionInfo>().transaction_info_map_.end();
   }
 
   TransactionInfoItem& getTransaction(std::string&& transaction_id) {
@@ -224,7 +236,7 @@ public:
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
     try {
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range const&) {
+    } catch (std::out_of_range const& e) {
       return nullptr;
     }
   }
@@ -290,8 +302,8 @@ private:
                                               MessageMetadataSharedPtr metadata, std::string dest,
                                               bool& lb_ret);
 
-  QueryStatus handleCustomizedAffinity(std::string type, std::string key,
-                                       MessageMetadataSharedPtr metadata);
+  QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
+                                       const std::string& key, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
@@ -307,7 +319,6 @@ private:
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
-  // bool continue_handling_;
 };
 
 class ResponseDecoder : public DecoderCallbacks,
@@ -329,10 +340,7 @@ public:
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
-    UNREFERENCED_PARAMETER(metadata);
-    return *this;
-  }
+  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -374,6 +382,7 @@ public:
 
   void setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
   void delDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks);
+  SipFilters::DecoderFilterCallbacks& decoderFilterCallbacks() { return *callbacks_; }
 
   ConnectionState connectionState() { return conn_state_; }
   void setConnectionState(ConnectionState state) { conn_state_ = state; }

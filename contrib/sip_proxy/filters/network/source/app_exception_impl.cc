@@ -15,11 +15,12 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   output << "SIP/2.0 503 Service Unavailable\r\n";
 
   // To
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::To]).empty()) {
-    auto to = absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::To])[0];
-    output << fmt::format("To: {}", to);
+  if (!metadata.header(HeaderType::To).empty()) {
+    metadata.parseHeader(HeaderType::To);
+    auto to = metadata.header(HeaderType::To);
+    output << fmt::format("To: {}", to.text());
 
-    if (to.find("tag=") == absl::string_view::npos) {
+    if (!to.hasParam("tag")) {
 
       // We could simply use the time of day as a tag; however, that is not unique
       // enough. So, let's perturb the time of day with a salt to get a better
@@ -41,30 +42,27 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   }
 
   // From
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From]).empty()) {
-    output << fmt::format("From: {}\r\n",
-                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::From])[0]);
+  if (!metadata.header(HeaderType::From).empty()) {
+    output << fmt::format("From: {}\r\n", metadata.header(HeaderType::From).text());
   } else {
     ENVOY_LOG(error, "No \"From\" in received message");
   }
 
   // Call-ID
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId]).empty()) {
-    output << fmt::format("Call-ID: {}\r\n",
-                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::CallId])[0]);
+  if (!metadata.header(HeaderType::CallId).empty()) {
+    output << fmt::format("Call-ID: {}\r\n", metadata.header(HeaderType::CallId).text());
   } else {
     ENVOY_LOG(error, "No \"Call-ID\" in received message");
   }
 
   // Via
-  for (auto via : absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Via])) {
-    output << fmt::format("Via: {}\r\n", via);
+  for (const auto& via : metadata.listHeader(HeaderType::Via)) {
+    output << fmt::format("Via: {}\r\n", via.text());
   }
 
   // CSeq
-  if (!absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq]).empty()) {
-    output << fmt::format("CSeq: {}\r\n",
-                          absl::get<VectorHeader>(metadata.msgHeaderList()[HeaderType::Cseq])[0]);
+  if (!metadata.header(HeaderType::Cseq).empty()) {
+    output << fmt::format("CSeq: {}\r\n", metadata.header(HeaderType::Cseq).text());
   } else {
     ENVOY_LOG(error, "No \"Cseq\" in received message");
   }

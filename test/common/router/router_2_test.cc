@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Router {
 
+using testing::AtLeast;
 using testing::Eq;
 using testing::StartsWith;
 
@@ -198,7 +199,7 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -236,7 +237,7 @@ TEST_F(WatermarkTest, FilterWatermarks) {
 
 TEST_F(WatermarkTest, FilterWatermarksUnwound) {
   num_add_callbacks_ = 0;
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(3)).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   // Send the headers sans-fin, and don't flag the pool as ready.
   sendRequest(false, false);
@@ -259,7 +260,7 @@ TEST_F(WatermarkTest, FilterWatermarksUnwound) {
 // Same as RetryRequestNotComplete but with decodeData larger than the buffer
 // limit, no retry will occur.
 TEST_F(WatermarkTest, RetryRequestNotComplete) {
-  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(2).WillRepeatedly(Return(10));
+  EXPECT_CALL(callbacks_, decoderBufferLimit()).Times(AtLeast(2)).WillRepeatedly(Return(10));
   router_.setDecoderFilterCallbacks(callbacks_);
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -309,7 +310,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span, injectContext(_));
+            EXPECT_CALL(*child_span, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -330,6 +331,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
@@ -357,7 +359,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span, injectContext(_));
+            EXPECT_CALL(*child_span, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -384,6 +386,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
@@ -409,7 +412,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
                            const Http::ConnectionPool::Instance::StreamOptions&)
                            -> Http::ConnectionPool::Cancellable* {
-        EXPECT_CALL(*child_span, injectContext(_));
+        EXPECT_CALL(*child_span, injectContext(_, _));
         callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, Http::Protocol::Http10);
         return nullptr;
@@ -430,6 +433,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
@@ -455,7 +459,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span_1, injectContext(_));
+            EXPECT_CALL(*child_span_1, injectContext(_, _));
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -477,6 +481,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span_1,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
@@ -499,7 +504,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(*child_span_2, injectContext(_));
+            EXPECT_CALL(*child_span_2, injectContext(_, _));
             EXPECT_CALL(*router_.retry_state_, onHostAttempted(_));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
@@ -522,6 +527,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span_2,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
@@ -551,7 +557,7 @@ TEST_F(RouterTestNoChildSpan, BasicFlow) {
                      const Http::ConnectionPool::Instance::StreamOptions&)
                      -> Http::ConnectionPool::Cancellable* {
             response_decoder = &decoder;
-            EXPECT_CALL(callbacks_.active_span_, injectContext(_));
+            EXPECT_CALL(callbacks_.active_span_, injectContext(_, _));
             callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;

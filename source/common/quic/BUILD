@@ -131,6 +131,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
+        ":quic_ssl_connection_info_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
     ],
 )
@@ -279,7 +280,7 @@ envoy_cc_library(
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
-        "//envoy/http:alternate_protocols_cache_interface",
+        "//envoy/http:http_server_properties_cache_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:codes_lib",

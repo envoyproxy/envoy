@@ -166,8 +166,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
                                            empty_stat_name,
-                                           enumToInt(Http::Code::TooManyRequests),
+                                           enumToInt(config_->rateLimitedStatus()),
                                            true,
+                                           empty_stat_name,
                                            empty_stat_name,
                                            empty_stat_name,
                                            empty_stat_name,
@@ -200,9 +201,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     state_ = State::Responded;
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
     callbacks_->sendLocalReply(
-        Http::Code::TooManyRequests, response_body,
+        config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
+          config_->responseHeadersParser().evaluateHeaders(headers, callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
@@ -269,8 +271,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
     const auto* specific_per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            "envoy.filters.http.ratelimit", route);
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:

@@ -1,10 +1,21 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 
 licenses(["notice"])  # Apache 2
 
+exports_files(["icu_data_filter.json"])
+
 envoy_package()
+
+configure_make(
+    name = "liburing",
+    configure_in_place = True,
+    lib_source = "@com_github_axboe_liburing//:all",
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+)
 
 # autotools packages are unusable on Windows as-is
 # TODO: Consider our own gperftools.BUILD file as we do with many other packages
@@ -104,7 +115,37 @@ configure_make(
 )
 
 configure_make(
+    name = "colm",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-shared",
+        "--enable-static",
+    ],
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_colm//:all",
+    out_binaries = ["colm"],
+    tags = ["skip_on_windows"],
+)
+
+configure_make(
     name = "ragel",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-manual",
+        "--disable-shared",
+        "--enable-static",
+        "--with-colm=$EXT_BUILD_DEPS/colm",
+    ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
@@ -113,6 +154,64 @@ configure_make(
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
+    deps = [":colm"],
+)
+
+# ICU used by the language detection filter (i18n).
+# Generates a minimal configuration and reduces the size of the ICU locale data filter file.
+# https://unicode-org.github.io/icu/userguide/icu_data/buildtool.html
+configure_make(
+    name = "unicode_icu_build",
+    build_data = ["//bazel/foreign_cc:icu_data_filter.json"],
+    configure_command = "icu4c/source/configure",
+    configure_options = [
+        "--enable-option-checking",
+        "--enable-static",
+        "--enable-tools",
+        "--disable-draft",
+        "--disable-dyload",
+        "--disable-extras",
+        "--disable-plugins",
+        "--disable-samples",
+        "--disable-shared",
+        "--disable-tests",
+        "--with-data-packaging=static",
+    ],
+    data = ["@com_github_unicode_org_icu//:all"],
+    env = {
+        "CXXFLAGS": "-fPIC",
+        "CFLAGS": "-fPIC",
+        "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
+    },
+    lib_source = "@com_github_unicode_org_icu//:all",
+    out_static_libs = [
+        "libicuuc.a",
+        "libicudata.a",
+    ],
+    tags = ["skip_on_windows"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "unicode_icu",
+    defines = [
+        "UCONFIG_ONLY_HTML_CONVERSION=1",
+        "U_CHARSET_IS_UTF8=1",
+        "U_USING_ICU_NAMESPACE=0",
+        "UNISTR_FROM_STRING_EXPLICIT=",
+        "UNISTR_FROM_CHAR_EXPLICIT=",
+    ] + select({
+        "//bazel:windows_x86_64": [
+            "U_STATIC_IMPLEMENTATION",
+            "UNICODE",
+            "_UNICODE",
+        ],
+        "//conditions:default": [],
+    }),
+    tags = ["skip_on_windows"],
+    # Can not be used for the core dataplane due to security concerns
+    visibility = ["//contrib/language/filters/http/source:__pkg__"],
+    deps = ["unicode_icu_build"],
 )
 
 envoy_cmake(
@@ -427,7 +526,7 @@ envoy_cmake(
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.
         "CFLAGS": "-UDEBUG",
-        "CXXFLAGS": "-UDEBUG",
+        "CXXFLAGS": "-UDEBUG -Wno-error=unused-but-set-variable",
         "ASMFLAGS": "-UDEBUG",
     },
     lib_source = "@com_github_wavm_wavm//:all",
@@ -479,4 +578,21 @@ envoy_cmake(
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
+)
+
+envoy_cmake(
+    name = "zstd",
+    build_data = ["@com_github_facebook_zstd//:all"],
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "ZSTD_BUILD_SHARED": "off",
+        "ZSTD_BUILD_STATIC": "on",
+    },
+    lib_source = "@com_github_facebook_zstd//:all",
+    out_static_libs = select({
+        "//bazel:windows_x86_64": ["zstd_static.lib"],
+        "//conditions:default": ["libzstd.a"],
+    }),
+    working_directory = "build/cmake",
 )

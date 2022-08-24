@@ -87,6 +87,13 @@ MockMetadataMatchCriteria::~MockMetadataMatchCriteria() = default;
 MockTlsContextMatchCriteria::MockTlsContextMatchCriteria() = default;
 MockTlsContextMatchCriteria::~MockTlsContextMatchCriteria() = default;
 
+MockPathMatchCriterion::MockPathMatchCriterion() {
+  ON_CALL(*this, matchType()).WillByDefault(ReturnPointee(&type_));
+  ON_CALL(*this, matcher()).WillByDefault(ReturnPointee(&matcher_));
+}
+
+MockPathMatchCriterion::~MockPathMatchCriterion() = default;
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
@@ -100,10 +107,12 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
+  ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, connectConfig()).WillByDefault(ReturnRef(connect_config_));
+  ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
 }
 
 MockRouteEntry::~MockRouteEntry() = default;
@@ -159,5 +168,14 @@ MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }
+
+MockClusterSpecifierPlugin::MockClusterSpecifierPlugin() {
+  ON_CALL(*this, route(_, _)).WillByDefault(Return(nullptr));
+}
+
+MockClusterSpecifierPluginFactoryConfig::MockClusterSpecifierPluginFactoryConfig() {
+  ON_CALL(*this, createClusterSpecifierPlugin(_, _)).WillByDefault(Return(nullptr));
+}
+
 } // namespace Router
 } // namespace Envoy

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sys/types.h>
+
 #include <cstdint>
 
 #include "envoy/network/connection.h"
@@ -27,14 +29,56 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+class SslHandshakerImpl;
+class SslExtendedSocketInfoImpl;
+
+class ValidateResultCallbackImpl : public Ssl::ValidateResultCallback {
+public:
+  ValidateResultCallbackImpl(Event::Dispatcher& dispatcher,
+                             SslExtendedSocketInfoImpl& extended_socket_info)
+      : dispatcher_(dispatcher), extended_socket_info_(extended_socket_info) {}
+
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+  void onCertValidationResult(bool succeeded, const std::string& error_details,
+                              uint8_t tls_alert) override;
+
+  void onSslHandshakeCancelled();
+
+private:
+  Event::Dispatcher& dispatcher_;
+  OptRef<SslExtendedSocketInfoImpl> extended_socket_info_;
+};
+
 class SslExtendedSocketInfoImpl : public Envoy::Ssl::SslExtendedSocketInfo {
 public:
+  explicit SslExtendedSocketInfoImpl(SslHandshakerImpl& handshaker) : ssl_handshaker_(handshaker) {}
+  // Overridden to notify cert_validate_result_callback_ that the handshake has been cancelled.
+  ~SslExtendedSocketInfoImpl() override;
+
   void setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus validated) override;
   Envoy::Ssl::ClientValidationStatus certificateValidationStatus() const override;
+  Ssl::ValidateResultCallbackPtr createValidateResultCallback() override;
+  void onCertificateValidationCompleted(bool succeeded) override;
+  Ssl::ValidateStatus certificateValidationResult() const override {
+    return cert_validation_result_;
+  }
+  uint8_t certificateValidationAlert() const override { return cert_validation_alert_; }
+
+  void setCertificateValidationAlert(uint8_t alert) { cert_validation_alert_ = alert; }
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
+  SslHandshakerImpl& ssl_handshaker_;
+  // Latch the in-flight async cert validation callback.
+  // nullopt if there is none.
+  OptRef<ValidateResultCallbackImpl> cert_validate_result_callback_;
+  // Stores the TLS alert.
+  uint8_t cert_validation_alert_{SSL_AD_CERTIFICATE_UNKNOWN};
+  // Stores the validation result if there is any.
+  // nullopt if no validation has ever been kicked off.
+  Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
 };
 
 class SslHandshakerImpl : public ConnectionInfoImplBase,
@@ -71,18 +115,22 @@ using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
   HandshakerFactoryContextImpl(Api::Api& api, const Server::Options& options,
-                               absl::string_view alpn_protocols)
-      : api_(api), options_(options), alpn_protocols_(alpn_protocols) {}
+                               absl::string_view alpn_protocols,
+                               Singleton::Manager& singleton_manager)
+      : api_(api), options_(options), alpn_protocols_(alpn_protocols),
+        singleton_manager_(singleton_manager) {}
 
   // HandshakerFactoryContext
   Api::Api& api() override { return api_; }
   const Server::Options& options() const override { return options_; }
   absl::string_view alpnProtocols() const override { return alpn_protocols_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 private:
   Api::Api& api_;
   const Server::Options& options_;
   const std::string alpn_protocols_;
+  Singleton::Manager& singleton_manager_;
 };
 
 class HandshakerFactoryImpl : public Ssl::HandshakerFactory {

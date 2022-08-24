@@ -61,9 +61,7 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
-    ON_CALL(file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
-        .WillByDefault(Return("access_token"));
-    ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
+    ON_CALL(file_system_, fileReadToEnd(_))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
@@ -92,6 +90,19 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
+    // Emulate main implementation of initializing bootstrap extensions.
+    std::vector<Server::BootstrapExtensionPtr> bootstrap_extensions;
+    for (const auto& bootstrap_extension : bootstrap.bootstrap_extensions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::BootstrapExtensionFactory>(
+              bootstrap_extension);
+      auto config = Config::Utility::translateAnyToFactoryConfig(
+          bootstrap_extension.typed_config(),
+          server_.messageValidationContext().staticValidationVisitor(), factory);
+      bootstrap_extensions.push_back(
+          factory.createBootstrapExtension(*config, server_factory_context_));
+    }
+
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
@@ -108,17 +119,19 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Network::FilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                           context);
+              return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
+                  filters, context);
             }));
+    ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
+        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::ListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
-                  filters, context);
+                -> Filter::ListenerFilterFactoriesList {
+              return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+                  filters, context, *component_factory_.getTcpListenerConfigProviderManager());
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -126,7 +139,7 @@ public:
                     filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
-              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
+              return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
@@ -158,6 +171,7 @@ public:
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
+  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {
@@ -189,6 +203,10 @@ void testMerge() {
 }
 
 uint32_t run(const std::string& directory) {
+  // In the default startup process, we will inject regex engine before initializing config.
+  // While in the ConfigTest, these kind of bootstrap injections will not take place, so we must
+  // register regex engine in advance.
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {

@@ -105,7 +105,7 @@ struct ScopedRdsStats {
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
 class ScopedRdsConfigSubscription
     : public Envoy::Config::DeltaConfigSubscriptionInstance,
-      Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
+      public Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration> {
 public:
   using ScopedRouteConfigurationMap =
       std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
@@ -227,7 +227,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string name_;
   // Stats must outlive subscription.
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   ScopedRdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::

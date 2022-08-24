@@ -88,6 +88,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
+    return;
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -168,22 +169,30 @@ void CodecClient::onData(Buffer::Instance& data) {
 CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
-                                 Random::RandomGenerator& random_generator)
-    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator) {
+                                 Random::RandomGenerator& random_generator,
+                                 const Network::TransportSocketOptionsConstSharedPtr& options)
+    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator,
+                               options) {
   connect();
 }
 
-NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
-                                                   Network::ClientConnectionPtr&& connection,
-                                                   Upstream::HostDescriptionConstSharedPtr host,
-                                                   Event::Dispatcher& dispatcher,
-                                                   Random::RandomGenerator& random_generator)
+NoConnectCodecClientProd::NoConnectCodecClientProd(
+    CodecType type, Network::ClientConnectionPtr&& connection,
+    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+    Random::RandomGenerator& random_generator,
+    const Network::TransportSocketOptionsConstSharedPtr& options)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case CodecType::HTTP1: {
+    // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
+    // send fully qualified URLs iff the underlying transport is plaintext.
+    bool proxied = false;
+    if (options && options->http11ProxyInfo().has_value()) {
+      proxied = true;
+    }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
+        host->cluster().maxResponseHeadersCount(), proxied);
     break;
   }
   case CodecType::HTTP2: {

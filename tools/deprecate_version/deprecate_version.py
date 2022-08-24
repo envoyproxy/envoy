@@ -79,7 +79,7 @@ def create_issues(access_token, runtime_and_pr):
             email = commit.author.email
             # Use the commit author's email to search through users for their login.
             search_user = git.search_users(email.split('@')[0] + " in:email")
-            login = search_user[0].login if search_user else None
+            login = search_user[0].login if search_user and search_user.totalCount else None
 
         title = '%s deprecation' % (runtime_guard)
         body = (
@@ -134,18 +134,21 @@ def get_runtime_and_pr():
     # PR they were added.
     features_to_flip = []
 
-    runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
+    runtime_features = re.compile(r'.*RUNTIME_GUARD.(envoy_reloadable_features_.*).;')
 
     removal_date = date.today() - datetime.timedelta(days=183)
     found_test_feature_true = False
 
     # Walk the blame of runtime_features and look for true runtime features older than 6 months.
-    for commit, lines in repo.blame('HEAD', 'source/common/runtime/runtime_features.cc'):
+    # Ignore #19880, the PR where we migrated from old style to new style flags as it
+    # shouldn't change deprecation dates or ownership.
+    for commit, lines in repo.blame(rev='HEAD', file='source/common/runtime/runtime_features.cc',
+                                    **{"ignore-rev": "93cd7c7835a"}):
         for line in lines:
             match = runtime_features.match(line)
             if match:
                 runtime_guard = match.group(1)
-                if runtime_guard == 'envoy.reloadable_features.test_feature_false':
+                if runtime_guard == 'envoy_reloadable_features_test_feature_false':
                     print("Found end sentinel\n")
                     if not found_test_feature_true:
                         # The script depends on the cc file having the true runtime block
@@ -153,7 +156,7 @@ def get_runtime_and_pr():
                         print('Failed to find test_feature_true.  Script needs fixing')
                         sys.exit(1)
                     return features_to_flip
-                if runtime_guard == 'envoy.reloadable_features.test_feature_true':
+                if runtime_guard == 'envoy_reloadable_features_test_feature_true':
                     found_test_feature_true = True
                     continue
                 pr_num = re.search('\(#(\d+)\)', commit.message)

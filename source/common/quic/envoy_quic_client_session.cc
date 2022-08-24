@@ -1,5 +1,9 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include <openssl/ssl.h>
+
+#include <memory>
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -9,21 +13,53 @@
 namespace Envoy {
 namespace Quic {
 
+// An implementation of the verify context interface.
+class EnvoyQuicProofVerifyContextImpl : public EnvoyQuicProofVerifyContext {
+public:
+  EnvoyQuicProofVerifyContextImpl(
+      Event::Dispatcher& dispatcher, const bool is_server,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      QuicSslConnectionInfo& ssl_info)
+      : dispatcher_(dispatcher), is_server_(is_server),
+        transport_socket_options_(transport_socket_options), ssl_info_(ssl_info) {}
+
+  // EnvoyQuicProofVerifyContext
+  bool isServer() const override { return is_server_; }
+  Event::Dispatcher& dispatcher() const override { return dispatcher_; }
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
+  Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext
+  extraValidationContext() const override {
+    ASSERT(ssl_info_.ssl());
+    return {};
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  const bool is_server_;
+  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options_;
+  QuicSslConnectionInfo& ssl_info_;
+};
+
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
-    QuicStatNames& quic_stat_names, OptRef<Http::AlternateProtocolsCache> rtt_cache,
-    Stats::Scope& scope)
+    QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
+    Stats::Scope& scope,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit,
                                       std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope) {
+      quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
+      transport_socket_options_(transport_socket_options) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 }
 
@@ -50,7 +86,8 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
   if (OneRttKeysAvailable() && rtt_cache_) {
     const quic::QuicConnectionStats& stats = connection()->GetStats();
     if (stats.srtt_us > 0) {
-      Http::AlternateProtocolsCache::Origin origin("https", server_id().host(), server_id().port());
+      Http::HttpServerPropertiesCache::Origin origin("https", server_id().host(),
+                                                     server_id().port());
       rtt_cache_->setSrtt(origin, std::chrono::microseconds(stats.srtt_us));
     }
   }
@@ -154,9 +191,12 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
+  // TODO(danzh) pass around transport_socket_options_ via context.
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
-      server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
-      this, /*has_application_state = */ version().UsesHttp3());
+      server_id(), this,
+      std::make_unique<EnvoyQuicProofVerifyContextImpl>(dispatcher_, /*is_server=*/false,
+                                                        transport_socket_options_, *quic_ssl_info_),
+      crypto_config(), this, /*has_application_state = */ version().UsesHttp3());
 }
 
 void EnvoyQuicClientSession::setHttp3Options(
@@ -180,7 +220,8 @@ void EnvoyQuicClientSession::setHttp3Options(
       disable_keepalive_ = true;
       return;
     }
-    connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+    connection()->set_keep_alive_ping_timeout(
+        quic::QuicTime::Delta::FromMilliseconds(max_interval));
     if (max_interval > initial_interval && initial_interval > 0u) {
       connection()->set_initial_retransmittable_on_wire_timeout(
           quic::QuicTime::Delta::FromMilliseconds(initial_interval));
@@ -204,6 +245,7 @@ void EnvoyQuicClientSession::OnNewEncryptionKeyAvailable(
     quic::EncryptionLevel level, std::unique_ptr<quic::QuicEncrypter> encrypter) {
   quic::QuicSpdyClientSession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
   if (level == quic::ENCRYPTION_ZERO_RTT) {
+    ENVOY_CONN_LOG(trace, "able to send early data", *this);
     raiseConnectionEvent(Network::ConnectionEvent::ConnectedZeroRtt);
   }
 }

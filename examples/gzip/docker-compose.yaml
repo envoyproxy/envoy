@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   flask_service:
@@ -6,15 +6,17 @@ services:
       context: ../shared/flask
     image: flask_service:python-3.10-slim-bullseye
     restart: "no"
+    deploy:
+      replicas: 0
 
   envoy-stats:
     build:
       context: .
       dockerfile: Dockerfile-gzip
     ports:
-    - "9901:9901"
-    - "9902:9902"
-    - "10000:10000"
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_STATS0:-9901}:9901"
+    - "${PORT_STATS1:-9902}:9902"
 
   service:
     build:

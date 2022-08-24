@@ -31,6 +31,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -739,6 +740,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
+  Upstream::HostDescriptionConstSharedPtr host{
+      new testing::NiceMock<Upstream::MockHostDescription>()};
 
   SpanPtr span_ptr =
       null_tracer.startSpan(config, request_headers, stream_info, {Reason::Sampling, true});
@@ -749,7 +752,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   span_ptr->setBaggage("key", "value");
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
-  span_ptr->injectContext(request_headers);
+  span_ptr->injectContext(request_headers, host);
   span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
@@ -842,6 +845,7 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip + ":0")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));
   EXPECT_CALL(*second_span,
               setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
@@ -863,6 +867,37 @@ TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {
   Http::TestRequestHeaderMapImpl header_map_;
   CustomTagContext context{&header_map_, testing_info_};
   EXPECT_EQ(tag.value(context), "default_value");
+}
+
+TEST_F(HttpConnManFinalizerImplTest, CustomTagOverwritesCommonTag) {
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/test"}, {":method", "GET"}, {":scheme", "https"}};
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http10;
+  EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(10));
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  absl::optional<uint32_t> response_code;
+  EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
+
+  EXPECT_CALL(config, customTags());
+
+  std::string custom_tag_str = "{ tag: component, literal: { value: override_component } }";
+  envoy::type::tracing::v3::CustomTag custom_tag;
+  TestUtility::loadFromYaml(custom_tag_str, custom_tag);
+  config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+  EXPECT_CALL(span, setTag(_, _)).Times(testing::AnyNumber());
+
+  {
+    // ensure our setTag(..., "override_component") happens later, taking precedence
+    InSequence s;
+    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(Tracing::Tags::get().Proxy)));
+    EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), "override_component"));
+  }
+
+  HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
+                                            config);
 }
 
 } // namespace

@@ -305,6 +305,8 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
   return cache_info;
 }
 
+SINGLETON_MANAGER_REGISTRATION(simple_http_cache_singleton);
+
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   // From UntypedFactory
@@ -315,13 +317,17 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-                      Server::Configuration::FactoryContext&) override {
-    return cache_;
+  std::shared_ptr<HttpCache>
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+           Server::Configuration::FactoryContext& context) override {
+    return context.singletonManager().getTyped<SimpleHttpCache>(
+        SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }
 
 private:
-  SimpleHttpCache cache_;
+  static std::shared_ptr<Singleton::Instance> createCache() {
+    return std::make_shared<SimpleHttpCache>();
+  }
 };
 
 static Registry::RegisterFactory<SimpleHttpCacheFactory, HttpCacheFactory> register_;

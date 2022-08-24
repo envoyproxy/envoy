@@ -185,6 +185,22 @@ TEST_F(SotwSubscriptionStateTest, LastUpdateNonceAndVersionUsed) {
   EXPECT_EQ("version1", cur_request->version_info());
 }
 
+// Validates that the last update version info is kept, and that nonce is reset
+// after reconnecting to the server.
+TEST_F(SotwSubscriptionStateTest, LastUpdateNonceAndVersionAfterStreamRefresh) {
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  deliverDiscoveryResponse({"name1", "name2"}, "version1", "nonce1");
+  state_->updateSubscriptionInterest({"name3"}, {});
+  auto cur_request = getNextDiscoveryRequestAckless();
+  EXPECT_EQ("nonce1", cur_request->response_nonce());
+  EXPECT_EQ("version1", cur_request->version_info());
+  // Reconnect the stream.
+  state_->markStreamFresh();
+  cur_request = getNextDiscoveryRequestAckless();
+  EXPECT_EQ("", cur_request->response_nonce());
+  EXPECT_EQ("version1", cur_request->version_info());
+}
+
 // Verifies that a sequence of good and bad responses from the server all get the appropriate
 // ACKs/NACKs from Envoy.
 TEST_F(SotwSubscriptionStateTest, AckGenerated) {

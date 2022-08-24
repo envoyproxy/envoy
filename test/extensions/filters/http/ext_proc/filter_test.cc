@@ -1,3 +1,6 @@
+#include <algorithm>
+
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
@@ -58,7 +61,7 @@ protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
-    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    EXPECT_CALL(*client_, start(_, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -82,7 +85,7 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
-    filter_ = std::make_unique<Filter>(config_, std::move(client_));
+    filter_ = std::make_unique<Filter>(config_, std::move(client_), grpc_service_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -92,15 +95,23 @@ protected:
   }
 
   void TearDown() override {
-    for (auto* t : timers_) {
-      // This will fail if, at the end of the test, we left any timers enabled.
-      // (This particular test suite does not actually let timers expire,
-      // although other test suites do.)
-      EXPECT_FALSE(t->enabled_);
-    }
+    // This will fail if, at the end of the test, we left any timers enabled.
+    // (This particular test suite does not actually let timers expire,
+    // although other test suites do.)
+    EXPECT_TRUE(allTimersDisabled());
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused) {
+  bool allTimersDisabled() {
+    for (auto* t : timers_) {
+      if (t->enabled_) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused,
+                                     testing::Unused) {
     stream_callbacks_ = &callbacks;
 
     auto stream = std::make_unique<MockStream>();
@@ -239,6 +250,22 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
+  // The number of processor grpc calls made in the encoding and decoding path.
+  void expectGrpcCalls(const envoy::config::core::v3::TrafficDirection traffic_direction,
+                       const Grpc::Status::GrpcStatus status, const int expected_calls_count) {
+    const ExtProcLoggingInfo::GrpcCalls& grpc_calls =
+        stream_info_.filterState()
+            ->getDataReadOnly<
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfo>(
+                Envoy::Extensions::HttpFilters::ExternalProcessing::ExtProcLoggingInfoName)
+            ->grpcCalls(traffic_direction);
+    int calls_count = std::count_if(
+        grpc_calls.begin(), grpc_calls.end(),
+        [&](ExtProcLoggingInfo::GrpcCall grpc_call) { return grpc_call.status_ == status; });
+    EXPECT_EQ(calls_count, expected_calls_count);
+  }
+
+  envoy::config::core::v3::GrpcService grpc_service_;
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
@@ -247,8 +274,8 @@ protected:
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Router::RouteConstSharedPtr route_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -319,6 +346,8 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -462,6 +491,8 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 0);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1180,6 +1211,8 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
   EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 2);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Ok, 7);
 }
 
 // Using a configuration with streaming set for the request and
@@ -1571,6 +1604,7 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1625,6 +1659,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND, Grpc::Status::Ok, 1);
+  expectGrpcCalls(envoy::config::core::v3::TrafficDirection::OUTBOUND, Grpc::Status::Internal, 1);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1700,6 +1736,33 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
 
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Mimic a downstream client reset while the filter waits for a response from
+// the processor.
+TEST_F(HttpFilterTest, PostAndDownstreamReset) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_FALSE(config_->failureModeAllow());
+
+  // Create synthetic HTTP request
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_FALSE(last_request_.async_mode());
+  ASSERT_TRUE(last_request_.has_request_headers());
+  EXPECT_FALSE(allTimersDisabled());
+
+  // Call onDestroy to mimic a downstream client reset.
+  filter_->onDestroy();
+
+  EXPECT_TRUE(allTimersDisabled());
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
@@ -2091,6 +2154,35 @@ TEST(OverrideTest, DisabledThingsAreDisabled) {
   route1.merge(route2);
   EXPECT_TRUE(route1.disabled());
   EXPECT_FALSE(route1.processingMode());
+}
+
+// When merging two configurations, second grpc_service overrides the first.
+TEST(OverrideTest, GrpcServiceOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_2");
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
+}
+
+// When merging two configurations, unset grpc_service is equivalent to no override.
+TEST(OverrideTest, GrpcServiceNonOverride) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "cluster_1");
+  ExtProcPerRoute cfg2;
+  // Leave cfg2.grpc_service unset.
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  ASSERT_TRUE(route1.grpcService().has_value());
+  EXPECT_THAT(*route1.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
 // Verify that attempts to change headers that are not allowed to be changed

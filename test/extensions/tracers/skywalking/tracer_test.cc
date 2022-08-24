@@ -64,8 +64,9 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   std::string test_string = "ABCDEFGHIJKLMN";
-  SkyWalkingTracerStats tracing_stats_{
-      SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))};
+  SkyWalkingTracerStatsSharedPtr tracing_stats_{
+      std::make_shared<SkyWalkingTracerStats>(SkyWalkingTracerStats{
+          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))})};
   TracerPtr tracer_;
 };
 
@@ -78,10 +79,11 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Create a new SegmentContext.
   auto segment_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
 
-  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan("TEST_OP", segment_context);
-  {
-    Span* span = dynamic_cast<Span*>(org_span.get());
+  Envoy::Tracing::SpanPtr org_span =
+      tracer_->startSpan("/downstream/path", "HTTP", segment_context);
+  Span* span = dynamic_cast<Span*>(org_span.get());
 
+  {
     EXPECT_TRUE(span->spanEntity()->spanType() == skywalking::v3::SpanType::Entry);
     EXPECT_EQ("", span->getBaggage("FakeStringAndNothingToDo"));
     span->setOperation("FakeStringAndNothingToDo");
@@ -95,7 +97,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'
     // method call.
-    EXPECT_EQ("TEST_OP", span->spanEntity()->operationName());
+    EXPECT_EQ("/downstream/path", span->spanEntity()->operationName());
 
     // Test whether the tag can be set correctly.
     span->setTag("TestTagKeyA", "TestTagValueA");
@@ -118,6 +120,10 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     // When setting http url tag, the corresponding tag name will be rewritten as 'url'.
     span->setTag(Tracing::Tags::get().HttpUrl, "http://test.com/test/path");
     EXPECT_EQ("url", span->spanEntity()->tags().at(4).first);
+
+    // When setting peer address tag, the peer will be set.
+    span->setTag(Tracing::Tags::get().PeerAddress, "1.2.3.4:8080");
+    EXPECT_EQ("1.2.3.4:8080", span->spanEntity()->peer());
 
     span->log(SystemTime{std::chrono::duration<int, std::milli>(100)}, "abc");
     EXPECT_EQ(1, span->spanEntity()->logs().size());
@@ -142,35 +148,74 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(1, first_child_span->spanEntity()->spanId());
     EXPECT_EQ(0, first_child_span->spanEntity()->parentSpanId());
 
-    EXPECT_EQ("TestChild", first_child_span->spanEntity()->operationName());
+    // "TestChild" will be ignored and operation name of parent span will be used by default for
+    // child span (EXIT span).
+    EXPECT_EQ(span->spanEntity()->operationName(), first_child_span->spanEntity()->operationName());
 
-    first_child_span->finishSpan();
-    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"},
+                                                       {":path", "/upstream/path"}};
+    Upstream::HostDescriptionConstSharedPtr host{
+        new testing::NiceMock<Upstream::MockHostDescription>()};
 
-    Http::TestRequestHeaderMapImpl first_child_headers{{":authority", "test.com"}};
+    first_child_span->injectContext(first_child_headers, host);
+    // Operation name of child span (EXIT span) will be override by the latest path of upstream
+    // request.
+    EXPECT_EQ("/upstream/path", first_child_span->spanEntity()->operationName());
 
-    first_child_span->injectContext(first_child_headers);
     auto sp = createSpanContext(first_child_headers.get_("sw8"));
     EXPECT_EQ("CURR#SERVICE", sp->service());
     EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
-    EXPECT_EQ("TEST_OP", sp->endpoint());
+    EXPECT_EQ("/downstream/path", sp->endpoint());
+    EXPECT_EQ("10.0.0.1:443", sp->targetAddress());
+
+    first_child_span->finishSpan();
+    EXPECT_NE(0, first_child_span->spanEntity()->endTime());
+  }
+
+  {
+    Envoy::Tracing::SpanPtr org_second_child_span =
+        org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
+
+    Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());
+
+    EXPECT_TRUE(second_child_span->spanEntity()->spanType() == skywalking::v3::SpanType::Exit);
+
+    EXPECT_FALSE(second_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(2, second_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
+
+    // "TestChild" will be ignored and operation name of parent span will be used by default for
+    // child span (EXIT span).
+    EXPECT_EQ(span->spanEntity()->operationName(),
+              second_child_span->spanEntity()->operationName());
+
+    Http::TestRequestHeaderMapImpl second_child_headers{{":authority", "test.com"}};
+
+    second_child_span->injectContext(second_child_headers, nullptr);
+    auto sp = createSpanContext(second_child_headers.get_("sw8"));
+    EXPECT_EQ("CURR#SERVICE", sp->service());
+    EXPECT_EQ("CURR#INSTANCE", sp->serviceInstance());
+    EXPECT_EQ("/downstream/path", sp->endpoint());
     EXPECT_EQ("test.com", sp->targetAddress());
+
+    second_child_span->finishSpan();
+    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
   }
 
   segment_context->setSkipAnalysis();
 
   {
-    Envoy::Tracing::SpanPtr org_second_child_span =
+    Envoy::Tracing::SpanPtr org_third_child_span =
         org_span->spawnChild(mock_tracing_config_, "TestChild", mock_time_source_.systemTime());
-    Span* second_child_span = dynamic_cast<Span*>(org_second_child_span.get());
+    Span* third_child_span = dynamic_cast<Span*>(org_third_child_span.get());
 
     // SkipAnalysis is true by default with calling setSkipAnalysis() on segment_context.
-    EXPECT_TRUE(second_child_span->spanEntity()->skipAnalysis());
-    EXPECT_EQ(2, second_child_span->spanEntity()->spanId());
-    EXPECT_EQ(0, second_child_span->spanEntity()->parentSpanId());
+    EXPECT_TRUE(third_child_span->spanEntity()->skipAnalysis());
+    EXPECT_EQ(3, third_child_span->spanEntity()->spanId());
+    EXPECT_EQ(0, third_child_span->spanEntity()->parentSpanId());
 
-    second_child_span->finishSpan();
-    EXPECT_NE(0, second_child_span->spanEntity()->endTime());
+    third_child_span->finishSpan();
+    EXPECT_NE(0, third_child_span->spanEntity()->endTime());
   }
 
   // When the child span ends, the data is not reported immediately, but the end time is set.
@@ -187,6 +232,26 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+
+  {
+    auto rpc_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
+    Envoy::Tracing::SpanPtr org_rpc_span =
+        tracer_->startSpan("io.envoyproxy.rpc.demo.Service", "RPCFramework", rpc_context);
+    Span* rpc_span = dynamic_cast<Span*>(org_rpc_span.get());
+    EXPECT_TRUE(rpc_span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::RPCFramework);
+    EXPECT_EQ(rpc_span->spanEntity()->operationName(), "io.envoyproxy.rpc.demo.Service");
+  }
+
+  {
+    // When protocol is not known by "skywalking", the span layer will be Unknown
+    auto unknown_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
+    Envoy::Tracing::SpanPtr org_unknown_span = tracer_->startSpan(
+        "com.company.department.business.Service", "InternalPrivateFramework", unknown_context);
+    Span* unknown_span = dynamic_cast<Span*>(org_unknown_span.get());
+    EXPECT_TRUE(unknown_span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::Unknown);
+    EXPECT_EQ(unknown_span->spanEntity()->operationName(),
+              "com.company.department.business.Service");
+  }
 }
 
 } // namespace

@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
@@ -188,9 +189,10 @@ public:
   virtual ~StreamFilterCallbacks() = default;
 
   /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   * @return OptRef<const Network::Connection> the downstream connection, or nullptr if there is
+   * none.
    */
-  virtual const Network::Connection* connection() PURE;
+  virtual OptRef<const Network::Connection> connection() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
@@ -200,7 +202,9 @@ public:
   /**
    * Reset the underlying stream.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
@@ -302,6 +306,27 @@ public:
    * Called when filter activity indicates that the stream idle timeout should be reset.
    */
   virtual void resetIdleTimer() PURE;
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
+
+  /**
+   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * it is present). Iteration of the configs is in order of specificity. That means that the
+   * callback will be called first for a config on a Virtual host, then a route, and finally a route
+   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
+   */
+  virtual void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
@@ -670,6 +695,8 @@ public:
   struct LocalReplyData {
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
+    // The gRPC status set in local reply.
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
     // True if a reset will occur rather than the local reply (some prior filter
@@ -906,12 +933,6 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t encoderBufferLimit() PURE;
-
-  /**
-   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
-   */
-  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
@@ -1001,6 +1022,17 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl() const { return connectionInfoProvider().sslConnection(); }
 };
 
 /**
@@ -1018,42 +1050,16 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
-   * Add a decoder filter that is used when reading stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void
-  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
-
-  /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
 
   /**
-   * Add an encoder filter that is used when writing stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void
-  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
-
-  /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
-
-  /**
-   * Add a decoder/encoder filter that is used both when reading and writing stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
-                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add an access log handler that is called when the stream is destroyed.
@@ -1067,48 +1073,5 @@ public:
    */
   virtual Event::Dispatcher& dispatcher() PURE;
 };
-
-/**
- * This function is used to wrap the creation of an HTTP filter chain for new streams as they
- * come in. Filter factories create the function at configuration initialization time, and then
- * they are used at runtime.
- * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
- * function will install a single filter, but it's technically possibly to install more than one
- * if desired.
- */
-using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
-
-/**
- * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
- * new stream is created on the connection (either locally or remotely). Typically it would be
- * implemented by a configuration engine that would install a set of filters that are able to
- * process an application scenario on top of a stream.
- */
-class FilterChainFactory {
-public:
-  virtual ~FilterChainFactory() = default;
-
-  /**
-   * Called when a new HTTP stream is created on the connection.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
-   */
-  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
-
-  /**
-   * Called when a new upgrade stream is created on the connection.
-   * @param upgrade supplies the upgrade header from downstream
-   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
-   * @return true if upgrades of this type are allowed and the filter chain has been created.
-   *    returns false if this upgrade type is not configured, and no filter chain is created.
-   */
-  using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
-                                        const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainFactoryCallbacks& callbacks) PURE;
-};
-
 } // namespace Http
 } // namespace Envoy

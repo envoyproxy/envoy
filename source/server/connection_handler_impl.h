@@ -36,8 +36,6 @@ public:
   using UdpListenerCallbacksOptRef =
       absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
-  using ActiveInternalListenerOptRef =
-      absl::optional<std::reference_wrapper<ActiveInternalListener>>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
@@ -60,19 +58,23 @@ public:
 
   // Network::TcpConnectionHandler
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  Network::BalancedConnectionHandlerOptRef getBalancedHandlerByTag(uint64_t listener_tag) override;
+  Network::BalancedConnectionHandlerOptRef
+  getBalancedHandlerByTag(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 
   // Network::UdpConnectionHandler
-  Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
+  Network::UdpListenerCallbacksOptRef
+  getUdpListenerCallbacks(uint64_t listener_tag,
+                          const Network::Address::Instance& address) override;
 
   // Network::InternalListenerManager
   Network::InternalListenerOptRef
   findByAddress(const Network::Address::InstanceConstSharedPtr& listen_address) override;
 
 private:
-  struct ActiveListenerDetails {
+  struct PerAddressActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
     Network::Address::InstanceConstSharedPtr address_;
@@ -80,28 +82,74 @@ private:
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
                   std::reference_wrapper<Network::UdpListenerCallbacks>,
-                  std::reference_wrapper<ActiveInternalListener>>
+                  std::reference_wrapper<Network::InternalListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
-    ActiveInternalListenerOptRef internalListener();
+    Network::InternalListenerOptRef internalListener();
   };
+
+  struct ActiveListenerDetails {
+    std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
+
+    using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
+
+    /**
+     * A helper to execute specific method on each PerAddressActiveListenerDetails item.
+     */
+    void invokeListenerMethod(ListenerMethodFn fn) {
+      std::for_each(per_address_details_list_.begin(), per_address_details_list_.end(),
+                    [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
+                      fn(*details->listener_);
+                    });
+    }
+
+    /**
+     * Add an ActiveListener into the list.
+     */
+    template <class ActiveListener>
+    void addActiveListener(Network::ListenerConfig& config,
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           UnitFloat& listener_reject_fraction, bool disable_listeners,
+                           ActiveListener&& listener) {
+      auto per_address_details = std::make_shared<PerAddressActiveListenerDetails>();
+      per_address_details->typed_listener_ = *listener;
+      per_address_details->listener_ = std::move(listener);
+      per_address_details->address_ = address;
+      if (disable_listeners) {
+        per_address_details->listener_->pauseListening();
+      }
+      if (auto* listener = per_address_details->listener_->listener(); listener != nullptr) {
+        listener->setRejectFraction(listener_reject_fraction);
+      }
+      per_address_details->listener_tag_ = config.listenerTag();
+      per_address_details_list_.emplace_back(per_address_details);
+    }
+  };
+
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
+
+  using PerAddressActiveListenerDetailsOptRef =
+      absl::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+  PerAddressActiveListenerDetailsOptRef
+  findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
+                                      const Network::Address::Instance& address);
 
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
-  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+  // Declare before its users ActiveListenerDetails.
+  std::atomic<uint64_t> num_handler_connections_{};
+  absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
+  absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
-  absl::flat_hash_map<std::string, std::shared_ptr<ActiveListenerDetails>>
+  absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       internal_listener_map_by_address_;
 
-  std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };

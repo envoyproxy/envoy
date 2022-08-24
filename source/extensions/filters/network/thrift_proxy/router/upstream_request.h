@@ -30,7 +30,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                          Logger::Loggable<Logger::Id::thrift> {
   UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                   MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                  ProtocolType protocol_type);
+                  ProtocolType protocol_type, bool close_downstream_on_error);
   ~UpstreamRequest() override;
 
   FilterStatus start();
@@ -55,7 +55,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   void onRequestComplete();
   void onResponseComplete();
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
-  void onResetStream(ConnectionPool::PoolFailureReason reason);
+  bool onResetStream(ConnectionPool::PoolFailureReason reason);
   void chargeResponseTiming();
 
   RequestOwner& parent_;
@@ -71,12 +71,20 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   ProtocolPtr protocol_;
   ThriftObjectPtr upgrade_response_;
 
-  bool request_complete_ : 1;
-  bool response_started_ : 1;
-  bool response_complete_ : 1;
+  enum class ResponseState : uint8_t {
+    None = 0,
+    Started = 1,
+    Completed = 2,
+    ConnectionReleased = 3
+  };
 
-  bool charged_response_timing_{false};
-  MonotonicTime downstream_request_complete_time_;
+  ResponseState response_state_{ResponseState::None};
+  bool request_complete_ : 1;
+  bool response_underflow_ : 1;
+  bool charged_response_timing_ : 1;
+  bool close_downstream_on_error_ : 1;
+
+  absl::optional<MonotonicTime> downstream_request_complete_time_;
   uint64_t response_size_{};
 };
 

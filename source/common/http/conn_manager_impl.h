@@ -187,6 +187,9 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
+    // Mark that the last downstream byte is received, and the downstream stream is complete.
+    void maybeEndDecode(bool end_stream);
+
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
@@ -217,7 +220,7 @@ private:
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
-    void encodeMetadata(MetadataMapVector& metadata) override;
+    void encodeMetadata(MetadataMapPtr&& metadata) override;
     void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
@@ -270,13 +273,13 @@ private:
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
-    void resetStream() override;
+    void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                     absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -285,6 +288,7 @@ private:
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -298,12 +302,14 @@ private:
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
+    void refreshIdleTimeout();
 
     // All state for the stream. Put here for readability.
     struct State {
       State()
           : codec_saw_local_complete_(false), saw_connection_close_(false),
-            successful_upgrade_(false), is_internally_created_(false), decorated_propagate_(true) {}
+            successful_upgrade_(false), is_internally_created_(false), is_tunneling_(false),
+            decorated_propagate_(true) {}
 
       bool codec_saw_local_complete_ : 1; // This indicates that local is complete as written all
                                           // the way through to the codec.
@@ -313,6 +319,10 @@ private:
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
       bool is_internally_created_ : 1;
+
+      // True if the response headers indicate a successful upgrade or connect
+      // response.
+      bool is_tunneling_ : 1;
 
       bool decorated_propagate_ : 1;
     };
@@ -342,6 +352,11 @@ private:
       return *tracing_custom_tags_;
     }
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate request header map after it was deserialized.
+    // If header map failed validation, it sends an error response and returns false.
+    bool validateHeaders();
+
     ConnectionManagerImpl& connection_manager_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
@@ -356,7 +371,7 @@ private:
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
-    FilterManager filter_manager_;
+    DownstreamFilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
@@ -383,6 +398,7 @@ private:
     const std::string* decorated_operation_{nullptr};
     std::unique_ptr<RdsRouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
+    Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
   };

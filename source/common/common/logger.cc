@@ -118,14 +118,17 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
 }
 
 std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
-  // Split the actual message from the trailing whitespace.
-  auto eol_it = std::find_if_not(msg_view.rbegin(), msg_view.rend(), absl::ascii_isspace);
-  absl::string_view msg_leading = msg_view.substr(0, msg_view.rend() - eol_it);
-  absl::string_view msg_trailing_whitespace =
-      msg_view.substr(msg_view.rend() - eol_it, eol_it - msg_view.rbegin());
+  absl::string_view eol = spdlog::details::os::default_eol;
+  if (!absl::EndsWith(msg_view, eol)) {
+    // Log does not end with newline, escape entire log.
+    return absl::CEscape(msg_view);
+  }
 
-  // Escape the message, but keep the whitespace unescaped.
-  return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);
+  // Log line ends with newline. Escape everything except the end-of-line character to preserve line
+  // format.
+  absl::string_view msg_leading =
+      absl::string_view(msg_view.data(), msg_view.size() - eol.length());
+  return absl::StrCat(absl::CEscape(msg_leading), eol);
 }
 
 DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
@@ -179,57 +182,56 @@ void Context::activate() {
   Registry::setLogLevel(log_level_);
   Registry::setLogFormat(log_format_);
 
-  // sets level and format for Fancy Logger
-  fancy_default_level_ = log_level_;
-  fancy_log_format_ = log_format_;
+  // sets level and format for Fine-grain Logger
+  fine_grain_default_level_ = log_level_;
+  fine_grain_log_format_ = log_format_;
   if (enable_fine_grain_logging_) {
-    // loggers with default level before are set to log_level_ as new default
-    getFancyContext().setDefaultFancyLevelFormat(log_level_, log_format_);
     if (log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      fancy_log_format_ = absl::StrReplaceAll(log_format_, {{"[%n]", ""}});
+      fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(fine_grain_default_level_,
+                                                               fine_grain_log_format_);
   }
 }
 
-bool Context::useFancyLogger() {
+bool Context::useFineGrainLogger() {
   if (current_context) {
     return current_context->enable_fine_grain_logging_;
   }
   return false;
 }
 
-void Context::enableFancyLogger() {
-  current_context->enable_fine_grain_logging_ = true;
+void Context::enableFineGrainLogger() {
   if (current_context) {
-    getFancyContext().setDefaultFancyLevelFormat(current_context->log_level_,
-                                                 current_context->log_format_);
-    current_context->fancy_default_level_ = current_context->log_level_;
-    current_context->fancy_log_format_ = current_context->log_format_;
+    current_context->enable_fine_grain_logging_ = true;
+    current_context->fine_grain_default_level_ = current_context->log_level_;
+    current_context->fine_grain_log_format_ = current_context->log_format_;
     if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      current_context->fancy_log_format_ =
-          absl::StrReplaceAll(current_context->log_format_, {{"[%n]", ""}});
+      current_context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
+        current_context->fine_grain_default_level_, current_context->fine_grain_log_format_);
   }
 }
 
-void Context::disableFancyLogger() {
+void Context::disableFineGrainLogger() {
   if (current_context) {
     current_context->enable_fine_grain_logging_ = false;
   }
 }
 
-std::string Context::getFancyLogFormat() {
+std::string Context::getFineGrainLogFormat() {
   if (!current_context) { // Context is not instantiated in benchmark test
-    return "[%Y-%m-%d %T.%e][%t][%l] %v";
+    return kDefaultFineGrainLogFormat;
   }
-  return current_context->fancy_log_format_;
+  return current_context->fine_grain_log_format_;
 }
 
-spdlog::level::level_enum Context::getFancyDefaultLevel() {
+spdlog::level::level_enum Context::getFineGrainDefaultLevel() {
   if (!current_context) {
     return spdlog::level::info;
   }
-  return current_context->fancy_default_level_;
+  return current_context->fine_grain_default_level_;
 }
 
 std::vector<Logger>& Registry::allLoggers() {

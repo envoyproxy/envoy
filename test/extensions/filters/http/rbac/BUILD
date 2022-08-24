@@ -36,9 +36,12 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,7 +49,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

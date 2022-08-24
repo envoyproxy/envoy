@@ -4,7 +4,6 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -23,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 14]
+// [#next-free-field: 16]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -37,10 +36,10 @@ message RouteConfiguration {
   repeated VirtualHost virtual_hosts = 2;
 
   // An array of virtual hosts will be dynamically loaded via the VHDS API.
-  // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used
-  // for a base routing table or for infrequently changing virtual hosts. *vhds* is used for
+  // Both ``virtual_hosts`` and ``vhds`` fields will be used when present. ``virtual_hosts`` can be used
+  // for a base routing table or for infrequently changing virtual hosts. ``vhds`` is used for
   // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
-  // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
+  // generate a routing table for a given RouteConfiguration, with ``vhds`` derived configuration
   // taking precedence.
   Vhds vhds = 9;
 
@@ -91,7 +90,6 @@ message RouteConfiguration {
   // To allow setting overrides at the route or virtual host level, this order can be reversed
   // by setting this option to true. Defaults to false.
   //
-  // [#next-major-version: In the v3 API, this will default to true.]
   bool most_specific_header_mutations_wins = 10;
 
   // An optional boolean that specifies whether the clusters that the route
@@ -122,28 +120,26 @@ message RouteConfiguration {
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
 
-  // [#not-implemented-hide:]
   // A list of plugins and their configurations which may be used by a
-  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin`
-  // within the route. All *extension.name* fields in this list must be unique.
+  // :ref:`cluster specifier plugin name <envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin>`
+  // within the route. All ``extension.name`` fields in this list must be unique.
   repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
 
   // Specify a set of default request mirroring policies which apply to all routes under its virtual hosts.
   // Note that policies are not merged, the most specific non-empty one becomes the mirror policies.
   repeated RouteAction.RequestMirrorPolicy request_mirror_policies = 13;
-}
 
-// Configuration for a cluster specifier plugin.
-message ClusterSpecifierPlugin {
-  // The name of the plugin and its opaque configuration.
-  core.v3.TypedExtensionConfig extension = 1;
+  // By default, port in :authority header (if any) is used in host matching.
+  // With this option enabled, Envoy will ignore the port number in the :authority header (if any) when picking VirtualHost.
+  // NOTE: this option will not strip the port number (if any) contained in route config
+  // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field.
+  bool ignore_port_in_host_matching = 14;
 
-  // If is_optional is not set and the plugin defined by this message is not
-  // a supported type, the containing resource is NACKed. If is_optional is
-  // set, the resource would not be NACKed for this reason. In this case,
-  // routes referencing this plugin's name would not be treated as an illegal
-  // configuration, but would result in a failure if the route is selected.
-  bool is_optional = 2;
+  // Ignore path-parameters in path-matching.
+  // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
+  // Envoy by default takes ":path" as "<path>;<params>".
+  // For users who want to only match path on the "<path>" portion, this option should be true.
+  bool ignore_path_parameters_in_path_matching = 15;
 }
 
 message Vhds {

@@ -40,23 +40,37 @@ These input functions are available for matching HTTP requests:
 Network Input Functions
 ***********************
 
-These input functions are available for matching both TCP connections and UDP datagrams:
+These input functions are available for matching TCP connections, UDP datagrams, and HTTP requests:
 
 * :ref:`Destination IP <extension_envoy.matching.inputs.destination_ip>`.
 * :ref:`Destination port <extension_envoy.matching.inputs.destination_port>`.
 * :ref:`Source IP <extension_envoy.matching.inputs.source_ip>`.
 * :ref:`Source port <extension_envoy.matching.inputs.source_port>`.
 
-These input functions are available for matching TCP connections:
+These input functions are available for matching TCP connections and HTTP requests:
 
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+
+These input functions are available for matching TCP connections:
+
 * :ref:`Transport protocol <extension_envoy.matching.inputs.transport_protocol>`.
 * :ref:`Application protocol <extension_envoy.matching.inputs.application_protocol>`.
 
-Common Input Functons
-*********************
+.. _extension_category_envoy.matching.ssl.input:
+
+SSL Input Functions
+*******************
+
+These input functions are available for matching TCP connections and HTTP requests:
+
+* :ref:`URI SAN <extension_envoy.matching.inputs.uri_san>`.
+* :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
+* :ref:`Subject <extension_envoy.matching.inputs.subject>`.
+
+Common Input Functions
+**********************
 
 These input functions are available in any context:
 

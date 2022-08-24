@@ -1,5 +1,6 @@
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -71,12 +72,13 @@ public:
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
+        transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         envoy_quic_session_(quic_config_, quic_version_,
                             std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
                             quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
-                            quic_stat_names_, {}, store_),
+                            quic_stat_names_, {}, store_, transport_socket_options_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -139,6 +141,7 @@ protected:
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   Stats::IsolatedStoreImpl store_;
   QuicStatNames quic_stat_names_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   EnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
@@ -357,6 +360,14 @@ TEST_P(EnvoyQuicClientSessionTest, GetRttAndCwnd) {
   envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
+  auto& verify_context =
+      dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
+  EXPECT_FALSE(verify_context.isServer());
+  EXPECT_EQ(transport_socket_options_.get(), verify_context.transportSocketOptions().get());
+  EXPECT_EQ(dispatcher_.get(), &verify_context.dispatcher());
 }
 
 } // namespace Quic

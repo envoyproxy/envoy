@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.router.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -18,4 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.thrift.router.v2alpha1.Router";
+
+  // Close downstream connection in case of routing or upstream connection problem. Default: true
+  google.protobuf.BoolValue close_downstream_on_upstream_error = 1;
 }

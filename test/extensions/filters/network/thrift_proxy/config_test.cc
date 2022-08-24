@@ -1,5 +1,5 @@
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
@@ -50,7 +50,7 @@ getProtocolTypes() {
 }
 
 envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy
-parseThriftProxyFromV2Yaml(const std::string& yaml) {
+parseThriftProxyFromV3Yaml(const std::string& yaml) {
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy thrift_proxy;
   TestUtility::loadFromYaml(yaml, thrift_proxy);
   return thrift_proxy;
@@ -63,7 +63,7 @@ public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_));
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -147,7 +147,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   std::string header = "A";
   header.push_back('\000'); // Add an invalid character for http header.
   config.mutable_route_config()->mutable_routes()->at(0).mutable_route()->set_cluster_header(
@@ -168,7 +168,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 }
 
@@ -186,7 +186,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
 
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "no_such_filter");
@@ -199,7 +199,17 @@ stat_prefix: ingress
 route_config:
   name: local_route
 thrift_filters:
-  - name: envoy.filters.thrift.mock_filter
+  - name: envoy.filters.thrift.mock_decoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_encoder_filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  - name: envoy.filters.thrift.mock_bidirectional_filter
     typed_config:
       "@type": type.googleapis.com/google.protobuf.Struct
       value:
@@ -209,11 +219,11 @@ thrift_filters:
       "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router
 )EOF";
 
-  ThriftFilters::MockFilterConfigFactory factory;
+  ThriftFilters::MockBidirectionalFilterConfigFactory factory;
   Registry::InjectFactory<ThriftFilters::NamedThriftFilterConfigFactory> registry(factory);
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
@@ -235,7 +245,7 @@ thrift_filters:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   testConfig(config);
 
   EXPECT_EQ(true, config.payload_passthrough());
@@ -258,7 +268,7 @@ resources:
 )EOF");
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(config_yaml);
+      parseThriftProxyFromV3Yaml(config_yaml);
   Matchers::UniversalStringMatcher universal_name_matcher;
   Network::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config, context_);
   auto response =
@@ -286,7 +296,7 @@ trds:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "both trds and route_config is present in ThriftProxy");
 }
@@ -302,7 +312,7 @@ trds:
 )EOF";
 
   envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
-      parseThriftProxyFromV2Yaml(yaml);
+      parseThriftProxyFromV3Yaml(yaml);
   EXPECT_THROW_WITH_REGEX(factory_.createFilterFactoryFromProto(config, context_), EnvoyException,
                           "trds supports only aggregated api_type in api_config_source");
 }

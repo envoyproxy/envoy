@@ -10,7 +10,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/server/active_internal_listener.h"
 #include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
@@ -30,17 +29,18 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime) {
-  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
-  if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
+  if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
-    listener_detail->get().listener_->updateListenerConfig(config);
+    listener_detail->get().invokeListenerMethod(
+        [&config](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.updateListenerConfig(config);
+        });
     return;
   }
 
-  auto details = std::make_shared<ActiveListenerDetails>();
+  auto details = std::make_unique<ActiveListenerDetails>();
   if (config.internalListenerConfig().has_value()) {
     // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
     // should be done only once. However, an extra phase and interface is overkill.
@@ -53,90 +53,90 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     if (overridden_listener.has_value()) {
       if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
           iter != listener_map_by_tag_.end()) {
-        iter->second->internalListener()->get().updateListenerConfig(config);
+        iter->second->invokeListenerMethod(
+            [&config](Network::ConnectionHandler::ActiveListener& listener) {
+              listener.updateListenerConfig(config);
+            });
         return;
       }
       IS_ENVOY_BUG("unexpected");
     }
-    auto internal_listener = std::make_unique<ActiveInternalListener>(*this, dispatcher(), config);
-    details->typed_listener_ = *internal_listener;
-    details->listener_ = std::move(internal_listener);
-  } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
-    if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
-      if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
-          iter != listener_map_by_tag_.end()) {
-        iter->second->tcpListener()->get().updateListenerConfig(config);
-        return;
-      }
-      IS_ENVOY_BUG("unexpected");
+    auto internal_listener =
+        local_registry->createActiveInternalListener(*this, config, dispatcher());
+    // TODO(soulxu): support multiple internal addresses in listener in the future.
+    ASSERT(config.listenSocketFactories().size() == 1);
+    details->addActiveListener(config, config.listenSocketFactories()[0]->localAddress(),
+                               listener_reject_fraction_, disable_listeners_,
+                               std::move(internal_listener));
+  } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
+    for (auto& socket_factory : config.listenSocketFactories()) {
+      auto address = socket_factory->localAddress();
+      // worker_index_ doesn't have a value on the main thread for the admin server.
+      details->addActiveListener(
+          config, address, listener_reject_fraction_, disable_listeners_,
+          std::make_unique<ActiveTcpListener>(
+              *this, config, runtime,
+              socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
+              address, config.connectionBalancer(*address)));
     }
-    // worker_index_ doesn't have a value on the main thread for the admin server.
-    auto tcp_listener = std::make_unique<ActiveTcpListener>(
-        *this, config, runtime, worker_index_.has_value() ? *worker_index_ : 0);
-    details->typed_listener_ = *tcp_listener;
-    details->listener_ = std::move(tcp_listener);
   } else {
     ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
     ASSERT(worker_index_.has_value());
-    ConnectionHandler::ActiveUdpListenerPtr udp_listener =
-        config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
-            runtime, *worker_index_, *this, dispatcher_, config);
-    details->typed_listener_ = *udp_listener;
-    details->listener_ = std::move(udp_listener);
+    for (auto& socket_factory : config.listenSocketFactories()) {
+      auto address = socket_factory->localAddress();
+      details->addActiveListener(
+          config, address, listener_reject_fraction_, disable_listeners_,
+          config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
+              runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
+              dispatcher_, config));
+    }
   }
-
-  if (disable_listeners_) {
-    details->listener_->pauseListening();
-  }
-  if (auto* listener = details->listener_->listener(); listener != nullptr) {
-    listener->setRejectFraction(listener_reject_fraction_);
-  }
-
-  details->listener_tag_ = config.listenerTag();
-  details->address_ = config.listenSocketFactory().localAddress();
 
   ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
 
-  listener_map_by_tag_.emplace(config.listenerTag(), details);
-  // This map only store the new listener.
-  if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-          details->typed_listener_)) {
-    tcp_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
+  for (const auto& per_address_details : details->per_address_details_list_) {
+    // This map only stores the new listener.
+    if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+            per_address_details->typed_listener_)) {
+      tcp_listener_map_by_address_.insert_or_assign(per_address_details->address_->asStringView(),
+                                                    per_address_details);
 
-    auto& address = details->address_;
-    // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the Ipv6
-    // address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
-    // can match the Ipv4 request to Ipv4-mapped address also.
-    if (address->type() == Network::Address::Type::Ip &&
-        address->ip()->version() == Network::Address::IpVersion::v6 &&
-        !address->ip()->ipv6()->v6only()) {
-      if (address->ip()->isAnyAddress()) {
-        // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-        // If there already one and it isn't shutdown for compatible addr,
-        // then won't insert a new one.
-        auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
-        auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
-        if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-            ipv4_any_listener->second->listener_->listener() == nullptr) {
-          tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, details);
-        }
-      } else {
-        auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-        // Remove this check when runtime flag
-        // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-        // If this isn't a valid Ipv4-mapped address, then do nothing.
-        if (v4_compatible_addr != nullptr) {
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
-                                                        details);
+      auto& address = per_address_details->address_;
+      // If the address is Ipv6 and isn't v6only, parse out the ipv4 compatible address from the
+      // Ipv6 address and put an item to the map. Then this allows the `getBalancedHandlerByAddress`
+      // can match the Ipv4 request to Ipv4-mapped address also.
+      if (address->type() == Network::Address::Type::Ip &&
+          address->ip()->version() == Network::Address::IpVersion::v6 &&
+          !address->ip()->ipv6()->v6only()) {
+        if (address->ip()->isAnyAddress()) {
+          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
+          // Only override the listener when this is an update of the existing listener by
+          // checking the address, this ensures the Ipv4 address listener won't be override
+          // by the listener which has the same IPv4-mapped address.
+          auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
+          auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
+          if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
+              *ipv4_any_listener->second->address_ == *address) {
+            tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, per_address_details);
+          }
+        } else {
+          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+          // Remove this check when runtime flag
+          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+          // If this isn't a valid Ipv4-mapped address, then do nothing.
+          if (v4_compatible_addr != nullptr) {
+            tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
+                                                          per_address_details);
+          }
         }
       }
+    } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
+                   per_address_details->typed_listener_)) {
+      internal_listener_map_by_address_.insert_or_assign(
+          per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
-  } else if (absl::holds_alternative<std::reference_wrapper<ActiveInternalListener>>(
-                 details->typed_listener_)) {
-    internal_listener_map_by_address_.insert_or_assign(
-        config.listenSocketFactory().localAddress()->asStringView(), details);
   }
+  listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
@@ -144,56 +144,77 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       listener_iter != listener_map_by_tag_.end()) {
     // listener_map_by_address_ may already update to the new listener. Compare it with the one
     // which find from listener_map_by_tag_, only delete it when it is same listener.
-    auto& address = listener_iter->second->address_;
-    auto address_view = address->asStringView();
-    if (tcp_listener_map_by_address_.contains(address_view) &&
-        tcp_listener_map_by_address_[address_view]->listener_tag_ ==
-            listener_iter->second->listener_tag_) {
-      tcp_listener_map_by_address_.erase(address_view);
+    for (const auto& per_address_details : listener_iter->second->per_address_details_list_) {
+      auto& address = per_address_details->address_;
+      auto address_view = address->asStringView();
+      if (tcp_listener_map_by_address_.contains(address_view) &&
+          tcp_listener_map_by_address_[address_view]->listener_tag_ ==
+              per_address_details->listener_tag_) {
+        tcp_listener_map_by_address_.erase(address_view);
 
-      // If the address is Ipv6 and isn't v6only, delete the corresponding Ipv4 item from the map.
-      if (address->type() == Network::Address::Type::Ip &&
-          address->ip()->version() == Network::Address::IpVersion::v6 &&
-          !address->ip()->ipv6()->v6only()) {
-        if (address->ip()->isAnyAddress()) {
-          auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(
-              Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
-          // Since both "::" with ipv4_compat and "0.0.0.0" can be supported, ensure they are same
-          // listener by tag.
-          if (ipv4_any_addr_iter != tcp_listener_map_by_address_.end() &&
-              ipv4_any_addr_iter->second->listener_tag_ == listener_iter->second->listener_tag_) {
-            tcp_listener_map_by_address_.erase(ipv4_any_addr_iter);
-          }
-        } else {
-          auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // Remove this check when runtime flag
-          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-          if (v4_compatible_addr != nullptr) {
-            // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
-            // remove the v4 compatible addr item directly.
-            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+        // If the address is Ipv6 and isn't v6only, delete the corresponding Ipv4 item from the map.
+        if (address->type() == Network::Address::Type::Ip &&
+            address->ip()->version() == Network::Address::IpVersion::v6 &&
+            !address->ip()->ipv6()->v6only()) {
+          if (address->ip()->isAnyAddress()) {
+            auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(
+                Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
+            // Since both "::" with ipv4_compat and "0.0.0.0" can be supported, ensure they are same
+            // listener by tag.
+            if (ipv4_any_addr_iter != tcp_listener_map_by_address_.end() &&
+                ipv4_any_addr_iter->second->listener_tag_ == per_address_details->listener_tag_) {
+              tcp_listener_map_by_address_.erase(ipv4_any_addr_iter);
+            }
+          } else {
+            auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
+            // Remove this check when runtime flag
+            // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
+            if (v4_compatible_addr != nullptr) {
+              // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
+              // remove the v4 compatible addr item directly.
+              tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+            }
           }
         }
+      } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+        const auto& address_id = address->envoyInternalAddress()->addressId();
+        if (internal_listener_map_by_address_.contains(address_id) &&
+            internal_listener_map_by_address_[address_id]->listener_tag_ ==
+                per_address_details->listener_tag_) {
+          internal_listener_map_by_address_.erase(address_id);
+        }
       }
-    } else if (internal_listener_map_by_address_.contains(address_view) &&
-               internal_listener_map_by_address_[address_view]->listener_tag_ ==
-                   listener_iter->second->listener_tag_) {
-      internal_listener_map_by_address_.erase(address_view);
     }
     listener_map_by_tag_.erase(listener_iter);
   }
 }
 
-Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
-  auto listener = findActiveListenerByTag(listener_tag);
-  if (listener.has_value()) {
+ConnectionHandlerImpl::PerAddressActiveListenerDetailsOptRef
+ConnectionHandlerImpl::findPerAddressActiveListenerDetails(
+    const ConnectionHandlerImpl::ActiveListenerDetailsOptRef active_listener_details,
+    const Network::Address::Instance& address) {
+  if (active_listener_details.has_value()) {
     // If the tag matches this must be a UDP listener.
-    auto udp_listener = listener->get().udpListener();
-    ASSERT(udp_listener.has_value());
-    return udp_listener;
+    for (auto& details : active_listener_details->get().per_address_details_list_) {
+      if (*details->address_ == address) {
+        return *details;
+      }
+    }
   }
 
+  return absl::nullopt;
+}
+
+Network::UdpListenerCallbacksOptRef
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
+  auto listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
+  if (listener.has_value()) {
+    // If the tag matches this must be a UDP listener.
+    ASSERT(listener->get().udpListener().has_value());
+    return listener->get().udpListener();
+  }
   return absl::nullopt;
 }
 
@@ -202,7 +223,10 @@ void ConnectionHandlerImpl::removeFilterChains(
     std::function<void()> completion) {
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
-    listener_it->second->listener_->onFilterChainDraining(filter_chains);
+    listener_it->second->invokeListenerMethod(
+        [&filter_chains](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.onFilterChainDraining(filter_chains);
+        });
   }
 
   // Reach here if the target listener is found or the target listener was removed by a full
@@ -213,73 +237,85 @@ void ConnectionHandlerImpl::removeFilterChains(
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
-    if (iter->second->listener_->listener() != nullptr) {
-      iter->second->listener_->shutdownListener();
-    }
+    iter->second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
+      if (listener.listener() != nullptr) {
+        listener.shutdownListener();
+      }
+    });
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& iter : listener_map_by_tag_) {
-    if (iter.second->listener_->listener() != nullptr) {
-      iter.second->listener_->shutdownListener();
-    }
+    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
+      if (listener.listener() != nullptr) {
+        listener.shutdownListener();
+      }
+    });
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& iter : listener_map_by_tag_) {
-    if (iter.second->listener_->listener() != nullptr) {
-      iter.second->listener_->pauseListening();
-    }
+    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
+      if (listener.listener() != nullptr) {
+        listener.pauseListening();
+      }
+    });
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& iter : listener_map_by_tag_) {
-    if (iter.second->listener_->listener() != nullptr) {
-      iter.second->listener_->resumeListening();
-    }
+    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
+      if (listener.listener() != nullptr) {
+        listener.resumeListening();
+      }
+    });
   }
 }
 
 void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& iter : listener_map_by_tag_) {
-    if (iter.second->listener_->listener() != nullptr) {
-      iter.second->listener_->listener()->setRejectFraction(reject_fraction);
-    }
+    iter.second->invokeListenerMethod(
+        [&reject_fraction](Network::ConnectionHandler::ActiveListener& listener) {
+          if (listener.listener() != nullptr) {
+            listener.listener()->setRejectFraction(reject_fraction);
+          }
+        });
   }
 }
 
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  if (auto listener_it = internal_listener_map_by_address_.find(address->asStringView());
+  if (auto listener_it =
+          internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
       listener_it != internal_listener_map_by_address_.end()) {
-    return Network::InternalListenerOptRef(listener_it->second->internalListener().value().get());
+    return {listener_it->second->internalListener().value().get()};
   }
-  return OptRef<Network::InternalListener>();
+  return {};
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
-ConnectionHandlerImpl::ActiveListenerDetails::tcpListener() {
+ConnectionHandlerImpl::PerAddressActiveListenerDetails::tcpListener() {
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 
 ConnectionHandlerImpl::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::ActiveListenerDetails::udpListener() {
+ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::UdpListenerCallbacks>>(&typed_listener_);
   return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
 }
 
-ConnectionHandlerImpl::ActiveInternalListenerOptRef
-ConnectionHandlerImpl::ActiveListenerDetails::internalListener() {
-  auto* val = absl::get_if<std::reference_wrapper<ActiveInternalListener>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+Network::InternalListenerOptRef
+ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
+  auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
+  return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef
@@ -291,14 +327,14 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
 }
 
 Network::BalancedConnectionHandlerOptRef
-ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
-  auto active_listener = findActiveListenerByTag(listener_tag);
+ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
+  auto active_listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
   if (active_listener.has_value()) {
-    ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-               active_listener->get().typed_listener_) &&
-           active_listener->get().listener_->listener() != nullptr);
-    return Network::BalancedConnectionHandlerOptRef(
-        active_listener->get().tcpListener().value().get());
+    // If the tag matches this must be a TCP listener.
+    ASSERT(active_listener->get().tcpListener().has_value());
+    return active_listener->get().tcpListener().value().get();
   }
   return absl::nullopt;
 }
@@ -317,7 +353,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
         listener_it->second->tcpListener().value().get());
   }
 
-  OptRef<ConnectionHandlerImpl::ActiveListenerDetails> details;
+  OptRef<ConnectionHandlerImpl::PerAddressActiveListenerDetails> details;
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.

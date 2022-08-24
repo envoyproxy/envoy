@@ -1,0 +1,25 @@
+max_bytes_read: 10
+actions {
+  peek_from_socket: 3
+}
+actions {
+  drain: 1
+}
+actions {
+  peek_from_socket: 5
+}
+actions {
+  reset_capacity: 20
+}
+actions {
+  peek_from_socket: 15
+}
+actions {
+  reset_capacity: 10
+}
+actions {
+  peek_from_socket: 5
+}
+actions {
+  drain: 5
+}

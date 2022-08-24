@@ -72,9 +72,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) { return async_client_; }));
+            getOrCreateRawAsyncClient(_, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                                  bool) { return async_client_; }));
 
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
@@ -102,9 +102,9 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
-                                  Grpc::CacheOption) { return async_client_; }));
+            getOrCreateRawAsyncClient(_, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                                  bool) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_connection_info_provider_
@@ -150,6 +150,26 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
+    }
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP2) {
+      // Sanity check on connection_keepalive interval and timeout.
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), interval);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive interval shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
+      try {
+        PROTOBUF_GET_MS_REQUIRED(config.http2_protocol_options().connection_keepalive(), timeout);
+      } catch (const DurationUtil::OutOfRangeException& e) {
+        throw EnvoyException(
+            absl::StrCat("In http2_protocol_options.connection_keepalive timeout shall not be "
+                         "negative. Exception {}",
+                         e.what()));
+      }
     }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::

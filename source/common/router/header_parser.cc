@@ -228,7 +228,8 @@ HeaderParserPtr HeaderParser::configure(
     HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
-        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value()});
+        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value(),
+                          header_value_option.keep_empty_value()});
   }
 
   return header_parser;
@@ -283,7 +284,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
-    if (!value.empty()) {
+    if (!value.empty() || entry.add_if_empty_) {
       if (entry.formatter_->append()) {
         headers.addReferenceKey(key, value);
       } else {
@@ -300,7 +301,7 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
       const std::string value = entry.formatter_->format(stream_info);
-      if (!value.empty()) {
+      if (!value.empty() || entry.add_if_empty_) {
         if (entry.formatter_->append()) {
           transforms.headers_to_append.push_back({key, value});
         } else {

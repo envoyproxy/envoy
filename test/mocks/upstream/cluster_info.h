@@ -29,6 +29,10 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
@@ -139,7 +143,7 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(AddressSelectFn, sourceAddressFn, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
@@ -156,6 +160,13 @@ public:
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+              (const));
+
+  MOCK_METHOD(void, createFilterChain, (Http::FilterChainManager & manager), (const));
+  MOCK_METHOD(bool, createUpgradeFilterChain,
+              (absl::string_view upgrade_type,
+               const Http::FilterChainFactory::UpgradeMap* upgrade_map,
+               Http::FilterChainManager& manager),
               (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
@@ -209,7 +220,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

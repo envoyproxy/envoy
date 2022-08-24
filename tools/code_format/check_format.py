@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
-import common
 import functools
+import logging
 import multiprocessing
 import os
-import os.path
 import pathlib
 import re
 import subprocess
@@ -13,227 +12,144 @@ import stat
 import sys
 import traceback
 import shutil
+from functools import cached_property
+from typing import Callable, Dict, List, Pattern, Tuple, Union
+
+# The way this script is currently used (ie no bazel) it relies on system deps.
+# As `pyyaml` is present in `envoy-build-ubuntu` it should be safe to use here.
+import yaml
+
 import paths
 
-EXCLUDED_PREFIXES = (
-    "./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
-    "./source/extensions/extensions_build_config.bzl", "./contrib/contrib_build_config.bzl",
-    "./bazel/toolchains/configs/", "./tools/testdata/check_format/", "./tools/pyformat/",
-    "./third_party/", "./test/extensions/filters/http/wasm/test_data",
-    "./test/extensions/filters/network/wasm/test_data",
-    "./test/extensions/stats_sinks/wasm/test_data", "./test/extensions/bootstrap/wasm/test_data",
-    "./test/extensions/common/wasm/test_data", "./test/extensions/access_loggers/wasm/test_data",
-    "./source/extensions/common/wasm/ext", "./examples/wasm-cc", "./bazel/external/http_parser/")
-SUFFIXES = ("BUILD", "WORKSPACE", ".bzl", ".cc", ".h", ".java", ".m", ".mm", ".proto")
-PROTO_SUFFIX = (".proto")
+logger = logging.getLogger(__name__)
 
-# Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_ALLOWLIST = (
-    "ci/prebuilt", "source/common/protobuf", "api/test", "test/extensions/bootstrap/wasm/test_data")
-REPOSITORIES_BZL = "bazel/repositories.bzl"
 
-# Files matching these exact names can reference real-world time. These include the class
-# definitions for real-world time, the construction of them in main(), and perf annotation.
-# For now it includes the validation server but that really should be injected too.
-REAL_TIME_ALLOWLIST = (
-    "./source/common/common/utility.h", "./source/extensions/common/aws/utility.cc",
-    "./source/common/event/real_time_system.cc", "./source/common/event/real_time_system.h",
-    "./source/exe/main_common.cc", "./source/exe/main_common.h",
-    "./source/server/config_validation/server.cc", "./source/common/common/perf_annotation.h",
-    "./test/common/common/log_macros_test.cc", "./test/common/protobuf/utility_test.cc",
-    "./test/test_common/simulated_time_system.cc", "./test/test_common/simulated_time_system.h",
-    "./test/test_common/test_time.cc", "./test/test_common/test_time.h",
-    "./test/test_common/utility.cc", "./test/test_common/utility.h",
-    "./test/integration/integration.h", "./test/tools/wee8_compile/wee8_compile.cc")
+class FormatConfig:
+    """Provides a format config object based on parsed YAML config."""
 
-# Tests in these paths may make use of the Registry::RegisterFactory constructor or the
-# REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
-# perform temporary registrations.
-REGISTER_FACTORY_TEST_ALLOWLIST = (
-    "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/", "./test/integration/load_balancers/",
-    "./test/extensions/transport_sockets/tls/integration/")
+    def __init__(self, path: str) -> None:
+        self.path = path
 
-# Files in these paths can use MessageLite::SerializeAsString
-SERIALIZE_AS_STRING_ALLOWLIST = (
-    "./source/common/protobuf/utility.cc",
-    "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
-    "./test/common/protobuf/utility_test.cc",
-    "./test/common/grpc/codec_test.cc",
-    "./test/common/grpc/codec_fuzz_test.cc",
-    "./test/extensions/filters/common/expr/context_test.cc",
-    "./test/extensions/filters/http/common/fuzz/uber_filter.h",
-    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc",
-    "./test/tools/router_check/router_check.cc",
-)
+    def __getitem__(self, k):
+        return self.config.__getitem__(k)
 
-# Files in these paths can use Protobuf::util::JsonStringToMessage
-JSON_STRING_TO_MESSAGE_ALLOWLIST = (
-    "./source/common/protobuf/utility.cc",
-    "./test/extensions/bootstrap/wasm/test_data/speed_cpp.cc")
+    @cached_property
+    def buildifier_path(self) -> str:
+        """Path to the buildifer binary."""
+        return paths.get_buildifier()
 
-# Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
-# ones were grandfathered as part of PR #8484 for backwards compatibility.
-HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = (
-    "cx_rtt_us", "cx_rtt_variance_us", "downstream_cx_length_ms", "downstream_cx_length_ms",
-    "initialization_time_ms", "loop_duration_us", "poll_delay_us", "request_time_ms",
-    "upstream_cx_connect_ms", "upstream_cx_length_ms")
+    @cached_property
+    def buildozer_path(self) -> str:
+        """Path to the buildozer binary."""
+        return paths.get_buildozer()
 
-# Files in these paths can use std::regex
-STD_REGEX_ALLOWLIST = (
-    "./source/common/common/utility.cc", "./source/common/common/regex.h",
-    "./source/common/common/regex.cc", "./source/common/stats/tag_extractor_impl.h",
-    "./source/common/stats/tag_extractor_impl.cc",
-    "./source/common/formatter/substitution_formatter.cc",
-    "./contrib/squash/filters/http/source/squash_filter.h",
-    "./contrib/squash/filters/http/source/squash_filter.cc", "./source/server/admin/utils.h",
-    "./source/server/admin/utils.cc", "./source/server/admin/stats_handler.h",
-    "./source/server/admin/stats_handler.cc", "./source/server/admin/stats_request.cc",
-    "./source/server/admin/stats_request.h", "./source/server/admin/prometheus_stats.h",
-    "./source/server/admin/prometheus_stats.cc", "./tools/clang_tools/api_booster/main.cc",
-    "./tools/clang_tools/api_booster/proto_cxx_utils.cc", "./source/common/version/version.cc")
+    @cached_property
+    def clang_format_path(self) -> str:
+        """Path to the clang-format binary."""
+        return os.getenv("CLANG_FORMAT", "clang-format-14")
 
-# Only one C++ file should instantiate grpc_init
-GRPC_INIT_ALLOWLIST = ("./source/common/grpc/google_grpc_context.cc")
+    @cached_property
+    def config(self) -> Dict:
+        """Parsed YAML config."""
+        # TODO(phlax): Ensure the YAML is valid/well-formed."""
+        return yaml.safe_load(pathlib.Path(self.path).read_text())
 
-# Files that should not raise an error for using memcpy
-MEMCPY_WHITELIST = (
-    "./source/common/common/mem_block_builder.h", "./source/common/common/safe_memcpy.h")
+    @cached_property
+    def dir_order(self) -> List[str]:
+        """Expected order of includes in code."""
+        return self["dir_order"]
 
-# These files should not throw exceptions. Add HTTP/1 when exceptions removed.
-EXCEPTION_DENYLIST = (
-    "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
+    @cached_property
+    def paths(self) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
+        """Mapping of named paths."""
+        paths = self._normalize("paths", cb=lambda paths: tuple(f"./{p}" for p in paths))
+        paths["build_fixer_py"] = self._build_fixer_path
+        paths["header_order_py"] = self._header_order_path
+        return paths
 
-# Files that are allowed to use try without main thread assertion.
-RAW_TRY_ALLOWLIST = (
-    "./source/common/common/regex.cc", "./source/common/common/thread.h",
-    "./source/common/network/utility.cc")
+    @cached_property
+    def re(self) -> Dict[str, Pattern[str]]:
+        """Mapping of named regular expressions."""
+        return {k: re.compile(v) for k, v in self["re"].items()}
 
-# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
-# now this is just WASM which makes use of std::string_view heavily so we need to convert to
-# absl::string_view internally. Everywhere else should be using absl::string_view for additional
-# safety.
-STD_STRING_VIEW_ALLOWLIST = (
-    "./source/extensions/common/wasm/context.h",
-    "./source/extensions/common/wasm/context.cc",
-    "./source/extensions/common/wasm/foreign.cc",
-    "./source/extensions/common/wasm/wasm.h",
-    "./source/extensions/common/wasm/wasm.cc",
-    "./source/extensions/common/wasm/wasm_vm.h",
-    "./source/extensions/common/wasm/wasm_vm.cc",
-    "./test/extensions/bootstrap/wasm/wasm_speed_test.cc",
-    "./test/extensions/bootstrap/wasm/wasm_test.cc",
-    "./test/extensions/common/wasm/wasm_test.cc",
-    "./test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc",
-    "./test/test_common/wasm_base.h",
-)
+    @cached_property
+    def re_multiline(self) -> Dict[str, Pattern[str]]:
+        """Mapping of named multi-line regular expressions."""
+        return {k: re.compile(v, re.MULTILINE) for k, v in self["re_multiline"].items()}
 
-# Header files that can throw exceptions. These should be limited; the only
-# valid situation identified so far is template functions used for config
-# processing.
-EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
+    @cached_property
+    def replacements(self) -> Dict[str, str]:
+        """Mapping of subsitutions to be replaced in code."""
+        return self["replacements"]
 
-# We want all URL references to exist in repository_locations.bzl files and have
-# metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
-# we have some exceptions for either infrastructure files or places we fall
-# short today (Rust).
-#
-# Please DO NOT extend this allow list without consulting
-# @envoyproxy/dependency-shepherds.
-BUILD_URLS_ALLOWLIST = (
-    "./bazel/repository_locations.bzl",
-    "./bazel/external/cargo/crates.bzl",
-    "./api/bazel/repository_locations.bzl",
-    "./api/bazel/envoy_http_archive.bzl",
-)
+    @cached_property
+    def suffixes(self) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
+        """Mapping of named file suffixes for target files."""
+        return self._normalize("suffixes")
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-12")
-BUILDIFIER_PATH = paths.get_buildifier()
-BUILDOZER_PATH = paths.get_buildozer()
-ENVOY_BUILD_FIXER_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
-HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
-SUBDIR_SET = set(common.include_dir_order())
-INCLUDE_ANGLE = "#include <"
-INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-PROTO_PACKAGE_REGEX = re.compile(r"^package (\S+);\n*", re.MULTILINE)
-X_ENVOY_USED_DIRECTLY_REGEX = re.compile(r'.*\"x-envoy-.*\".*')
-DESIGNATED_INITIALIZER_REGEX = re.compile(r"\{\s*\.\w+\s*\=")
-MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}")
-HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
-TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
-EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
-CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
-COMMENT_REGEX = re.compile(r"//|\*")
-DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
-PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
-OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
-# C++17 feature, lacks sufficient support across various libraries / compilers.
-FOR_EACH_N_REGEX = re.compile("for_each_n\(")
-# Check for punctuation in a terminal ref clause, e.g.
-# :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
-DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
-FLAG_REGEX = re.compile("RUNTIME_GUARD\((.*)\);")
+    @property
+    def _build_fixer_path(self) -> str:
+        return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 
-# yapf: disable
-PROTOBUF_TYPE_ERRORS = {
-    # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any":                    "ProtobufWkt::Any",
-    "Protobuf::Empty":                  "ProtobufWkt::Empty",
-    "Protobuf::ListValue":              "ProtobufWkt::ListValue",
-    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
-    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
-    "Protobuf::Struct":                 "ProtobufWkt::Struct",
-    "Protobuf::Value":                  "ProtobufWkt::Value",
+    @property
+    def _header_order_path(self) -> str:
+        return os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
-    # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map":                 "Protobuf::Map",
-    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
-    "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
-}
-# yapf: enable
-
-LIBCXX_REPLACEMENTS = {
-    "absl::make_unique<": "std::make_unique<",
-}
-
-CODE_CONVENTION_REPLACEMENTS = {
-    # We can't just remove Times(1) everywhere, since .Times(1).WillRepeatedly
-    # is a legitimate pattern. See
-    # https://github.com/google/googletest/blob/master/googlemock/docs/for_dummies.md#cardinalities-how-many-times-will-it-be-called
-    ".Times(1);": ";",
-    # These may miss some cases, due to line breaks, but should reduce the
-    # Times(1) noise.
-    ".Times(1).WillOnce": ".WillOnce",
-    ".Times(1).WillRepeatedly": ".WillOnce",
-}
-
-UNSORTED_FLAGS = {
-    "envoy.reloadable_features.activate_timers_next_event_loop",
-    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-    "envoy.reloadable_features.sanitize_http_header_referer",
-}
+    def _normalize(
+            self,
+            config_type: str,
+            cb: Callable = tuple) -> Dict[str, Union[Tuple[str, ...], Dict[str, Tuple[str, ...]]]]:
+        config = {}
+        for k, v in self[config_type].items():
+            if isinstance(v, dict):
+                config[k] = {}
+                for key in ("include", "exclude"):
+                    if key in v:
+                        config[k][key] = cb(v[key])
+            else:
+                config[k] = cb(v)
+        return config
 
 
 class FormatChecker:
 
     def __init__(self, args):
+        self.args = args
+        self.config_path = args.config_path
         self.operation_type = args.operation_type
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
-        self.namespace_check = args.namespace_check
-        self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
-            "./tools/api_boost/testdata/",
-            "./tools/clang_tools/",
-        ]
-        self.build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
-            "./bazel/external/",
-            "./bazel/toolchains/",
-            "./bazel/BUILD",
-            "./tools/clang_tools",
-        ]
-        self.include_dir_order = args.include_dir_order
+        self._include_dir_order = args.include_dir_order
+
+    @cached_property
+    def build_fixer_check_excluded_paths(self):
+        return (
+            tuple(self.args.build_fixer_check_excluded_paths)
+            + self.config.paths["build_fixer"]["exclude"])
+
+    @cached_property
+    def config(self) -> FormatConfig:
+        return FormatConfig(self.config_path)
+
+    @cached_property
+    def include_dir_order(self):
+        return ",".join(
+            self._include_dir_order if self._include_dir_order else self.config["dir_order"])
+
+    @property
+    def namespace_check(self):
+        return self.args.namespace_check
+
+    @cached_property
+    def namespace_check_excluded_paths(self):
+        return (
+            tuple(self.args.namespace_check_excluded_paths)
+            + self.config.paths["namespace_check"]["exclude"])
+
+    @cached_property
+    def namespace_re(self):
+        return re.compile("^\s*namespace\s+%s\s*{" % self.namespace_check, re.MULTILINE)
 
     # Map a line transformation function across each line of a file,
     # writing the result lines as requested.
@@ -265,7 +181,10 @@ class FormatChecker:
 
     # Obtain all the lines in a given file.
     def read_lines(self, path):
-        return self.read_file(path).split('\n')
+        with open(path) as f:
+            for l in f:
+                yield l[:-1]
+        yield ""
 
     # Read a UTF-8 encoded file as a str.
     def read_file(self, path):
@@ -296,22 +215,22 @@ class FormatChecker:
     def check_tools(self):
         error_messages = []
 
-        clang_format_abs_path = self.look_path(CLANG_FORMAT_PATH)
+        clang_format_abs_path = self.look_path(self.config.clang_format_path)
         if clang_format_abs_path:
             if not self.executable_by_others(clang_format_abs_path):
                 error_messages.append(
                     "command {} exists, but cannot be executed by other "
-                    "users".format(CLANG_FORMAT_PATH))
+                    "users".format(self.config.clang_format_path))
         else:
             error_messages.append(
                 "Command {} not found. If you have clang-format in version 12.x.x "
                 "installed, but the binary name is different or it's not available in "
                 "PATH, please use CLANG_FORMAT environment variable to specify the path. "
                 "Examples:\n"
-                "    export CLANG_FORMAT=clang-format-12.0.1\n"
-                "    export CLANG_FORMAT=/opt/bin/clang-format-12\n"
-                "    export CLANG_FORMAT=/usr/local/opt/llvm@12/bin/clang-format".format(
-                    CLANG_FORMAT_PATH))
+                "    export CLANG_FORMAT=clang-format-14.0.0\n"
+                "    export CLANG_FORMAT=/opt/bin/clang-format-14\n"
+                "    export CLANG_FORMAT=/usr/local/opt/llvm@14/bin/clang-format".format(
+                    self.config.clang_format_path))
 
         def check_bazel_tool(name, path, var):
             bazel_tool_abs_path = self.look_path(path)
@@ -336,8 +255,8 @@ class FormatChecker:
                     "    go get -u github.com/bazelbuild/buildtools/{}".format(
                         path, name, var, var, name, name, name))
 
-        check_bazel_tool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
-        check_bazel_tool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
+        check_bazel_tool('buildifier', self.config.buildifier_path, 'BUILDIFIER_BIN')
+        check_bazel_tool('buildozer', self.config.buildozer_path, 'BUILDOZER_BIN')
 
         return error_messages
 
@@ -348,30 +267,19 @@ class FormatChecker:
 
         nolint = "NOLINT(namespace-%s)" % self.namespace_check.lower()
         text = self.read_file(file_path)
-        if not re.search("^\s*namespace\s+%s\s*{" % self.namespace_check, text, re.MULTILINE) and \
-                not nolint in text:
+        if not self.namespace_re.search(text) and not nolint in text:
             return [
                 "Unable to find %s namespace or %s for file: %s" %
                 (self.namespace_check, nolint, file_path)
             ]
         return []
 
-    def package_name_for_proto(self, file_path):
-        package_name = None
-        error_message = []
-        result = PROTO_PACKAGE_REGEX.search(self.read_file(file_path))
-        if result is not None and len(result.groups()) == 1:
-            package_name = result.group(1)
-        if package_name is None:
-            error_message = ["Unable to find package name for proto file: %s" % file_path]
-
-        return [package_name, error_message]
-
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
         return (
-            file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL)
-            or any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_ALLOWLIST))
+            file_path.endswith(self.config.suffixes["proto"])
+            or file_path.endswith(self.config.suffixes["repositories_bzl"])
+            or any(file_path.startswith(path) for path in self.config.paths["protobuf"]["include"]))
 
     # Real-world time sources should not be instantiated in the source, except for a few
     # specific cases. They should be passed down from where they are instantied to where
@@ -379,31 +287,34 @@ class FormatChecker:
     def allow_listed_for_realtime(self, file_path):
         if file_path.endswith(".md"):
             return True
-        return file_path in REAL_TIME_ALLOWLIST
+        return file_path in self.config.paths["real_time"]["include"]
 
     def allow_listed_for_register_factory(self, file_path):
         if not file_path.startswith("./test/"):
             return True
 
-        return any(file_path.startswith(prefix) for prefix in REGISTER_FACTORY_TEST_ALLOWLIST)
+        return any(
+            file_path.startswith(prefix)
+            for prefix in self.config.paths["register_factory_test"]["include"])
 
     def allow_listed_for_serialize_as_string(self, file_path):
-        return file_path in SERIALIZE_AS_STRING_ALLOWLIST
+        return file_path in self.config.paths["serialize_as_string"]["include"]
 
     def allow_listed_for_std_string_view(self, file_path):
-        return file_path in STD_STRING_VIEW_ALLOWLIST
+        return file_path in self.config.paths["std_string_view"]["include"]
 
     def allow_listed_for_json_string_to_message(self, file_path):
-        return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
+        return file_path in self.config.paths["json_string_to_message"]["include"]
 
     def allow_listed_for_histogram_si_suffix(self, name):
-        return name in HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST
+        return name in self.config.suffixes["histogram_with_si"]["include"]
 
     def allow_listed_for_std_regex(self, file_path):
-        return file_path.startswith("./test") or file_path in STD_REGEX_ALLOWLIST
+        return file_path.startswith(
+            "./test") or file_path in self.config.paths["std_regex"]["include"]
 
     def allow_listed_for_grpc_init(self, file_path):
-        return file_path in GRPC_INIT_ALLOWLIST
+        return file_path in self.config.paths["grpc_init"]["include"]
 
     def allow_listed_for_unpack_to(self, file_path):
         return file_path.startswith("./test") or file_path in [
@@ -412,17 +323,18 @@ class FormatChecker:
 
     def allow_listed_for_raw_try(self, file_path):
         # TODO(chaoqin-li1123): Exclude some important extensions from ALLOWLIST.
-        return file_path in RAW_TRY_ALLOWLIST or file_path.startswith("./source/extensions")
+        return file_path in self.config.paths["raw_try"]["include"] or file_path.startswith(
+            "./source/extensions")
 
     def deny_listed_for_exceptions(self, file_path):
         # Returns true when it is a non test header file or the file_path is in DENYLIST or
         # it is under tools/testdata subdirectory.
 
-        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in EXCEPTION_ALLOWLIST) or file_path in EXCEPTION_DENYLIST \
+        return (file_path.endswith('.h') and not file_path.startswith("./test/") and not file_path in self.config.paths["exception"]["include"]) or file_path in self.config.paths["exception"]["exclude"] \
             or self.is_in_subdir(file_path, 'tools/testdata')
 
     def allow_listed_for_build_urls(self, file_path):
-        return file_path in BUILD_URLS_ALLOWLIST
+        return file_path in self.config.paths["build_urls"]["include"]
 
     def is_api_file(self, file_path):
         return file_path.startswith(self.api_prefix)
@@ -451,27 +363,28 @@ class FormatChecker:
         return False
 
     def has_invalid_angle_bracket_directory(self, line):
-        if not line.startswith(INCLUDE_ANGLE):
+        if not line.startswith(self.config["include_angle"]):
             return False
-        path = line[INCLUDE_ANGLE_LEN:]
+        path = line[len(self.config["include_angle"]):]
         slash = path.find("/")
         if slash == -1:
             return False
         subdir = path[0:slash]
-        return subdir in SUBDIR_SET
+        return subdir in self.config.dir_order
 
     # simple check that all flags are sorted.
     def check_runtime_flags(self, file_path, error_messages):
         previous_flag = ""
         for line_number, line in enumerate(self.read_lines(file_path)):
             if line.startswith("RUNTIME_GUARD"):
-                match = FLAG_REGEX.match(line)
+                match = self.config.re["runtime_guard_flag"].match(line)
                 if not match:
                     error_messages.append("%s does not look like a reloadable flag" % line)
                     break
 
                 if previous_flag:
-                    if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                    if line < previous_flag and match.groups(
+                    )[0] not in self.config["unsorted_flags"]:
                         error_messages.append(
                             "%s and %s are out of order\n" % (line, previous_flag))
                 previous_flag = line
@@ -498,21 +411,23 @@ class FormatChecker:
     def fix_source_line(self, line, line_number):
         # Strip double space after '.'  This may prove overenthusiastic and need to
         # be restricted to comments and metadata files but works for now.
-        line = re.sub(DOT_MULTI_SPACE_REGEX, ". ", line)
+        line = self.config.re["dot_multi_space"].sub(". ", line)
 
         if self.has_invalid_angle_bracket_directory(line):
             line = line.replace("<", '"').replace(">", '"')
 
         # Fix incorrect protobuf namespace references.
-        for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+        for invalid_construct, valid_construct in self.config.replacements[
+                "protobuf_type_errors"].items():
             line = line.replace(invalid_construct, valid_construct)
 
         # Use recommended cpp stdlib
-        for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
+        for invalid_construct, valid_construct in self.config.replacements["libcxx"].items():
             line = line.replace(invalid_construct, valid_construct)
 
         # Fix code conventions violations.
-        for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+        for invalid_construct, valid_construct in self.config.replacements["code_convention"].items(
+        ):
             line = line.replace(invalid_construct, valid_construct)
 
         return line
@@ -531,6 +446,9 @@ class FormatChecker:
                 preceding.endswith("time_system_"):
             return False
         return True
+
+    def is_api_proto(self, file_path):
+        return file_path.endswith(self.config.suffixes["proto"]) and self.is_api_file(file_path)
 
     # Determines whether the filename is either in the specified subdirectory, or
     # at the top level. We consider files in the top level for the benefit of
@@ -568,29 +486,31 @@ class FormatChecker:
         if line.find(".  ") != -1:
             report_error("over-enthusiastic spaces")
         if self.is_in_subdir(file_path, 'source',
-                             'include') and X_ENVOY_USED_DIRECTLY_REGEX.match(line):
+                             'include') and self.config.re["x_envoy_used_directly"].match(line):
             report_error(
                 "Please do not use the raw literal x-envoy in source code.  See Envoy::Http::PrefixValue."
             )
         if self.has_invalid_angle_bracket_directory(line):
             report_error("envoy includes should not have angle brackets")
-        for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+        for invalid_construct, valid_construct in self.config.replacements[
+                "protobuf_type_errors"].items():
             if invalid_construct in line:
                 report_error(
                     "incorrect protobuf type reference %s; "
                     "should be %s" % (invalid_construct, valid_construct))
-        for invalid_construct, valid_construct in LIBCXX_REPLACEMENTS.items():
+        for invalid_construct, valid_construct in self.config.replacements["libcxx"].items():
             if invalid_construct in line:
                 report_error(
                     "term %s should be replaced with standard library term %s" %
                     (invalid_construct, valid_construct))
-        for invalid_construct, valid_construct in CODE_CONVENTION_REPLACEMENTS.items():
+        for invalid_construct, valid_construct in self.config.replacements["code_convention"].items(
+        ):
             if invalid_construct in line:
                 report_error(
                     "term %s should be replaced with preferred term %s" %
                     (invalid_construct, valid_construct))
         # Do not include the virtual_includes headers.
-        if re.search("#include.*/_virtual_includes/", line):
+        if self.config.re["virtual_include_headers"].search(line):
             report_error("Don't include the virtual includes headers.")
 
         # Some errors cannot be fixed automatically, and actionable, consistent,
@@ -625,7 +545,7 @@ class FormatChecker:
                     "Don't use CondVar::waitFor(); use TimeSystem::waitFor() instead.  If this "
                     "already is TimeSystem::waitFor(), please name the TimeSystem variable "
                     "time_system or time_system_ so the linter can understand.")
-        duration_arg = DURATION_VALUE_REGEX.search(line)
+        duration_arg = self.config.re["duration_value"].search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero
             report_error(
@@ -638,7 +558,8 @@ class FormatChecker:
                     "use Registry::InjectFactory instead.")
         if not self.allow_listed_for_unpack_to(file_path):
             if "UnpackTo" in line:
-                report_error("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
+                report_error(
+                    "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
         # Check that we use the absl::Time library
         if self.token_in_line("std::get_time", line):
             if "test/" in file_path:
@@ -711,7 +632,7 @@ class FormatChecker:
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
                 "in envoy/common/platform.h instead")
-        if DESIGNATED_INITIALIZER_REGEX.search(line):
+        if self.config.re["designated_initializer"].search(line):
             # Designated initializers are not part of the C++14 standard and are not supported
             # by MSVC
             report_error(
@@ -724,13 +645,13 @@ class FormatChecker:
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
         if line.startswith("using testing::TestWithParams;"):
             report_error("Don't use 'using testing::Test;, elaborate the type instead")
-        if TEST_NAME_STARTING_LOWER_CASE_REGEX.search(line):
+        if self.config.re["test_name_starting_lc"].search(line):
             # Matches variants of TEST(), TEST_P(), TEST_F() etc. where the test name begins
             # with a lowercase letter.
             report_error("Test names should be CamelCase, starting with a capital letter")
-        if OLD_MOCK_METHOD_REGEX.search(line):
+        if self.config.re["old_mock_method"].search(line):
             report_error("The MOCK_METHODn() macros should not be used, use MOCK_METHOD() instead")
-        if FOR_EACH_N_REGEX.search(line):
+        if self.config.re["for_each_n"].search(line):
             report_error("std::for_each_n should not be used, use an alternative for loop instead")
 
         if not self.allow_listed_for_serialize_as_string(file_path) and "SerializeAsString" in line:
@@ -754,10 +675,10 @@ class FormatChecker:
             report_error(
                 "Don't lookup stats by name at runtime; use StatName saved during construction")
 
-        if MANGLED_PROTOBUF_NAME_REGEX.search(line):
+        if self.config.re["mangled_protobuf_name"].search(line):
             report_error("Don't use mangled Protobuf names for enum constants")
 
-        hist_m = HISTOGRAM_SI_SUFFIX_REGEX.search(line)
+        hist_m = self.config.re["histogram_si_suffix"].search(line)
         if hist_m and not self.allow_listed_for_histogram_si_suffix(hist_m.group(0)):
             report_error(
                 "Don't suffix histogram names with the unit symbol, "
@@ -785,7 +706,7 @@ class FormatChecker:
                         "Don't call grpc_init() or grpc_shutdown() directly, instantiate "
                         + "Grpc::GoogleGrpcContext. See #8282")
 
-        if not self.whitelisted_for_memcpy(file_path) and \
+        if not self.included_for_memcpy(file_path) and \
            not ("test/" in file_path) and \
            ("memcpy(" in line) and \
            not ("NOLINT(safe-memcpy)" in line):
@@ -796,7 +717,7 @@ class FormatChecker:
         if self.deny_listed_for_exceptions(file_path):
             # Skpping cases where 'throw' is a substring of a symbol like in "foothrowBar".
             if "throw" in line.split():
-                comment_match = COMMENT_REGEX.search(line)
+                comment_match = self.config.re["comment"].search(line)
                 if comment_match is None or comment_match.start(0) > line.find("throw"):
                     report_error(
                         "Don't introduce throws into exception-free files, use error "
@@ -808,9 +729,9 @@ class FormatChecker:
                 + "Lua API (bad light userdata pointer) on ARM64 architecture. See "
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
-        if file_path.endswith(PROTO_SUFFIX):
+        if file_path.endswith(self.config.suffixes["proto"]):
             exclude_path = ['v1', 'v2']
-            result = PROTO_VALIDATION_STRING.search(line)
+            result = self.config.re["proto_validation_string"].search(line)
             if result is not None:
                 if not any(x in file_path for x in exclude_path):
                     report_error("min_bytes is DEPRECATED, Use min_len.")
@@ -849,10 +770,11 @@ class FormatChecker:
         if not self.is_build_fixer_excluded_file(file_path) and not self.is_api_file(
                 file_path) and not self.is_starlark_file(file_path) and not self.is_workspace_file(
                     file_path):
-            if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+            if os.system("%s %s %s" %
+                         (self.config.paths["build_fixer_py"], file_path, file_path)) != 0:
                 error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
 
-        if os.system("%s -lint=fix -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+        if os.system("%s -lint=fix -mode=fix %s" % (self.config.buildifier_path, file_path)) != 0:
             error_messages += ["buildifier rewrite failed for file: %s" % file_path]
         return error_messages
 
@@ -862,7 +784,8 @@ class FormatChecker:
         if not self.is_build_fixer_excluded_file(file_path) and not self.is_api_file(
                 file_path) and not self.is_starlark_file(file_path) and not self.is_workspace_file(
                     file_path):
-            command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
+            command = "%s %s | diff %s -" % (
+                self.config.paths["build_fixer_py"], file_path, file_path)
             error_messages += self.execute_command(
                 command, "envoy_build_fixer check failed", file_path)
 
@@ -875,7 +798,7 @@ class FormatChecker:
             if not found:
                 error_messages += ["API build file does not provide api_proto_package()"]
 
-        command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
+        command = "%s -mode=diff %s" % (self.config.buildifier_path, file_path)
         error_messages += self.execute_command(command, "buildifier check failed", file_path)
         error_messages += self.check_file_contents(file_path, self.check_build_line)
         return error_messages
@@ -885,44 +808,32 @@ class FormatChecker:
 
         error_messages = []
 
-        if not file_path.endswith(PROTO_SUFFIX):
+        if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.fix_header_order(file_path)
         error_messages += self.clang_format(file_path)
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     def check_source_path(self, file_path):
         error_messages = self.check_file_contents(file_path, self.check_source_line)
 
-        if not file_path.endswith(PROTO_SUFFIX):
+        if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
-                "%s --include_dir_order %s --path %s | diff %s -" %
-                (HEADER_ORDER_PATH, self.include_dir_order, file_path, file_path))
+                "%s --include_dir_order %s --path %s | diff %s -" % (
+                    self.config.paths["header_order_py"], self.include_dir_order, file_path,
+                    file_path))
             error_messages += self.execute_command(
                 command, "header_order.py check failed", file_path)
-        command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
+        command = ("%s %s | diff %s -" % (self.config.clang_format_path, file_path, file_path))
         error_messages += self.execute_command(command, "clang-format check failed", file_path)
-
-        if file_path.endswith(PROTO_SUFFIX) and self.is_api_file(file_path):
-            package_name, error_message = self.package_name_for_proto(file_path)
-            if package_name is None:
-                error_messages += error_message
         return error_messages
 
     # Example target outputs are:
     #   - "26,27c26"
     #   - "12,13d13"
     #   - "7a8,9"
-    def execute_command(
-        self,
-        command,
-        error_message,
-        file_path,
-        regex=re.compile(r"^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$")):
+    def execute_command(self, command, error_message, file_path, regex=None):
+        regex = regex or self.config.re["line_number"]
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
@@ -940,40 +851,51 @@ class FormatChecker:
 
     def fix_header_order(self, file_path):
         command = "%s --rewrite --include_dir_order %s --path %s" % (
-            HEADER_ORDER_PATH, self.include_dir_order, file_path)
+            self.config.paths["header_order_py"], self.include_dir_order, file_path)
         if os.system(command) != 0:
             return ["header_order.py rewrite error: %s" % (file_path)]
         return []
 
     def clang_format(self, file_path):
-        command = "%s -i %s" % (CLANG_FORMAT_PATH, file_path)
+        command = "%s -i %s" % (self.config.clang_format_path, file_path)
         if os.system(command) != 0:
             return ["clang-format rewrite error: %s" % (file_path)]
         return []
 
-    def check_format(self, file_path):
+    def check_format(self, file_path, fail_on_diff=False):
         error_messages = []
+        orig_error_messages = []
         # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
         # an issue, but there's still an error, that's a problem.
         try_to_fix = self.operation_type == "fix"
         if self.is_build_file(file_path) or self.is_starlark_file(
                 file_path) or self.is_workspace_file(file_path):
             if try_to_fix:
-                error_messages += self.fix_build_path(file_path)
-            error_messages += self.check_build_path(file_path)
+                orig_error_messages = self.check_build_path(file_path)
+                if orig_error_messages:
+                    error_messages += self.fix_build_path(file_path)
+                    error_messages += self.check_build_path(file_path)
+            else:
+                error_messages += self.check_build_path(file_path)
         else:
             if try_to_fix:
-                error_messages += self.fix_source_path(file_path)
-            error_messages += self.check_source_path(file_path)
+                orig_error_messages = self.check_source_path(file_path)
+                if orig_error_messages:
+                    error_messages += self.fix_source_path(file_path)
+                    error_messages += self.check_source_path(file_path)
+            else:
+                error_messages += self.check_source_path(file_path)
 
         if error_messages:
             return ["From %s" % file_path] + error_messages
+        if not error_messages and fail_on_diff:
+            return orig_error_messages
         return error_messages
 
-    def check_format_return_trace_on_error(self, file_path):
+    def check_format_return_trace_on_error(self, file_path, fail_on_diff=False):
         """Run check_format and return the traceback of any exception."""
         try:
-            return self.check_format(file_path)
+            return self.check_format(file_path, fail_on_diff=fail_on_diff)
         except:
             return traceback.format_exc().split("\n")
 
@@ -988,20 +910,21 @@ class FormatChecker:
         for owned in owned_directories:
             if owned.startswith(dir_name) or dir_name.startswith(owned):
                 found = True
+                break
         if not found:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_format_visitor(self, arg, dir_name, names):
+    def check_format_visitor(self, arg, dir_name, names, fail_on_diff=False):
         """Run check_format in parallel for the given files.
-    Args:
-      arg: a tuple (pool, result_list, owned_directories, error_messages)
-        pool and result_list are for starting tasks asynchronously.
-        owned_directories tracks directories listed in the CODEOWNERS file.
-        error_messages is a list of string format errors.
-      dir_name: the parent directory of the given files.
-      names: a list of file names.
-    """
+        Args:
+          arg: a tuple (pool, result_list, owned_directories, error_messages)
+            pool and result_list are for starting tasks asynchronously.
+            owned_directories tracks directories listed in the CODEOWNERS file.
+            error_messages is a list of string format errors.
+          dir_name: the parent directory of the given files.
+            names: a list of file names.
+        """
 
         # Unpack the multiprocessing.Pool process pool and list of results. Since
         # python lists are passed as references, this is used to collect the list of
@@ -1028,9 +951,18 @@ class FormatChecker:
 
         dir_name = normalize_path(dir_name)
 
+        # TODO(phlax): improve class/process handling - this is required because if these
+        #   are not cached before the class is sent into the pool, it only caches them on the
+        #   forked proc
+        self.build_fixer_check_excluded_paths
+        self.namespace_check_excluded_paths
+        self.namespace_re
+        self.config.replacements
+        self.config.dir_order
+
         for file_name in names:
             result = pool.apply_async(
-                self.check_format_return_trace_on_error, args=(dir_name + file_name,))
+                self.check_format_return_trace_on_error, args=(dir_name + file_name, fail_on_diff))
             result_list.append(result)
 
     # check_error_messages iterates over the list with error messages and prints
@@ -1042,8 +974,8 @@ class FormatChecker:
             return True
         return False
 
-    def whitelisted_for_memcpy(self, file_path):
-        return file_path in MEMCPY_WHITELIST
+    def included_for_memcpy(self, file_path):
+        return file_path in self.config.paths["memcpy"]["include"]
 
 
 def normalize_path(path):
@@ -1071,6 +1003,14 @@ if __name__ == "__main__":
         nargs="?",
         default=".",
         help="specify the root directory for the script to recurse over. Default '.'.")
+    parser.add_argument(
+        "--config_path",
+        default="./tools/code_format/config.yaml",
+        help="specify the config path. Default './tools/code_format/config.yaml'.")
+    parser.add_argument(
+        "--fail_on_diff",
+        action="store_true",
+        help="exit with failure if running fix produces changes.")
     parser.add_argument(
         "--add-excluded-prefixes", type=str, nargs="+", help="exclude additional prefixes.")
     parser.add_argument(
@@ -1111,28 +1051,32 @@ if __name__ == "__main__":
     parser.add_argument(
         "--include_dir_order",
         type=str,
-        default=",".join(common.include_dir_order()),
+        default="",
         help="specify the header block include directory order.")
     args = parser.parse_args()
-    if args.add_excluded_prefixes:
-        EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
+
     format_checker = FormatChecker(args)
+
+    excluded_prefixes = format_checker.config.paths["excluded"]
+    if args.add_excluded_prefixes:
+        excluded_prefixes += tuple(args.add_excluded_prefixes)
 
     # Check whether all needed external tools are available.
     ct_error_messages = format_checker.check_tools()
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
+    if not os.environ.get("CI"):
+        # TODO(phlax): Remove this after a month or so
+        logger.warning(
+            "Please note: `tools/code_format/check_format.py` no longer checks API `.proto` files, "
+            "please use `tools/proto_format/proto_format.sh` if you are making changes to the API files"
+        )
+
     def check_visibility(error_messages):
-        # https://github.com/envoyproxy/envoy/issues/20589
-        # https://github.com/envoyproxy/envoy/issues/9953
-        # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
-        exclude_list = (
-            "':(exclude)source/extensions/filters/http/buffer/BUILD' "
-            "':(exclude)source/extensions/filters/network/common/BUILD' ")
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % exclude_list)
+            % "".join([f"':(exclude){c}' " for c in format_checker.config["visibility_excludes"]]))
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:
@@ -1153,12 +1097,11 @@ if __name__ == "__main__":
 
     def get_owners():
         with open('./OWNERS.md') as f:
-            EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*github.com.(.*)\)\)')
             maintainers = ["@UNOWNED"]
             for line in f:
                 if "Senior extension maintainers" in line:
                     return maintainers
-                m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                m = format_checker.config.re["maintainers"].search(line)
                 if m is not None:
                     maintainers.append("@" + m.group(1).lower())
 
@@ -1173,10 +1116,10 @@ if __name__ == "__main__":
                 for line in f:
                     # If this line is of the form "extensions/... @owner1 @owner2" capture the directory
                     # name and store it in the list of directories with documented owners.
-                    m = EXTENSIONS_CODEOWNERS_REGEX.search(line)
+                    m = format_checker.config.re["codeowners_extensions"].search(line)
                     if m is not None and not line.startswith('#'):
                         owned.append(m.group(1).strip())
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = format_checker.config.re["owner"].findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Extensions require at least 2 owners in CODEOWNERS:\n"
@@ -1187,7 +1130,7 @@ if __name__ == "__main__":
                                 "Extensions require at least one maintainer OWNER:\n"
                                 "    {}".format(line))
 
-                    m = CONTRIB_CODEOWNERS_REGEX.search(line)
+                    m = format_checker.config.re["codeowners_contrib"].search(line)
                     if m is not None and not line.startswith('#'):
                         stripped_path = m.group(1).strip()
                         if not stripped_path.endswith('/'):
@@ -1205,7 +1148,7 @@ if __name__ == "__main__":
                             continue
 
                         owned.append(stripped_path)
-                        owners = re.findall('@\S+', m.group(2).strip())
+                        owners = format_checker.config.re["owner"].findall(m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
                                 "Contrib extensions require at least 2 owners in CODEOWNERS:\n"
@@ -1222,12 +1165,13 @@ if __name__ == "__main__":
     check_visibility(error_messages)
 
     if os.path.isfile(args.target_path):
-        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # All of our `excluded_prefixes` start with "./", but the provided
         # target path argument might not. Add it here if it is missing,
         # and use that normalized path for both lookup and `check_format`.
         normalized_target_path = normalize_path(args.target_path)
         if not normalized_target_path.startswith(
-                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+                excluded_prefixes) and normalized_target_path.endswith(
+                    format_checker.config.suffixes["included"]):
             error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
@@ -1241,14 +1185,17 @@ if __name__ == "__main__":
                 for filename in files:
                     file_path = os.path.join(root, filename)
                     check_file = (
-                        path_predicate(filename) and not file_path.startswith(EXCLUDED_PREFIXES)
-                        and file_path.endswith(SUFFIXES))
+                        path_predicate(filename) and not file_path.startswith(excluded_prefixes)
+                        and file_path.endswith(format_checker.config.suffixes["included"]) and not (
+                            file_path.endswith(format_checker.config.suffixes["proto"])
+                            and root.startswith(args.api_prefix)))
                     if check_file:
                         _files.append(filename)
                 if not _files:
                     continue
                 format_checker.check_format_visitor(
-                    (pool, results, owned_directories, error_messages), root, _files)
+                    (pool, results, owned_directories, error_messages), root, _files,
+                    args.fail_on_diff)
 
             # Close the pool to new tasks, wait for all of the running tasks to finish,
             # then collect the error messages.
@@ -1264,7 +1211,10 @@ if __name__ == "__main__":
         error_messages += sum((r.get() for r in results), [])
 
     if format_checker.check_error_messages(error_messages):
-        print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
+        if args.operation_type == "check":
+            print("ERROR: check format failed. run 'tools/code_format/check_format.py fix'")
+        else:
+            print("ERROR: check format failed. diff has been applied'")
         sys.exit(1)
 
     if args.operation_type == "check":

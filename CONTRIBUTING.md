@@ -109,7 +109,7 @@ versioning guidelines:
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
-  well as [release notes](docs/root/version_history/current.rst). API changes should be documented
+  well as [release notes](changelogs/current.yaml). API changes should be documented
   inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
   to multiple sections of the release notes, it should be noted in the first (most important) section
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
@@ -134,7 +134,7 @@ versioning guidelines:
   maintainer will be assigned to review and merge the PR.
 * Once your PR is under review, *please do not rebase it*. If you rebase, you will need to force push to
   github, and github's user interface will force your reviewer to review the PR
-  from stratch rather than simply look at your latest changes.  It's much easier to review
+  from scratch rather than simply look at your latest changes.  It's much easier to review
   new commits and/or merges. We squash rebase the final merged commit so the number of commits
   you have in the PR don't matter. Again once your PR is assigned a reviewer, unless you need to fix DCO
   *please do not force push*.  If you need to pull recent changes you can run
@@ -150,7 +150,7 @@ versioning guidelines:
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, the [version history](docs/root/version_history/current.rst) must be updated with
+  Additionally, the [version history](changelogs/current.yaml) must be updated with
   relevant RST links for fields and messages as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
@@ -219,11 +219,12 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
-Please note that if adding a runtime guarded feature, your [release notes](docs/root/version_history/current.rst) should include both the functional change, and how to revert it, for example
+Please note that if adding a runtime guarded feature, your [release notes](changelogs/current.yaml) should include both the functional change, and how to revert it, for example
 
-```rst
-* http: changed the ``:scheme`` header to ``:schema``. This behavioral change can be
-temporarily reverted by setting runtime guard ``envoy.reloadable_features.schema_is_better_than_scheme`` to false.
+```yaml
+- area: config
+  change: |
+      type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
 ```
 
 # PR review policy for maintainers
@@ -286,6 +287,7 @@ extension mostly mirrors adding a normal extension above. Some differences are n
   to core).
 * Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
   and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
+* An entrypoint should be added in `docs/root/api-v3/config/contrib/contrib.rst`
 
 # DCO: Sign your work
 

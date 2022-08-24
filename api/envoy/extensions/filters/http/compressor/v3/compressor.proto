@@ -114,13 +114,13 @@ message Compressor {
   //
   // .. attention::
   //
-  //    If the field is not empty then the duplicate deprecated fields of the `Compressor` message,
-  //    such as `content_length`, `content_type`, `disable_on_etag_header`,
-  //    `remove_accept_encoding_header` and `runtime_enabled`, are ignored.
+  //    If the field is not empty then the duplicate deprecated fields of the ``Compressor`` message,
+  //    such as ``content_length``, ``content_type``, ``disable_on_etag_header``,
+  //    ``remove_accept_encoding_header`` and ``runtime_enabled``, are ignored.
   //
   //    Also all the statistics related to response compression will be rooted in
-  //    `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.response.*`
+  //    ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.response.*``
   //    instead of
-  //    `<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*`.
+  //    ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``.
   ResponseDirectionConfig response_direction_config = 8;
 }

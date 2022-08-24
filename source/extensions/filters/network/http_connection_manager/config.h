@@ -13,15 +13,18 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
+#include "source/common/http/dependency_manager.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -32,7 +35,6 @@
 #include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -40,7 +42,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-using FilterConfigProviderManager = Filter::FilterConfigProviderManager<Http::FilterFactoryCb>;
+using FilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+                                        Server::Configuration::FactoryContext>;
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
@@ -130,15 +134,16 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr<Http::FilterFactoryCb>>;
+  void createFilterChain(Http::FilterChainManager& manager) const override;
+  using FilterFactoriesList =
+      std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainFactoryCallbacks& callbacks) override;
+                                Http::FilterChainManager& manager) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -229,22 +234,21 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
+                                               StreamInfo::StreamInfo& stream_info) override {
+    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
+                                     : nullptr;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void
-  processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
-                    proto_config,
-                int i, const std::string& prefix, const std::string& filter_chain_type,
-                bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
-                DependencyManager& dependency_manager);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
                              FilterFactoriesList& filter_factories,
                              const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
-  void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
+  void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
 
   /**
@@ -325,6 +329,7 @@ private:
   const bool strip_trailing_host_dot_;
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  const Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 /**

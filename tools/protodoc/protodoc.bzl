@@ -15,16 +15,21 @@ def _protodoc_impl(target, ctx):
 protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
 
 def _protodoc_rule_impl(ctx):
+    deps = []
+    for dep in ctx.attr.deps:
+        for path in dep[OutputGroupInfo].rst.to_list():
+            envoy_api = (
+                path.short_path.startswith("../envoy_api") or
+                path.short_path.startswith("../com_github_cncf_udpa")
+            )
+            if envoy_api:
+                deps.append(path)
+
     return [
         DefaultInfo(
             files = depset(
                 transitive = [
-                    depset([
-                        x
-                        for x in ctx.attr.deps[0][OutputGroupInfo].rst.to_list()
-                        if (x.short_path.startswith("../envoy_api") or
-                            x.short_path.startswith("../com_github_cncf_udpa"))
-                    ]),
+                    depset(deps),
                 ],
             ),
         ),

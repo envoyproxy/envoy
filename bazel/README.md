@@ -105,9 +105,11 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
+
+    _notes_: See Homebrew python setup notes: https://docs.brew.sh/Homebrew-and-Python.
 
     The full version of Xcode (not just Command Line Tools) is also required to build Envoy on macOS.
     Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
@@ -309,7 +311,7 @@ Change the value of `--remote_cache`, `--remote_executor` and `--remote_instance
 be run in remote execution too.
 
 Note: Currently the test run configuration in `.bazelrc` doesn't download test binaries and test logs,
-to override the behavior set [`--experimental_remote_download_outputs`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_download_outputs)
+to override the behavior set [`--remote_download_outputs`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--remote_download_outputs)
 accordingly.
 
 ## Building Envoy with Docker sandbox
@@ -349,8 +351,8 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 10.
+We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
+Currently the CI is running with Clang 14.
 
 ## Clang STL debug symbols
 
@@ -367,6 +369,16 @@ building a linked envoy binary you can build the implicit `.stripped`
 target from [`cc_binary`](https://docs.bazel.build/versions/master/be/c-cpp.html#cc_binary)
 or pass [`--strip=always`](https://docs.bazel.build/versions/master/command-line-reference.html#flag--strip)
 instead.
+
+# Running the built Envoy binary on the host system
+
+After Envoy is built, it can be executed via CLI.
+
+For example, if Envoy was built using the `bazel build -c opt //source/exe:envoy-static` command, then it can be executed from the project's root directory by running:
+
+```console
+$(bazel info bazel-genfiles)/source/exe/envoy-static --config-path /path/to/your/envoy/config.yaml
+```
 
 # Testing Envoy with Bazel
 
@@ -490,7 +502,7 @@ gdb bazel-bin/test/common/http/async_client_impl_test
 
 We need to use `-c dbg` Bazel option to generate debugging symbols and without
 that GDB will not be very useful. The debugging symbols are stored as separate
-debugging information files (`.dwo` files) and we can build a DWARF package file
+debugging information files (`.dwp` files) and we can build a DWARF package file
 with `.dwp ` target. The `.dwp` file need to be presented in the same folder with the
 binary for a full debugging experience.
 
@@ -663,14 +675,15 @@ The following optional features can be disabled on the Bazel build command-line:
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
 * http3/quic with --//bazel:http3=False
+* admin HTML home page with `--define=admin_html=disabled`
 
 ## Enabling optional features
 
 The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
-  This is useful in cases where you have a lua script that loads shared object libraries, such as
-  those installed via luarocks.
+  This config will exports all symbols and results in larger binary size. If partial symbols export
+  is required and target platform is Linux, then `bazel/exported_symbols.txt` can be used to land it.
 * Perf annotation with `--define perf_annotation=enabled` (see
   source/common/common/perf_annotation.h for details).
 * BoringSSL can be built in a FIPS-compliant mode with `--define boringssl=fips`
@@ -707,6 +720,13 @@ The extensions disabled by default can be enabled by adding the following parame
 The extensions enabled by default can be disabled by adding the following parameter to Bazel, for example to disable
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
+
+To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+
+* `v8` (the default included engine)
+* `wamr`
+* `wasmtime`
+* `wavm`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
 `--@envoy//source/extensions/filters/http/kill_request:enabled`.
@@ -914,7 +934,7 @@ Note that if you run the `check_spelling.py` script you will need to have `aspel
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
-export CLANG_FORMAT="$HOME/ext/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format"
+export CLANG_FORMAT="$HOME/ext/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04/bin/clang-format"
 export BUILDIFIER_BIN="/usr/bin/buildifier"
 ```
 
@@ -989,5 +1009,5 @@ slower cache performance on macOS due to slow disk performance on Docker for Mac
 Adding the following parameter to Bazel everytime or persist them in `.bazelrc`.
 
 ```
---remote_http_cache=http://127.0.0.1:28080/
+--remote_cache=http://127.0.0.1:28080/
 ```

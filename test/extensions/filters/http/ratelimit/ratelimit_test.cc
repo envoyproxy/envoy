@@ -87,6 +87,18 @@ public:
   domain: foo
   )EOF";
 
+  const std::string rate_limited_status_config_ = R"EOF(
+  domain: foo
+  rate_limited_status:
+    code: 503
+  )EOF";
+
+  const std::string invalid_rate_limited_status_config_ = R"EOF(
+  domain: foo
+  rate_limited_status:
+    code: 200
+  )EOF";
+
   Filters::Common::RateLimit::MockClient* client_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Stats::StatNamePool pool_{filter_callbacks_.clusterInfo()->statsScope().symbolTable()};
@@ -96,6 +108,8 @@ public:
   Stats::StatName ratelimit_over_limit_{pool_.add("ratelimit.over_limit")};
   Stats::StatName upstream_rq_4xx_{pool_.add("upstream_rq_4xx")};
   Stats::StatName upstream_rq_429_{pool_.add("upstream_rq_429")};
+  Stats::StatName upstream_rq_5xx_{pool_.add("upstream_rq_5xx")};
+  Stats::StatName upstream_rq_503_{pool_.add("upstream_rq_503")};
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -886,6 +900,88 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseRuntimeDisabled) {
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
 }
 
+TEST_F(HttpRateLimitFilterTest, LimitResponseWithRateLimitedStatus) {
+  SetUpTest(rate_limited_status_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "503"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::move(h), nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_5xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_503_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, LimitResponseWithInvalidRateLimitedStatus) {
+  SetUpTest(invalid_rate_limited_status_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::RateLimited));
+
+  Http::ResponseHeaderMapPtr h{new Http::TestResponseHeaderMapImpl()};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::move(h), nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
 TEST_F(HttpRateLimitFilterTest, ResetDuringCall) {
   SetUpTest(filter_config_);
   InSequence s;
@@ -1088,8 +1184,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
@@ -1138,8 +1233,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
@@ -1186,8 +1280,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
@@ -1236,8 +1329,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
@@ -1285,8 +1377,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
@@ -1334,8 +1425,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
@@ -1379,8 +1469,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ratelimit"))
+  EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,

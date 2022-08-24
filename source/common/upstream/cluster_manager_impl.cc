@@ -37,7 +37,6 @@
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
-#include "source/common/tcp/original_conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/maglev_lb.h"
@@ -73,6 +72,18 @@ bool contains(const std::vector<Http::Protocol>& protocols,
     }
   }
   return true;
+}
+
+absl::optional<Http::HttpServerPropertiesCache::Origin>
+getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
+  std::string sni = std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (options && options->serverNameOverride().has_value()) {
+    sni = options->serverNameOverride().value();
+  }
+  if (sni.empty() || !host->address() || !host->address()->ip()) {
+    return absl::nullopt;
+  }
+  return {{"https", sni, host->address()->ip()->port()}};
 }
 
 } // namespace
@@ -185,12 +196,17 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds;
+      Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-        const auto eds_type_url =
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
+
+        std::vector<std::string> paused_xds_types{
+            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
+          paused_xds_types.push_back(
+              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
+        }
+        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
     }
@@ -990,25 +1006,26 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   return data;
 }
 
-void ClusterManagerImpl::drainConnections(const std::string& cluster) {
+void ClusterManagerImpl::drainConnections(const std::string& cluster,
+                                          DrainConnectionsHostPredicate predicate) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call", "drainConnections called for cluster {}",
                   cluster);
 
-  tls_.runOnAllThreads([cluster](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+  tls_.runOnAllThreads([cluster, predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-      cluster_entry->second->drainAllConnPools();
+      cluster_entry->second->drainAllConnPools(predicate);
     }
   });
 }
 
-void ClusterManagerImpl::drainConnections() {
+void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
                   "drainConnections called for all clusters");
 
-  tls_.runOnAllThreads([](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+  tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainAllConnPools();
+      cluster_entry.second->drainAllConnPools(predicate);
     }
   });
 }
@@ -1559,9 +1576,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnP
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools() {
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools(
+    DrainConnectionsHostPredicate predicate) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     for (const HostSharedPtr& host : host_set->hosts()) {
+      if (predicate != nullptr && !predicate(*host)) {
+        continue;
+      }
+
       parent_.drainAllConnPoolsWorker(host);
     }
   }
@@ -1717,20 +1739,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  if (container->draining_ ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  container->pools_->erasePool(priority, hash_key);
 
-    ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
-    container->pools_->erasePool(priority, hash_key);
-
-    // Guard deletion of the container with `do_not_delete_` to avoid deletion while
-    // iterating through the container in `container->pools_->startDrain()`. See
-    // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->empty()) {
-      ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
-      host_http_conn_pool_map_.erase(
-          host); // NOTE: `container` is erased after this point in the lambda.
-    }
+  // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+  // iterating through the container in `container->pools_->startDrain()`. See
+  // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+  if (!container->do_not_delete_ && container->pools_->empty()) {
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    host_http_conn_pool_map_.erase(
+        host); // NOTE: `container` is erased after this point in the lambda.
   }
 }
 
@@ -1802,12 +1820,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      if (container.draining_ ||
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
-        ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
-        thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
-        container.pools_.erase(erase_iter);
-      }
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+      container.pools_.erase(erase_iter);
     }
 
     if (container.pools_.empty()) {
@@ -1833,15 +1848,36 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& quic_info) {
+
+  Http::HttpServerPropertiesCacheSharedPtr alternate_protocols_cache;
+  if (alternate_protocol_options.has_value()) {
+    // If there is configuration for an alternate protocols cache, always create one.
+    alternate_protocols_cache = alternate_protocols_cache_manager_->getCache(
+        alternate_protocol_options.value(), dispatcher);
+  } else if (!alternate_protocol_options.has_value() &&
+             (protocols.size() == 2 ||
+              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2)) &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+    // If there is no configuration for an alternate protocols cache, still
+    // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
+    // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
+    // connections.
+    envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+    default_options.set_name(host->cluster().name());
+    alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+  }
+
+  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+      getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
+    ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
-                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     if (quic_info == nullptr) {
       quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
@@ -1857,15 +1893,26 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
+        origin.has_value()) {
+      ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
+      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+      default_options.set_name(host->cluster().name());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+    }
+
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state);
+        transport_socket_options, state, origin, alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state);
+                                         priority, options, transport_socket_options, state, origin,
+                                         alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
@@ -1893,22 +1940,17 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     ClusterConnectivityState& state) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
-    return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                               transport_socket_options, state);
-  } else {
-    return Tcp::ConnectionPool::InstancePtr{new Tcp::OriginalConnPoolImpl(
-        dispatcher, host, priority, options, transport_socket_options)};
-  }
+  return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                             transport_socket_options, state);
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
-      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
-      singleton_manager_, outlier_event_logger, added_via_api,
+      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
+      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
+      admin_, singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
       context_.api(), context_.options());

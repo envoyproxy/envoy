@@ -83,14 +83,14 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
-                                                std::move(scope), false);
+    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
+                                                factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
@@ -152,6 +152,7 @@ public:
            num_hosts);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   State& state_;
   bool use_unified_mux_;
   const std::string type_url_;

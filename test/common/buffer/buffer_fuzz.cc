@@ -315,8 +315,9 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
       for (uint32_t i = 0; i < reservation.numSlices(); ++i) {
         ::memset(reservation.slices()[i].mem_, insert_value, reservation.slices()[i].len_);
       }
-      const uint32_t target_length =
-          std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length());
+      const uint32_t target_length = clampSize(
+          std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length()),
+          reserve_length);
       reservation.commit(target_length);
     }
     break;

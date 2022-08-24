@@ -10,6 +10,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 
+#include "spdlog/spdlog.h"
+
 namespace Envoy {
 namespace Ssl {
 
@@ -59,14 +61,21 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
 std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
 CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config) {
-  if (!config.match_typed_subject_alt_names().empty() &&
-      !config.match_subject_alt_names().empty()) {
-    throw EnvoyException("SAN-based verification using both match_typed_subject_alt_names and "
-                         "the deprecated match_subject_alt_names is not allowed");
-  }
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
       subject_alt_name_matchers(config.match_typed_subject_alt_names().begin(),
                                 config.match_typed_subject_alt_names().end());
+  // If typed subject alt name matchers are provided in the config, don't check
+  // for the deprecated non-typed field.
+  if (!subject_alt_name_matchers.empty()) {
+    // Warn that we're ignoring the deprecated san matcher field, if both are
+    // specified.
+    if (!config.match_subject_alt_names().empty()) {
+      ENVOY_LOG_MISC(warn,
+                     "Ignoring match_subject_alt_names as match_typed_subject_alt_names is also "
+                     "specified, and the former is deprecated.");
+    }
+    return subject_alt_name_matchers;
+  }
   // Handle deprecated string type san matchers without san type specified, by
   // creating a matcher for each supported type.
   for (const envoy::type::matcher::v3::StringMatcher& matcher : config.match_subject_alt_names()) {

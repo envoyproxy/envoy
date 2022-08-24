@@ -122,14 +122,17 @@ public:
               (const std::string&, const std::string&,
                std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)>));
   MOCK_METHOD(void, eraseActiveTransFromPendingList, (std::string&));
-  MOCK_METHOD(void, continueHandling, (const std::string&));
+  MOCK_METHOD(void, continueHandling, (const std::string&, bool));
   MOCK_METHOD(MessageMetadataSharedPtr, metadata, ());
+  MOCK_METHOD(SipFilterStats&, stats, ());
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
   NiceMock<Network::MockConnection> connection_;
   std::shared_ptr<Router::MockRoute> route_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
+  Stats::TestUtil::TestStore store_;
+  SipFilterStats stats_;
 };
 
 class MockFilterConfigFactory : public NamedSipFilterConfigFactory {
@@ -186,16 +189,19 @@ public:
 class MockTrafficRoutingAssistantHandler : public TrafficRoutingAssistantHandler {
 public:
   MockTrafficRoutingAssistantHandler(
-      ConnectionManager& parent,
+      ConnectionManager& parent, Event::Dispatcher& dispatcher,
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const std::string&), ());
-  MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
-              (const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-               std::string&),
+              (const std::string&, const std::string&, const std::string&,
+               const absl::optional<TraContextMap>),
               ());
-  MOCK_METHOD(void, deleteTrafficRoutingAssistant, (const std::string&, const std::string&), ());
+  MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
+              (const std::string&, const std::string&, const absl::optional<TraContextMap>,
+               SipFilters::DecoderFilterCallbacks&, std::string&),
+              ());
+  MOCK_METHOD(void, deleteTrafficRoutingAssistant,
+              (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
   MOCK_METHOD(void, complete,
               (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),
@@ -222,10 +228,10 @@ public:
 class MockTrafficRoutingAssistantHandlerDeep : public TrafficRoutingAssistantHandler {
 public:
   MockTrafficRoutingAssistantHandlerDeep(
-      ConnectionManager& parent,
+      ConnectionManager& parent, Event::Dispatcher& dispatcher,
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
-      : TrafficRoutingAssistantHandler(parent, config, context, stream_info) {}
+      : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {}
   MOCK_METHOD(TrafficRoutingAssistant::ClientPtr&, traClient, (), (override));
 };
 

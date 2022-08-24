@@ -1,4 +1,5 @@
 #include <sstream>
+#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -73,6 +74,20 @@ void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::funct
   });
   done_notification.WaitForNotification();
 }
+
+void waitForNumTurns(std::vector<uint64_t>& turns, absl::Mutex& mu, uint32_t expected_size) {
+
+  absl::MutexLock l(&mu);
+  auto check_data_in_connection_output_buffer = [&turns, &mu, expected_size]() {
+    mu.AssertHeld();
+    return turns.size() == expected_size;
+  };
+
+  ASSERT_TRUE(mu.AwaitWithTimeout(absl::Condition(&check_data_in_connection_output_buffer),
+                                  absl::FromChrono(TestUtility::DefaultTimeout)))
+      << "Turns:" << absl::StrJoin(turns, ",") << std::endl;
+}
+
 } // namespace
 
 class Http2BufferWatermarksTest
@@ -104,6 +119,10 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
@@ -112,9 +131,7 @@ public:
     }
 
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      protocol_test_params.http2_new_codec_wrapper ? "true"
-                                                                                   : "false");
+    setupHttp2Overrides(protocol_test_params.http2_implementation);
     config_helper_.addRuntimeOverride(
         Runtime::defer_processing_backedup_streams,
         protocol_test_params.defer_processing_backedup_streams ? "true" : "false");
@@ -305,6 +322,10 @@ public:
             ConfigHelper::httpProxyConfig(
                 /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
                 Http::CodecType::HTTP3)) {
+    // This test tracks the number of buffers created, and the tag extraction check uses some
+    // buffers, so disable it in this test.
+    skip_tag_extraction_rule_check_ = true;
+
     if (streamBufferAccounting()) {
       buffer_factory_ =
           std::make_shared<Buffer::TrackedWatermarkBufferFactory>(absl::bit_width(4096u));
@@ -312,9 +333,7 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      protocol_test_params.http2_new_codec_wrapper ? "true"
-                                                                                   : "false");
+    setupHttp2Overrides(protocol_test_params.http2_implementation);
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
   }
@@ -767,7 +786,7 @@ protected:
     buffer_factory_->waitUntilTotalBufferedExceeds(2000);
     test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
                                    0);
-    EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
       absl::MutexLock l{&tee.mutex_};
       EXPECT_EQ(tee.request_body_.length(), 1000);
     }));
@@ -783,7 +802,7 @@ protected:
     };
 
     // Allow draining to the upstream, and complete the stream.
-    EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(0, crash_if_over_1000));
+    EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(1, crash_if_over_1000));
     write_matcher_->setResumeWrites();
     waitForNextUpstreamRequest();
     FakeStreamPtr upstream_request = std::move(upstream_request_);
@@ -821,7 +840,7 @@ protected:
     test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
     test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                    0);
-    EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+    EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
       absl::MutexLock l{&tee.mutex_};
       EXPECT_EQ(tee.response_body_.length(), 1000);
     }));
@@ -835,11 +854,35 @@ protected:
       }
       return Http::FilterDataStatus::Continue;
     };
-    EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(0, crash_if_over_1000));
+    EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(1, crash_if_over_1000));
 
     // Resuming here will cause us to crash above.
     write_matcher_->setResumeWrites();
     ASSERT_TRUE(response_decoder->waitForEndStream());
+  }
+
+  using RequestEncoderResponseDecoderPair =
+      std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>;
+
+  std::vector<RequestEncoderResponseDecoderPair> startRequests(int num_requests) {
+    std::vector<RequestEncoderResponseDecoderPair> responses;
+
+    for (int i = 0; i < num_requests; ++i) {
+      responses.emplace_back(codec_client_->startRequest(default_request_headers_));
+      test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", i + 1);
+    }
+
+    return responses;
+  }
+
+  void writeToRequests(std::vector<RequestEncoderResponseDecoderPair>& request_response_pairs,
+                       std::vector<int> write_sizes, bool end_stream) {
+    ASSERT_EQ(write_sizes.size(), request_response_pairs.size());
+    for (uint32_t i = 0; i < write_sizes.size(); ++i) {
+      const char stream_char = 'A' + i;
+      Buffer::OwnedImpl send_buffer{std::string(write_sizes[i], stream_char)};
+      codec_client_->sendData(request_response_pairs[i].first, send_buffer, end_stream);
+    }
   }
 };
 
@@ -880,7 +923,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   buffer_factory_->waitUntilTotalBufferedExceeds(2000);
   test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
                                  0);
-  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{&tee.mutex_};
     EXPECT_EQ(tee.request_body_.length(), 1000);
   }));
@@ -926,7 +969,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   buffer_factory_->waitUntilTotalBufferedExceeds(1500);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
-  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{&tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
@@ -971,7 +1014,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
   test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
-  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{&tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
@@ -1021,7 +1064,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
     return Http::FilterDataStatus::Continue;
   };
 
-  EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(0, close_if_over_9000));
+  EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(1, close_if_over_9000));
 
   upstream_request->encodeData(1, true);
 
@@ -1030,7 +1073,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
-  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{&tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 9000);
   }));
@@ -1080,7 +1123,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   test_server_->waitForGaugeEq("cluster.cluster_0.http2.deferred_stream_close", 1);
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
-  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(0, [](const StreamTee& tee) {
+  EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
     absl::MutexLock l{&tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
@@ -1091,6 +1134,349 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   // Resetting the upstream stream doesn't increment this count.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
+  config_helper_.setBufferLimits(10000, 10000);
+  initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const uint32_t num_requests = 4;
+  auto request_response_pairs = startRequests(num_requests);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 4);
+  writeToRequests(request_response_pairs, {2500, 2500, 2500, 2510}, false);
+
+  // Wait for an upstream request to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 4);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 4);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 10000);
+
+  // Subsequent data should be buffered at downstream codec for deferred
+  // processing.
+  writeToRequests(request_response_pairs, {2500, 2500, 2500, 2500}, false);
+
+  // Verify codec received but is buffered as we're still read disabled.
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 20000);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 0);
+
+  // Track the order of when streams invoke decodeData to understand the
+  // ordering in deferred processing.
+  absl::Mutex mu;
+  std::vector<uint64_t> turns;
+  auto record_turns_on_decode =
+      [&turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    (void)tee; // silence gcc unused warning (the absl annotation usage didn't mark it used.)
+    absl::MutexLock l(&mu);
+    turns.push_back(decoder_callbacks->streamId());
+    return Http::FilterDataStatus::Continue;
+  };
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(
+        tee_filter_factory_.computeClientStreamId(i), record_turns_on_decode));
+  }
+
+  // Allow draining to the upstream, this will trigger deferred processing.
+  write_matcher_->setResumeWrites();
+  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 4);
+
+  std::vector<FakeStreamPtr> upstream_requests;
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    upstream_requests.emplace_back(std::move(upstream_request_));
+    // Check all data drained to upstream.
+    ASSERT_TRUE(upstream_requests[i]->waitForData(*dispatcher_, 5000));
+  }
+
+  // Do another round of writes that will buffer in connection output buffer.
+  write_matcher_->setWriteReturnsEgain();
+  writeToRequests(request_response_pairs, {2500, 2500, 2500, 2510}, false);
+
+  // Wait for the data to hit the connection output buffer.
+  waitForNumTurns(turns, mu, 8);
+
+  writeToRequests(request_response_pairs, {2500, 2500, 2500, 2500}, true);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 40000);
+
+  // Allow draining to upstream, this will trigger second round of deferred
+  // processing. Check drain to upstream.
+  write_matcher_->setResumeWrites();
+  for (auto& upstream_request : upstream_requests) {
+    ASSERT_TRUE(upstream_request->waitForData(*dispatcher_, 10000));
+  }
+
+  // Send responses.
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(request_response_pairs[i].second->waitForEndStream());
+  }
+
+  // Check that during deferred processing we round robin between the streams.
+  // Turns in the sequence 0-3 and 8-11 should match.
+  {
+    absl::MutexLock l(&mu);
+    for (uint32_t i = 0; i < num_requests; ++i) {
+      EXPECT_EQ(turns[i], turns[i + 8]);
+    }
+  }
+}
+
+// Test that we handle round robin between streams with stream exiting.
+TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
+  config_helper_.setBufferLimits(10000, 10000);
+  initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
+
+  // Stop writes to the downstream.
+  write_matcher_->setSourcePort(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  const uint32_t num_requests = 3;
+  const uint32_t request_body_size = 1;
+  const uint32_t response_body_size = 14000;
+  auto responses = sendRequests(num_requests, request_body_size, response_body_size);
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+  // Tracking turns and block writes to downstream on end stream.
+  absl::Mutex mu;
+  std::vector<uint64_t> turns;
+  auto record_turns_on_encode_and_stop_writes_on_endstream =
+      [this, &turns, &mu](StreamTee& tee, Http::StreamEncoderFilterCallbacks* encoder_callbacks)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    absl::MutexLock l(&mu);
+    turns.push_back(encoder_callbacks->streamId());
+
+    if (tee.encode_end_stream_) {
+      write_matcher_->setWriteReturnsEgain();
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    EXPECT_TRUE(tee_filter_factory_.setEncodeDataCallback(
+        tee_filter_factory_.computeClientStreamId(i),
+        record_turns_on_encode_and_stop_writes_on_endstream));
+  }
+
+  // Capture corresponding upstream, and saturate the downstream connection
+  // buffer.
+  std::vector<FakeStreamPtr> upstream_requests;
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    waitForNextUpstreamRequest();
+    upstream_requests.emplace_back(std::move(upstream_request_));
+    upstream_requests[i]->encodeHeaders(default_response_headers_, false);
+    upstream_requests[i]->encodeData(4000, false);
+    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 4000 * (i + 1));
+  }
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_paused_reading_total", 3);
+
+  // Data that should be buffered by the upstream codec.
+  upstream_requests[0]->encodeData(4000, false);
+  upstream_requests[1]->encodeData(10000, true);
+  upstream_requests[2]->encodeData(10000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 36000);
+
+  // Enable writes, check drainage.
+  write_matcher_->setResumeWrites();
+  for (auto& response : responses) {
+    response->waitForBodyData(4000);
+  }
+  // The 1st and 2nd stream should get to write, since the second finishes it
+  // blocks draining the connection output buffer so the 3rd stream doesn't get
+  // a chance.
+  waitForNumTurns(turns, mu, 5);
+  {
+    absl::MutexLock l(&mu);
+    // Check ordering as expected.
+    EXPECT_EQ(turns[3], turns[0]);
+    EXPECT_EQ(turns[4], turns[1]);
+  }
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_EQ(tee.response_body_.length(), 8000);
+                                       });
+
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(1),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_TRUE(tee.encode_end_stream_);
+                                       });
+
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(2),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_EQ(tee.response_body_.length(), 4000);
+                                       });
+
+  // Send the 1st stream data so that both remaining streams have data to
+  // process. We expect that the 3rd stream, which didn't get a turn above will
+  // get to go and exit.
+  upstream_requests[0]->encodeData(6000, true);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total", 42000);
+  write_matcher_->setResumeWrites();
+
+  waitForNumTurns(turns, mu, 6);
+  // Check 1st stream gets its turn and finishes but consumes the connection
+  // buffer stopping the 3rd stream from flushing its buffered data.
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(2),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_TRUE(tee.encode_end_stream_);
+                                       });
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_EQ(tee.response_body_.length(), 8000);
+                                       });
+  // The 1st stream will finish.
+  write_matcher_->setResumeWrites();
+  waitForNumTurns(turns, mu, 7);
+  tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
+                                       [](const StreamTee& tee) {
+                                         absl::MutexLock l{&tee.mutex_};
+                                         EXPECT_TRUE(tee.encode_end_stream_);
+                                       });
+  // All responses would have drained to client.
+  write_matcher_->setResumeWrites();
+
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+}
+
+TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
+  // Limit the connection buffers to 10Kb, and the downstream HTTP2 stream
+  // buffers to 64KiB.
+  config_helper_.setBufferLimits(10000, 10000);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* h2_options = hcm.mutable_http2_protocol_options();
+        h2_options->mutable_initial_stream_window_size()->set_value(
+            Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        h2_options->mutable_initial_connection_window_size()->set_value(
+            Http2::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+      });
+
+  initialize();
+  if (!deferProcessingBackedUpStreams()) {
+    return;
+  }
+
+  // Stop writes to the upstream.
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const uint32_t num_requests = 3;
+  auto request_response_pairs = startRequests(num_requests);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 3);
+
+  // Track which stream processed what amount of the request data at a
+  // particular point.
+  absl::Mutex mu;
+  using StreamIdAndRequestBodySizePair = std::pair<uint64_t, uint64_t>;
+  std::vector<StreamIdAndRequestBodySizePair> turns;
+  auto record_on_decode =
+      [this, &turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
+          ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
+    absl::MutexLock l(&mu);
+    turns.emplace_back(decoder_callbacks->streamId(), tee.request_body_.length());
+
+    // Allows us to build more than chunk size in a stream, as the
+    // the 3rd stream won't get to drain.
+    if (turns.size() == 2) {
+      write_matcher_->setWriteReturnsEgain();
+    }
+    return Http::FilterDataStatus::Continue;
+  };
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    EXPECT_TRUE(tee_filter_factory_.setDecodeDataCallback(
+        tee_filter_factory_.computeClientStreamId(i), record_on_decode));
+  }
+
+  writeToRequests(request_response_pairs, {10000, 10000, 65535}, false);
+
+  // Wait for an upstream request to have our reach its buffer limit and read
+  // disable.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_backed_up_total", 3);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 3);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 85000);
+
+  // Only the first stream should have drained its data, the second streams data
+  // is stuck in the connection output buffer. This read-disables all the
+  // streams flowing to that connection, allowing us to queue additional
+  // data for the third stream.
+  write_matcher_->setResumeWrites();
+  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_resumed_reading_total",
+                                 3);
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
+                                 6);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_tx_bytes_total", 10000);
+
+  std::vector<FakeStreamPtr> upstream_requests;
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    upstream_requests.emplace_back(std::move(upstream_request_));
+    if (i == 0) {
+      EXPECT_TRUE(upstream_requests[i]->waitForData(*dispatcher_, 10000));
+    }
+  }
+
+  // Should be able to write to third stream with data.
+  Buffer::OwnedImpl data(std::string(65535, 'C'));
+  codec_client_->sendData(request_response_pairs[2].first, 65535, true);
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_rx_bytes_total", 150000);
+
+  // Enabling again should cause us to chunk this write to third stream.
+  write_matcher_->setResumeWrites();
+  EXPECT_TRUE(upstream_requests[2]->waitForData(*dispatcher_, 131000));
+
+  {
+    absl::MutexLock l(&mu);
+    // The 3rd stream should have gone multiple times to drain out the 128KiB of
+    // data. Each chunk drain is 10KB.
+    ASSERT_GE(turns.size(), 3);
+    for (uint32_t i = 2; i < turns.size(); ++i) {
+      EXPECT_EQ(turns[i].first, turns[2].first);
+      if (i != turns.size() - 1) {
+        EXPECT_EQ(turns[i].second, 10000 * (i - 1));
+      } else {
+        EXPECT_EQ(turns[i].second, 131070);
+      }
+    }
+  }
+
+  // Clean up
+  codec_client_->sendData(request_response_pairs[0].first, 1, true);
+  codec_client_->sendData(request_response_pairs[1].first, 1, true);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    upstream_requests[i]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    EXPECT_TRUE(request_response_pairs[i].second->waitForEndStream());
+  }
 }
 
 // Insufficient support on Windows.

@@ -1,5 +1,4 @@
 admin {
-  access_log_path: "W"
   address {
     pipe {
   path: "W"

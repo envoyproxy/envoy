@@ -110,6 +110,66 @@ TEST(StartTlsTest, BasicSwitch) {
   socket->doWrite(buf, true);
 }
 
+TEST(StartTlsTest, CallbackProxy) {
+
+  Network::TransportSocketOptionsConstSharedPtr options =
+      std::make_shared<Network::TransportSocketOptionsImpl>();
+  Network::MockTransportSocketCallbacks transport_callbacks;
+  NiceMock<Network::MockTransportSocket>* raw_socket = new NiceMock<Network::MockTransportSocket>;
+  NiceMock<Network::MockTransportSocket>* ssl_socket = new NiceMock<Network::MockTransportSocket>;
+
+  std::unique_ptr<StartTlsSocket> socket = std::make_unique<StartTlsSocket>(
+      Network::TransportSocketPtr(raw_socket), Network::TransportSocketPtr(ssl_socket), options);
+  socket->setTransportSocketCallbacks(transport_callbacks);
+
+  // This is an instance of the StartTlsSocket::CallbackProxy which wraps the above
+  // transport_callbacks
+  Network::TransportSocketCallbacks* proxy = raw_socket->callbacks_;
+
+  // Verify raiseEvent logic
+
+  // Connected should only called once. When ssl_socket takes over it also raises Connected,
+  // which we don't want to propagate.
+  EXPECT_CALL(transport_callbacks, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(transport_callbacks, flushWriteBuffer);
+  proxy->raiseEvent(Network::ConnectionEvent::Connected);
+  proxy->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Should get multiples of other events
+  EXPECT_CALL(transport_callbacks, raiseEvent(Network::ConnectionEvent::RemoteClose)).Times(2);
+  proxy->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  proxy->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Connected should get raised again after !Connected but only once
+  EXPECT_CALL(transport_callbacks, raiseEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(transport_callbacks, flushWriteBuffer);
+  proxy->raiseEvent(Network::ConnectionEvent::Connected);
+  proxy->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Verify all the passthrough functions work
+
+  Network::MockIoHandle handle;
+  EXPECT_CALL(transport_callbacks, ioHandle()).WillOnce(testing::ReturnRef(handle));
+  proxy->ioHandle();
+
+  // Check const version of ioHandle
+  EXPECT_CALL(testing::Const(transport_callbacks), ioHandle()).WillOnce(testing::ReturnRef(handle));
+  static_cast<const Network::TransportSocketCallbacks*>(proxy)->ioHandle();
+
+  Network::MockConnection connection;
+  EXPECT_CALL(transport_callbacks, connection()).WillOnce(testing::ReturnRef(connection));
+  proxy->connection();
+
+  EXPECT_CALL(transport_callbacks, shouldDrainReadBuffer()).WillOnce(testing::Return(true));
+  proxy->shouldDrainReadBuffer();
+
+  EXPECT_CALL(transport_callbacks, setTransportSocketIsReadable());
+  proxy->setTransportSocketIsReadable();
+
+  EXPECT_CALL(transport_callbacks, flushWriteBuffer());
+  proxy->flushWriteBuffer();
+}
+
 // Factory test.
 TEST(StartTls, BasicFactoryTest) {
   NiceMock<Network::MockTransportSocketFactory>* raw_buffer_factory =
@@ -117,8 +177,8 @@ TEST(StartTls, BasicFactoryTest) {
   NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
   std::unique_ptr<StartTlsSocketFactory> factory = std::make_unique<StartTlsSocketFactory>(
-      Network::TransportSocketFactoryPtr(raw_buffer_factory),
-      Network::TransportSocketFactoryPtr(ssl_factory));
+      Network::UpstreamTransportSocketFactoryPtr(raw_buffer_factory),
+      Network::UpstreamTransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
   std::vector<uint8_t> key;
   factory->hashKey(key, nullptr);

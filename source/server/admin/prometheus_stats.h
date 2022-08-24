@@ -8,6 +8,8 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
+#include "source/server/admin/stats_params.h"
+
 namespace Envoy {
 namespace Server {
 /**
@@ -26,8 +28,7 @@ public:
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                                    Buffer::Instance& response, const bool used_only,
-                                    const absl::optional<std::regex>& regex,
+                                    Buffer::Instance& response, const StatsParams& params,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
   /**
    * Format the given tags, returning a string as a comma-separated list

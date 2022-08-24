@@ -16,7 +16,7 @@ namespace HttpFilters {
 namespace Cache {
 
 // Example cache backend that never evicts. Not suitable for production use.
-class SimpleHttpCache : public HttpCache {
+class SimpleHttpCache : public HttpCache, public Singleton::Instance {
 private:
   struct Entry {
     Http::ResponseHeaderMapPtr response_headers_;

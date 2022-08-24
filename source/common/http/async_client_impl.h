@@ -41,6 +41,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 namespace Envoy {
 namespace Http {
@@ -169,6 +170,11 @@ private:
     static const NullConfig route_configuration_;
   };
 
+  struct NullPathMatchCriterion : public Router::PathMatchCriterion {
+    Router::PathMatchType matchType() const override { return Router::PathMatchType::None; }
+    const std::string& matcher() const override { return EMPTY_STRING; }
+  };
+
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(
         AsyncClientImpl& parent, const absl::optional<std::chrono::milliseconds>& timeout,
@@ -191,6 +197,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    const Router::RouteStatsContextOptRef routeStatsContext() const override {
+      return Router::RouteStatsContextOptRef();
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }
@@ -265,6 +274,9 @@ private:
     bool autoHostRewrite() const override { return false; }
     bool appendXfh() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
+    const Router::PathMatchCriterion& pathMatchCriterion() const override {
+      return path_match_criterion_;
+    }
 
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return connect_config_nullopt_;
@@ -274,6 +286,8 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
+    const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
+
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     std::unique_ptr<Router::RetryPolicy> retry_policy_;
 
@@ -283,12 +297,16 @@ private:
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
+    static const NullPathMatchCriterion path_match_criterion_;
 
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
+    // Pass early data option config through StreamOptions.
+    std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
+        new Router::DefaultEarlyDataPolicy(true)};
   };
 
   struct RouteImpl : public Router::Route {
@@ -323,9 +341,10 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  const Network::Connection* connection() override { return nullptr; }
+  OptRef<const Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                   absl::string_view transport_failure_reason = "") override;
   Router::RouteConstSharedPtr route() override { return route_; }
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
   void setRoute(Router::RouteConstSharedPtr) override {}
@@ -397,6 +416,12 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
+    return nullptr;
+  }
+  void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
   void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}

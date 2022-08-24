@@ -122,25 +122,6 @@ TEST_F(TcpStatsTest, CloseSocket) {
   EXPECT_EQ(0, gaugeValue("cx_tx_unacked_segments"));
 }
 
-TEST_F(TcpStatsTest, SyscallFailureShortRead) {
-  initialize(true);
-  tcp_info_.tcpi_notsent_bytes = 42;
-  EXPECT_CALL(io_handle_, getOption(IPPROTO_TCP, TCP_INFO, _, _))
-      .WillOnce(Invoke([this](int, int, void* optval, socklen_t* optlen) {
-        *optlen = *optlen - 1;
-        memcpy(optval, &tcp_info_, sizeof(*optlen));
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_LOG_CONTAINS(
-      "debug",
-      fmt::format("Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc 0 errno 0 optlen {}",
-                  sizeof(tcp_info_) - 1),
-      timer_->callback_());
-
-  // Not updated on failed syscall.
-  EXPECT_EQ(0, gaugeValue("cx_tx_unsent_bytes"));
-}
-
 TEST_F(TcpStatsTest, SyscallFailureReturnCode) {
   initialize(true);
   tcp_info_.tcpi_notsent_bytes = 42;
@@ -260,20 +241,20 @@ public:
     envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
-    factory_ =
-        std::make_unique<TcpStatsSocketFactory>(context_, proto_config, std::move(inner_factory));
+    factory_ = std::make_unique<UpstreamTcpStatsSocketFactory>(context_, proto_config,
+                                                               std::move(inner_factory));
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
-  std::unique_ptr<TcpStatsSocketFactory> factory_;
+  std::unique_ptr<UpstreamTcpStatsSocketFactory> factory_;
 };
 
 // Test createTransportSocket returns nullptr if inner call returns nullptr
 TEST_F(TcpStatsSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
   initialize();
-  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
-  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_, _)).WillOnce(ReturnNull());
+  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr, nullptr));
 }
 
 // Test implementsSecureTransport calls inner factory
