@@ -39,7 +39,8 @@ struct Variable {
   std::string debugString() const;
 
   absl::string_view name_;
-  // replacement value for the rewrite.
+
+  // The pattern which this variable matches.
   std::vector<absl::variant<Operator, Literal>> match_;
 };
 
