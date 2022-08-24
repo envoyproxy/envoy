@@ -73,6 +73,9 @@ new_features:
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
