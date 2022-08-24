@@ -363,10 +363,9 @@ filter_chains:
         - name: envoy.filters.http.router
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  - name: envoy.filters.network.rbac
+  - name: envoy.test.test_network_filter
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
-      stat_prefix: rbac
+      "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
   transport_socket:
     name: envoy.transport_sockets.quic
     typed_config:
