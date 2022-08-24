@@ -977,11 +977,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   const std::string hcm_str =
       "type.googleapis.com/"
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-  if (is_quic && (filter_chain.filters().size() != 1 ||
-                  filter_chain.filters(0).typed_config().type_url() != hcm_str)) {
-    throw EnvoyException(fmt::format(
-        "error building network filter chain for quic listener: requires exactly one http_"
-        "connection_manager filter."));
+  if (is_quic &&
+      (filter_chain.filters().empty() ||
+       filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
+           hcm_str)) {
+    throw EnvoyException(
+        fmt::format("error building network filter chain for quic listener: requires "
+                    "http_connection_manager filter to be last in the chain."));
   }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport
