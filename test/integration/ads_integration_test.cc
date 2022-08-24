@@ -86,7 +86,7 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
                                                                             {cla_0}, {}, "2");
 
   // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
-  // delete the other.  We use cluster membership health as a proxy for this.
+  // delete the other. We use cluster membership health as a proxy for this.
   test_server_->waitForCounterEq("cluster_manager.cluster_updated", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
