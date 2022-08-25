@@ -279,45 +279,60 @@ TEST(NetworkUtility, GetOriginalDst) {
   sin.sin_port = htons(9527);
   sin.sin_addr.s_addr = inet_addr("12.34.56.78");
   EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v4));
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
-      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})))
-      .WillOnce(Return(Api::SysCallIntResult{-1, 0}))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+#ifndef WIN32
+  // Transparent socket gets original dst from local address while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true)).WillOnce(Return(false));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .WillOnce(DoAll(SetArg1Sockaddr(storage), SetArg2Uint32(sizeof(sockaddr_in)),
                       Return(Api::SysCallIntResult{0, 0})));
-  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
-  EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
-  // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
   // Non-transparent socket fails to get original dst while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+#endif // ifndef WIN32
 
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(storage);
   sin6.sin6_family = AF_INET6;
   sin6.sin6_port = htons(9527);
   EXPECT_EQ(1, inet_pton(AF_INET6, "12::34", &sin6.sin6_addr));
   EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v6));
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
-      .WillOnce(DoAll(SetArg2Sockaddr6(storage), Return(Api::SysCallIntResult{0, 0})))
-      .WillOnce(Return(Api::SysCallIntResult{-1, 0}))
+      .WillOnce(DoAll(SetArg2Sockaddr6(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
+#ifndef WIN32
+  // Transparent socket gets original dst from local address while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true)).WillOnce(Return(false));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .WillOnce(DoAll(SetArg1Sockaddr6(storage), SetArg2Uint32(sizeof(sockaddr_in6)),
                       Return(Api::SysCallIntResult{0, 0})));
-  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
-  EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
-  // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
   // Non-transparent socket fails to get original dst while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
-#endif
+#endif // ifndef WIN32
+
+#endif // ifdef SOL_IP
 }
 
 TEST(NetworkUtility, LocalConnection) {
