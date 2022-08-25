@@ -1255,7 +1255,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
   EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
       .WillRepeatedly(Return(this->test_address_));
   EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
-  EXPECT_NE(nullptr, local_pool.makeRequest("hash_key", value, callbacks));
+  EXPECT_NE(nullptr, local_pool.makeRequest("hash_key", value, callbacks, transaction_));
 
   // Move redirection.
   Common::Redis::Client::MockPoolRequest active_request2;
