@@ -622,6 +622,16 @@ replace()
 Replaces a header. *key* is a string that supplies the header key. *value* is a string that supplies
 the header value. If the header does not exist, it is added as per the *add()* function.
 
+setHttp1ReasonPhrase()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:setHttp1ReasonPhrase(reasonPhrase)
+
+Sets a custom HTTP1 response reason phrase. This call is *only valid in the response flow*.
+*reasonPhrase* is a string that supplies the reason phrase value.
+
 .. _config_http_filters_lua_buffer_wrapper:
 
 Buffer API
