@@ -30,7 +30,7 @@ envoy_cc_library(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
-        "//source/common/proto_json:proto_json_marshaller_base_lib",
+        "//source/extensions/common/proto_json:proto_json_marshaller_base_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
         "@com_google_googleapis//google/api:http_cc_proto",

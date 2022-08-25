@@ -9,7 +9,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
-#include "source/common/proto_json/proto_json_marshaller.h"
+#include "source/extensions/common/proto_json/proto_json_marshaller.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
@@ -105,7 +105,7 @@ public:
 
   bool disabled() const { return disabled_; }
 
-  const ProtoJson::ProtoJsonMarshaller<::google::rpc::Status>* grpc_status_json_marshaller() {
+  const ProtoJson::ProtoJsonMarshaller<::google::rpc::Status>* grpc_status_json_marshaller() const {
     return grpc_status_json_marshaller_.get();
   }
 
