@@ -206,7 +206,9 @@ public:
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
-    header_value_option->mutable_append()->set_value(append);
+    header_value_option->set_append_action(
+        append ? envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+               : envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 
   void prepareEDS() {
