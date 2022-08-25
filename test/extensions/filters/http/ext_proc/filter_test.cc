@@ -365,19 +365,19 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
-  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&,
-                                  HeadersResponse& header_resp) {
-    auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
-    auto add1 = headers_mut->add_set_headers();
-    add1->mutable_header()->set_key("x-new-header");
-    add1->mutable_header()->set_value("new");
-    add1->mutable_append_action()->set_value(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-    auto add2 = headers_mut->add_set_headers();
-    add2->mutable_header()->set_key("x-some-other-header");
-    add2->mutable_header()->set_value("no");
-    add2->mutable_append_action()->set_value(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-    *headers_mut->add_remove_headers() = "x-do-we-want-this";
-  });
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header");
+        add1->mutable_header()->set_value("new");
+        add1->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header");
+        add2->mutable_header()->set_value("no");
+        add2->set_append_action(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        *headers_mut->add_remove_headers() = "x-do-we-want-this";
+      });
 
   // We should now have changed the original header a bit
   Http::TestRequestHeaderMapImpl expected{{":path", "/"},
@@ -462,11 +462,11 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
-  hdr2->mutable_append_action()->set_value(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  hdr2->set_append_action(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   hdr2->mutable_header()->set_key("x-another-thing");
   hdr2->mutable_header()->set_value("1");
   auto* hdr3 = immediate_headers->add_set_headers();
-  hdr3->mutable_append_action()->set_value(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  hdr3->set_append_action(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   hdr3->mutable_header()->set_key("x-another-thing");
   hdr3->mutable_header()->set_value("2");
   stream_callbacks_->onReceiveMessage(std::move(resp1));

@@ -4577,8 +4577,7 @@ public:
     config.mutable_grpc_health_check()->set_service_name("service");
     for (const auto& pair : headers_to_add) {
       auto header_value_option = config.mutable_grpc_health_check()->add_initial_metadata();
-      header_value_option->mutable_append_action()->set_value(
-          Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      header_value_option->set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
       auto header = header_value_option->mutable_header();
       header->set_key(pair.first);
       header->set_value(pair.second);

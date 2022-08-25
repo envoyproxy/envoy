@@ -603,8 +603,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
         auto* add3 = response_mutation->add_set_headers();
         add3->mutable_header()->set_key(":status");
         add3->mutable_header()->set_value("202");
-        add3->mutable_append_action()->set_value(
-            Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        add3->set_append_action(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
         return true;
       });
 
