@@ -762,7 +762,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
-    header->mutable_append()->set_value(true);
+    header->mutable_append_action()->set_value(Router::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
@@ -1488,9 +1488,12 @@ request_headers_to_add:
 
   // Disable append mode.
   envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
-  route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
+  route.mutable_request_headers_to_add(0)->mutable_append_action()->set_value(
+      Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  route.mutable_request_headers_to_add(1)->mutable_append_action()->set_value(
+      Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  route.mutable_request_headers_to_add(2)->mutable_append_action()->set_value(
+      Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
