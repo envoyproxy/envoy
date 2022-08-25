@@ -578,17 +578,12 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  return compareSotwDiscoveryRequest(xds_stream_, expected_type_url, expected_version,
-                                     expected_resource_names, expect_node, expected_error_code,
-                                     expected_error_substring);
-}
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
+  if (stream == nullptr) {
+    stream = xds_stream_.get();
+  }
 
-AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
-    FakeStreamPtr& stream, const std::string& expected_type_url,
-    const std::string& expected_version, const std::vector<std::string>& expected_resource_names,
-    bool expect_node, const Protobuf::int32 expected_error_code,
-    const std::string& expected_error_substring) {
   envoy::service::discovery::v3::DiscoveryRequest discovery_request;
   VERIFY_ASSERTION(stream->waitForGrpcMessage(*dispatcher_, discovery_request));
 

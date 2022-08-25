@@ -965,23 +965,27 @@ TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthor
       // SDS for the first cluster.
       initXdsStream(getXdsUpstream1(), xds_connection_1_, xds_stream_1_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          xds_stream_1_, /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
           /*expected_version=*/"",
-          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true));
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_1_.get()));
       auto sds_resource = getClientSecret(cert_name);
       sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          xds_stream_1_, Config::TypeUrl::get().Secret, {sds_resource}, "1");
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_1_.get());
     }
     {
       // SDS for the second cluster.
       initXdsStream(getXdsUpstream2(), xds_connection_2_, xds_stream_2_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
-          xds_stream_2_, /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
           /*expected_version=*/"",
-          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true));
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_2_.get()));
       auto sds_resource = getClientSecret(cert_name);
       sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-          xds_stream_2_, Config::TypeUrl::get().Secret, {sds_resource}, "1");
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_2_.get());
     }
   };
 
