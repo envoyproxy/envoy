@@ -332,8 +332,71 @@ udp_listener_config:
 
 #if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
-                          "error building network filter chain for quic listener: requires exactly "
-                          "one http_connection_manager filter.");
+                          "error building network filter chain for quic listener: requires "
+                          "http_connection_manager filter to be last in the chain.");
+#else
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithNetworkFilterAfterHcm) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  name: foo
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  - name: envoy.test.test_network_filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options: {}
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+
+#if defined(ENVOY_ENABLE_QUIC)
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "error building network filter chain for quic listener: requires "
+                          "http_connection_manager filter to be last in the chain.");
 #else
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");
