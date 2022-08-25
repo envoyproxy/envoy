@@ -1112,5 +1112,12 @@ Network::ConnectionSocket::OptionsSharedPtr
 combineConnectionSocketOptions(const ClusterInfo& cluster,
                                const Network::ConnectionSocket::OptionsSharedPtr& options);
 
+/**
+ * Utility function to resolve health check address.
+ */
+Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    Network::Address::InstanceConstSharedPtr host_address);
+
 } // namespace Upstream
 } // namespace Envoy
