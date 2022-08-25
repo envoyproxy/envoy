@@ -2,7 +2,6 @@
 
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
-#include "source/extensions/http/header_validators/envoy_default/null_header_validator.h"
 
 namespace Envoy {
 namespace Extensions {
