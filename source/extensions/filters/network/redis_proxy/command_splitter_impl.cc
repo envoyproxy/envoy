@@ -608,6 +608,13 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (request->asArray().size() < 2 &&
+      Common::Redis::SupportedCommands::transactionCommands().count(to_lower_string) == 0) {
+    // Commands other than PING and transaction commands all have at least two arguments.
+    onInvalidRequest(callbacks);
+    return nullptr;
+  }
+
   // Get the handler for the downstream request
   auto handler = handler_lookup_table_.find(to_lower_string.c_str());
   if (handler == nullptr) {
