@@ -35,7 +35,7 @@ std::string ipSuppressEnvoyHeadersTestParamsToString(
 void disableHeaderValueOptionAppend(
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
-    i.set_append_action(Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+    i.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 }
 

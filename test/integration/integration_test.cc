@@ -294,18 +294,18 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
         header_value_option->mutable_header()->set_key("x-additional-header");
         header_value_option->mutable_header()->set_value("example-value");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-type");
         header_value_option->mutable_header()->set_value("text/html");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         // Add a wrong content-length.
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-length");
         header_value_option->mutable_header()->set_value("2000");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
         virtual_host->add_domains(domain);
@@ -345,18 +345,18 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
         header_value_option->mutable_header()->set_key("x-additional-header");
         header_value_option->mutable_header()->set_value("example-value");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-type");
         header_value_option->mutable_header()->set_value("text/html");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         // Add a wrong content-length.
         header_value_option = route_config->mutable_response_headers_to_add()->Add();
         header_value_option->mutable_header()->set_key("content-length");
         header_value_option->mutable_header()->set_value("2000");
         header_value_option->set_append_action(
-            Router::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
         virtual_host->add_domains(domain);
