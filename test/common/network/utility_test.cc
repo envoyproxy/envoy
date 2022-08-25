@@ -301,7 +301,7 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
-#endif // ifndef WIN32
+#endif // WIN32
 
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(storage);
   sin6.sin6_family = AF_INET6;
@@ -330,9 +330,9 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
-#endif // ifndef WIN32
+#endif // WIN32
 
-#endif // ifdef SOL_IP
+#endif // SOL_IP
 }
 
 TEST(NetworkUtility, LocalConnection) {
