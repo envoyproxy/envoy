@@ -273,15 +273,14 @@ public:
 
     for (const auto& header_to_add : headers_to_add) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      entry->set_append_action(
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      entry->mutable_append()->set_value(false);
       entry->mutable_header()->set_key(header_to_add.first);
       entry->mutable_header()->set_value(header_to_add.second);
     }
 
     for (const auto& header_to_append : headers_to_append) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+      entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(header_to_append.first);
       entry->mutable_header()->set_value(header_to_append.second);
     }
@@ -292,15 +291,15 @@ public:
     }
 
     // Entries in this headers are not present in the original request headers.
-    new_headers_from_upstream.iterate([&check_response](
-                                          const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
-      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      // Try to append to a non-existent field.
-      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-      entry->mutable_header()->set_key(std::string(h.key().getStringView()));
-      entry->mutable_header()->set_value(std::string(h.value().getStringView()));
-      return Http::HeaderMap::Iterate::Continue;
-    });
+    new_headers_from_upstream.iterate(
+        [&check_response](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+          auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+          // Try to append to a non-existent field.
+          entry->mutable_append()->set_value(true);
+          entry->mutable_header()->set_key(std::string(h.key().getStringView()));
+          entry->mutable_header()->set_value(std::string(h.value().getStringView()));
+          return Http::HeaderMap::Iterate::Continue;
+        });
 
     // Entries in this headers are not present in the original request headers. But we set append =
     // true and append = false.
@@ -322,7 +321,7 @@ public:
       const auto key = std::string(response_header_to_add.first);
       const auto value = std::string(response_header_to_add.second);
 
-      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+      entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add {}={}", key, value);
@@ -334,8 +333,7 @@ public:
       const auto value = std::string(response_header_to_set.second);
 
       // Replaces the one sent by the upstream.
-      entry->set_append_action(
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+      entry->mutable_append()->set_value(false);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set {}={}", key, value);

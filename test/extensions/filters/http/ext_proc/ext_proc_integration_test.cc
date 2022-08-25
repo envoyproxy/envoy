@@ -603,8 +603,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
         auto* add3 = response_mutation->add_set_headers();
         add3->mutable_header()->set_key(":status");
         add3->mutable_header()->set_value("202");
-        add3->set_append_action(
-            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        add3->mutable_append()->set_value(true);
         return true;
       });
 
