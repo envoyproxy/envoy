@@ -20,9 +20,9 @@
 
 #include "gtest/gtest.h"
 
-using testing::Return;
-using testing::Eq;
 using testing::DoAll;
+using testing::Eq;
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -217,9 +217,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-ACTION_P(SetArg2Int, val) {
-  *(static_cast<int*>(arg2)) = val;
-}
+ACTION_P(SetArg2Int, val) { *(static_cast<int*>(arg2)) = val; }
 
 ACTION_P(SetArg2Sockaddr, val) {
   const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
