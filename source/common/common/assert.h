@@ -42,7 +42,7 @@ public:
       if (success) {
         ENVOY_LOG(error, "#{} {} [{}]", i, out, stack_trace_[i]);
       } else {
-        ENVOY_LOG(error, "#{} [{}]", i, stack_trace_[i]);
+        ENVOY_LOG(error, "#{} {} [{}]", i, "UNKNOWN", stack_trace_[i]);
       }
     }
   }
