@@ -22,6 +22,8 @@ constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
 // A test implementation of the XdsResourcesDelegate extension.
 class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
 public:
+  TestXdsResourcesDelegate() { OnConfigUpdatedCount = 0; }
+
   void onConfigUpdated(const Config::XdsSourceId& /*source_id*/,
                        const std::vector<Config::DecodedResourceRef>& /*resources*/) override {
     OnConfigUpdatedCount++;
