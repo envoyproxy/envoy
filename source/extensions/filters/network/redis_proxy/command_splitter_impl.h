@@ -151,9 +151,7 @@ public:
     callbacks_.onAuth(username, password);
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
-  Common::Redis::Client::Transaction& transaction() override {
-    return callbacks_.transaction();
-  }
+  Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
