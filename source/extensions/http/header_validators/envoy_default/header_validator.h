@@ -29,26 +29,11 @@ public:
   validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Configuration for validateStatusHeader method.
-   */
-  enum class StatusPseudoHeaderValidationMode {
-    // Only accept whole number integer values.
-    WholeNumber,
-
-    // Only accept values in the following range: 100 <= status <= 599.
-    ValueRange,
-
-    // Only accept RFC registered status codes:
-    // https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml.
-    OfficialStatusCodes,
-  };
-
-  /*
-   * Validate the :status response pseudo header.
+   * Validate the :status response pseudo header based on the range of valid response statuses.
+   * TODO: add RFC reference
    */
   virtual HeaderEntryValidationResult
-  validateStatusHeader(const StatusPseudoHeaderValidationMode& mode,
-                       const ::Envoy::Http::HeaderString& value);
+  validateStatusHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate any request or response header name.
@@ -85,7 +70,7 @@ public:
    * contains valid characters and does not validate the syntax or form of the path URI.
    */
   virtual HeaderEntryValidationResult
-  validateGenericPathHeader(const ::Envoy::Http::HeaderString& value);
+  validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
 protected:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -106,6 +91,7 @@ struct UhvResponseCodeDetailValues {
   const std::string InvalidStatus = "uhv.invalid_status";
   const std::string EmptyHeaderName = "uhv.empty_header_name";
   const std::string InvalidPseudoHeader = "uhv.invalid_pseudo_header";
+  const std::string InvalidHostDeprecatedUserInfo = "uhv.invalid_host_deprecated_user_info";
 };
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;

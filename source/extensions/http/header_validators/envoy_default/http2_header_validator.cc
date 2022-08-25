@@ -45,9 +45,8 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
       {":method", &Http2HeaderValidator::validateMethodHeader},
       {":authority", &Http2HeaderValidator::validateAuthorityHeader},
-      {"host", &Http2HeaderValidator::validateAuthorityHeader},
       {":scheme", &Http2HeaderValidator::validateSchemeHeader},
-      {":path", &Http2HeaderValidator::validateGenericPathHeader},
+      {":path", &Http2HeaderValidator::validatePathHeaderCharacters},
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
@@ -90,8 +89,8 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":status") {
-    // Validate the :status header against the RFC valid range (100 <= status < 600)
-    return validateStatusHeader(StatusPseudoHeaderValidationMode::ValueRange, value);
+    // Validate the :status header against the RFC valid range.
+    return validateStatusHeader(value);
   } else if (key_string_view == "content-length") {
     // Validate the Content-Length header
     return validateContentLengthHeader(value);
@@ -122,11 +121,9 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   absl::string_view path = header_map.getPathValue();
 
-  //
   // Step 1: verify that required pseudo headers are present.
   //
   // The method pseudo header is always mandatory.
-  //
   if (header_map.getMethodValue().empty()) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
@@ -137,19 +134,16 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   bool path_is_absolute = !path.empty() && path.at(0) == '/';
 
   if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
-    //
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
     //
     // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme",
     // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
     // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
-    //
     auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
                                 : UhvResponseCodeDetail::get().InvalidScheme;
     return {RejectOrRedirectAction::Reject, details};
   } else if (is_connect_method) {
-    //
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 7540,
     // https://datatracker.ietf.org/doc/html/rfc7540#section-8.3:
@@ -159,7 +153,6 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //  * The ":authority" pseudo-header field contains the host and port to connect to
     //    (equivalent to the authority-form of the request-target of CONNECT requests (see
     //    [RFC7230], Section 5.3)).
-    //
     absl::string_view details;
     if (!path.empty()) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
@@ -204,9 +197,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // If path normalization is disabled or the path isn't absolute then the path will be validated
   // against the RFC character set in validateRequestHeaderEntry.
 
-  //
   // Step 3: Verify each request header
-  //
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
   std::string reject_details;
@@ -244,7 +235,6 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
 Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
-  //
   // Step 1: verify that required pseudo headers are present
   //
   // For HTTP/2 responses, RFC 7540 states that only the :status
@@ -253,14 +243,11 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // For HTTP/2 responses, a single ":status" pseudo-header field is defined that carries the HTTP
   // status code field (see [RFC7231], Section 6). This pseudo-header field MUST be included in
   // all responses; otherwise, the response is malformed.
-  //
   if (header_map.getStatusValue().empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
-  //
   // Step 2: Verify each response header
-  //
   std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
@@ -288,14 +275,12 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value) {
-  //
   // Only allow a TE value of "trailers" for HTTP/2, based on
   // RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
   //
   // The only exception to this is the TE header field, which MAY be present
   // in an HTTP/2 request; when it is, it MUST NOT contain any value other
   // than "trailers".
-  //
   if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
     return {RejectAction::Reject, Http2ResponseCodeDetail::get().InvalidTE};
   }
@@ -305,7 +290,6 @@ Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value)
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString& value) {
-  //
   // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2:
   //
   // authority = [ userinfo "@" ] host [ ":" port ]
@@ -316,13 +300,11 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   //
   // The host portion can be any valid URI host, which this function does not
   // validate. The port, if present, is validated as a valid uint16_t port.
-  //
   return validateHostHeader(value);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
-  //
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
   //
@@ -342,7 +324,6 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //
   // any message containing connection-specific header fields MUST be treated
   // as malformed (Section 8.1.2.6).
-  //
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
   const auto& key_string_view = name.getStringView();
@@ -361,7 +342,6 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool is_valid = true;
   char c = '\0';
 
-  //
   // Verify that the header name is all lowercase. From RFC 7540,
   // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2:
   //
@@ -369,11 +349,10 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // a case-insensitive fashion. However, header field names MUST be converted to lowercase prior
   // to their encoding in HTTP/2. A request or response containing uppercase header field names
   // MUST be treated as malformed (Section 8.1.2.6).
-  //
-  for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
-    c = key_string_view.at(i);
-    is_valid = testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&
-               (c < 'A' || c > 'Z');
+  for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
+    c = *iter;
+    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&
+                (c < 'A' || c > 'Z');
   }
 
   if (!is_valid) {

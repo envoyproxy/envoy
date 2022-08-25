@@ -46,9 +46,8 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
       {":method", &Http1HeaderValidator::validateMethodHeader},
       {":authority", &Http1HeaderValidator::validateHostHeader},
-      {"host", &Http1HeaderValidator::validateHostHeader},
       {":scheme", &Http1HeaderValidator::validateSchemeHeader},
-      {":path", &Http1HeaderValidator::validateGenericPathHeader},
+      {":path", &Http1HeaderValidator::validatePathHeaderCharacters},
       {"transfer-encoding", &Http1HeaderValidator::validateTransferEncodingHeader},
       {"content-length", &Http1HeaderValidator::validateContentLengthHeader},
   };
@@ -91,8 +90,8 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":status") {
-    // Validate the :status header against the RFC valid range (100 <= status <= 599)
-    return validateStatusHeader(StatusPseudoHeaderValidationMode::ValueRange, value);
+    // Validate the :status header against the RFC valid range
+    return validateStatusHeader(value);
   } else if (key_string_view == "content-length") {
     // Validate the Content-Length header
     return validateContentLengthHeader(value);
@@ -115,13 +114,11 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
-  //
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
   // :method and :path headers based on RFC 7230
   // https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1:
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
-  //
   if (path.empty()) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
@@ -130,7 +127,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
 
-  //
   // HTTP/1.1 also requires the Host header,
   // https://datatracker.ietf.org/doc/html/rfc7230#section-5.4:
   //
@@ -141,12 +137,10 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // ...
   // If the authority component is missing or undefined for the target URI, then a
   // client MUST send a Host header field with an empty field-value.
-  //
   if (header_map.getHostValue().empty()) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
-  //
   // Verify that the path and Host/:authority header matches based on the method.
   // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.4:
   //
@@ -161,13 +155,11 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
   //
   // TODO(meilya) - should this be implemented here in UHV or the H1 codec?
-  //
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
   auto path_is_asterisk = path == "*";
   auto path_is_absolute = path.at(0) == '/';
 
-  //
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.3.4:
   //
@@ -175,12 +167,10 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // request
   // ...
   // asterisk-form  = "*"
-  //
   if (!is_options_method && path_is_asterisk) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
-  //
   // Step 2: Validate Transfer-Encoding and Content-Length headers.
   // HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
   // https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
@@ -192,16 +182,13 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // override the RFC compliance to allow a Transfer-Encoding of "chunked" with
   // a Content-Length set. In this exception case, we remove the Content-Length
   // header.
-  //
   if (header_map.TransferEncoding()) {
-    //
     // CONNECT methods must not contain a Transfer-Encoding, per RFC 7231,
     // https://tools.ietf.org/html/rfc7231#section-4.3.6:
     //
     // A payload within a CONNECT request message has no defined semantics; sending
     // a payload body on a CONNECT request might cause some existing
     // implementations to reject the request.
-    //
     bool is_chunked = absl::EqualsIgnoreCase(header_map.getTransferEncodingValue(),
                                              header_values_.TransferEncodingValues.Chunked);
     if (!is_chunked || is_connect_method) {
@@ -230,11 +217,8 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     }
   }
 
-  //
   // Step 3: Normalize and validate :path header
-  //
   if (is_connect_method) {
-    //
     // The :path must be authority-form for CONNECT method requests. From RFC
     // 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-5.3.3:
     //
@@ -243,12 +227,10 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     //
     //    authority-form = authority
     //
-    //  When making a CONNECT request to establish a tunnel through one or
-    //  more proxies, a client MUST send only the target URI's authority
-    //  component (excluding any userinfo and its "@" delimiter) as the
-    //  request-target.
-    //
-    // return RequestHeaderMapValidationResult(RejectOrRedirectAction::Reject,
+    // When making a CONNECT request to establish a tunnel through one or
+    // more proxies, a client MUST send only the target URI's authority
+    // component (excluding any userinfo and its "@" delimiter) as the
+    // request-target.
     auto host_result = validateHostHeader(header_map.Path()->value());
     if (!host_result) {
       return {RejectOrRedirectAction::Reject, host_result.details()};
@@ -268,9 +250,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // If path normalization is disabled or the path isn't absolute then the path will be validated
   // against the RFC character set in validateRequestHeaderEntry.
 
-  //
   // Step 4: Verify each request header
-  //
   std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
@@ -298,21 +278,17 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
 Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
-  //
   // Step 1: verify that required pseudo headers are present
   //
   // For HTTP/1.1 responses, RFC 7230 states that only the :status
   // header is required: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.2
   //
   // status-line = HTTP-version SP status-code SP reason-phrase CRLF
-  //
   if (header_map.getStatusValue().empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
-  //
   // Step 2: Verify each response header
-  //
   std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
@@ -340,18 +316,15 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) {
-  //
   // HTTP/1.1 states that requests with an unrecognized transfer encoding should
   // be rejected, from RFC 7230, https://tools.ietf.org/html/rfc7230#section-3.3.1:
   //
   // A server that receives a request message with a transfer coding it does not
   // understand SHOULD respond with 501 (Not Implemented).
-  //
   bool is_valid = true;
   const auto encoding = value.getStringView();
-  std::size_t size = encoding.size();
-  for (std::size_t i{0}; i < size && is_valid; ++i) {
-    is_valid = testChar(kTransferEncodingHeaderCharTable, encoding.at(i));
+  for (auto iter = encoding.begin(); iter != encoding.end() && is_valid; ++iter) {
+    is_valid &= testChar(kTransferEncodingHeaderCharTable, *iter);
   }
 
   if (!is_valid) {
