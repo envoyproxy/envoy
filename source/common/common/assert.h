@@ -18,41 +18,38 @@ using ActionRegistrationPtr = std::unique_ptr<ActionRegistration>;
 
 /*
  * EnvoyBugStackTrace captures and writes the stack trace to Envoy Bug
- * to assist with getting additional context for reports
+ * to assist with getting additional context for reports.
  */
-class EnvoyBugStackTrace : Logger::Loggable<Logger::Id::envoy_bug> {
+class EnvoyBugStackTrace : private Logger::Loggable<Logger::Id::envoy_bug> {
 public:
   EnvoyBugStackTrace() = default;
   /*
-   * Capture the stack trace
-   * Skip count is one as to skip the last call which is capture()
+   * Capture the stack trace.
+   * Skip count is one as to skip the last call which is capture().
    */
   void capture() {
-    stack_depth_ = absl::GetStackTrace(stack_trace_, MaxStackDepth, /* skip_count = */ 1);
+    stack_depth_ = absl::GetStackTrace(stack_trace_, kMaxStackDepth, /* skip_count = */ 1);
   }
 
   /*
-   * Logs each row of the captured stack into the envoy_bug log
+   * Logs each row of the captured stack into the envoy_bug log.
    */
   void logStackTrace() {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,
-                        "stacktrace for envoy bug");
+    ENVOY_LOG(error, "stacktrace for envoy bug");
+    char out[1024];
     for (int i = 0; i < stack_depth_; ++i) {
-      char out[1024];
       const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
       if (success) {
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,
-                            "#{} {} [{}]", i, out, stack_trace_[i]);
+        ENVOY_LOG(error, "#{} {} [{}]", i, out, stack_trace_[i]);
       } else {
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,
-                            "#{} [{}]", i, stack_trace_[i]);
+        ENVOY_LOG(error, "#{} [{}]", i, stack_trace_[i]);
       }
     }
   }
 
 private:
-  static const int MaxStackDepth = 16;
-  void* stack_trace_[MaxStackDepth];
+  static const int kMaxStackDepth = 16;
+  void* stack_trace_[kMaxStackDepth];
   int stack_depth_{0};
 };
 

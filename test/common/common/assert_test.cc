@@ -84,10 +84,11 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, "With some logs"); },
                    "envoy bug failure: false. Details: With some logs");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "stacktrace for envoy bug");
+  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "testing::Test::Run()");
 
 #ifdef NDEBUG
-  EXPECT_EQ(4, envoy_bug_fail_count);
-  EXPECT_EQ(4, envoy_bug_fail_count2);
+  EXPECT_EQ(5, envoy_bug_fail_count);
+  EXPECT_EQ(5, envoy_bug_fail_count2);
   // Reset envoy bug count to simplify testing exponential back-off below.
   envoy_bug_fail_count = 0;
   envoy_bug_fail_count2 = 0;
