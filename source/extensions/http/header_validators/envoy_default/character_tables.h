@@ -8,7 +8,7 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-inline bool testChar(const uint32_t table[8], char c) {
+constexpr bool testChar(const uint32_t table[8], char c) {
   uint8_t uc = static_cast<uint8_t>(c);
   return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
 }
@@ -28,7 +28,7 @@ inline bool testChar(const uint32_t table[8], char c) {
 //                ; any VCHAR, except delimiters
 // SPELLCHECKER(on)
 //
-const uint32_t kGenericHeaderNameCharTable[] = {
+constexpr uint32_t kGenericHeaderNameCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -59,7 +59,7 @@ const uint32_t kGenericHeaderNameCharTable[] = {
 //                   ; visible (printing) characters
 // SPELLCHECKER(on)
 //
-const uint32_t kGenericHeaderValueCharTable[] = {
+constexpr uint32_t kGenericHeaderValueCharTable[] = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -86,7 +86,7 @@ const uint32_t kGenericHeaderValueCharTable[] = {
 //       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
 //
-const uint32_t kMethodHeaderCharTable[] = {
+constexpr uint32_t kMethodHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -108,7 +108,7 @@ const uint32_t kMethodHeaderCharTable[] = {
 //
 // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
 //
-const uint32_t kSchemeHeaderCharTable[] = {
+constexpr uint32_t kSchemeHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -149,7 +149,7 @@ const uint32_t kSchemeHeaderCharTable[] = {
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 // SPELLCHECKER(on)
 //
-const uint32_t kPathHeaderCharTable[] = {
+constexpr uint32_t kPathHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -171,7 +171,7 @@ const uint32_t kPathHeaderCharTable[] = {
 //
 // unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
 //
-const uint32_t kUnreservedCharTable[] = {
+constexpr uint32_t kUnreservedCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -205,7 +205,7 @@ const uint32_t kUnreservedCharTable[] = {
 // transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
 // SPELLCHECKER(on)
 //
-const uint32_t kTransferEncodingHeaderCharTable[] = {
+constexpr uint32_t kTransferEncodingHeaderCharTable[] = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?

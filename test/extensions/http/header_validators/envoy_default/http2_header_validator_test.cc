@@ -146,7 +146,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
   auto uhv = createH2(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
@@ -205,11 +205,11 @@ TEST_F(Http2HeaderValidatorTest, ValidateTE) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateTEHeader(deflate), "uhv.http2.invalid_te");
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateGenericPath) {
+TEST_F(Http2HeaderValidatorTest, ValidatePathHeaderCharacters) {
   HeaderString valid{"/"};
   auto uhv = createH2(empty_config);
   // TODO(meilya) - after path normalization has been approved and implemented
-  EXPECT_TRUE(uhv->validateGenericPathHeader(valid).ok());
+  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedTransferEncoding) {
@@ -260,18 +260,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
 
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(authority, valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(authority, invalid),
-                             UhvResponseCodeDetail::get().InvalidHost);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
-  HeaderString host{"host"};
-  HeaderString valid{"envoy.com"};
-  HeaderString invalid{"user:pass@envoy.com"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(host, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(host, invalid),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {

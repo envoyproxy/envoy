@@ -95,65 +95,16 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidStartChar) {
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusNoneValid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::WholeNumber;
-  HeaderString valid{"200"};
-  HeaderString valid_outside_of_range{"1024"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid_outside_of_range).ok());
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusNoneInvalid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::WholeNumber;
-  HeaderString invalid{"asdf"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
 TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeValid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
   HeaderString valid{"200"};
   HeaderString invalid_max{"1024"};
   HeaderString invalid_min{"99"};
   auto uhv = createBase(empty_config);
 
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_max),
+  EXPECT_TRUE(uhv->validateStatusHeader(valid).ok());
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_max),
                              UhvResponseCodeDetail::get().InvalidStatus);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_min),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeInvalidMin) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
-  HeaderString invalid_min{"99"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_min),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeInvalidMax) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
-  HeaderString invalid_max{"1024"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_max),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusOfficalCodes) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::OfficialStatusCodes;
-  HeaderString valid{"200"};
-  HeaderString invalid_unregistered{"420"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_unregistered),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_min),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
@@ -251,7 +202,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidUserInfo) {
   auto uhv = createBase(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_userinfo),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidPortNumber) {

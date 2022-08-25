@@ -34,11 +34,11 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
                              "uhv.http1.invalid_transfer_encoding");
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateGenericPath) {
+TEST_F(Http1HeaderValidatorTest, ValidatePathHeaderCharacters) {
   HeaderString valid{"/"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateGenericPathHeader(valid).ok());
+  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
@@ -69,16 +69,6 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryMethodStrict) {
                              UhvResponseCodeDetail::get().InvalidMethod);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryHost) {
-  HeaderString name{"host"};
-  HeaderString valid{"envoy.com"};
-  HeaderString invalid{"user:pass@envoy.com"};
-  auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
-                             UhvResponseCodeDetail::get().InvalidHost);
-}
-
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
   HeaderString name{":authority"};
   HeaderString valid{"envoy.com"};
@@ -86,7 +76,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
   auto uhv = createH1(empty_config);
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntrySchemeValid) {
@@ -337,7 +327,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateConnectPathInvalidAuthorityForm) {
   auto uhv = createH1(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingConnect) {

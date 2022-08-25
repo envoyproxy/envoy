@@ -167,20 +167,16 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     }
   }
 
-  //
   // Step 2: Validate and normalize the :path pseudo header
-  //
-  if (!is_options_method && path_is_asterisk) {
-    //
-    // Reject a request if the path is in asterisk-form, "*", and not an OPTIONS method. This is
-    // based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+  if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
+    // The :path must be in absolute-form or for an OPTIONS request in asterisk-form. This is based
+    // on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
     //
     // [The :path] pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or
     // "https" URIs that do not contain a path component MUST include a value of '/'. The
     // exception to this rule is an OPTIONS request for an "http" or "https" URI that does not
     // include a path component; these MUST include a ":path" pseudo-header field with a value
     // of '*'.
-    //
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
