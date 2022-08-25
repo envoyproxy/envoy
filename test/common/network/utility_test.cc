@@ -265,9 +265,9 @@ TEST(NetworkUtility, GetOriginalDst) {
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
-  // Get original dst from SO_ORIGINAL_DST with iptables NAT
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
   EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
-  // Get original dst from socket local address with iptables TPROXY and no nf_conntrack enabled
+  // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_EQ("1.2.3.4:0", Utility::getOriginalDst(socket)->asString());
 
   sin.sin_family = AF_INET6;
@@ -280,9 +280,9 @@ TEST(NetworkUtility, GetOriginalDst) {
       .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
       .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
-  // Get original dst from SO_ORIGINAL_DST with iptables NAT
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
   EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
-  // Get original dst from socket local address with iptables TPROXY and no nf_conntrack enabled
+  // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_EQ("[1::2]:0", Utility::getOriginalDst(socket)->asString());
 #endif
 }
