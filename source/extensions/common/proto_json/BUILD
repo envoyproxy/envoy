@@ -9,7 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_package()
 
 envoy_cc_library(
     name = "proto_json_marshaller_base_lib",
