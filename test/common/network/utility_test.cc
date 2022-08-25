@@ -21,6 +21,8 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
+using testing::Eq;
+using testing::DoAll;
 
 namespace Envoy {
 namespace Network {
@@ -215,6 +217,17 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+ACTION_P(SetArg2Int, val) {
+  *(static_cast<int*>(arg2)) = val;
+}
+
+ACTION_P(SetArg2Sockaddr, val) {
+  const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
+  (static_cast<sockaddr_in*>(arg2))->sin_addr = sin.sin_addr;
+  (static_cast<sockaddr_in*>(arg2))->sin_family = sin.sin_family;
+  (static_cast<sockaddr_in*>(arg2))->sin_port = sin.sin_port;
+}
+
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   auto ip_version = GetParam();
   auto local_address = Utility::getLocalAddress(ip_version);
@@ -233,6 +246,47 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, addressType()).WillOnce(testing::Return(Address::Type::Pipe));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+#ifdef SOL_IP
+  std::string addr;
+  sockaddr_storage storage;
+  auto& sin = reinterpret_cast<sockaddr_in&>(storage);
+  sin.sin_port = htons(9527);
+  testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  ON_CALL(os_sys_calls, supportsIpTransparent()).WillByDefault(Return(true));
+  EXPECT_CALL(socket, addressType()).WillRepeatedly(Return(Address::Type::Ip));
+
+  sin.sin_family = AF_INET;
+  sin.sin_addr.s_addr = inet_addr("12.34.56.78");
+  socket.connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4"));
+  EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v4));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
+  // Get original dst from SO_ORIGINAL_DST with iptables NAT
+  EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+  // Get original dst from socket local address with iptables TPROXY and no nf_conntrack enabled
+  EXPECT_EQ("1.2.3.4:0", Utility::getOriginalDst(socket)->asString());
+
+  sin.sin_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "12::34", &sin.sin_addr));
+  socket.connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv6Instance>("1::2"));
+  EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v6));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
+  // Get original dst from SO_ORIGINAL_DST with iptables NAT
+  EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
+  // Get original dst from socket local address with iptables TPROXY and no nf_conntrack enabled
+  EXPECT_EQ("[1::2]:0", Utility::getOriginalDst(socket)->asString());
+#endif
 }
 
 TEST(NetworkUtility, LocalConnection) {
