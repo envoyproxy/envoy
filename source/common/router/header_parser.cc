@@ -297,6 +297,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
     if (!value.empty() || entry.add_if_empty_) {
       switch (entry.append_action_) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         headers.addReferenceKey(key, value);
         break;
@@ -308,8 +309,6 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers.setReferenceKey(key, value);
         break;
-      default:
-        PANIC_DUE_TO_CORRUPT_ENUM;
       }
     }
   }
