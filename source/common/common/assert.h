@@ -28,8 +28,7 @@ public:
    * Skip count is one as to skip the last call which is capture()
    */
   void capture() {
-    stack_depth_ =
-        absl::GetStackTrace(stack_trace_, MaxStackDepth, /* skip_count = */ 1);
+    stack_depth_ = absl::GetStackTrace(stack_trace_, MaxStackDepth, /* skip_count = */ 1);
   }
 
   /*
