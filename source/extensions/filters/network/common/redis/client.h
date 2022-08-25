@@ -228,9 +228,7 @@ public:
 // A class representing a Redis transaction.
 class Transaction {
 public:
-  Transaction(Network::ConnectionCallbacks& parent)
-      : connection_established_(false), should_close_(false), client_(nullptr), parent_(parent),
-        active_(false) {}
+  Transaction(Network::ConnectionCallbacks& parent) : parent_(parent) {}
   virtual ~Transaction() {
     if (connection_established_) {
       client_->close();
@@ -252,8 +250,8 @@ public:
 
   virtual bool isActive() { return active_; }
 
-  bool connection_established_;
-  bool should_close_;
+  bool connection_established_{false};
+  bool should_close_{false};
   std::string key_;
   ClientPtr client_;
   Network::ConnectionCallbacks& parent_;

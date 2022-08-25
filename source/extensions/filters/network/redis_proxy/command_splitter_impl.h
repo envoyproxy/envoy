@@ -151,7 +151,7 @@ public:
     callbacks_.onAuth(username, password);
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
-  virtual Common::Redis::Client::Transaction& transaction() override {
+  Common::Redis::Client::Transaction& transaction() override {
     return callbacks_.transaction();
   }
 
