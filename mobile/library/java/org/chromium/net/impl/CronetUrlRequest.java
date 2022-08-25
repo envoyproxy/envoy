@@ -531,7 +531,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
     mUrlChain.add(mCurrentUrl);
     Map<String, List<String>> envoyRequestHeaders =
         buildEnvoyRequestHeaders(mInitialMethod, mRequestHeaders, mUploadDataStream, mUserAgent,
-                                 mCurrentUrl, mRequestContext.getBuilder().http2Enabled());
+                                 mCurrentUrl, mRequestContext.getBuilder().quicEnabled());
     mCronvoyCallbacks = new CronvoyHttpCallbacks();
     mStream.set(mRequestContext.getEnvoyEngine().startStream(mCronvoyCallbacks,
                                                              /* explicitFlowCrontrol= */ true));
@@ -544,7 +544,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
   private static Map<String, List<String>>
   buildEnvoyRequestHeaders(String initialMethod, HeadersList headersList,
                            CronetUploadDataStream mUploadDataStream, String userAgent,
-                           String currentUrl, boolean isHttp2Enabled) {
+                           String currentUrl, boolean isQuicEnabled) {
     Map<String, List<String>> headers = new LinkedHashMap<>();
     final URL url;
     try {
@@ -574,11 +574,12 @@ public final class CronetUrlRequest extends UrlRequestBase {
     if (!hasContentType && mUploadDataStream != null) {
       throw new IllegalArgumentException("Requests with upload data must have a Content-Type.");
     }
-    String protocol =
-        isHttp2Enabled && url.getProtocol().equalsIgnoreCase("https") ? "http2" : "http1";
 
-    headers.computeIfAbsent("x-envoy-mobile-upstream-protocol", unused -> new ArrayList<>())
-        .add(protocol);
+    if (isQuicEnabled) {
+      headers.computeIfAbsent("x-envoy-mobile-upstream-protocol", unused -> new ArrayList<>())
+          .add("http3");
+    }
+
     return headers;
   }
 

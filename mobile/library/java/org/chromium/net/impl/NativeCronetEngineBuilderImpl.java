@@ -45,7 +45,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mEnableDnsFilterUnroutableFamilies = false;
   private boolean mDnsUseSystemResolver = false;
   private boolean mEnableDrainPostDnsRefresh = false;
-  private boolean mEnableHttp3 = false;
   private boolean mEnableGzip = true;
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = false;
@@ -110,7 +109,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
         mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames,
         mDnsFallbackNameservers, mEnableDnsFilterUnroutableFamilies, mDnsUseSystemResolver,
-        mEnableDrainPostDnsRefresh, mEnableHttp3, mEnableGzip, brotliEnabled(), mEnableSocketTag,
+        mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag,
         mEnableHappyEyeballs, mEnableInterfaceBinding, mForceIPv6,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mH2ExtendKeepaliveTimeout, mH2RawDomains, mMaxConnectionsPerHost, mStatsFlushSeconds,
