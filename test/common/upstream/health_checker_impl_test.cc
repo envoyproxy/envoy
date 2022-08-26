@@ -594,7 +594,7 @@ public:
         - header:
             key: user-agent
             value: CoolEnvoy/HC
-          append: false
+          append_action: OVERWRITE_IF_EXISTS_OR_ADD
         - header:
             key: x-protocol
             value: "%PROTOCOL%"
@@ -4577,7 +4577,8 @@ public:
     config.mutable_grpc_health_check()->set_service_name("service");
     for (const auto& pair : headers_to_add) {
       auto header_value_option = config.mutable_grpc_health_check()->add_initial_metadata();
-      header_value_option->mutable_append()->set_value(false);
+      header_value_option->set_append_action(
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
       auto header = header_value_option->mutable_header();
       header->set_key(pair.first);
       header->set_value(pair.second);
