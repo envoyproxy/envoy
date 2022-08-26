@@ -82,12 +82,11 @@ public:
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
 class Decoder : public Logger::Loggable<Logger::Id::websocket> {
 public:
-  Decoder(uint64_t max_payload_length = kMaxPayloadBufferLength)
+  Decoder(uint64_t max_payload_length = 0)
       : max_payload_buffer_length_{std::min(max_payload_length, kMaxPayloadBufferLength)} {};
-  // Decodes the given buffer with WebSocket frame. Drains the input buffer when
-  // decoding succeeded (returns true). If the input is not sufficient to make a
-  // complete WebSocket frame, it will be buffered in the decoder. If a decoding
-  // error happened, the input buffer remains unchanged.
+  // Decodes the given buffer into WebSocket frames. If the input is not sufficient to make a
+  // complete WebSocket frame, then the decoder saves the state of halfway decoded WebSocket
+  // frame until the next decode calls feed rest of the frame data.
   // @param input supplies the binary octets wrapped in a WebSocket frame.
   // @return the decoded frames.
   absl::optional<std::vector<Frame>> decode(const Buffer::Instance& input);
