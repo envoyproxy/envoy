@@ -392,7 +392,7 @@ message RateLimitQuotaBucketSettings {
   // the internal specified in this field.
   // [#comment: 100000000 nanoseconds = 0.1 seconds]
   google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
-    required: true
+    required: false
     gt {nanos: 100000000}
   }];
 

@@ -24,7 +24,11 @@ namespace RateLimitQuota {
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
-using BucketSettings = envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
+using BucketSettings =
+    envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
+// TODO(tyxia) Or using directly???
+// using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
+using BucketId = ::envoy::service::rate_limit_quota::v3::BucketId;
 
 /**
  * TODO(tyxia) Placeholder!!! Implement as needed.
@@ -43,7 +47,6 @@ public:
   }
 };
 
-using BucketId = envoy::service::rate_limit_quota::v3::BucketId;
 // TODO(tyxia) Starts with passThroughFilter consider streamFilter.
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RequestCallbacks,
@@ -53,7 +56,9 @@ public:
                        Server::Configuration::FactoryContext& factory_context,
                        RateLimitClientPtr client)
       : config_(std::move(config)), rate_limit_client_(std::move(client)),
-        factory_context_(factory_context) {}
+        factory_context_(factory_context) {
+          createMatcherTree();
+        }
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
@@ -68,9 +73,13 @@ public:
           settings);
 
   std::vector<BucketSettings> buildMatcher();
+  BucketId buildMatcherTree(const Http::RequestHeaderMap& headers);
+  BucketId requestMatching(const Http::RequestHeaderMap& headers);
+
   ~RateLimitQuotaFilter() override = default;
 
 private:
+  void createMatcherTree();
   FilterConfigConstSharedPtr config_;
   // TODO(tyxia) Rate limit client is a member of rate limit filter.
   RateLimitClientPtr rate_limit_client_;
@@ -78,6 +87,7 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_;
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 
 } // namespace RateLimitQuota

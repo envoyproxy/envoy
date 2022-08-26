@@ -68,7 +68,8 @@ constexpr char BucketSetting[] = R"EOF(
 //                     string_value: staging
 //   )EOF";
 
-// TODO(tyxia) matcher_list example https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/test/common/matcher/matcher_test.cc;rcl=442062708;l=162
+// TODO(tyxia) matcher_list example
+// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/test/common/matcher/matcher_test.cc;rcl=442062708;l=162
 constexpr char MatcherConfig[] = R"EOF(
     matcher_list:
       matchers:
@@ -78,7 +79,7 @@ constexpr char MatcherConfig[] = R"EOF(
             input:
               typed_config:
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: env
+                header_name: environment
             value_match:
               exact: staging
         on_match:
@@ -92,11 +93,13 @@ constexpr char MatcherConfig[] = R"EOF(
                       string_value: "prod"
                   "env":
                       custom_value:
+                        name: "test_1"
                         typed_config:
                           "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                           header_name: environment
                   "group":
                       custom_value:
+                        name: "test_2"
                         typed_config:
                           "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                           header_name: group
@@ -124,6 +127,7 @@ public:
 };
 
 TEST_F(RateLimitQuotaFilterTest, BucketSettings) {
+  // Add {"environment", "staging"} for exact value_match in the predicate.
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},         {":path", "/"},
                                          {":scheme", "http"},        {":authority", "host"},
                                          {"environment", "staging"}, {"group", "envoy"}};
@@ -144,6 +148,11 @@ TEST_F(RateLimitQuotaFilterTest, BucketSettings) {
       std::cout << it.first << "___" << it.second << std::endl;
     }
   }
+
+  auto ids = filter_->requestMatching(headers);
+  for (auto it : ids.bucket()) {
+      std::cout << it.first << "___" << it.second << std::endl;
+    }
 }
 
 } // namespace
