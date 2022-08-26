@@ -69,6 +69,13 @@ TEST(AssertInReleaseTest, AssertLocation) {
 #endif
 }
 
+TEST(EnvoyBugStackTrace, TestStackTrace) {
+  Assert::EnvoyBugStackTrace st;
+  st.capture();
+  EXPECT_LOG_CONTAINS("error", "stacktrace for envoy bug", st.logStackTrace());
+  EXPECT_LOG_CONTAINS("error", "#0 ", st.logStackTrace());
+}
+
 TEST(EnvoyBugDeathTest, VariousLogs) {
   // Use 2 envoy bug action registrations to verify that action chaining is working correctly.
   int envoy_bug_fail_count = 0;
@@ -84,7 +91,7 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, "With some logs"); },
                    "envoy bug failure: false. Details: With some logs");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "stacktrace for envoy bug");
-  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "testing::Test::Run()");
+  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "#0 ");
 
 #ifdef NDEBUG
   EXPECT_EQ(5, envoy_bug_fail_count);
