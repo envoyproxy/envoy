@@ -1264,7 +1264,7 @@ TEST_F(DnsFilterTest, InvalidAuthorityRRsInQueryTest) {
   EXPECT_EQ(0, response_ctx_->answers_.size());
 }
 
-TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
+TEST_F(DnsFilterTest, IgnoreAdditionalRRsInQueryTest) {
   InSequence s;
 
   setup(forward_query_off_config);
@@ -1290,8 +1290,7 @@ TEST_F(DnsFilterTest, InvalidAdditionalRRsInQueryTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
 }
 
 TEST_F(DnsFilterTest, InvalidQueryNameTest) {
