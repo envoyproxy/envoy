@@ -583,7 +583,6 @@ envoy_cc_test(
         "instantiate_protocol_integration_test.cc",
     ],
     args = [
-        "--",
         # for coverage, until this defaults true.
         "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],
@@ -1843,7 +1842,6 @@ envoy_cc_test(
         "quic_protocol_integration_test.cc",
     ]),
     args = [
-        "--",
         # for coverage, until this defaults true.
         "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],

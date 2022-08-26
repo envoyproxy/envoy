@@ -14,7 +14,6 @@ envoy_cc_test(
         "http_tracer_impl_test.cc",
     ],
     args = [
-        "--",
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.update_grpc_response_error_tag",
     ],
     coverage = True,
@@ -47,7 +46,6 @@ envoy_cc_test(
         "http_tracer_impl_test.cc",
     ],
     args = [
-        "--",
         "--runtime-feature-override-for-tests=envoy.reloadable_features.update_grpc_response_error_tag",
     ],
     coverage = True,
