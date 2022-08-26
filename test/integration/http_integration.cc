@@ -173,7 +173,8 @@ std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>
 IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
                                      bool header_only_request) {
   auto response = std::make_shared<IntegrationStreamDecoder>(dispatcher_);
-  response_decoders_.push_back(response);
+  // Checking whether lifetime issue is fixed for quic.
+  // response_decoders_.push_back(response);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
