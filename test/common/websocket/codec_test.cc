@@ -15,7 +15,7 @@ namespace Envoy {
 namespace WebSocket {
 namespace {
 
-// Default payload buffer length
+// Default payload buffer length for tests
 constexpr uint64_t kDefaultPayloadBufferLength = 1048576;
 
 bool areFramesEqual(const Frame& a, const Frame& b) {
