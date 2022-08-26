@@ -230,7 +230,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
     context->queries_.push_back(std::move(rec));
   }
 
-  // We could encounter additional rrs in an EDNS query, and Envoy will ignore them.
+  // We could encounter additional RRs in an EDNS query, and Envoy will ignore them.
   if (context->header_.additional_rrs) {
     ENVOY_LOG(debug, "Ignoring additional RRs in a query because Envoy does not support. "
                      "This could be an EDNS query.");
