@@ -78,6 +78,10 @@ int TestRunner::RunTests(int argc, char** argv) {
                                    std::regex::optimize};
   std::string runtime_override_disable = findAndRemove(DISABLE_PATTERN, argc, argv);
 
+  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
@@ -88,10 +92,6 @@ int TestRunner::RunTests(int argc, char** argv) {
   // for details.
   ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
   listeners.Append(new TestListener);
-
-  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
-  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
 
   // Set gtest properties
   // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
