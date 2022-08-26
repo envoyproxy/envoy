@@ -466,7 +466,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
   // Start transaction on MULTI, and stop on EXEC/DISCARD.
   if (to_lower_string == "multi") {
     // Check for nested MULTI commands.
-    if (transaction.isActive()) {
+    if (transaction.active_) {
       callbacks.onResponse(
           Common::Redis::Utility::makeError(fmt::format("MULTI calls can not be nested")));
       return nullptr;
@@ -478,7 +478,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   } else if (to_lower_string == "exec" || to_lower_string == "discard") {
     // Handle the case where we don't have an open transaction.
-    if (transaction.isActive() == false) {
+    if (transaction.active_ == false) {
       callbacks.onResponse(Common::Redis::Utility::makeError(
           fmt::format("{} without MULTI", absl::AsciiStrToUpper(to_lower_string))));
       return nullptr;
@@ -626,7 +626,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   // If we are within a transaction, forward all requests to the transaction handler (i.e. handler
   // of "multi" command).
-  if (callbacks.transaction().isActive()) {
+  if (callbacks.transaction().active_) {
     handler = handler_lookup_table_.find("multi");
   }
 

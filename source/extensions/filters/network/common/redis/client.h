@@ -229,7 +229,7 @@ public:
 class Transaction {
 public:
   Transaction(Network::ConnectionCallbacks& parent) : parent_(parent) {}
-  virtual ~Transaction() {
+  ~Transaction() {
     if (connection_established_) {
       client_->close();
       connection_established_ = false;
@@ -248,16 +248,12 @@ public:
     should_close_ = false;
   }
 
-  virtual bool isActive() { return active_; }
-
+  bool active_{false};
   bool connection_established_{false};
   bool should_close_{false};
   std::string key_;
   ClientPtr client_;
   Network::ConnectionCallbacks& parent_;
-
-private:
-  bool active_;
 };
 
 class NoOpConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -270,7 +266,6 @@ public:
 class NoOpTransaction : public Transaction {
 public:
   NoOpTransaction() : Transaction(callbacks_) {}
-  bool isActive() override { return false; }
 
 private:
   NoOpConnectionCallbacks callbacks_;
