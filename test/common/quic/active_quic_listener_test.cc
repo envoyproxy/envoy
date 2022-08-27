@@ -35,7 +35,6 @@
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
-#include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_crypto_server_config_peer.h"
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -354,11 +353,6 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
                                            ->config()
                                            ->max_time_before_crypto_handshake()
                                            .ToMilliseconds());
-  EXPECT_EQ(Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.quic_defer_send_in_response_to_packet"),
-            quic::test::QuicConnectionPeer::GetSendAlarm(
-                const_cast<quic::QuicSession*>(session)->connection())
-                ->IsSet());
   readFromClientSockets();
 }
 
