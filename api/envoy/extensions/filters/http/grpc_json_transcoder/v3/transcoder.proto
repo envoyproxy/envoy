@@ -45,6 +45,7 @@ message GrpcJsonTranscoder {
     ALL_CHARACTERS = 2;
   }
 
+  // [#next-free-field: 6]
   message PrintOptions {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder.PrintOptions";
@@ -68,6 +69,9 @@ message GrpcJsonTranscoder {
     // generate JSON field names using the ``json_name`` option, or lower camel case,
     // in that order. Setting this flag will preserve the original field names. Defaults to false.
     bool preserve_proto_field_names = 4;
+
+    // If true, return all streams as newline-delimited JSON messages instead of as a comma-separated array
+    bool stream_newline_delimited = 5;
   }
 
   message RequestValidationOptions {
