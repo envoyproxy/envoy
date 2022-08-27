@@ -6453,6 +6453,7 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
       custom_validator_config:
         name: "envoy.tls.cert_validator.timed_cert_validator"
+  sni: "example.com"
 )EOF";
 
   const std::string server_ctx_yaml = R"EOF(
@@ -6468,10 +6469,13 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
       custom_validator_config:
         name: "envoy.tls.cert_validator.timed_cert_validator"
 )EOF";
-  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+  auto* cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
       "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(0));
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setExpectedHostName("example.com");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
@@ -6509,8 +6513,9 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
 )EOF";
-  auto cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
+  auto* cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
       "envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
   static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(0));
 
