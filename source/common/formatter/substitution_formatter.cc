@@ -904,6 +904,15 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return result;
                                   });
                             }}},
+                          {"DOWNSTREAM_HANDSHAKE_DURATION",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoDurationFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    StreamInfo::TimingUtility timing(stream_info);
+                                    return timing.downstreamHandshakeComplete();
+                                  });
+                            }}},
                           {"BYTES_RECEIVED",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
