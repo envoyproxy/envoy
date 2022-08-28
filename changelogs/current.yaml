@@ -23,7 +23,7 @@ minor_behavior_changes:
     removed blank line for being compatible with OpenMetrics.
 - area: original_dst
   change: |
-    transparent listener could use original_dst filter without nf_conntrack enabled.
+    transparent listener can use original_dst filter without nf_conntrack enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
