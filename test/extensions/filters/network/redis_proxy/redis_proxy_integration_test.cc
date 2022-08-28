@@ -1218,7 +1218,8 @@ TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
+                    redis_client);
 
   redis_client->close();
 }
