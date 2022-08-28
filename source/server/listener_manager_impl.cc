@@ -383,20 +383,15 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     name = server_.api().randomGenerator().uuid();
   }
 
-  // TODO (soulxu): Support multiple internal addresses in the future.
-  if ((config.address().has_envoy_internal_address() && config.additional_addresses_size() > 0) ||
-      std::any_of(config.additional_addresses().begin(), config.additional_addresses().end(),
-                  [](const envoy::config::listener::v3::AdditionalAddress& proto_address) {
-                    return proto_address.address().has_envoy_internal_address();
-                  })) {
-    throw EnvoyException(
-        fmt::format("listener {}: internal address doesn't support multiple addresses.", name));
-  }
-
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
+    if (config.has_internal_listener()) {
+      throw EnvoyException(fmt::format(
+          "error adding listener named '{}': api_listener and internal_listener cannot be both set",
+          name));
+    }
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImplBase derived classes.
@@ -982,11 +977,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   const std::string hcm_str =
       "type.googleapis.com/"
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-  if (is_quic && (filter_chain.filters().size() != 1 ||
-                  filter_chain.filters(0).typed_config().type_url() != hcm_str)) {
-    throw EnvoyException(fmt::format(
-        "error building network filter chain for quic listener: requires exactly one http_"
-        "connection_manager filter."));
+  if (is_quic &&
+      (filter_chain.filters().empty() ||
+       filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
+           hcm_str)) {
+    throw EnvoyException(
+        fmt::format("error building network filter chain for quic listener: requires "
+                    "http_connection_manager filter to be last in the chain."));
   }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport

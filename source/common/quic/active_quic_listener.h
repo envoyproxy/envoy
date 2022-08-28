@@ -13,6 +13,8 @@
 #include "source/server/active_udp_listener.h"
 #include "source/server/connection_handler_impl.h"
 
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+
 #if defined(__linux__)
 #include <linux/filter.h>
 #endif
@@ -84,6 +86,7 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

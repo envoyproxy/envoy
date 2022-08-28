@@ -9,15 +9,24 @@ behavior_changes:
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
     This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
+- area: tls
+  change: |
+    Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: resource_monitors
+  change: |
+    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: listener
+  change: |
+    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
 - area: transport_socket
   change: |
     fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
@@ -56,12 +65,17 @@ new_features:
 - area: http
   change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
+  change: |
+    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
 - area: dns_resolver
   change: |
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
@@ -77,8 +91,40 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: upstream
+  change: |
+    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
+- area: admin
+  change: |
+    added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
+- area: health check
+  change: |
+    added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: listener
+  change: |
+    expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
+- area: ratelimit
+  change: |
+    add support for :ref:`adding response headers <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
+- area: access_log
+  change: |
+    added support for number values in substitution format string in json_format.
+- area: http
+  change: |
+    added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check for HTTP health check.
+    Added :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP health check response buffer size.
+- area: lua
+  change: |
+    added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
 
 deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
+    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.

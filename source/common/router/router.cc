@@ -37,7 +37,6 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
-#include "source/common/router/upstream_request.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -50,11 +49,11 @@ constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
-                  const Network::Connection& connection) {
+                  OptRef<const Network::Connection> connection) {
   if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
-  if (!connection.ssl()) {
+  if (connection.has_value() && !connection->ssl()) {
     return true;
   }
   return false;
@@ -686,7 +685,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
                                         /*can_use_http3=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->encodeHeaders(end_stream);
+  upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (end_stream) {
     onRequestComplete();
   }
@@ -775,7 +774,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // since it's all moves from here on.
     if (!upstream_requests_.empty()) {
       Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->encodeData(copy, end_stream);
+      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
     }
 
     // If we are potentially going to retry or shadow this request we need to buffer.
@@ -785,7 +784,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // potentially shadow.
     callbacks_->addDecodedData(data, true);
   } else {
-    upstream_requests_.front()->encodeData(data, end_stream);
+    upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
   }
 
   if (end_stream) {
@@ -805,8 +804,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   // a backoff timer.
   ASSERT(upstream_requests_.size() <= 1);
   downstream_trailers_ = &trailers;
-  for (auto& upstream_request : upstream_requests_) {
-    upstream_request->encodeTrailers(trailers);
+  if (!upstream_requests_.empty()) {
+    upstream_requests_.front()->acceptTrailersFromRouter(trailers);
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
@@ -816,7 +815,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
   if (!upstream_requests_.empty()) {
     // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
-    upstream_requests_.front()->encodeMetadata(std::move(metadata_map_ptr));
+    upstream_requests_.front()->acceptMetadataFromRouter(std::move(metadata_map_ptr));
   }
   return Http::FilterMetadataStatus::Continue;
 }
@@ -1602,7 +1601,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     }
   }
 
-  upstream_request.removeFromList(upstream_requests_);
+  // Defer deletion as this is generally called under the stack of the upstream
+  // request, and immediate deletion is dangerous.
+  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
   cleanup();
 }
 
@@ -1660,7 +1661,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 
   const auto& policy = route_entry_->internalRedirectPolicy();
   // Don't change the scheme from the original request
-  const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
+  const bool scheme_is_http = schemeIsHttp(downstream_headers, callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: incorrect scheme for {}", *callbacks_,
@@ -1816,20 +1817,21 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3) {
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() &&
-                                            !downstream_trailers_ && downstream_end_stream_);
+  upstream_requests_.front()->acceptHeadersFromRouter(
+      !callbacks_->decodingBuffer() && !downstream_trailers_ && downstream_end_stream_);
   // It's possible we got immediately reset which means the upstream request we just
   // added to the front of the list might have been removed, so we need to check to make
-  // sure we don't encodeData on the wrong request.
+  // sure we don't send data on the wrong request.
   if (!upstream_requests_.empty() && (upstream_requests_.front().get() == upstream_request_tmp)) {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_requests_.front()->encodeData(copy, !downstream_trailers_ && downstream_end_stream_);
+      upstream_requests_.front()->acceptDataFromRouter(copy, !downstream_trailers_ &&
+                                                                 downstream_end_stream_);
     }
 
     if (downstream_trailers_) {
-      upstream_requests_.front()->encodeTrailers(*downstream_trailers_);
+      upstream_requests_.front()->acceptTrailersFromRouter(*downstream_trailers_);
     }
   }
 }

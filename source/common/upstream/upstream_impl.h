@@ -43,6 +43,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -596,6 +597,23 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
+class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
+public:
+  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
+                                 Init::Manager& init_manager)
+      : server_context_(context), init_manager_(init_manager) {}
+
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_context_;
+  }
+
+  Init::Manager& initManager() override { return init_manager_; }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  Init::Manager& init_manager_;
+};
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -605,7 +623,7 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Server::Configuration::ServerFactoryContext& server_context,
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -722,9 +740,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
+  AddressSelectFn sourceAddressFn() const override { return source_address_fn_; };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
@@ -756,6 +772,16 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
+
+  // Http::FilterChainFactory
+  void createFilterChain(Http::FilterChainManager& manager) const override {
+    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+  }
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainManager&) const override {
+    // Upgrade filter chains not yet supported for upstream filters.
+    return false;
+  }
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -814,7 +840,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  AddressSelectFn source_address_fn_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
@@ -841,9 +867,11 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  UpstreamHttpFactoryContextImpl upstream_context_;
 };
 
 /**

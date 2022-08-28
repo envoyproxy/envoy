@@ -1234,6 +1234,7 @@ envoy.matching.inputs.subject:
   - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
 envoy.matching.custom_matchers.trie_matcher:
   categories:
+  - envoy.matching.http.custom_matchers
   - envoy.matching.network.custom_matchers
   security_posture: unknown
   status: alpha

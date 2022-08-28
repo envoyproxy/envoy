@@ -232,7 +232,9 @@ bool ActiveStreamFilterBase::commonHandleAfterTrailersCallback(FilterTrailersSta
   return true;
 }
 
-const Network::Connection* ActiveStreamFilterBase::connection() { return parent_.connection(); }
+OptRef<const Network::Connection> ActiveStreamFilterBase::connection() {
+  return parent_.connection();
+}
 
 Event::Dispatcher& ActiveStreamFilterBase::dispatcher() { return parent_.dispatcher_; }
 
@@ -251,7 +253,7 @@ void ActiveStreamFilterBase::restoreContextOnContinue(
   parent_.contextOnContinue(tracked_object_stack);
 }
 
-Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
+const Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
@@ -312,6 +314,12 @@ void ActiveStreamFilterBase::traversePerFilterConfig(
   }
 
   route->traversePerFilterConfig(filter_context_.filter_name, cb);
+}
+
+Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
+  // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
+  // we give the filter direct access to the encoder options.
+  return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
 }
 
 bool ActiveStreamDecoderFilter::canContinue() {
@@ -857,7 +865,7 @@ void DownstreamFilterManager::sendLocalReply(
   if (data.reset_imminent_) {
     ENVOY_STREAM_LOG(debug, "Resetting stream due to {}. onLocalReply requested reset.", *this,
                      details);
-    filter_manager_callbacks_.resetStream();
+    filter_manager_callbacks_.resetStream(Http::StreamResetReason::LocalReset, "");
     return;
   }
 
@@ -1329,7 +1337,9 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
 }
 
 void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
-  tracked_object_stack.add(connection_);
+  if (connection_.has_value()) {
+    tracked_object_stack.add(*connection_);
+  }
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
@@ -1445,10 +1455,6 @@ void ActiveStreamDecoderFilter::requestRouteConfigUpdate(
   parent_.filter_manager_callbacks_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
-absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeConfig() {
-  return parent_.filter_manager_callbacks_.routeConfig();
-}
-
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },
@@ -1558,12 +1564,6 @@ void ActiveStreamEncoderFilter::sendLocalReply(
   parent_.sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-Http1StreamEncoderOptionsOptRef ActiveStreamEncoderFilter::http1StreamEncoderOptions() {
-  // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
-  // we give the filter direct access to the encoder options.
-  return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
-}
-
 void ActiveStreamEncoderFilter::responseDataTooLarge() {
   ENVOY_STREAM_LOG(debug, "response data too large watermark exceeded", parent_);
   if (parent_.state_.encoder_filters_streaming_) {
@@ -1583,7 +1583,10 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
   onEncoderFilterBelowWriteBufferLowWatermark();
 }
 
-void ActiveStreamFilterBase::resetStream() { parent_.filter_manager_callbacks_.resetStream(); }
+void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
+                                         absl::string_view transport_failure_reason) {
+  parent_.filter_manager_callbacks_.resetStream(reset_reason, transport_failure_reason);
+}
 
 uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
 

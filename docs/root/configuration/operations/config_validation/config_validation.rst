@@ -10,7 +10,7 @@ keeps Envoy's internal state correct. If a given config violates a constraint, t
 config is rejected (see :ref:`ACK/NACK and resource type instance version <xds_ack_nack>`).
 
 In addition to the above, Envoy also supports custom config validations where
-verifications can be made, when using `gRPC-based subscriptions <xds_protocol_streaming_grpc_subscriptions>` .
+verifications can be made, when using :ref:`gRPC-based subscriptions <xds_protocol_streaming_grpc_subscriptions>` .
 An example of such a validator is where an Envoy instance is expected to always have a
 minimal number of clusters, then any config update that results with a number of
 clusters which is less than the threshold should be rejected.

@@ -13,8 +13,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
