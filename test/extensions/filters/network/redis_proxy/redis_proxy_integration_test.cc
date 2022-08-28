@@ -1200,5 +1200,57 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
 
+// This test sends a MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, SendMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"multi"}), "+OK\r\n");
+}
+
+// This test sends a nested MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond with an
+// error.
+
+TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test sends an EXEC command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
+}
+
+// This test sends an DISCARD command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
+}
+
+// This test executes an empty transaction. The proxy responds
+// with an empty array.
+
+TEST_P(RedisProxyIntegrationTest, EmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}), "+(empty array)\r\n", redis_client);
+
+  redis_client->close();
+}
+
 } // namespace
 } // namespace Envoy
