@@ -282,6 +282,9 @@ public:
   absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
+  absl::optional<MonotonicTime> downstreamHandshakeComplete() const {
+    return downstream_handshake_complete_;
+  }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
     ASSERT(!last_downstream_rx_byte_received_);
@@ -295,6 +298,10 @@ public:
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeComplete(TimeSource& time_source) {
+    // An existing value can be overwritten, e.g. in resumption case.
+    downstream_handshake_complete_ = time_source.monotonicTime();
+  }
 
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
@@ -304,6 +311,8 @@ private:
   absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
   absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake completed. Set at connection level.
+  absl::optional<MonotonicTime> downstream_handshake_complete_;
 };
 
 // Measure the number of bytes sent and received for a stream.

@@ -1079,9 +1079,11 @@ typed_config:
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
 
   // Change the configured cert validation to defer 1s.
-  auto cert_validator_factory =
+  auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
@@ -1123,6 +1125,8 @@ typed_config:
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
@@ -1143,6 +1147,21 @@ typed_config:
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+}
+
+TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
+  config_helper_.addNetworkFilter(R"EOF(
+      name: envoy.test.test_network_filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
+)EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  test_server_->waitForCounterEq("test_network_filter.on_new_connection", 1);
+  EXPECT_EQ(test_server_->counter("test_network_filter.on_data")->value(), 0);
+  codec_client_->close();
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {

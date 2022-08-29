@@ -75,5 +75,5 @@ The following sandboxes are available:
     wasm-cc
     websocket
     win32_front_proxy
-    zipkin_tracing
+    zipkin
     zstd

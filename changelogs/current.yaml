@@ -78,12 +78,18 @@ new_features:
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: load balancer
+  change: |
+    added a new field to subset load balancer config: :ref:`metadata_fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
@@ -121,5 +127,12 @@ new_features:
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
 
 deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
+    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.
