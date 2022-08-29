@@ -102,6 +102,7 @@ Step 7: Check admin ``kafka_service`` stats
   cluster.kafka_service.membership_total: 1
 
 .. seealso::
+
    :ref:`Envoy Kafka broker filter <config_network_filters_kafka_broker>`
       Learn more about the Kafka broker filter.
 
