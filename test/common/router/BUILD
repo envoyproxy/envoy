@@ -246,8 +246,8 @@ envoy_directory_genrule(
         "$(location //test/common/router:config_impl_test_static)",
     ]),
     tools = [
-        ":corpus_from_config_impl_sh",
         ":config_impl_test_static",
+        ":corpus_from_config_impl_sh",
     ],
 )
 
