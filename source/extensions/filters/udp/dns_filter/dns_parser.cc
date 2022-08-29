@@ -197,10 +197,11 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   if (!(context->header_.flags.qr == 0 && context->header_.answers == 0 &&
         context->header_.authority_rrs == 0)) {
     ENVOY_LOG(debug,
-              "One or more of Answers [{}], Authority [{}] present in the query. "
+              "One or more of Answers [{}], Authority [{}] RRs present in the query. "
               "Inverse query is not supported",
               static_cast<int>(context->header_.answers),
               static_cast<int>(context->header_.authority_rrs));
+    context->counters_.queries_with_ans_or_authority_rrs.inc();
     return false;
   }
 
@@ -234,6 +235,7 @@ bool DnsMessageParser::parseDnsObject(DnsQueryContextPtr& context,
   if (context->header_.additional_rrs) {
     ENVOY_LOG(debug, "Ignoring additional RRs in a query because Envoy does not support. "
                      "This could be an EDNS query.");
+    context->counters_.queries_with_additional_rrs.inc();
   }
 
   return true;
