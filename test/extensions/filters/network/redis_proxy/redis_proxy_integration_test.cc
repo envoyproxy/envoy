@@ -1243,12 +1243,25 @@ TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
 // This test executes an empty transaction. The proxy responds
 // with an empty array.
 
-TEST_P(RedisProxyIntegrationTest, EmptyTransaction) {
+TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
   proxyResponseStep(makeBulkStringArray({"exec"}), "+(empty array)\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test discards an empty transaction. The proxy responds
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
 
   redis_client->close();
 }
