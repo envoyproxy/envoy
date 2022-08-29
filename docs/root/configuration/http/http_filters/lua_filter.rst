@@ -409,7 +409,7 @@ is a table of key/value pairs to send (the value can be a string or table of str
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
 data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
 
-*async* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+*async* is a boolean flag. If async is set to true, Envoy will make the HTTP request and continue,
 regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
