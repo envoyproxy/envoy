@@ -7,7 +7,7 @@
 
 #include "source/common/http/path_utility.h"
 #include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-#include "source/extensions/path/uri_template_lib/proto/uri_template_rewrite_segments.pb.h"
+#include "source/extensions/path/uri_template_lib/proto/rewrite_segments.pb.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -48,20 +48,20 @@ PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr pa
 absl::StatusOr<std::string>
 PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
                                     absl::string_view matched_path) const {
-  absl::StatusOr<std::string> regex_pattern = convertURLPatternSyntaxToRegex(matched_path);
+  absl::StatusOr<std::string> regex_pattern = convertPathPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse url pattern regex");
   }
   std::string regex_pattern_str = *std::move(regex_pattern);
 
-  absl::StatusOr<envoy::extensions::uri_template::UriTemplateRewriteSegments> rewrite_pattern =
+  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite_pattern =
       parseRewritePattern(url_rewrite_pattern_, regex_pattern_str);
 
   if (!rewrite_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse url rewrite pattern");
   }
 
-  const envoy::extensions::uri_template::UriTemplateRewriteSegments& rewrite_pattern_proto =
+  const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern_proto =
       *std::move(rewrite_pattern);
   RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
@@ -77,19 +77,19 @@ PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
   }
 
   std::string new_path;
-  for (const envoy::extensions::uri_template::UriTemplateRewriteSegments::RewriteSegment& segment :
+  for (const envoy::extensions::uri_template::RewriteSegments::RewriteSegment& segment :
        rewrite_pattern_proto.segments()) {
     if (segment.has_literal()) {
       absl::StrAppend(&new_path, segment.literal());
-    } else if (segment.has_var_index()) {
-      if (segment.var_index() < 1 || segment.var_index() >= capture_num) {
+    } else if (segment.has_capture_index()) {
+      if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
-      absl::StrAppend(&new_path, absl::string_view(captures[segment.var_index()].as_string()));
+      absl::StrAppend(&new_path, absl::string_view(captures[segment.capture_index()].as_string()));
     }
   }
 
-  return absl::StatusOr<std::string>{new_path};
+  return {new_path};
 }
 
 } // namespace Rewrite

@@ -20,7 +20,7 @@ public:
                                              v3::PatternTemplateRewriteConfig&>(
             rewrite_config, ProtobufMessage::getStrictValidationVisitor());
 
-    if (!UriTemplate::isValidPathTemplateRewritePattern(path_rewrite_config.path_template_rewrite())
+    if (!UriTemplate::isValidRewritePattern(path_rewrite_config.path_template_rewrite())
              .ok()) {
       return absl::InvalidArgumentError(
           fmt::format("path_rewrite_policy.path_template_rewrite {} is invalid",
