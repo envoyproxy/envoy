@@ -209,9 +209,11 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         const auto& header_name = header_entry.key();
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
-        bool is_pseudo_header = !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
+        bool is_pseudo_header =
+            !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
 
-        ENVOY_LOG_MISC(debug, ">> checking {} (is_pseudo_header:{}, finished_pseudo_headers:{})", string_header_name, is_pseudo_header, finished_pseudo_headers);
+        ENVOY_LOG_MISC(debug, ">> checking {} (is_pseudo_header:{}, finished_pseudo_headers:{})",
+                       string_header_name, is_pseudo_header, finished_pseudo_headers);
 
         if (string_header_name.empty()) {
           // reject empty header names
@@ -269,28 +271,30 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // Step 2: Verify each response header
   std::string reject_details;
   bool finished_pseudo_headers = false;
-  header_map.iterate([this, &reject_details, &finished_pseudo_headers](const ::Envoy::Http::HeaderEntry& header_entry)
-                         -> ::Envoy::Http::HeaderMap::Iterate {
-    const auto& header_name = header_entry.key();
-    const auto& header_value = header_entry.value();
-    const auto& string_header_name = header_name.getStringView();
-    bool is_pseudo_header = !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
+  header_map.iterate(
+      [this, &reject_details, &finished_pseudo_headers](
+          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
+        const auto& header_name = header_entry.key();
+        const auto& header_value = header_entry.value();
+        const auto& string_header_name = header_name.getStringView();
+        bool is_pseudo_header =
+            !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
 
-    if (string_header_name.empty()) {
-      reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-    } else if (is_pseudo_header && finished_pseudo_headers) {
-      reject_details = Http2ResponseCodeDetail::get().InvalidPseudoHeaderOrder;
-    } else {
-      finished_pseudo_headers = !is_pseudo_header;
-      auto entry_result = validateResponseHeaderEntry(header_name, header_value);
-      if (!entry_result) {
-        reject_details = static_cast<std::string>(entry_result.details());
-      }
-    }
+        if (string_header_name.empty()) {
+          reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
+        } else if (is_pseudo_header && finished_pseudo_headers) {
+          reject_details = Http2ResponseCodeDetail::get().InvalidPseudoHeaderOrder;
+        } else {
+          finished_pseudo_headers = !is_pseudo_header;
+          auto entry_result = validateResponseHeaderEntry(header_name, header_value);
+          if (!entry_result) {
+            reject_details = static_cast<std::string>(entry_result.details());
+          }
+        }
 
-    return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
-                                  : ::Envoy::Http::HeaderMap::Iterate::Break;
-  });
+        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
+      });
 
   return reject_details.empty()
              ? ResponseHeaderMapValidationResult::success()
