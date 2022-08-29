@@ -21,6 +21,7 @@ using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValid
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
   const std::string ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
+  const std::string InvalidPseudoHeaderOrder = "uhv.http2.invalid_pseudo_header_order";
 };
 
 using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
@@ -200,22 +201,41 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
   std::string reject_details;
+  bool finished_pseudo_headers = false;
 
   header_map.iterate(
-      [this, &reject_details, &allowed_headers](
+      [this, &reject_details, &allowed_headers, &finished_pseudo_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
         const auto& header_name = header_entry.key();
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
+        bool is_pseudo_header = !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
+
+        ENVOY_LOG_MISC(debug, ">> checking {} (is_pseudo_header:{}, finished_pseudo_headers:{})", string_header_name, is_pseudo_header, finished_pseudo_headers);
 
         if (string_header_name.empty()) {
           // reject empty header names
           reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-        } else if (string_header_name.at(0) == ':' &&
-                   !allowed_headers.contains(string_header_name)) {
-          // This is an unrecognized pseudo header, reject the request
+        } else if (is_pseudo_header && !allowed_headers.contains(string_header_name)) {
+          // Reject unrecognized or unallowed pseudo header name, from RFC 9113,
+          // https://www.rfc-editor.org/rfc/rfc9113#section-8.3:
+          //
+          // Pseudo-header fields are only valid in the context in which they are defined.
+          // Pseudo-header fields defined for requests MUST NOT appear in responses; pseudo-header
+          // fields defined for responses MUST NOT appear in requests. Pseudo-header fields MUST
+          // NOT appear in a trailer section. Endpoints MUST treat a request or response that
+          // contains undefined or invalid pseudo-header fields as malformed (Section 8.1.1).
           reject_details = UhvResponseCodeDetail::get().InvalidPseudoHeader;
+        } else if (is_pseudo_header && finished_pseudo_headers) {
+          // Pseudo headers must appear first. From RFC 9113,
+          // https://www.rfc-editor.org/rfc/rfc9113#section-8.3:
+          //
+          // All pseudo-header fields MUST appear in a field block before all regular field lines.
+          // Any request or response that contains a pseudo-header field that appears in a field
+          // block after a regular field line MUST be treated as malformed (Section 8.1.1).
+          reject_details = Http2ResponseCodeDetail::get().InvalidPseudoHeaderOrder;
         } else {
+          finished_pseudo_headers |= !is_pseudo_header;
           auto entry_result = validateRequestHeaderEntry(header_name, header_value);
           if (!entry_result) {
             reject_details = static_cast<std::string>(entry_result.details());
@@ -248,15 +268,20 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
   // Step 2: Verify each response header
   std::string reject_details;
-  header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
+  bool finished_pseudo_headers = false;
+  header_map.iterate([this, &reject_details, &finished_pseudo_headers](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const auto& header_name = header_entry.key();
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
+    bool is_pseudo_header = !string_header_name.empty() ? string_header_name.at(0) == ':' : false;
 
     if (string_header_name.empty()) {
       reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
+    } else if (is_pseudo_header && finished_pseudo_headers) {
+      reject_details = Http2ResponseCodeDetail::get().InvalidPseudoHeaderOrder;
     } else {
+      finished_pseudo_headers = !is_pseudo_header;
       auto entry_result = validateResponseHeaderEntry(header_name, header_value);
       if (!entry_result) {
         reject_details = static_cast<std::string>(entry_result.details());
