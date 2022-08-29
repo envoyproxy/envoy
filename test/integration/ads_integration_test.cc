@@ -1,4 +1,3 @@
-#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -56,6 +55,9 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
+// Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
+// an xDS server without removing the resources not included in the DiscoveryResponse from the xDS
+// server.
 TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
   initialize();
   registerTestServerPorts({});
@@ -77,7 +79,7 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
       eds_type_url, {cla_0, cla_1}, {cla_0, cla_1}, {}, "1");
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
   // Send an update for one of the ClusterLoadAssignments only.
   cla_0.mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_load_balancing_weight()->set_value(
@@ -87,7 +89,8 @@ TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
 
   // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
   // delete the other. We use cluster membership health as a proxy for this.
-  test_server_->waitForCounterEq("cluster_manager.cluster_updated", 1);
+  test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
+  test_server_->waitForCounterEq("cluster.cluster_1.update_success", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
 }

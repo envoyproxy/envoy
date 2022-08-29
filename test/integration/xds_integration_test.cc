@@ -957,6 +957,8 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, XdsSotwMultipleAuthoritiesTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// Verifies that if two different xDS servers send resources of the same name and same type, Envoy
+// still treats them as two separate resources.
 TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthorities) {
   const std::string cert_name{CLIENT_CERT_NAME};
 
