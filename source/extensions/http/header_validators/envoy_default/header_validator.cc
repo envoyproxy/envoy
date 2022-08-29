@@ -136,7 +136,7 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
   // (inclusive). This is based on RFC 9110, although the Envoy implementation is more permissive
   // and allows status codes larger than 599,
   // https://www.rfc-editor.org/rfc/rfc9110.html#section-15:
-  // 
+  //
   // The status code of a response is a three-digit integer code that describes the result of the
   // request and the semantics of the response, including whether the request was successful and
   // what content is enclosed (if any). All valid status codes are within the range of 100 to 599,
@@ -257,6 +257,12 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   // uri-host   = IP-literal / IPv4address / reg-name
   const auto& value_string_view = value.getStringView();
 
+  // Check if the host/:authority contains the deprecated userinfo component. This is based on RFC
+  // 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-4.2.4:
+  //
+  // Before making use of an "http" or "https" URI reference received from an untrusted source, a
+  // recipient SHOULD parse for userinfo and treat its presence as an error; it is likely being
+  // used to obscure the authority for the sake of phishing attacks.
   auto user_info_delimiter = value_string_view.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header

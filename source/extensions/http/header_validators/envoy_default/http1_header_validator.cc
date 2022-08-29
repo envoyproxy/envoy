@@ -95,6 +95,9 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   } else if (key_string_view == "content-length") {
     // Validate the Content-Length header
     return validateContentLengthHeader(value);
+  } else if (key_string_view == "transfer-encoding") {
+    // Validate the Transfer-Encoding header
+    return validateTransferEncodingHeader(value);
   } else if (key_string_view.at(0) != ':') {
     // Validate the generic header name.
     auto name_result = validateGenericHeaderName(key);
@@ -232,7 +235,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     // obtains the host and port from the target URI's authority component, except that it sends
     // the scheme's default port if the target URI elides the port. For example, a CONNECT request
     // to "http://www.example.com" looks like the following:
-    // 
+    //
     //    CONNECT www.example.com:80 HTTP/1.1
     //    Host: www.example.com
     //
@@ -294,11 +297,22 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   //
   // status-line = HTTP-version SP status-code SP [ reason-phrase ] CRLF
   // status-code = 3DIGIT
-  if (header_map.getStatusValue().empty()) {
+  const auto status = header_map.getStatusValue();
+  if (status.empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
-  // Step 2: Verify each response header
+  // Step 2: Validate Transfer-Encoding
+  const auto transfer_encoding = header_map.getTransferEncodingValue();
+  if (!transfer_encoding.empty() && (status[0] == '1' || status == "204")) {
+    // From RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1:
+    //
+    // A server MUST NOT send a Transfer-Encoding header field in any response with a status code
+    // of 1xx (Informational) or 204 (No Content).
+    return {RejectAction::Reject, Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
+  }
+
+  // Step 3: Verify each response header
   std::string reject_details;
   header_map.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
@@ -334,14 +348,16 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   //
   // This method validates that the transfer encoding syntax is correct but does not validate the
   // actual context of the header.
-  bool is_valid = true;
   const auto encoding = value.getStringView();
-  for (auto iter = encoding.begin(); iter != encoding.end() && is_valid; ++iter) {
-    is_valid &= testChar(kTransferEncodingHeaderCharTable, *iter);
-  }
+  bool is_valid = true;
+  for (absl::string_view header_value : StringUtil::splitToken(encoding, ",", true)) {
+    for (auto iter = header_value.begin(); iter != header_value.end() && is_valid; ++iter) {
+      is_valid &= testChar(kTransferEncodingHeaderCharTable, *iter);
+    }
 
-  if (!is_valid) {
-    return {RejectAction::Reject, Http1ResponseCodeDetail::get().InvalidTransferEncoding};
+    if (!is_valid) {
+      return {RejectAction::Reject, Http1ResponseCodeDetail::get().InvalidTransferEncoding};
+    }
   }
 
   return HeaderEntryValidationResult::success();

@@ -417,7 +417,8 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapInvalidGeneric) {
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapValid) {
-  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-foo", "bar"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
   auto uhv = createH1(empty_config);
 
   EXPECT_TRUE(uhv->validateResponseHeaderMap(headers).ok());
@@ -453,6 +454,33 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingStatus100) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "100"},
+                                                   {"transfer-encoding", "chunked"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
+                             "uhv.http1.transfer_encoding_not_allowed");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingStatus204) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "204"},
+                                                   {"transfer-encoding", "chunked"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
+                             "uhv.http1.transfer_encoding_not_allowed");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncodingChars) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                                   {"transfer-encoding", "{chunked}"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
+                             "uhv.http1.invalid_transfer_encoding");
 }
 
 } // namespace
