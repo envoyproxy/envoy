@@ -579,6 +579,10 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {

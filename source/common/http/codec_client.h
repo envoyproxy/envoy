@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -231,6 +232,8 @@ private:
         break;
       case Protocol::Http2:
       case Protocol::Http3:
+        wait_encode_complete_ =
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_response_half_close");
         break;
       }
     }
