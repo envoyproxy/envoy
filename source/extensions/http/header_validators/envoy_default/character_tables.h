@@ -15,7 +15,7 @@ constexpr bool testChar(const uint32_t table[8], char c) {
 
 //
 // Header name character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
 //
 // SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
@@ -25,7 +25,6 @@ constexpr bool testChar(const uint32_t table[8], char c) {
 // tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
-//                ; any VCHAR, except delimiters
 // SPELLCHECKER(on)
 //
 constexpr uint32_t kGenericHeaderNameCharTable[] = {
@@ -46,12 +45,13 @@ constexpr uint32_t kGenericHeaderNameCharTable[] = {
 
 //
 // Header value character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
 //
 // SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
-// field-value    = *( field-content / obs-fold )
-// field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
+// field-value    = *field-content
+// field-content  = field-vchar
+//                  [ 1*( SP / HTAB / field-vchar ) field-vchar ]
 // field-vchar    = VCHAR / obs-text
 // obs-text       = %x80-FF
 //
@@ -77,13 +77,13 @@ constexpr uint32_t kGenericHeaderValueCharTable[] = {
 
 //
 // :method header character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1
+// From RFC 9110: https://www.rfc-editor.org/rfc/rfc9110.html#section-9.1
 //
 // SPELLCHECKER(off)
 // method = token
-// token = 1*tchar
-// tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
-//       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+// token  = 1*tchar
+// tchar  = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
+//        /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
 //
 constexpr uint32_t kMethodHeaderCharTable[] = {
@@ -189,19 +189,11 @@ constexpr uint32_t kUnreservedCharTable[] = {
 
 //
 // Transfer-Encoding HTTP/1.1 header character table.
-// From RFC 7230: https://www.rfc-editor.org/rfc/rfc7230#section-4
+// From RFC 9110: https://www.rfc-editor.org/rfc/rfc9110.html#section-10.1.4
 //
 // SPELLCHECKER(off)
-// Transfer-Encoding   = *( "," OWS ) transfer-coding *( OWS "," [ OWS
-//                       transfer-coding ] )
-//
-// transfer-coding     = "chunked" ; Section 4.1
-//                     / "compress" ; Section 4.2.1
-//                     / "deflate" ; Section 4.2.2
-//                     / "gzip" ; Section 4.2.3
-//                     / transfer-extension
-//
-// transfer-extension  = token *( OWS ";" OWS transfer-parameter )
+// Transfer-Encoding   = #transfer-coding
+// transfer-coding     = token *( OWS ";" OWS transfer-parameter )
 // transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
 // SPELLCHECKER(on)
 //

@@ -32,8 +32,8 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  * several RFCS:
  *
  * RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
- * RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
- * RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
+ * RFC 9110 <https://www.rfc-editor.org/rfc/rfc9110.html> HTTP Semantics
+ * RFC 9112 <https://www.rfc-editor.org/rfc/rfc9112.html> HTTP/1.1
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
@@ -115,8 +115,8 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
-  // :method and :path headers based on RFC 7230
-  // https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1:
+  // :method and :path headers based on RFC 9112
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-3:
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
   if (path.empty()) {
@@ -128,7 +128,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   // HTTP/1.1 also requires the Host header,
-  // https://datatracker.ietf.org/doc/html/rfc7230#section-5.4:
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2:
   //
   // A client MUST send a Host header field in all HTTP/1.1 request messages.
   // ...
@@ -142,7 +142,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   // Verify that the path and Host/:authority header matches based on the method.
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.4:
+  // From RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.2:
   //
   // When a proxy receives a request with an absolute-form of request-target, the
   // proxy MUST ignore the received Host header field (if any) and instead replace
@@ -161,7 +161,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   auto path_is_absolute = path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
-  // 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.3.4:
+  // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
   //
   // The asterisk-form of request-target is only used for a server-wide OPTIONS
   // request
@@ -173,7 +173,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 
   // Step 2: Validate Transfer-Encoding and Content-Length headers.
   // HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
-  // https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-6.2:
   //
   // A sender MUST NOT send a Content-Length header field in any message that
   // contains a Transfer-Encoding header field.
@@ -183,15 +183,13 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // a Content-Length set. In this exception case, we remove the Content-Length
   // header.
   if (header_map.TransferEncoding()) {
-    // CONNECT methods must not contain a Transfer-Encoding, per RFC 7231,
-    // https://tools.ietf.org/html/rfc7231#section-4.3.6:
+    // CONNECT methods must not contain any content so reject the request if Transfer-Encoding or
+    // Content-Length is provided, per RFC 9110,
+    // https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.6:
     //
-    // A payload within a CONNECT request message has no defined semantics; sending
-    // a payload body on a CONNECT request might cause some existing
-    // implementations to reject the request.
-    bool is_chunked = absl::EqualsIgnoreCase(header_map.getTransferEncodingValue(),
-                                             header_values_.TransferEncodingValues.Chunked);
-    if (!is_chunked || is_connect_method) {
+    // A CONNECT request message does not have content. The interpretation of data sent after the
+    // header section of the CONNECT request message is specific to the version of HTTP in use.
+    if (is_connect_method) {
       return {RejectOrRedirectAction::Reject,
               Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
     }
@@ -199,6 +197,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     if (header_map.ContentLength()) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
+        // TODO(meilya) - is this correct? we allow any transfer-encoding
         return {RejectOrRedirectAction::Reject,
                 Http1ResponseCodeDetail::get().ChunkedContentLength};
       } else {
@@ -220,17 +219,27 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // Step 3: Normalize and validate :path header
   if (is_connect_method) {
     // The :path must be authority-form for CONNECT method requests. From RFC
-    // 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-5.3.3:
+    // 9112: https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.3:
     //
-    // The authority-form of request-target is only used for CONNECT
-    // requests (Section 4.3.6 of [RFC7231]).
+    // The "authority-form" of request-target is only used for CONNECT requests (Section 9.3.6 of
+    // [HTTP]). It consists of only the uri-host and port number of the tunnel destination,
+    // separated by a colon (":").
     //
-    //    authority-form = authority
+    //    authority-form = uri-host ":" port
     //
-    // When making a CONNECT request to establish a tunnel through one or
-    // more proxies, a client MUST send only the target URI's authority
-    // component (excluding any userinfo and its "@" delimiter) as the
-    // request-target.
+    // When making a CONNECT request to establish a tunnel through one or more proxies, a client
+    // MUST send only the host and port of the tunnel destination as the request-target. The client
+    // obtains the host and port from the target URI's authority component, except that it sends
+    // the scheme's default port if the target URI elides the port. For example, a CONNECT request
+    // to "http://www.example.com" looks like the following:
+    // 
+    //    CONNECT www.example.com:80 HTTP/1.1
+    //    Host: www.example.com
+    //
+    // TODO(meilya): implement RFC guidance
+    // https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.6:
+    //   A server MUST reject a CONNECT request that targets an empty or invalid port number,
+    //   typically by responding with a 400 (Bad Request) status code
     auto host_result = validateHostHeader(header_map.Path()->value());
     if (!host_result) {
       return {RejectOrRedirectAction::Reject, host_result.details()};
@@ -280,10 +289,11 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   // Step 1: verify that required pseudo headers are present
   //
-  // For HTTP/1.1 responses, RFC 7230 states that only the :status
-  // header is required: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.2
+  // For HTTP/1.1 responses, RFC 9112 states that only the :status
+  // header is required, https://www.rfc-editor.org/rfc/rfc9112.html#section-4:
   //
-  // status-line = HTTP-version SP status-code SP reason-phrase CRLF
+  // status-line = HTTP-version SP status-code SP [ reason-phrase ] CRLF
+  // status-code = 3DIGIT
   if (header_map.getStatusValue().empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -317,10 +327,13 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) {
   // HTTP/1.1 states that requests with an unrecognized transfer encoding should
-  // be rejected, from RFC 7230, https://tools.ietf.org/html/rfc7230#section-3.3.1:
+  // be rejected, from RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1:
   //
-  // A server that receives a request message with a transfer coding it does not
-  // understand SHOULD respond with 501 (Not Implemented).
+  // A server that receives a request message with a transfer coding it does not understand SHOULD
+  // respond with 501 (Not Implemented).
+  //
+  // This method validates that the transfer encoding syntax is correct but does not validate the
+  // actual context of the header.
   bool is_valid = true;
   const auto encoding = value.getStringView();
   for (auto iter = encoding.begin(); iter != encoding.end() && is_valid; ++iter) {

@@ -132,19 +132,24 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateStatusHeader(const HeaderString& value) {
-  // This is based on RFC 7231, https://datatracker.ietf.org/doc/html/rfc7231#section-6,
-  // describing the list of response status codes and the list of registered response status codes,
-  // https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml.
+  // Validate that the response :status header is a valid whole number between 100 and 999
+  // (inclusive). This is based on RFC 9110, although the Envoy implementation is more permissive
+  // and allows status codes larger than 599,
+  // https://www.rfc-editor.org/rfc/rfc9110.html#section-15:
+  // 
+  // The status code of a response is a three-digit integer code that describes the result of the
+  // request and the semantics of the response, including whether the request was successful and
+  // what content is enclosed (if any). All valid status codes are within the range of 100 to 599,
+  // inclusive.
 
   static uint32_t kMinimumResponseStatusCode = 100;
   static uint32_t kMaximumResponseStatusCode = 999;
   const auto& value_string_view = value.getStringView();
-  auto buffer_end = value_string_view.data() + value_string_view.size();
 
   // Convert the status to an integer.
   std::uint32_t status_value{};
   auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), status_value);
-  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+  if (result.ec == std::errc::invalid_argument || result.ptr != value_string_view.end()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
 
@@ -160,7 +165,7 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
   //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
   //
   // header-field   = field-name ":" OWS field-value OWS
   // field-name     = token
@@ -198,11 +203,12 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   // Verify that the header value is valid.
   //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
   //
   // header-field   = field-name ":" OWS field-value OWS
-  // field-value    = *( field-content / obs-fold )
-  // field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
+  // field-value    = *field-content
+  // field-content  = field-vchar
+  //                  [ 1*( SP / HTAB / field-vchar ) field-vchar ]
   // field-vchar    = VCHAR / obs-text
   // obs-text       = %x80-FF
   //
@@ -224,7 +230,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6:
   //
   // Content-Length = 1*DIGIT
   const auto& value_string_view = value.getStringView();
@@ -233,11 +239,9 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
-  auto buffer_end = value_string_view.data() + value_string_view.size();
-
   std::uint64_t int_value{};
   auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), int_value);
-  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+  if (result.ec == std::errc::invalid_argument || result.ptr != value_string_view.end()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
@@ -246,7 +250,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateHostHeader(const HeaderString& value) {
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.4,
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-7.2,
   // and RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2:
   //
   // Host       = uri-host [ ":" port ]
@@ -272,17 +276,10 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     // Validate the port is an integer and a valid port number (uint16_t)
     auto port_string_view = value_string_view.substr(port_delimiter + 1);
 
-    // auto port_string_view_size = port_string_view.size();
-    // if (port_string_view_size == 0 || port_string_view_size > 5) {
-    //   return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
-    // }
-
-    auto buffer_end = port_string_view.data() + port_string_view.size();
-
     std::uint16_t port_integer_value{};
     auto result =
         std::from_chars(port_string_view.begin(), port_string_view.end(), port_integer_value);
-    if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+    if (result.ec == std::errc::invalid_argument || result.ptr != port_string_view.end()) {
       return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
 

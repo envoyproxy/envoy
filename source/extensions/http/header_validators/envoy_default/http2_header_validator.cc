@@ -30,9 +30,9 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  * several RFCS:
  *
  * RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
- * RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
- * RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
- * RFC 7540 <https://datatracker.ietf.org/doc/html/rfc7540> HTTP/2
+ * RFC 9110 <https://www.rfc-editor.org/rfc/rfc9110.html> HTTP Semantics
+ * RFC 9112 <https://www.rfc-editor.org/rfc/rfc9112.html> HTTP/1.1
+ * RFC 9113 <https://www.rfc-editor.org/rfc/rfc9113.html> HTTP/2
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
@@ -135,24 +135,24 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
-    // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+    // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
-    // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme",
-    // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
-    // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
+    // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme", and
+    // ":path" pseudo-header fields, unless they are CONNECT requests (Section 8.5). An HTTP
+    // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
     auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
                                 : UhvResponseCodeDetail::get().InvalidScheme;
     return {RejectOrRedirectAction::Reject, details};
   } else if (is_connect_method) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
-    // provided. This is based on RFC 7540,
-    // https://datatracker.ietf.org/doc/html/rfc7540#section-8.3:
+    // provided. This is based on RFC 9113,
+    // https://www.rfc-editor.org/rfc/rfc9113#section-8.5:
     //
-    //  * The ":method" pseudo-header field is set to "CONNECT".
+    //  * The ":method" pseudo-header field is set to CONNECT.
     //  * The ":scheme" and ":path" pseudo-header fields MUST be omitted.
-    //  * The ":authority" pseudo-header field contains the host and port to connect to
-    //    (equivalent to the authority-form of the request-target of CONNECT requests (see
-    //    [RFC7230], Section 5.3)).
+    //  * The ":authority" pseudo-header field contains the host and port to connect to (equivalent
+    //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
+    //    [HTTP/1.1]).
     absl::string_view details;
     if (!path.empty()) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
@@ -169,14 +169,17 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   // Step 2: Validate and normalize the :path pseudo header
   if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
-    // The :path must be in absolute-form or for an OPTIONS request in asterisk-form. This is based
-    // on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+    // The :path must be in absolute-form or, for an OPTIONS request, in asterisk-form. This is
+    // based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
-    // [The :path] pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or
-    // "https" URIs that do not contain a path component MUST include a value of '/'. The
-    // exception to this rule is an OPTIONS request for an "http" or "https" URI that does not
-    // include a path component; these MUST include a ":path" pseudo-header field with a value
-    // of '*'.
+    // This pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or "https"
+    // URIs that do not contain a path component MUST include a value of '/'. The exceptions to
+    // this rule are:
+    //
+    // * an OPTIONS request for an "http" or "https" URI that does not include a path component;
+    //   these MUST include a ":path" pseudo-header field with a value of '*' (see Section 7.1 of
+    //   [HTTP]).
+    // * CONNECT requests (Section 8.5), where the ":path" pseudo-header field is omitted.
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
@@ -233,12 +236,12 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
   // Step 1: verify that required pseudo headers are present
   //
-  // For HTTP/2 responses, RFC 7540 states that only the :status
-  // header is required: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.4:
+  // For HTTP/2 responses, RFC 9113 states that only the :status
+  // header is required: https://www.rfc-editor.org/rfc/rfc9113#section-8.3.2:
   //
   // For HTTP/2 responses, a single ":status" pseudo-header field is defined that carries the HTTP
-  // status code field (see [RFC7231], Section 6). This pseudo-header field MUST be included in
-  // all responses; otherwise, the response is malformed.
+  // status code field (see Section 15 of [HTTP]). This pseudo-header field MUST be included in all
+  // responses, including interim responses; otherwise, the response is malformed (Section 8.1.1).
   if (header_map.getStatusValue().empty()) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -272,11 +275,10 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value) {
   // Only allow a TE value of "trailers" for HTTP/2, based on
-  // RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
+  // RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.2.2:
   //
-  // The only exception to this is the TE header field, which MAY be present
-  // in an HTTP/2 request; when it is, it MUST NOT contain any value other
-  // than "trailers".
+  // The only exception to this is the TE header field, which MAY be present in an HTTP/2 request;
+  // when it is, it MUST NOT contain any value other than "trailers".
   if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
     return {RejectAction::Reject, Http2ResponseCodeDetail::get().InvalidTE};
   }
@@ -292,7 +294,10 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   //
   // HTTP/2 deprecates the userinfo portion of the :authority header. Validate
   // the :authority header and reject the value if the userinfo is present. This
-  // is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3
+  // is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
+  //
+  // ":authority" MUST NOT include the deprecated userinfo subcomponent for "http" or "https"
+  // schemed URIs.
   //
   // The host portion can be any valid URI host, which this function does not
   // validate. The port, if present, is validated as a valid uint16_t port.
@@ -304,7 +309,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
   //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
   //
   // header-field   = field-name ":" OWS field-value OWS
   // field-name     = token
@@ -315,11 +320,11 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   //
-  // For HTTP/2, connection-specific headers must be treated as malformed. From RFC 7540,
-  // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
+  // For HTTP/2, connection-specific headers must be treated as malformed. From RFC 9113,
+  // https://www.rfc-editor.org/rfc/rfc9113#section-8.2.2:
   //
-  // any message containing connection-specific header fields MUST be treated
-  // as malformed (Section 8.1.2.6).
+  // Any message containing connection-specific header fields MUST be treated as malformed (Section
+  // 8.1.1).
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
   const auto& key_string_view = name.getStringView();
@@ -338,13 +343,12 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool is_valid = true;
   char c = '\0';
 
-  // Verify that the header name is all lowercase. From RFC 7540,
-  // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2:
+  // Verify that the header name is all lowercase. From RFC 9113,
+  // https://www.rfc-editor.org/rfc/rfc9113#section-8.2.1:
   //
-  // Just as in HTTP/1.x, header field names are strings of ASCII characters that are compared in
-  // a case-insensitive fashion. However, header field names MUST be converted to lowercase prior
-  // to their encoding in HTTP/2. A request or response containing uppercase header field names
-  // MUST be treated as malformed (Section 8.1.2.6).
+  // A field name MUST NOT contain characters in the ranges 0x00-0x20, 0x41-0x5a, or 0x7f-0xff (all
+  // ranges inclusive). This specifically excludes all non-visible ASCII characters, ASCII SP
+  // (0x20), and uppercase characters ('A' to 'Z', ASCII 0x41 to 0x5a).
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
     is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&

@@ -295,18 +295,6 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingValid) 
   EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingInvalid) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "GET"},
-                                                  {":path", "/"},
-                                                  {":authority", "envoy.com"},
-                                                  {"transfer-encoding", "deflate"}};
-  auto uhv = createH1(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             "uhv.http1.transfer_encoding_not_allowed");
-}
-
 TEST_F(Http1HeaderValidatorTest, ValidateConnectPathIsAuthorityForm) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
