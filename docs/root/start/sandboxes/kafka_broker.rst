@@ -1,6 +1,6 @@
 .. _install_sandboxes_kafka:
 
-Kafka Broker
+Kafka broker
 ============
 
 .. sidebar:: Requirements
@@ -25,8 +25,28 @@ Change to the ``examples/kafka-broker`` directory.
     $ docker-compose ps
 
 
-Step 2: Test Envoy's Kafka Broker
-*********************************
+Step 2: Create a Kafka topic
+****************************
+
+
+Step 3: Check the Kafka topic
+*****************************
+
+
+Step 4: Send a message using the Kafka producer
+***********************************************
+
+
+Step 5: Receive a message using the Kafka consumer
+**************************************************
+
+
+Step 6: Check admin kafka_broker stats
+**************************************
+
+
+Step 7: Check admin kafka_service stats
+***************************************
 
 
 .. seealso::
