@@ -16,7 +16,8 @@ behavior_changes:
   change: |
     For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
     stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
-    streaming calls.
+    streaming calls. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
