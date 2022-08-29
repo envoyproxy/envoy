@@ -196,6 +196,7 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString alice{"alice"};
 
   // Check allowed request headers.
+  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
   EXPECT_TRUE(
@@ -225,8 +226,8 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_EQ(config_->timeout(), std::chrono::milliseconds{250});
 }
 
-// Test default allowed headers in the HTTP client.
-TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
+// Test default allowed client and upstream headers in the HTTP client.
+TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedClientAndUpstreamHeaders) {
   const std::string yaml = R"EOF(
   http_service:
     server_uri:
@@ -238,13 +239,6 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
 
   initialize(yaml);
 
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-
   // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
@@ -252,6 +246,61 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   // Check allowed upstream headers.
   EXPECT_FALSE(
       config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+}
+
+TEST_F(ExtAuthzHttpClientTest, NoRequestHeaderMatchersByDefault) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  failure_mode_allow: true
+  )EOF";
+
+  initialize(yaml);
+  EXPECT_TRUE(config_->requestHeaderMatchers() == nullptr);
+}
+
+TEST_F(ExtAuthzHttpClientTest, NoRequestHeaderMatchersForNewAllowedHeadersConfig) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  allowed_headers:
+    patterns:
+    - exact: Foo
+      ignore_case: true
+  failure_mode_allow: true
+  )EOF";
+
+  initialize(yaml);
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() == nullptr);
+}
+
+TEST_F(ExtAuthzHttpClientTest, DuplicateAllowedHeadersConfigIsInvalid) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+    authorization_request:
+      allowed_headers:
+        patterns:
+        - exact: Foo
+          ignore_case: true
+  allowed_headers:
+    patterns:
+    - exact: Bar
+      ignore_case: true
+  failure_mode_allow: true
+  )EOF";
+
+  EXPECT_THROW(initialize(yaml), EnvoyException);
 }
 
 // Verify client response when the authorization server returns a 200 OK and path_prefix is

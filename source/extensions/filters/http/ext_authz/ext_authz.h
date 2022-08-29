@@ -19,6 +19,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
@@ -94,6 +95,13 @@ public:
         destination_labels_[labels_it.first] = labels_it.second.string_value();
       }
     }
+
+    if (config.has_grpc_service() ||
+        (config.has_http_service() &&
+         !config.http_service().authorization_request().has_allowed_headers())) {
+      request_header_matchers_ =
+          Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(config.allowed_headers());
+    }
   }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -141,6 +149,10 @@ public:
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
+    return request_header_matchers_;
+  }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -192,6 +204,8 @@ private:
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+
+  Filters::Common::ExtAuthz::MatcherSharedPtr request_header_matchers_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

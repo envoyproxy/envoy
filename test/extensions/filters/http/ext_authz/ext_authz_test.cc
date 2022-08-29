@@ -34,6 +34,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using Envoy::Http::LowerCaseString;
 using testing::_;
 using testing::InSequence;
 using testing::Invoke;
@@ -1757,6 +1758,104 @@ TEST_P(HttpFilterTestParam, OkResponse) {
   // decodeData() and decodeTrailers() are called after continueDecoding().
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+}
+
+TEST_F(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithDefaultAllowedHeaders) {
+  initialize(R"EOF(
+    transport_api_version: V3
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    )EOF");
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+}
+
+TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithDefaultAllowedHeaders) {
+  initialize(R"EOF(
+    transport_api_version: V3
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    )EOF");
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+}
+
+TEST_F(HttpFilterTestParam, RequestHeaderMatchersForGrpcServiceWithAllowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    transport_api_version: V3
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_server"
+    allowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+}
+
+TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeaders) {
+  const Http::LowerCaseString foo{"foo"};
+  initialize(R"EOF(
+    transport_api_version: V3
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+    allowed_headers:
+      patterns:
+      - exact: Foo
+        ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() != nullptr);
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(
+      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
+}
+
+TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithLegacyAllowedHeaders) {
+  initialize(R"EOF(
+    transport_api_version: V3
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_request:
+        allowed_headers:
+          patterns:
+          - exact: Foo
+            ignore_case: true
+    )EOF");
+
+  EXPECT_TRUE(config_->requestHeaderMatchers() == nullptr);
 }
 
 // Test that an synchronous OK response from the authorization service, on the call stack, results

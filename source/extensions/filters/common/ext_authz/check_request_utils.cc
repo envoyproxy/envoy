@@ -105,7 +105,8 @@ void CheckRequestUtils::setRequestTime(envoy::service::auth::v3::AttributeContex
 void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
-    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes) {
+    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
+    const MatcherSharedPtr& request_header_matchers) {
   httpreq.set_id(std::to_string(stream_id));
   httpreq.set_method(getHeaderStr(headers.Method()));
   httpreq.set_path(getHeaderStr(headers.Path()));
@@ -119,15 +120,31 @@ void CheckRequestUtils::setHttpRequest(
 
   // Fill in the headers.
   auto* mutable_headers = httpreq.mutable_headers();
-  headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
+
+  headers.iterate([request_header_matchers, mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
       const std::string key(e.key().getStringView());
-      if (mutable_headers->find(key) == mutable_headers->end()) {
-        (*mutable_headers)[key] = std::string(e.value().getStringView());
+
+      if (request_header_matchers != nullptr) {
+
+        ENVOY_LOG_MISC(trace, "request header matchers are set");
+        if (request_header_matchers->matches(key)) {
+          ENVOY_LOG_MISC(trace, "found a match for key {}", key);
+          if (mutable_headers->find(key) == mutable_headers->end()) {
+            (*mutable_headers)[key] = std::string(e.value().getStringView());
+          } else {
+            // Merge duplicate headers.
+            (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+          }
+        }
       } else {
-        // Merge duplicate headers.
-        (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+        if (mutable_headers->find(key) == mutable_headers->end()) {
+          (*mutable_headers)[key] = std::string(e.value().getStringView());
+        } else {
+          // Merge duplicate headers.
+          (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+        }
       }
     }
     return Envoy::Http::HeaderMap::Iterate::Continue;
@@ -157,10 +174,11 @@ void CheckRequestUtils::setHttpRequest(
 void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3::AttributeContext::Request& req, const uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
-    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes) {
+    const Envoy::Http::RequestHeaderMap& headers, uint64_t max_request_bytes, bool pack_as_bytes,
+    const MatcherSharedPtr& request_header_matchers) {
   setRequestTime(req, stream_info);
   setHttpRequest(*req.mutable_http(), stream_id, stream_info, decoding_buffer, headers,
-                 max_request_bytes, pack_as_bytes);
+                 max_request_bytes, pack_as_bytes, request_header_matchers);
 }
 
 void CheckRequestUtils::createHttpCheck(
@@ -170,7 +188,8 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
     bool include_peer_certificate,
-    const Protobuf::Map<std::string, std::string>& destination_labels) {
+    const Protobuf::Map<std::string, std::string>& destination_labels,
+    const MatcherSharedPtr& request_header_matchers) {
 
   auto attrs = request.mutable_attributes();
   const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
@@ -183,7 +202,8 @@ void CheckRequestUtils::createHttpCheck(
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
                      include_peer_certificate);
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
-                        cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes);
+                        cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
+                        request_header_matchers);
 
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.
@@ -206,6 +226,35 @@ void CheckRequestUtils::createTcpCheck(
   setAttrContextPeer(*attrs->mutable_destination(), cb->connection(), server_name, true,
                      include_peer_certificate);
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
+}
+
+MatcherSharedPtr
+CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  const std::vector<Http::LowerCaseString> keys{
+      {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
+       Http::Headers::get().Path, Http::Headers::get().Host}};
+
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
+  for (const auto& key : keys) {
+    envoy::type::matcher::v3::StringMatcher matcher;
+    matcher.set_exact(key.get());
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
+  }
+
+  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
+}
+
+std::vector<Matchers::StringMatcherPtr>
+CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  std::vector<Matchers::StringMatcherPtr> matchers;
+  for (const auto& matcher : list.patterns()) {
+    matchers.push_back(
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher));
+  }
+  return matchers;
 }
 
 } // namespace ExtAuthz
