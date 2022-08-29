@@ -300,7 +300,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   const auto& path = value.getStringView();
-  bool is_valid = path.size() > 0;
+  bool is_valid = !path.empty();
 
   for (auto iter = path.begin(); iter != path.end() && is_valid; ++iter) {
     is_valid &= testChar(kPathHeaderCharTable, *iter);
