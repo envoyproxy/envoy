@@ -66,7 +66,7 @@ Step 6: Check admin kafka_broker stats
 **************************************
 
 .. code-block:: console
-  $ curl -s http://localhost:8001/stats?filter=kafka.kafka_broker | grep -v ": 0"
+  $ curl -s "http://localhost:8001/stats?filter=kafka.kafka_broker" | grep -v ": 0"
   kafka.kafka_broker.request.create_topics_request: 1
   kafka.kafka_broker.request.api_versions_request: 4
   kafka.kafka_broker.request.find_coordinator_request: 1
@@ -79,7 +79,7 @@ Step 7: Check admin kafka_service stats
 ***************************************
 
 .. code-block:: console
-  $ curl -s http://localhost:8001/stats?filter=cluster.kafka_service | grep -v ": 0"
+  $ curl -s "http://localhost:8001/stats?filter=cluster.kafka_service" | grep -v ": 0"
   cluster.kafka_service.max_host_weight: 1
   cluster.kafka_service.membership_healthy: 1
   cluster.kafka_service.membership_total: 1
