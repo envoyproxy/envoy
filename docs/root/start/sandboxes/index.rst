@@ -59,7 +59,7 @@ The following sandboxes are available:
     gzip
     jaeger_native_tracing
     jaeger_tracing
-    kafka_broker
+    kafka
     load_reporting_service
     locality_load_balancing
     local_ratelimit

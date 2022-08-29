@@ -21,7 +21,7 @@ filegroup(
             # Contrib extensions tested over in contrib.
             "mysql/*",
             "postgres/*",
-            "kafka-broker/*.yaml",
+            "kafka/*.yaml",
         ],
     ),
 )
@@ -32,7 +32,7 @@ genrule(
         [
             "mysql/*.yaml",
             "postgres/*.yaml",
-            "kafka-broker/*.yaml",
+            "kafka/*.yaml",
         ],
         exclude = [
             "**/*docker-compose*.yaml",

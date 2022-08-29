@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-export NAME=kafka-broker
+export NAME=kafka
 export PORT_PROXY="${KAFKA_PORT_PROXY:-11100}"
 export PORT_ADMIN="${KAFKA_PORT_ADMIN:-11101}"
 
@@ -13,7 +13,7 @@ kafka_client () {
 
 TOPIC="envoy-kafka-broker"
 
-MESSAGE="Welcome to Envoy and Kafka Broker filter!"
+MESSAGE="Welcome to Envoy and Kafka broker filter!"
 
 run_log "Create a Kafka topic"
 kafka_client kafka-topics --bootstrap-server proxy:10000 --create --topic $TOPIC
