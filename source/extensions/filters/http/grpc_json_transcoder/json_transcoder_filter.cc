@@ -900,8 +900,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 
   std::string json_status;
   std::unique_ptr<Protobuf::Message> transformed_grpc_status =
-      config_.grpc_status_proto_transformer() && status_details
-          ? config_.grpc_status_proto_transformer()->transform(*status_details)
+      config_.grpcStatusProtoTransformer() && status_details
+          ? config_.grpcStatusProtoTransformer()->transform(*status_details)
           : nullptr;
   auto translate_status = per_route_config_->translateProtoMessageToJson(
       transformed_grpc_status ? *transformed_grpc_status : *status_details, &json_status);

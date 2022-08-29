@@ -106,7 +106,7 @@ public:
   bool disabled() const { return disabled_; }
 
   const ProtoTransformer::ProtoTransformer<::google::rpc::Status>*
-  grpc_status_proto_transformer() const {
+  grpcStatusProtoTransformer() const {
     return grpc_status_proto_transformer_.get();
   }
 
