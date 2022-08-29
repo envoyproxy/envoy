@@ -228,8 +228,9 @@ message GrpcJsonTranscoder {
   bool convert_grpc_status = 9;
 
   // Specifies a proto transformer extension that transforms grpc response status into a custom protobuf format.
+  // This field is effective only when ``convert_grpc_status`` is set to true.
   // The target custom prototype type must be in ``proto_descriptor``.
-  // It should be an extension of ``envoy.proto_transformer``.
+  // This field should be an extension of ``envoy.proto_transformer``.
   config.core.v3.TypedExtensionConfig grpc_status_proto_transformer = 14;
 
   // URL unescaping policy.
