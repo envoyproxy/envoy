@@ -8,6 +8,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
 
+using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
@@ -1785,7 +1786,8 @@ TEST_P(WasmHttpFilterTest, Property) {
   request_stream_info_.downstream_connection_info_provider_->setRequestedServerName("w3.org");
   NiceMock<Network::MockConnection> connection;
   EXPECT_CALL(connection, id()).WillRepeatedly(Return(4));
-  EXPECT_CALL(encoder_callbacks_, connection()).WillRepeatedly(Return(&connection));
+  EXPECT_CALL(encoder_callbacks_, connection())
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection}));
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
@@ -2068,7 +2070,7 @@ TEST_P(WasmHttpFilterTest, CloseRequest) {
   filter().setDecoderFilterCallbacks(decoder_callbacks);
   EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
-  EXPECT_CALL(decoder_callbacks, resetStream());
+  EXPECT_CALL(decoder_callbacks, resetStream(_, _));
 
   // Create in-VM context.
   filter().onCreate();
@@ -2083,7 +2085,7 @@ TEST_P(WasmHttpFilterTest, CloseResponse) {
   filter().setEncoderFilterCallbacks(encoder_callbacks);
   EXPECT_CALL(encoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
-  EXPECT_CALL(encoder_callbacks, resetStream());
+  EXPECT_CALL(encoder_callbacks, resetStream(_, _));
 
   // Create in-VM context.
   filter().onCreate();

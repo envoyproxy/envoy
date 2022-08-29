@@ -38,9 +38,9 @@ public:
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  uint64_t body_size);
+                                                  uint64_t body_size, bool end_stream = true);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  const std::string& body);
+                                                  const std::string& body, bool end_stream = true);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
   bool streamOpen() const { return !stream_gone_; }
@@ -293,6 +293,25 @@ protected:
   void testGiantRequestAndResponse(
       uint64_t request_size, uint64_t response_size, bool set_content_length_header,
       std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
+
+  struct BytesCountExpectation {
+    BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
+                          int header_bytes_received)
+        : wire_bytes_sent_{wire_bytes_sent}, wire_bytes_received_{wire_bytes_received},
+          header_bytes_sent_{header_bytes_sent}, header_bytes_received_{header_bytes_received} {}
+    int wire_bytes_sent_;
+    int wire_bytes_received_;
+    int header_bytes_sent_;
+    int header_bytes_received_;
+  };
+
+  void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                          BytesCountExpectation h2_expectation,
+                                          BytesCountExpectation h3_expectation, const int id = 0);
+
+  void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                            BytesCountExpectation h2_expectation,
+                                            BytesCountExpectation h3_expectation, const int id = 0);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;

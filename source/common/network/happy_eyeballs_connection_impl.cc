@@ -7,12 +7,12 @@ namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Address::InstanceConstSharedPtr source_address, UpstreamTransportSocketFactory& socket_factory,
+    Upstream::AddressSelectFn source_address_fn, UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options)
     : dispatcher_(dispatcher), address_list_(sortAddresses(address_list)),
-      source_address_(source_address), socket_factory_(socket_factory),
+      source_address_fn_(source_address_fn), socket_factory_(socket_factory),
       transport_socket_options_(transport_socket_options), host_(host), options_(options) {}
 
 bool HappyEyeballsConnectionProvider::hasNextConnection() {
@@ -23,8 +23,9 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
   ASSERT(hasNextConnection());
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
                   address_list_[next_address_]);
+  auto& address = address_list_[next_address_++];
   return dispatcher_.createClientConnection(
-      address_list_[next_address_++], source_address_,
+      address, source_address_fn_ ? source_address_fn_(address) : nullptr,
       socket_factory_.createTransportSocket(transport_socket_options_, host_), options_,
       transport_socket_options_);
 }

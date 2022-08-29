@@ -347,9 +347,10 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  const Network::Connection* connection() override { return nullptr; }
+  OptRef<const Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                   absl::string_view transport_failure_reason = "") override;
   Router::RouteConstSharedPtr route() override { return route_; }
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
   void setRoute(Router::RouteConstSharedPtr) override {}

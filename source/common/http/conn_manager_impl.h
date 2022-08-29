@@ -273,13 +273,13 @@ private:
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
-    void resetStream() override;
+    void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                     absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -288,6 +288,7 @@ private:
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is

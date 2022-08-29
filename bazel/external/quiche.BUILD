@@ -2432,6 +2432,26 @@ envoy_cc_library(
     ],
 )
 
+cc_library(
+    name = "quic_core_connection_id_generator_interface_lib",
+    hdrs = ["quiche/quic/core/connection_id_generator.h"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_core_versions_lib",
+    ],
+)
+
+cc_library(
+    name = "quic_core_deterministic_connection_id_generator_lib",
+    srcs = ["quiche/quic/core/deterministic_connection_id_generator.cc"],
+    hdrs = ["quiche/quic/core/deterministic_connection_id_generator.h"],
+    deps = [
+        ":quic_core_connection_id_generator_interface_lib",
+        ":quic_core_utils_lib",
+        ":quic_platform_base",
+    ],
+)
+
 envoy_cc_library(
     name = "quic_core_connection_lib",
     srcs = ["quiche/quic/core/quic_connection.cc"],
@@ -4002,10 +4022,12 @@ envoy_cc_library(
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
         ":quic_core_blocked_writer_interface_lib",
+        ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_connection_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_random_lib",
+        ":quic_core_deterministic_connection_id_generator_lib",
         ":quic_core_framer_lib",
         ":quic_core_packets_lib",
         ":quic_core_process_packet_interface_lib",

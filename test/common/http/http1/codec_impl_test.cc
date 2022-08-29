@@ -1142,11 +1142,6 @@ TEST_P(Http1ServerConnectionImplTest, HostHeaderTranslation) {
 // Ensures that requests with invalid HTTP header values are properly rejected
 // when the runtime guard is enabled for the feature.
 TEST_P(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
@@ -1156,8 +1151,11 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
         response_encoder = &encoder;
         return decoder;
       }));
-  Buffer::OwnedImpl buffer(
-      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n"));
+  Buffer::OwnedImpl buffer(absl::StrCat(
+      "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: ", std::string(1, 3), "\r\n",
+      // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser") ? "\r\n"
+                                                                                         : ""));
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
@@ -1257,14 +1255,9 @@ TEST_P(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
 // Mutate an HTTP GET with embedded NULs, this should always be rejected in some
 // way (not necessarily with "head value contains NUL" though).
 TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
+  const absl::string_view example_input = "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: barbaz\r\n";
 
-  const std::string example_input = "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: barbaz\r\n";
-
-  for (size_t n = 1; n < example_input.size(); ++n) {
+  for (size_t n = 0; n < example_input.size(); ++n) {
     initialize();
 
     InSequence sequence;
@@ -1272,16 +1265,49 @@ TEST_P(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
     MockRequestDecoder decoder;
     EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
-    Buffer::OwnedImpl buffer(
-        absl::StrCat(example_input.substr(0, n), std::string(1, '\0'), example_input.substr(n)));
+    Buffer::OwnedImpl buffer(absl::StrCat(
+        example_input.substr(0, n), absl::string_view("\0", 1), example_input.substr(n),
+        // TODO(#21245): Fix BalsaParser to process headers before final "\r\n".
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser") ? "\r\n"
+                                                                                           : ""));
     EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
     auto status = codec_->dispatch(buffer);
-    EXPECT_FALSE(status.ok());
+    EXPECT_FALSE(status.ok()) << n;
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_THAT(status.message(), testing::HasSubstr("http/1.1 protocol error:"));
   }
 }
 
+// Mutate the trailers with an HTTP POST with embedded NULs.
+// This should always be rejected.
+TEST_P(Http1ServerConnectionImplTest, TrailerMutateEmbeddedNul) {
+  codec_settings_.enable_trailers_ = true;
+
+  const absl::string_view headers_and_body = "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\n"
+                                             "6\r\nHello \r\n"
+                                             "5\r\nWorld\r\n"
+                                             "0\r\n";
+  const absl::string_view trailers = "hello: world\r\nsecond: header\r\n";
+
+  for (size_t n = 0; n < trailers.size(); ++n) {
+    initialize();
+
+    InSequence sequence;
+
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+    Buffer::OwnedImpl buffer(absl::StrCat(headers_and_body, trailers.substr(0, n),
+                                          absl::string_view("\0", 1), trailers.substr(n), "\r\n"));
+    EXPECT_CALL(decoder, decodeHeaders_).Times(testing::AnyNumber());
+    EXPECT_CALL(decoder, decodeData).Times(testing::AnyNumber());
+    EXPECT_CALL(decoder, sendLocalReply);
+    auto status = codec_->dispatch(buffer);
+    EXPECT_FALSE(status.ok()) << n;
+    EXPECT_TRUE(isCodecProtocolError(status));
+    EXPECT_THAT(status.message(), testing::HasSubstr("http/1.1 protocol error:"));
+  }
+}
 // Mutate an HTTP GET with CR or LF. These can cause an error status or maybe
 // result in a valid decodeHeaders(). In any case, the validHeaderString()
 // ASSERTs should validate we never have any embedded CR or LF.
@@ -3595,7 +3621,7 @@ const char* kValidFirstLines[] = {
 
 const char* kInvalidFirstLines[] = {
     "GET www.somewhere.com HTTP/1.1\r\n",
-    "GET http11://www.somewhere.com HTTP/1.1\r\n",
+    "GET http!://www.somewhere.com HTTP/1.1\r\n",
     "GET 0ttp:/\r\n",
     "GET http:/www.somewhere.com HTTP/1.1\r\n",
     "GET http:://www.somewhere.com HTTP/1.1\r\n",
