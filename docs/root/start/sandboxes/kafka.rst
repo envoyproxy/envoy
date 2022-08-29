@@ -103,8 +103,8 @@ Step 7: Check admin ``kafka_service`` stats
 
 .. seealso::
 
-   :ref:`Envoy Kafka broker filter <config_network_filters_kafka_broker>`
-      Learn more about the Kafka broker filter.
+  :ref:`Envoy Kafka broker filter <config_network_filters_kafka_broker>`
+    Learn more about the Kafka broker filter.
 
-   `Kafka <https://kafka.apache.org/>`_
-      The Apache Kafka.
+  `Kafka <https://kafka.apache.org/>`_
+    The Apache Kafka.
