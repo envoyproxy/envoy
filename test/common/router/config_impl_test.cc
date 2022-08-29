@@ -7029,10 +7029,12 @@ TEST(MetadataMatchCriteriaImpl, Filter) {
   auto matches = MetadataMatchCriteriaImpl(metadata_matches);
   auto filtered_matches1 = matches.filterMatchCriteria({"b", "c"});
   auto filtered_matches2 = matches.filterMatchCriteria({"a"});
+  auto filtered_matches_empty = matches.filterMatchCriteria({"d"});
 
   EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria().size(), 2);
   EXPECT_EQ(filtered_matches2->metadataMatchCriteria().size(), 1);
+  EXPECT_EQ(filtered_matches_empty->metadataMatchCriteria().size(), 0);
 
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->name(), "b");
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->value().value().number_value(), 2.0);
