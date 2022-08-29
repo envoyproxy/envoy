@@ -34,6 +34,8 @@ Change to the ``examples/kafka`` directory.
 Step 2: Create a Kafka topic
 ****************************
 
+Let's start by creating a Kafka topic called ``envoy-kafka-broker``:
+
 .. code-block:: console
 
   $ export TOPIC="envoy-kafka-broker"
@@ -43,6 +45,9 @@ Step 2: Create a Kafka topic
 Step 3: Check the Kafka topic
 *****************************
 
+You can view the topics that Kafka is aware of with the ``--list`` argument.
+Let's check that the topic you created exists:
+
 .. code-block:: console
 
   $ docker-compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --list | grep $TOPIC
@@ -50,6 +55,8 @@ Step 3: Check the Kafka topic
 
 Step 4: Send a message using the Kafka producer
 ***********************************************
+
+ Next, let's send a message using the topic you have created using the ``kafka-console-producer``:
 
 .. code-block:: console
 
@@ -61,6 +68,8 @@ Step 4: Send a message using the Kafka producer
 
 Step 5: Receive a message using the Kafka consumer
 **************************************************
+
+ Now you can receive the message using the ``kafka-console-consumer`` :
 
 .. code-block:: console
 
@@ -93,3 +102,8 @@ Step 7: Check admin ``kafka_service`` stats
   cluster.kafka_service.membership_total: 1
 
 .. seealso::
+   :ref:`Envoy Kafka broker filter <config_network_filters_kafka_broker>`
+      Learn more about the Kafka broker filter.
+
+   `Kafka <https://kafka.apache.org/>`_
+      Apache Kafka.
