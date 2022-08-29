@@ -3,7 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
-#include "quic_ssl_connection_info.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
