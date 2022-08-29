@@ -172,7 +172,7 @@ class MockPathRewritePolicy : public PathRewritePolicy {
 public:
   MockPathRewritePolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PathRewriterSharedPtr, path_rewriter, (), (const));
+  MOCK_METHOD(PathRewriterSharedPtr, pathRewriter, (), (const));
 };
 
 class MockPathRewriter : public PathRewriter {
@@ -184,7 +184,7 @@ class MockPathMatchPolicy : public PathMatchPolicy {
 public:
   MockPathMatchPolicy();
   MOCK_METHOD(bool, enabled, (), (const));
-  MOCK_METHOD(PathMatcherSharedPtr, path_matcher, (), (const));
+  MOCK_METHOD(PathMatcherSharedPtr, pathMatcher, (), (const));
 };
 
 class MockPathMatcher : public PathMatcher {
