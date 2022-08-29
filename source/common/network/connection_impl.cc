@@ -1,5 +1,7 @@
 #include "source/common/network/connection_impl.h"
 
+#include <execinfo.h>
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -21,8 +23,6 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
-
-#include <execinfo.h>
 
 namespace Envoy {
 namespace Network {
@@ -133,9 +133,9 @@ bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   ENVOY_LOG(critical, "in ConnectionImpl::close");
-  void *array[1024];
+  void* array[1024];
   int size = backtrace(array, 1024);
-  char **strings = backtrace_symbols(array, size);
+  char** strings = backtrace_symbols(array, size);
   ENVOY_LOG(critical, "Obtained {} stack frames.", size);
   for (int i = 0; i < size; i++)
     ENVOY_LOG(critical, "{}", strings[i]);

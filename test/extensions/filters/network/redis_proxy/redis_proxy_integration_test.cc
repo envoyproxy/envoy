@@ -1287,8 +1287,8 @@ TEST_P(RedisProxyIntegrationTest, FullTransaction) {
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"set", "foo", "bar"}),
-                    "-upstream failure\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"set", "foo", "bar"}), "-upstream failure\r\n",
+                    redis_client);
 
   redis_client->close();
 }
