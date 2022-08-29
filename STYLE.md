@@ -172,9 +172,9 @@ A few general notes on our error handling philosophy:
   debug-only checks and documentation. They may be `ENVOY_BUG`s if performance allows, see point
   below.
 * `ENVOY_BUG`s provide detectability and more confidence than an `ASSERT`. They are useful for
-  non-trivial conditions, those with complex control flow, and rapidly changing protocols. Testing
-  should be added to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is
-  violated.
+  non-trivial conditions, those with complex control flow, and rapidly changing protocols. They
+  also log a stack trace of the previous calls leading up to `ENVOY_BUG`. Testing should be added
+  to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is violated.
 * Annotate conditions with comments on belief or reasoning, for example `Condition is guaranteed by
   caller foo` or `Condition is likely to hold after processing through external library foo`.
 * Macro usage should be understandable to a reader. Add comments if not. They should be robust to
