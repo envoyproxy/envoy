@@ -12,7 +12,7 @@ if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_for
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
-build_setup_args="-nofetch"
+
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
@@ -225,10 +225,10 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
   echo "bazel release build..."
-  # bazel_envoy_binary_build release
+  bazel_envoy_binary_build release
 
   echo "bazel contrib release build..."
-  # bazel_contrib_binary_build release
+  bazel_contrib_binary_build release
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
