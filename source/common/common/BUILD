@@ -161,6 +161,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:key_value_store_interface",
+        "//source/common/config:ttl_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
         "@com_github_google_quiche//:quiche_common_lib",

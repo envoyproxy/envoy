@@ -1,6 +1,8 @@
 #include "source/common/common/key_value_store_base.h"
 
 #include "absl/cleanup/cleanup.h"
+#include <algorithm>
+#include <chrono>
 
 namespace Envoy {
 namespace {
@@ -8,7 +10,7 @@ namespace {
 // Removes a length prefixed token from |contents| and returns the token,
 // or returns absl::nullopt on failure.
 absl::optional<absl::string_view> getToken(absl::string_view& contents, std::string& error) {
-  const auto it = contents.find("\n");
+  const auto it = contents.find('\n');
   if (it == contents.npos) {
     error = "Bad file: no newline";
     return {};
@@ -30,11 +32,11 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 
 } // namespace
 
-KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher, 
-                                     std::chrono::milliseconds flush_interval, 
-                                     uint32_t max_entries, 
-                                     )
-  : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval](), ttlManager(callback, dispatcher, dispatcher.timeSource()) {
+KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
+                                     std::chrono::milliseconds flush_interval, uint32_t max_entries)
+    : ttl_manager([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
+                  dispatcher.timeSource()),
+      max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
         flush();
         flush_timer_->enableTimer(flush_interval);
       })) {
@@ -43,8 +45,10 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
   }
 }
 
-void KeyValueStoreBase::ttlCallback(absl::string_view key, const std::vector<std::string>& expired) {
-  
+void KeyValueStoreBase::ttlCallback(const std::vector<std::string>& expired) {
+  for (const auto& key : expired) {
+    remove(key);
+  }
 }
 
 bool KeyValueStoreBase::parseContents(absl::string_view contents) {
@@ -64,7 +68,8 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
   return true;
 }
 
-void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view, const absl::optional<std::chrono::seconds> ttl) {
+void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view,
+                                    const absl::optional<std::chrono::milliseconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
@@ -79,7 +84,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
     store_.pop_front();
   }
   if (ttl) {
-    ttlManager.add(ttl, key);
+    ttl_manager.add(ttl.value(), key);
   }
   if (!flush_timer_->enabled()) {
     flush();

@@ -23,7 +23,7 @@ public:
    * @param key supplies a key to add or update.
    * @param value supplies the value to set for that key.
    */
-  virtual void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::seconds> ttl = absl::nullopt) PURE;
+  virtual void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) PURE;
 
   /**
    * Removes a key:value pair from the store. This is a no-op if the key is not present.

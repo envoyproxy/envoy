@@ -35,6 +35,8 @@ void TtlManager::add(std::chrono::milliseconds ttl, const std::string& name) {
   clear(name);
 
   auto itr_and_inserted = ttls_.insert({time_source_.monotonicTime() + ttl, name});
+  std::cout << time_source_.monotonicTime().time_since_epoch().count();
+  std::cout << "\nlook up";
   ttl_lookup_[name] = itr_and_inserted.first;
 }
 

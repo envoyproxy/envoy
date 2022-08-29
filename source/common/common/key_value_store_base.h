@@ -8,6 +8,7 @@
 #include "source/common/config/ttl.h"
 
 #include "quiche/common/quiche_linked_hash_map.h"
+#include <chrono>
 
 namespace Envoy {
 
@@ -25,14 +26,15 @@ public:
   // parses key value pairs from |contents| and inserts into store_.
   // Returns true on success and false on failure.
   bool parseContents(absl::string_view contents);
+  void ttlCallback(const std::vector<std::string>& expired);
 
   std::string error;
   // KeyValueStore
-  void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::seconds> ttl = absl::nullopt) override;
+  void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) override;
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
-  TtlManager ttlManager_;
+  Config::TtlManager ttl_manager;
 
 protected:
   const uint32_t max_entries_;

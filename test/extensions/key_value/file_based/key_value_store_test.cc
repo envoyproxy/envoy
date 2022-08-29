@@ -3,6 +3,7 @@
 
 #include "source/common/common/key_value_store_base.h"
 #include "source/extensions/key_value/file_based/config.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -23,10 +24,12 @@ protected:
   KeyValueStoreTest() : filename_(TestEnvironment::temporaryPath("key_value_store")) {
     TestEnvironment::removePath(filename_);
     createStore();
+    test_time_.setSystemTime(std::chrono::milliseconds(2));
   }
 
   void createStore(uint32_t max_entries = 0) {
     flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     store_ = std::make_unique<FileBasedKeyValueStore>(
         dispatcher_, flush_interval_, Filesystem::fileSystemForTest(), filename_, max_entries);
   }
@@ -35,6 +38,8 @@ protected:
   std::unique_ptr<FileBasedKeyValueStore> store_{};
   std::chrono::seconds flush_interval_{5};
   Event::MockTimer* flush_timer_ = nullptr;
+  Event::MockTimer* ttl_timer_ = nullptr;
+  Event::SimulatedTimeSystem test_time_;
 };
 
 TEST_F(KeyValueStoreTest, Basic) {
@@ -46,7 +51,20 @@ TEST_F(KeyValueStoreTest, Basic) {
   store_->remove("foo");
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
+TEST_F(KeyValueStoreTest, TTL) {
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));  
 
+  store_->addOrUpdate("foo", "bar", std::chrono::milliseconds(5));
+  EXPECT_EQ("bar", store_->get("foo").value());
+  // Advance timer, but not enough to trigger expiry
+  test_time_.setSystemTime(std::chrono::milliseconds(1));
+  ttl_timer_->invokeCallback();
+  EXPECT_EQ("bar", store_->get("foo").value());
+  // Advance timer to trigger expiry
+  test_time_.setSystemTime(std::chrono::milliseconds(10));
+  ttl_timer_->invokeCallback();
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
 TEST_F(KeyValueStoreTest, MaxEntries) {
   createStore(2);
   // Add 2 entries.
