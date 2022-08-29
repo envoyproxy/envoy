@@ -18,36 +18,71 @@ Change to the ``examples/kafka-broker`` directory.
 
 .. code-block:: console
 
-    $ pwd
-    envoy/examples/kafka-broker
-    $ docker-compose pull
-    $ docker-compose up --build -d
-    $ docker-compose ps
+  $ pwd
+  envoy/examples/kafka-broker
+  $ docker-compose pull
+  $ docker-compose up --build -d
+  $ docker-compose ps
 
+            Name                          Command                  State                            Ports
+  ------------------------------------------------------------------------------------------------------------------------------
+  kafka-broker_kafka-server_1   /etc/confluent/docker/run        Up             9092/tcp
+  kafka-broker_proxy_1          /docker-entrypoint.sh /usr ...   Up             0.0.0.0:10000->10000/tcp, 0.0.0.0:8001->8001/tcp
+  kafka-broker_zookeeper_1      /etc/confluent/docker/run        Up (healthy)   2181/tcp, 2888/tcp, 3888/tcp
 
 Step 2: Create a Kafka topic
 ****************************
 
+.. code-block:: console
+
+  $ export TOPIC="envoy-kafka-broker"
+  $ docker-compose run --rm kafka-client --bootstrap-server proxy:10000 --create --topic $TOPIC
 
 Step 3: Check the Kafka topic
 *****************************
+
+.. code-block:: console
+
+  $ docker-compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --list | grep $TOPIC
 
 
 Step 4: Send a message using the Kafka producer
 ***********************************************
 
+.. code-block:: console
+
+  $ export MESSAGE="Welcome to Envoy and Kafka Broker filter!"
+  $ docker-compose run --rm kafka-client /bin/bash -c " \
+      echo $MESSAGE \
+      | kafka-console-producer --request-required-acks 1 --broker-list proxy:10000 --topic $TOPIC"
 
 Step 5: Receive a message using the Kafka consumer
 **************************************************
 
+.. code-block:: console
+  $ docker-compose run --rm kafka-client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPIC --from-beginning --max-messages 1 | grep "$MESSAGE"
 
 Step 6: Check admin kafka_broker stats
 **************************************
 
+.. code-block:: console
+  $ curl -s http://localhost:8001/stats?filter=kafka.kafka_broker | grep -v ": 0"
+  kafka.kafka_broker.request.create_topics_request: 1
+  kafka.kafka_broker.request.api_versions_request: 4
+  kafka.kafka_broker.request.find_coordinator_request: 1
+  kafka.kafka_broker.request.metadata_request: 4
+  kafka.kafka_broker.response.api_versions_response: 4
+  kafka.kafka_broker.response.find_coordinator_response: 1
+  kafka.kafka_broker.response.metadata_response: 4
 
 Step 7: Check admin kafka_service stats
 ***************************************
 
+.. code-block:: console
+  $ curl -s http://localhost:8001/stats?filter=cluster.kafka_service | grep -v ": 0"
+  cluster.kafka_service.max_host_weight: 1
+  cluster.kafka_service.membership_healthy: 1
+  cluster.kafka_service.membership_total: 1
 
 .. seealso::
 
