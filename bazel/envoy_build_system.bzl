@@ -88,7 +88,9 @@ envoy_directory_genrule = rule(
     attrs = {
         "srcs": attr.label_list(),
         "cmd": attr.string(),
-        "tools": attr.label_list(),
+        "tools": attr.label_list(
+            cfg = "exec",
+        ),
     },
 )
 

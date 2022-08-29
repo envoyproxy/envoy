@@ -241,28 +241,20 @@ sh_binary(
 envoy_directory_genrule(
     name = "corpus_from_config_impl",
     testonly = 1,
-    srcs = [
-        # This is deliberately in srcs, since we run into host/target confusion
-        # otherwise in oss-fuzz builds.
-        ":config_impl_test_static",
-    ],
     cmd = " ".join([
         "$(location corpus_from_config_impl_sh)",
         "$(location //test/common/router:config_impl_test_static)",
     ]),
-    tools = [":corpus_from_config_impl_sh"],
+    tools = [
+        ":corpus_from_config_impl_sh",
+        ":config_impl_test_static",
+    ],
 )
 
 filegroup(
     name = "route_corpus",
     testonly = 1,
-    srcs = select({
-        # TODO(asraa): Clean this up for cross-compilation. Right now we assume
-        # the host and target are the same on x86 builds, so we only execute the
-        # corpus generation binary on x86 platforms.
-        "//bazel:x86": [":corpus_from_config_impl"],
-        "//conditions:default": [],
-    }) + glob([
+    srcs = [":corpus_from_config_impl"] + glob([
         "route_corpus/**",
     ]),
 )
