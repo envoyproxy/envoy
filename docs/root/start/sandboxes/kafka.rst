@@ -24,11 +24,11 @@ Change to the ``examples/kafka`` directory.
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                      Command                  State                            Ports
+           Name                      Command                State                            Ports
   -----------------------------------------------------------------------------------------------------------------------
-  kafka_kafka-server_1   /etc/confluent/docker/run        Up             9092/tcp
-  kafka_proxy_1          /docker-entrypoint.sh /usr ...   Up             0.0.0.0:10000->10000/tcp, 0.0.0.0:8001->8001/tcp
-  kafka_zookeeper_1      /etc/confluent/docker/run        Up (healthy)   2181/tcp, 2888/tcp, 3888/tcp
+  kafka_kafka-server_1   /etc/confluent/docker/run      Up             9092/tcp
+  kafka_proxy_1          /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp, 0.0.0.0:8001->8001/tcp
+  kafka_zookeeper_1      /etc/confluent/docker/run      Up (healthy)   2181/tcp, 2888/tcp, 3888/tcp
 
 
 Step 2: Create a Kafka topic
@@ -77,7 +77,7 @@ Step 5: Receive a message using the Kafka consumer
 
 
 Step 6: Check admin ``kafka_broker`` stats
-**************************************
+******************************************
 
 .. code-block:: console
 
@@ -92,7 +92,7 @@ Step 6: Check admin ``kafka_broker`` stats
 
 
 Step 7: Check admin ``kafka_service`` stats
-***************************************
+*******************************************
 
 .. code-block:: console
 
@@ -107,4 +107,4 @@ Step 7: Check admin ``kafka_service`` stats
       Learn more about the Kafka broker filter.
 
    `Kafka <https://kafka.apache.org/>`_
-      Apache Kafka.
+      The Apache Kafka.
