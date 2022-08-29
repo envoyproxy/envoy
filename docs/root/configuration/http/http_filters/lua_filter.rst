@@ -425,7 +425,7 @@ the supported keys are:
 - *timeout* is an integer that specifies the call timeout in milliseconds.
   It refers to the same *timeout* argument as the first function signature.
 - *sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
-- *multiple* is boolean flag that decides whether the returned headers could has multiple values for same header name.
+- *multiple* is boolean flag that decides whether the returned headers could have multiple values for same header name.
 
 Some examples of specifying *request_options* are shown below:
 
