@@ -44,13 +44,17 @@ public:
     return nullptr;
   }
 
-  std::pair<Http::RequestEncoder*, IntegrationStreamDecoderSharedPtr>
+  std::pair<Http::RequestEncoder*, IntegrationStreamDecoderPtr>
   startRequest(const Http::TestRequestHeaderMapImpl& request_headers,
                const std::vector<std::string>& request_body_chunks,
                const Http::TestRequestTrailerMapImpl* request_trailers,
                IntegrationCodecClient* codec_client) {
-    const bool header_only = !request_trailers && request_body_chunks.empty();
-    auto encoder_decoder = codec_client->startRequest(request_headers, header_only);
+    if (!request_trailers && request_body_chunks.empty()) {
+      // Headers only request - no encoder needed as no data
+      return {nullptr, codec_client->makeHeaderOnlyRequest(request_headers)};
+    }
+
+    auto encoder_decoder = codec_client->startRequest(request_headers);
     return {&encoder_decoder.first, std::move(encoder_decoder.second)};
   }
 
@@ -77,7 +81,7 @@ public:
   void encodeResponse(const Http::TestResponseHeaderMapImpl& response_headers,
                       const std::vector<std::string>& response_body_chunks,
                       const Http::TestResponseTrailerMapImpl* response_trailers,
-                      FakeStream* upstream_request, IntegrationStreamDecoderSharedPtr& decoder) {
+                      FakeStream* upstream_request, IntegrationStreamDecoderPtr& decoder) {
     upstream_request->encodeHeaders(response_headers,
                                     !response_trailers && response_body_chunks.empty());
 
@@ -515,14 +519,14 @@ tap_config:
   startAdminRequest(fmt::format(admin_request_yaml, num_streams));
 
   FakeStreamPtr upstream_reqs[num_streams];
-  IntegrationStreamDecoderSharedPtr decoders[num_streams];
+  IntegrationStreamDecoderPtr decoders[num_streams];
   Http::RequestEncoder* encoders[num_streams];
 
   for (int i = 0; i < num_streams; i++) {
     auto [encoder, decoder] =
         startRequest(request_headers_no_tap_, {{std::to_string(i)}}, nullptr, codec_client_.get());
     encoders[i] = encoder;
-    decoders[i] = decoder;
+    decoders[i] = std::move(decoder);
   }
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));

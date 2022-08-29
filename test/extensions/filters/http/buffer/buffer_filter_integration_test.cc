@@ -48,7 +48,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
-  IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "123", false);
   codec_client_->sendData(*request_encoder_, "456", false);
   codec_client_->sendData(*request_encoder_, "789", true);
@@ -75,7 +75,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
       {":method", "POST"}, {":scheme", "http"}, {":path", "/shelf"}, {":authority", "host"}});
   request_encoder_ = &encoder_decoder.first;
-  IntegrationStreamDecoderSharedPtr response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
   codec_client_->sendData(*request_encoder_, "0123", false);
   codec_client_->sendData(*request_encoder_, "456", false);
   codec_client_->sendData(*request_encoder_, "789", false);

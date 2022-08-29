@@ -862,7 +862,7 @@ protected:
   }
 
   using RequestEncoderResponseDecoderPair =
-      std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>;
+      std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>;
 
   std::vector<RequestEncoderResponseDecoderPair> startRequests(int num_requests) {
     std::vector<RequestEncoderResponseDecoderPair> responses;

@@ -47,7 +47,7 @@ protected:
     }
   }
 
-  IntegrationStreamDecoderSharedPtr response_;
+  IntegrationStreamDecoderPtr response_;
 };
 
 } // namespace Envoy

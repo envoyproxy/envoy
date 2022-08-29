@@ -169,16 +169,15 @@ void IntegrationCodecClient::sendMetadata(Http::RequestEncoder& encoder,
   flushWrite();
 }
 
-std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>
+std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
 IntegrationCodecClient::startRequest(const Http::RequestHeaderMap& headers,
                                      bool header_only_request) {
-  auto response = std::make_shared<IntegrationStreamDecoder>(dispatcher_);
-  // response_decoders_.push_back(response);
+  auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, /*end_stream=*/header_only_request).IgnoreError();
   flushWrite();
-  return {encoder, response};
+  return {encoder, std::move(response)};
 }
 
 AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
@@ -496,16 +495,9 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoderPtr response,
                                          const std::string& response_code,
                                          const Http::TestResponseHeaderMapImpl& expected_headers,
                                          const std::string& expected_body) {
-  verifyResponse(*response, response_code, expected_headers, expected_body);
-}
-
-void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoder& response,
-                                         const std::string& response_code,
-                                         const Http::TestResponseHeaderMapImpl& expected_headers,
-                                         const std::string& expected_body) {
-  EXPECT_TRUE(response.complete());
-  EXPECT_EQ(response_code, response.headers().getStatusValue());
-  expected_headers.iterate([response_headers = &response.headers()](
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response_code, response->headers().getStatusValue());
+  expected_headers.iterate([response_headers = &response->headers()](
                                const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const auto entry =
         response_headers->get(Http::LowerCaseString{std::string(header.key().getStringView())});
@@ -514,7 +506,7 @@ void HttpIntegrationTest::verifyResponse(IntegrationStreamDecoder& response,
     return Http::HeaderMap::Iterate::Continue;
   });
 
-  EXPECT_EQ(response.body(), expected_body);
+  EXPECT_EQ(response->body(), expected_body);
 }
 
 absl::optional<uint64_t> HttpIntegrationTest::waitForNextUpstreamConnection(

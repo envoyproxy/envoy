@@ -111,8 +111,7 @@ protected:
   void sendGetRequest(const Http::RequestHeaderMap& headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    auto encoder_decoder = codec_client_->startRequest(headers, true);
-    client_response_ = std::move(encoder_decoder.second);
+    client_response_ = codec_client_->makeHeaderOnlyRequest(headers);
   }
 
   // Send an HTTP POST containing a randomly-generated body consisting of
@@ -137,7 +136,7 @@ protected:
 
   TestProcessor test_processor_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
-  IntegrationStreamDecoderSharedPtr client_response_;
+  IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
 };

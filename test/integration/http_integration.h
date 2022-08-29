@@ -51,7 +51,7 @@ public:
   void sendReset(Http::RequestEncoder& encoder);
   // Intentionally makes a copy of metadata_map.
   void sendMetadata(Http::RequestEncoder& encoder, Http::MetadataMap metadata_map);
-  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderSharedPtr>
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::RequestHeaderMap& headers, bool header_only_request = false);
   ABSL_MUST_USE_RESULT AssertionResult
   waitForDisconnect(std::chrono::milliseconds time_to_wait = TestUtility::DefaultTimeout);
@@ -104,7 +104,6 @@ private:
   bool saw_goaway_{};
   bool stream_gone_{};
   Network::ConnectionEvent last_connection_event_;
-  std::vector<IntegrationStreamDecoderSharedPtr> response_decoders_;
 };
 
 using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
@@ -206,12 +205,6 @@ protected:
   // Verifies the response_headers contains the expected_headers, and response body matches given
   // body string.
   void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& response_code,
-                      const Http::TestResponseHeaderMapImpl& expected_headers,
-                      const std::string& expected_body);
-
-  // Verifies the response_headers contains the expected_headers, and response body matches given
-  // body string.
-  void verifyResponse(IntegrationStreamDecoder& response, const std::string& response_code,
                       const Http::TestResponseHeaderMapImpl& expected_headers,
                       const std::string& expected_body);
 

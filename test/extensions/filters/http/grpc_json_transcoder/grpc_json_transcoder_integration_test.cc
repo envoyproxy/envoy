@@ -73,13 +73,15 @@ protected:
                        bool expect_response_complete = true) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    IntegrationStreamDecoderSharedPtr response;
-    auto encoder_decoder = codec_client_->startRequest(request_headers, request_body.empty());
-    request_encoder_ = &encoder_decoder.first;
-    response = std::move(encoder_decoder.second);
+    IntegrationStreamDecoderPtr response;
     if (!request_body.empty()) {
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      request_encoder_ = &encoder_decoder.first;
+      response = std::move(encoder_decoder.second);
       Buffer::OwnedImpl body(request_body);
       codec_client_->sendData(*request_encoder_, body, true);
+    } else {
+      response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
     if (expect_connection_to_upstream) {

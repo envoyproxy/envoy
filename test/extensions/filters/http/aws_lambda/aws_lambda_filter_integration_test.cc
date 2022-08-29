@@ -72,10 +72,13 @@ public:
                const std::string& expected_response_body) {
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    auto encoder_decoder = codec_client_->startRequest(request_headers, request_body.empty());
-    request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-    if (!request_body.empty()) {
+    IntegrationStreamDecoderPtr response;
+    if (request_body.empty()) {
+      response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    } else {
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      request_encoder_ = &encoder_decoder.first;
+      response = std::move(encoder_decoder.second);
       // Chunk the data to simulate a real request.
       const size_t chunk_size = 5;
       size_t i = 0;

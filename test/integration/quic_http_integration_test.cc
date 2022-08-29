@@ -722,7 +722,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(*response, "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
@@ -787,7 +787,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(*response, "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
@@ -825,7 +825,7 @@ TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(*response, "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
@@ -864,7 +864,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   upstream_request_->encodeHeaders(response_headers, false);
   upstream_request_->encodeData(response_size, true);
   ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(*response, "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());

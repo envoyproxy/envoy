@@ -35,7 +35,7 @@ protected:
     }
   }
 
-  IntegrationStreamDecoderSharedPtr response_;
+  IntegrationStreamDecoderPtr response_;
 };
 
 /*
@@ -49,7 +49,7 @@ public:
                                                   {":protocol", "bytestream"},
                                                   {":scheme", "https"},
                                                   {":authority", "host:80"}};
-  IntegrationStreamDecoderSharedPtr response_;
+  IntegrationStreamDecoderPtr response_;
 };
 
 } // namespace Envoy
