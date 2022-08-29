@@ -54,7 +54,7 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
   dispatcher_ = dispatcher;
   EXPECT_CALL(*dispatcher, createTimer_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
-      .RetiresOnSaturation(); //mock inSequence?
+      .RetiresOnSaturation();
   ON_CALL(*this, enableTimer(_, _))
       .WillByDefault(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
         enabled_ = true;

@@ -34,11 +34,11 @@ public:
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
-  Config::TtlManager ttl_manager;
 
 protected:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
+  Config::TtlManager ttl_manager;
   quiche::QuicheLinkedHashMap<std::string, std::string> store_;
   // Used for validation only.
   mutable bool under_iterate_{};

@@ -34,12 +34,12 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 
 KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
                                      std::chrono::milliseconds flush_interval, uint32_t max_entries)
-    : ttl_manager([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
-                  dispatcher.timeSource()),
-      max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
+    : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
         flush();
         flush_timer_->enableTimer(flush_interval);
-      })) {
+      })),
+      ttl_manager([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
+                  dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
   }
@@ -83,9 +83,9 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
   }
-  if (ttl) {
+  if (ttl)
     ttl_manager.add(ttl.value(), key);
-  }
+
   if (!flush_timer_->enabled()) {
     flush();
   }

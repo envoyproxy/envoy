@@ -28,8 +28,8 @@ protected:
   }
 
   void createStore(uint32_t max_entries = 0) {
-    flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+    flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     store_ = std::make_unique<FileBasedKeyValueStore>(
         dispatcher_, flush_interval_, Filesystem::fileSystemForTest(), filename_, max_entries);
   }
@@ -37,8 +37,8 @@ protected:
   std::string filename_;
   std::unique_ptr<FileBasedKeyValueStore> store_{};
   std::chrono::seconds flush_interval_{5};
-  Event::MockTimer* flush_timer_ = nullptr;
   Event::MockTimer* ttl_timer_ = nullptr;
+  Event::MockTimer* flush_timer_ = nullptr;
   Event::SimulatedTimeSystem test_time_;
 };
 
