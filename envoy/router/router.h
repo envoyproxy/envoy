@@ -320,7 +320,7 @@ public:
    * Returns the stored target route PathMatcher.
    * @return a PathMatcher instance.
    */
-  virtual PathMatcherSharedPtr path_matcher() const PURE;
+  virtual PathMatcherSharedPtr pathMatcher() const PURE;
 };
 
 /**
@@ -339,7 +339,7 @@ public:
    * Returns the stored target route PathRewriter.
    * @return a PathRewriter instance.
    */
-  virtual PathRewriterSharedPtr path_rewriter() const PURE;
+  virtual PathRewriterSharedPtr pathRewriter() const PURE;
 };
 
 /**

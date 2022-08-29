@@ -472,7 +472,7 @@ public:
   // Router::PathMatchPolicy
   bool enabled() const override { return enabled_; }
 
-  PathMatcherSharedPtr path_matcher() const override;
+  PathMatcherSharedPtr pathMatcher() const override;
 
 private:
   const bool enabled_;
@@ -495,7 +495,7 @@ public:
   // Router::PathRewritePolicy
   bool enabled() const override { return enabled_; }
 
-  PathRewriterSharedPtr path_rewriter() const override;
+  PathRewriterSharedPtr pathRewriter() const override;
 
 private:
   const bool enabled_;
