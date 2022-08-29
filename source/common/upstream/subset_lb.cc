@@ -36,6 +36,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
       least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
       scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
@@ -289,7 +290,73 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
   if (override_host != nullptr) {
     return override_host;
   }
+  if (metadata_fallback_policy_ !=
+      envoy::config::cluster::v3::
+          Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
+    return chooseHostIteration(context);
+  }
+  const ProtobufWkt::Value* metadata_fallbacks = getMetadataFallbackList(context);
+  if (metadata_fallbacks == nullptr) {
+    return chooseHostIteration(context);
+  }
 
+  LoadBalancerContextWrapper context_no_metadata_fallback = removeMetadataFallbackList(context);
+  return chooseHostWithMetadataFallbacks(&context_no_metadata_fallback,
+                                         metadata_fallbacks->list_value().values());
+}
+
+HostConstSharedPtr
+SubsetLoadBalancer::chooseHostWithMetadataFallbacks(LoadBalancerContext* context,
+                                                    const MetadataFallbacks& metadata_fallbacks) {
+
+  if (metadata_fallbacks.empty()) {
+    return chooseHostIteration(context);
+  }
+
+  for (const auto& metadata_override : metadata_fallbacks) {
+    LoadBalancerContextWrapper context_wrapper(context, metadata_override.struct_value());
+    const auto host = chooseHostIteration(&context_wrapper);
+    if (host) {
+      return host;
+    }
+  }
+  return nullptr;
+}
+
+// assumes context->metadataMatchCriteria() is not null and there is 'fallback_list' criterion
+SubsetLoadBalancer::LoadBalancerContextWrapper
+SubsetLoadBalancer::removeMetadataFallbackList(LoadBalancerContext* context) {
+  ASSERT(context->metadataMatchCriteria());
+  const auto& match_criteria = context->metadataMatchCriteria()->metadataMatchCriteria();
+
+  std::set<std::string> to_preserve;
+  for (const auto& criterion : match_criteria) {
+    if (criterion->name() != Config::MetadataEnvoyLbKeys::get().FALLBACK_LIST) {
+      to_preserve.emplace(criterion->name());
+    }
+  }
+  return {context, to_preserve};
+}
+
+const ProtobufWkt::Value*
+SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  const auto& match_criteria = context->metadataMatchCriteria();
+  if (match_criteria == nullptr) {
+    return nullptr;
+  }
+
+  for (const auto& criterion : match_criteria->metadataMatchCriteria()) {
+    if (criterion->name() == Config::MetadataEnvoyLbKeys::get().FALLBACK_LIST) {
+      return &criterion->value().value();
+    } // TODO(MarcinFalkowski): optimization: stop iteration when lexically after 'fallback_list'
+  }
+  return nullptr;
+}
+
+HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* context) {
   if (context) {
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
@@ -375,7 +442,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     auto filtered_context = std::make_unique<LoadBalancerContextWrapper>(
         context, *fallback_params.fallback_keys_subset_);
     // Perform whole subset load balancing again with reduced metadata match criteria
-    return chooseHost(filtered_context.get());
+    return chooseHostIteration(filtered_context.get());
   } else {
     return nullptr;
   }
@@ -977,6 +1044,14 @@ SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
 
   metadata_match_ =
       wrapped->metadataMatchCriteria()->filterMatchCriteria(filtered_metadata_match_criteria_names);
+}
+
+SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
+    LoadBalancerContext* wrapped, const ProtobufWkt::Struct& metadata_match_criteria_override)
+    : wrapped_(wrapped) {
+  ASSERT(wrapped->metadataMatchCriteria());
+  metadata_match_ =
+      wrapped->metadataMatchCriteria()->mergeMatchCriteria(metadata_match_criteria_override);
 }
 } // namespace Upstream
 } // namespace Envoy
