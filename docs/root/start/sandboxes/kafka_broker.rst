@@ -60,12 +60,14 @@ Step 5: Receive a message using the Kafka consumer
 **************************************************
 
 .. code-block:: console
+
   $ docker-compose run --rm kafka-client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPIC --from-beginning --max-messages 1 | grep "$MESSAGE"
 
 Step 6: Check admin kafka_broker stats
 **************************************
 
 .. code-block:: console
+
   $ curl -s "http://localhost:8001/stats?filter=kafka.kafka_broker" | grep -v ": 0"
   kafka.kafka_broker.request.create_topics_request: 1
   kafka.kafka_broker.request.api_versions_request: 4
@@ -79,6 +81,7 @@ Step 7: Check admin kafka_service stats
 ***************************************
 
 .. code-block:: console
+
   $ curl -s "http://localhost:8001/stats?filter=cluster.kafka_service" | grep -v ": 0"
   cluster.kafka_service.max_host_weight: 1
   cluster.kafka_service.membership_healthy: 1
