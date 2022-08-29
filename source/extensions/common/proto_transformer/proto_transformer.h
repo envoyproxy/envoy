@@ -6,7 +6,7 @@ namespace Envoy {
 namespace ProtoTransformer {
 
 /*
- * A transformer transform a protobuf to another. The output is a generic proto message.
+ * A transformer transforms a protobuf to another. The output is a generic proto message.
  */
 template <class ProtoType> class ProtoTransformer {
 public:
