@@ -122,6 +122,11 @@ new_features:
 - area: listener
   change: |
     allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+- area: lua
+  change: |
+    added an alternative function signature to `httpCall()` with `options` as an argument. This allows to skip sampling the produced trace span
+    by setting `{["sampled"] = false}` as the `options`. And this allows to return multiple header values for same header name by setting
+    `{["multiple"] = true}` as the `options`.
 
 deprecated:
 - area: http
