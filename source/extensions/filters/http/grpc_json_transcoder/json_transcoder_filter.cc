@@ -226,12 +226,14 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
-  if (proto_config.has_grpc_status_json_marshaller()) {
-    grpc_status_json_marshaller_ =
-        Envoy::Config::Utility::getFactoryByName<
-            ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status>>(
-            proto_config.grpc_status_json_marshaller().name())
-            ->createProtoJsonMarshaller(proto_config.grpc_status_json_marshaller().typed_config());
+  if (proto_config.has_grpc_status_proto_transformer()) {
+    auto* factory = Envoy::Config::Utility::getFactoryByName<
+        ProtoTransformer::ProtoTransformerFactory<google::rpc::Status>>(
+        proto_config.grpc_status_proto_transformer().name());
+    if (factory) {
+      grpc_status_proto_transformer_ = factory->createProtoTransformer(
+          proto_config.grpc_status_proto_transformer().typed_config());
+    }
   }
 }
 
@@ -897,10 +899,12 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   }
 
   std::string json_status;
-  auto translate_status =
-      config_.grpc_status_json_marshaller()
-          ? config_.grpc_status_json_marshaller()->marshal(*status_details, json_status)
-          : per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
+  std::unique_ptr<Protobuf::Message> transformed_grpc_status =
+      config_.grpc_status_proto_transformer() && status_details
+          ? config_.grpc_status_proto_transformer()->transform(*status_details)
+          : nullptr;
+  auto translate_status = per_route_config_->translateProtoMessageToJson(
+      transformed_grpc_status ? *transformed_grpc_status : *status_details, &json_status);
   if (!translate_status.ok()) {
     ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
     return false;

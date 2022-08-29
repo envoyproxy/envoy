@@ -9,8 +9,8 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "proto_json_marshaller_base_lib",
-    hdrs = ["proto_json_marshaller.h"],
+    name = "proto_transformer_base_lib",
+    hdrs = ["proto_transformer.h"],
     deps = [
         "//source/extensions/filters/http/common:factory_base_lib",
     ],

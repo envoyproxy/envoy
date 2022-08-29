@@ -434,30 +434,28 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
   EXPECT_FALSE(transcoder);
 }
-
-class TranscoderTestProtoJsonMarshaller
-    : public ProtoJson::ProtoJsonMarshaller<google::rpc::Status> {
-  Protobuf::util::Status marshal(const google::rpc::Status& status,
-                                 std::string& output) const override {
-    output = absl::StrFormat(R"({"new_code_name":%d, "new_message_name":"%s"})", status.code(),
-                             status.message());
-    return Protobuf::util::Status(StatusCode::kOk, "");
+class TranscoderTestProtoTransformer
+    : public ProtoTransformer::ProtoTransformer<google::rpc::Status> {
+  std::unique_ptr<Protobuf::Message> transform(const google::rpc::Status& proto) const override {
+    std::unique_ptr<ProtobufWkt::Any> any = std::make_unique<ProtobufWkt::Any>();
+    any->PackFrom(proto);
+    return any;
   }
 };
 
-class TranscoderTestProtoJsonMarshallerFactory
-    : public ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status> {
+class TranscoderTestProtoTransformerFactory
+    : public ProtoTransformer::ProtoTransformerFactory<google::rpc::Status> {
 public:
-  std::unique_ptr<ProtoJson::ProtoJsonMarshaller<google::rpc::Status>>
-  createProtoJsonMarshaller(const Protobuf::Message&) override {
-    return std::make_unique<TranscoderTestProtoJsonMarshaller>();
+  std::unique_ptr<ProtoTransformer::ProtoTransformer<google::rpc::Status>>
+  createProtoTransformer(const Protobuf::Message&) override {
+    return std::make_unique<TranscoderTestProtoTransformer>();
   }
 
   std::string name() const override {
-    return "envoy.proto_json_marshaller.transcoder_test_proto_json_marshaller";
+    return "envoy.proto_transformer.transcoder_test_proto_transformer";
   }
 
-  std::string category() const override { return "envoy.proto_json_marshaller"; };
+  std::string category() const override { return "envoy.proto_transformer"; };
 };
 
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
@@ -491,8 +489,8 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
-  TranscoderTestProtoJsonMarshallerFactory factory_;
-  Registry::InjectFactory<ProtoJson::ProtoJsonMarshallerFactory<google::rpc::Status>>
+  TranscoderTestProtoTransformerFactory factory_;
+  Registry::InjectFactory<ProtoTransformer::ProtoTransformerFactory<google::rpc::Status>>
       register_factory_{factory_};
 
   // TODO(lizan): Add a mock of JsonTranscoderConfig and test more error cases.
@@ -1650,8 +1648,8 @@ private:
   makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
     proto_config.set_convert_grpc_status(true);
-    proto_config.mutable_grpc_status_json_marshaller()->set_name(
-        "envoy.proto_json_marshaller.transcoder_test_proto_json_marshaller");
+    proto_config.mutable_grpc_status_proto_transformer()->set_name(
+        "envoy.proto_transformer.transcoder_test_proto_transformer");
     return proto_config;
   }
 };
@@ -1659,7 +1657,7 @@ private:
 TEST_F(GrpcJsonTranscoderFilterConvertGrpcStatusByExtensionTest,
        TranscodingBinaryHeaderInTrailerOnlyResponse) {
   const std::string expected_response(
-      R"({"new_code_name":5, "new_message_name":"Resource not found"})");
+      R"({"@type":"type.googleapis.com/google.rpc.Status","code":5,"message":"Resource not found"})");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
       .WillOnce(Invoke([&expected_response](Buffer::Instance& data, bool) {
         EXPECT_EQ(expected_response, data.toString());

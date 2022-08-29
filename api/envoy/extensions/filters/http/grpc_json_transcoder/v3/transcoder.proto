@@ -227,9 +227,9 @@ message GrpcJsonTranscoder {
   // :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
   bool convert_grpc_status = 9;
 
-  // Specifies a proto json marshaller extension that can be called during translating grpc response status into JSON.
-  // It should be an extension of ``envoy.proto_json_marshaller``.
-  config.core.v3.TypedExtensionConfig grpc_status_json_marshaller = 14;
+  // Specifies a proto transformer extension that transforms grpc response status into a custom protobuf format.
+  // It should be an extension of ``envoy.proto_transformer``.
+  config.core.v3.TypedExtensionConfig grpc_status_proto_transformer = 14;
 
   // URL unescaping policy.
   // This spec is only applied when extracting variable with multiple segments in the URL path.

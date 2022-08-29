@@ -138,7 +138,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @snowp
-/*/extensions/common/proto_json @taoxuy @qiwzhang @nareddyt
+/*/extensions/common/proto_transformer @lizan @taoxuy @qiwzhang
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder

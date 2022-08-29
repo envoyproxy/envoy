@@ -124,6 +124,6 @@ new_features:
     allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
 - area: grpc_json_transcoder
   change: |
-    added support for custom JSON format for gRPC response status by :ref:`grpc_status_json_marshaller <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.grpc_status_json_marshaller>`.
+    added support for custom JSON format for gRPC response status by :ref:`grpc_status_proto_transformer <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.grpc_status_proto_transformer>`.
 
 deprecated:
