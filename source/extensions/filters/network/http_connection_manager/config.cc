@@ -127,6 +127,36 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
+Http::HeaderValidatorFactoryPtr
+createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
+                                 http_connection_manager::v3::HttpConnectionManager& config,
+                             [[maybe_unused]] Server::Configuration::FactoryContext& context) {
+
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+  if (config.has_typed_header_validation_config()) {
+#ifdef ENVOY_ENABLE_UHV
+    auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
+        config.typed_header_validation_config());
+    if (!factory) {
+      throw EnvoyException(fmt::format("Header validator extension not found: '{}'",
+                                       config.typed_header_validation_config().name()));
+    }
+
+    header_validator_factory =
+        factory->createFromProto(config.typed_header_validation_config().typed_config(), context);
+    if (!header_validator_factory) {
+      throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
+                                       config.typed_header_validation_config().name()));
+    }
+#else
+    throw EnvoyException(
+        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+                    config.typed_header_validation_config().name()));
+#endif
+  }
+  return header_validator_factory;
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -323,7 +353,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       proxy_status_config_(config.has_proxy_status_config()
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
-                               : nullptr) {
+                               : nullptr),
+      header_validator_factory_(createHeaderValidatorFactory(config, context)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -629,14 +660,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks) {
+    Http::FilterChainManager& callbacks) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -656,7 +687,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     // or neither is configured for this upgrade.
     return false;
   }
-  FilterFactoriesList* filters_to_use = &filter_factories_;
+  const FilterFactoriesList* filters_to_use = &filter_factories_;
   if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
     filters_to_use = it->second.filter_factories.get();
   }

@@ -158,7 +158,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   const bool runtime_overridden = (warn_default == false && warn_only == true);
 
   std::string with_overridden = fmt::format(
-      error,
+      fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,

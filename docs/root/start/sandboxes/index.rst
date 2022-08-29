@@ -65,6 +65,7 @@ The following sandboxes are available:
     lua
     mysql
     postgres
+    rbac
     redis
     skywalking_tracing
     tls-inspector
@@ -74,5 +75,5 @@ The following sandboxes are available:
     wasm-cc
     websocket
     win32_front_proxy
-    zipkin_tracing
+    zipkin
     zstd

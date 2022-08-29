@@ -337,7 +337,7 @@ public:
   /**
    * Construct from a string name.
    */
-  explicit EnvoyInternalInstance(const std::string& address_id,
+  explicit EnvoyInternalInstance(const std::string& address_id, const std::string& endpoint_id = "",
                                  const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
@@ -352,10 +352,13 @@ public:
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
-    explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
+    explicit EnvoyInternalAddressImpl(const std::string& address_id, const std::string& endpoint_id)
+        : address_id_(address_id), endpoint_id_(endpoint_id) {}
     ~EnvoyInternalAddressImpl() override = default;
     const std::string& addressId() const override { return address_id_; }
+    const std::string& endpointId() const override { return endpoint_id_; }
     const std::string address_id_;
+    const std::string endpoint_id_;
   };
   EnvoyInternalAddressImpl internal_address_;
 };

@@ -11,6 +11,7 @@
 #include "source/server/active_tcp_listener.h"
 
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
+#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.validate.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"
@@ -57,7 +58,7 @@ public:
   }
 
   Envoy::Network::ConnectionBalancerSharedPtr
-  createConnectionBalancerFromProto(const Protobuf::Message&,
+  createConnectionBalancerFromProto(const Protobuf::Message& config,
                                     Server::Configuration::FactoryContext& context) override;
 
   std::string name() const override { return "envoy.network.connection_balance.dlb"; }

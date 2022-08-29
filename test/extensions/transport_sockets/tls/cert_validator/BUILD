@@ -85,3 +85,14 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "timed_cert_validator",
+    srcs = ["timed_cert_validator.cc"],
+    hdrs = [
+        "timed_cert_validator.h",
+    ],
+    deps = [
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+    ],
+)

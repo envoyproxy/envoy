@@ -155,6 +155,7 @@ public:
 
 class NetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::MatchingData> {};
 class UdpNetworkTrieMatcherFactory : public TrieMatcherFactoryBase<Network::UdpMatchingData> {};
+class HttpTrieMatcherFactory : public TrieMatcherFactoryBase<Http::HttpMatchingData> {};
 
 } // namespace Matcher
 } // namespace Common

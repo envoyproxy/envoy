@@ -423,10 +423,11 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
   {
     envoy::config::core::v3::Address proto_address;
-    Address::EnvoyInternalInstance address("internal_address");
+    Address::EnvoyInternalInstance address("internal_address", "endpoint_id");
     Utility::addressToProtobufAddress(address, proto_address);
     EXPECT_TRUE(proto_address.has_envoy_internal_address());
     EXPECT_EQ("internal_address", proto_address.envoy_internal_address().server_listener_name());
+    EXPECT_EQ("endpoint_id", proto_address.envoy_internal_address().endpoint_id());
   }
 }
 
@@ -530,22 +531,29 @@ TEST(PortRangeListTest, Normal) {
   }
 }
 
-// TODO(ccaraman): Support big-endian. These tests operate under the assumption that the machine
-// byte order is little-endian.
 TEST(AbslUint128, TestByteOrder) {
+#if defined(ABSL_IS_BIG_ENDIAN)
+  auto flip_order_for_endianness = [](const absl::uint128& input) {
+    return absl::MakeUint128(__builtin_bswap64(absl::Uint128Low64(input)),
+                             __builtin_bswap64(absl::Uint128High64(input)));
+  };
+#else
+  auto flip_order_for_endianness = [](const absl::uint128& input) { return input; };
+#endif
   {
     Address::Ipv6Instance address("::1");
     uint64_t high = 0x100000000000000;
-    EXPECT_EQ(absl::MakeUint128(high, 0), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::MakeUint128(high, 0),
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, 0)),
+              address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, 0)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
 
     EXPECT_EQ(absl::uint128(1), Utility::Ip6ntohl(address.ip()->ipv6()->address()));
   }
   {
     Address::Ipv6Instance address("1::");
-    EXPECT_EQ(absl::uint128(256), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::uint128(256),
+    EXPECT_EQ(flip_order_for_endianness(absl::uint128(256)), address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::uint128(256)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
 
     uint64_t high = 0x001000000000000;
@@ -555,8 +563,9 @@ TEST(AbslUint128, TestByteOrder) {
     Address::Ipv6Instance address("2001:abcd:ef01:2345:6789:abcd:ef01:234");
     uint64_t low = 0x452301EFCDAB0120;
     uint64_t high = 0x340201EFCDAB8967;
-    EXPECT_EQ(absl::MakeUint128(high, low), address.ip()->ipv6()->address());
-    EXPECT_EQ(absl::MakeUint128(high, low),
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, low)),
+              address.ip()->ipv6()->address());
+    EXPECT_EQ(flip_order_for_endianness(absl::MakeUint128(high, low)),
               Utility::Ip6htonl(Utility::Ip6ntohl(address.ip()->ipv6()->address())));
   }
   {

@@ -882,6 +882,10 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 }
 
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
+  if (stream_id_ == -1) {
+    // Handle the case where client streams are reset before headers are created.
+    return;
+  }
   if (parent_.use_new_codec_wrapper_) {
     parent_.adapter_->SubmitRst(stream_id_,
                                 static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
@@ -1968,6 +1972,11 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_list_bytes = max_headers_kb * 1024;
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
+
+#ifdef ENVOY_ENABLE_UHV
+  // UHV - disable header validations in oghttp2
+  og_options_.validate_http_headers = false;
+#endif
 
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents

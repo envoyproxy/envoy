@@ -13,6 +13,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -133,7 +134,7 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  void createFilterChain(Http::FilterChainManager& manager) const override;
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
@@ -142,7 +143,7 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager) override;
+                                Http::FilterChainManager& manager) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -232,6 +233,11 @@ public:
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
+  }
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
+                                               StreamInfo::StreamInfo& stream_info) override {
+    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
+                                     : nullptr;
   }
 
 private:
@@ -323,6 +329,7 @@ private:
   const bool strip_trailing_host_dot_;
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
+  const Http::HeaderValidatorFactoryPtr header_validator_factory_;
 };
 
 /**

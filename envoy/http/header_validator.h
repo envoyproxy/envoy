@@ -1,7 +1,11 @@
 #pragma once
 
+#include <string>
+#include <tuple>
+
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -17,12 +21,39 @@ class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
 
-  enum class HeaderEntryValidationResult { Accept, Reject };
+  // A class that holds either success condition or an error condition with tuple of
+  // action and error details.
+  template <typename ActionType> class Result {
+  public:
+    using Action = ActionType;
+
+    // Helper for constructing successful results
+    static Result success() { return Result(ActionType::Accept, absl::string_view()); }
+
+    Result(ActionType action, absl::string_view details) : result_(action, details) {
+      ENVOY_BUG(action == ActionType::Accept || !details.empty(),
+                "Error details must not be empty in case of an error");
+    }
+
+    bool ok() const { return std::get<0>(result_) == ActionType::Accept; }
+    operator bool() const { return ok(); }
+    absl::string_view details() const { return std::get<1>(result_); }
+    Action action() const { return std::get<0>(result_); }
+
+  private:
+    const std::tuple<ActionType, std::string> result_;
+  };
+
+  enum class RejectAction { Accept, Reject };
+  enum class RejectOrRedirectAction { Accept, Reject, Redirect };
+  using RejectResult = Result<RejectAction>;
+  using RejectOrRedirectResult = Result<RejectOrRedirectAction>;
 
   /**
    * Method for validating a request header entry.
    * Returning the Reject value causes the request to be rejected with the 400 status.
    */
+  using HeaderEntryValidationResult = RejectResult;
   virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString& key,
                                                                  const HeaderString& value) PURE;
 
@@ -41,7 +72,7 @@ public:
    * causes HTTP requests to be redirected to the :path presudo header in the request map. gRPC
    * requests will still be rejected with the INTERNAL (13) error code.
    */
-  enum class RequestHeaderMapValidationResult { Accept, Reject, Redirect };
+  using RequestHeaderMapValidationResult = RejectOrRedirectResult;
   virtual RequestHeaderMapValidationResult
   validateRequestHeaderMap(RequestHeaderMap& header_map) PURE;
 
@@ -50,7 +81,7 @@ public:
    * Returning the Reject value causes HTTP requests to be rejected with the 502 status,
    * and gRPC requests with the the UNAVAILABLE (14) error code.
    */
-  enum class ResponseHeaderMapValidationResult { Accept, Reject };
+  using ResponseHeaderMapValidationResult = RejectResult;
   virtual ResponseHeaderMapValidationResult
   validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
 };
@@ -64,22 +95,20 @@ class HeaderValidatorFactory {
 public:
   virtual ~HeaderValidatorFactory() = default;
 
-  enum class Protocol { HTTP09, HTTP1, HTTP2, HTTP3 };
-
   /**
    * Create a new header validator for the specified protocol.
    */
   virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info) PURE;
 };
 
-using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
+using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;
 
 /**
  * Extension configuration for header validators.
  */
 class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
-  virtual HeaderValidatorFactorySharedPtr
+  virtual HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) PURE;
 

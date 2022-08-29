@@ -544,6 +544,39 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "filter_integration_test",
+    srcs = [
+        "filter_integration_test.cc",
+    ],
+    shard_count = 12,
+    deps = [
+        ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
+        "//envoy/network:filter_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/integration/filters:add_body_filter_config_lib",
+        "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:buffer_continue_filter_lib",
+        "//test/integration/filters:continue_after_local_reply_filter_lib",
+        "//test/integration/filters:continue_headers_only_inject_body",
+        "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:invalid_header_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
+        "//test/integration/filters:local_reply_with_metadata_filter_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
+        "//test/integration/filters:remove_response_headers_lib",
+        "//test/integration/filters:reset_stream_filter_config_lib",
+        "//test/integration/filters:stop_iteration_and_continue",
+        "//test/integration/filters:stop_iteration_headers_inject_body",
+        "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "protocol_integration_test_lib",
     srcs = [
@@ -1517,11 +1550,16 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )
 
@@ -1881,6 +1919,8 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
@@ -1890,6 +1930,8 @@ envoy_cc_test(
         "//source/common/quic:quic_factory_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/integration/filters:test_network_filter_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
@@ -1925,6 +1967,11 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "typed_metadata_integration_proto",
+    srcs = ["typed_metadata_integration_test.proto"],
+)
+
 envoy_cc_test(
     name = "typed_metadata_integration_test",
     srcs = [
@@ -1932,9 +1979,11 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        ":typed_metadata_integration_proto_cc_proto",
         "//source/common/protobuf",
         "//test/integration/filters:listener_typed_metadata_filter_lib",
         "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )
