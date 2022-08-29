@@ -1266,5 +1266,19 @@ TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
   redis_client->close();
 }
 
+// This test tries to insert a multi-key command in a transaction, which is not
+// supported. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"mget", "foo1", "foo2"}),
+                    "-'mget' command is not supported within transaction\r\n", redis_client);
+
+  redis_client->close();
+}
+
 } // namespace
 } // namespace Envoy
