@@ -3,8 +3,6 @@
 #include <initializer_list>
 #include <memory>
 
-#include "source/server/backtrace.h"
-
 #include "quic_ssl_connection_info.h"
 
 namespace Envoy {
@@ -99,7 +97,6 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     } else {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
-    std::cerr << "========= danzh: delay close\n";
   } else if (hasDataToWrite()) {
     // Quic connection has unsent data but caller wants to close right away.
     ASSERT(type == Network::ConnectionCloseType::NoFlush);
@@ -149,19 +146,21 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
+    if (close_type_during_initialize_.has_value()) {
+      ASSERT(!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
+      close(close_type_during_initialize_.value());
+      close_type_during_initialize_ = absl::nullopt;
+    }
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    std::cerr << "============ danzh: still has " << bytes_to_send_
-              << " bytes of data to send, update timer\n";
-    BACKTRACE_LOG();
     if (delayed_close_timer_ != nullptr) {
       // Re-arm delay close timer on every write event if there are still data
       // buffered or the connection close is supposed to be delayed.
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     }
   } else {
-    std::cerr << "============ danzh: actual close connection\n";
     closeConnectionImmediately();
   }
 }

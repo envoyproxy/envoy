@@ -3550,12 +3550,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-#ifdef WIN32
-  ENVOY_LOG_MISC(warn, "manually set logs to trace");
-  LogLevelSetter save_levels(spdlog::level::trace);
-  quiche::setVerbosityLogThreshold(1);
-#endif
-
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
                "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
 
@@ -3564,9 +3558,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 0, 164, 0),
                                      BytesCountExpectation(120, 0, 120, 0),
                                      BytesCountExpectation(120, 0, 120, 0));
-#ifdef WIN32
-  quiche::setVerbosityLogThreshold(0);
-#endif
 }
 
 TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireBytesCountUpstream) {

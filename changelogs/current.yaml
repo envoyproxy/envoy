@@ -23,7 +23,7 @@ minor_behavior_changes:
     removed blank line for being compatible with OpenMetrics.
 - area: quic
   change: |
-    changed the timing of QUIC connection writing data in response to incoming packets. This change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to false.
+    changed the timing of QUIC connection writing data in response to incoming packets in non-Windowns platforms. This change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

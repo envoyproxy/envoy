@@ -20,7 +20,12 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
       QuicNetworkConnection(std::move(connection_socket)) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_send_in_response_to_packet")) {
+#ifndef WIN32
+    // Defer sending while processing UDP packets till the end of the current event loop to optimize
+    // UDP GSO sendmsg efficiency. But this optimization causes some test failures under Windows,
+    // and Windows doesn't support GSO, do not apply this optimization on Windows.
     set_defer_send_in_response_to_packets(GetQuicFlag(FLAGS_quic_defer_send_in_response));
+#endif
     defer_send_ = true;
   }
 }
