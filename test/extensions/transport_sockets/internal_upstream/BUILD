@@ -43,6 +43,9 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "//source/extensions/filters/http/dynamic_forward_proxy:config",
+        "//source/extensions/filters/http/router:config",
         "//source/extensions/io_socket/user_space:config",
         "//source/extensions/transport_sockets/internal_upstream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
@@ -54,5 +57,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/internal_upstream/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],
 )
