@@ -204,6 +204,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
+          config_->responseHeadersParser().evaluateHeaders(headers, callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {

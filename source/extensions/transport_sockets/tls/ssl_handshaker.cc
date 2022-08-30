@@ -5,6 +5,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 using Envoy::Network::PostIoAction;
@@ -13,6 +14,26 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+void ValidateResultCallbackImpl::onSslHandshakeCancelled() { extended_socket_info_.reset(); }
+
+void ValidateResultCallbackImpl::onCertValidationResult(bool succeeded,
+                                                        const std::string& /*error_details*/,
+                                                        uint8_t tls_alert) {
+  if (!extended_socket_info_.has_value()) {
+    return;
+  }
+  extended_socket_info_->setCertificateValidationStatus(
+      succeeded ? Ssl::ClientValidationStatus::Validated : Ssl::ClientValidationStatus::Failed);
+  extended_socket_info_->setCertificateValidationAlert(tls_alert);
+  extended_socket_info_->onCertificateValidationCompleted(succeeded);
+}
+
+SslExtendedSocketInfoImpl::~SslExtendedSocketInfoImpl() {
+  if (cert_validate_result_callback_.has_value()) {
+    cert_validate_result_callback_->onSslHandshakeCancelled();
+  }
+}
 
 void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
     Envoy::Ssl::ClientValidationStatus validated) {
@@ -23,10 +44,30 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
   return certificate_validation_status_;
 }
 
+void SslExtendedSocketInfoImpl::onCertificateValidationCompleted(bool succeeded) {
+  cert_validation_result_ =
+      succeeded ? Ssl::ValidateStatus::Successful : Ssl::ValidateStatus::Failed;
+  if (cert_validate_result_callback_.has_value()) {
+    ASSERT(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_async_cert_validation"));
+    // This is an async cert validation.
+    cert_validate_result_callback_.reset();
+    // Resume handshake.
+    ssl_handshaker_.handshakeCallbacks()->onAsynchronousCertValidationComplete();
+  }
+}
+
+Ssl::ValidateResultCallbackPtr SslExtendedSocketInfoImpl::createValidateResultCallback() {
+  auto callback = std::make_unique<ValidateResultCallbackImpl>(
+      ssl_handshaker_.handshakeCallbacks()->connection().dispatcher(), *this);
+  cert_validate_result_callback_ = *callback;
+  cert_validation_result_ = Ssl::ValidateStatus::Pending;
+  return callback;
+}
+
 SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                                      Ssl::HandshakeCallbacks* handshake_callbacks)
     : ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
-      state_(Ssl::SocketState::PreHandshake) {
+      state_(Ssl::SocketState::PreHandshake), extended_socket_info_(*this) {
   SSL_set_ex_data(ssl_.get(), ssl_extended_socket_info_index, &(this->extended_socket_info_));
 }
 
@@ -55,6 +96,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_WRITE:
       return PostIoAction::KeepOpen;
     case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+    case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
     default:

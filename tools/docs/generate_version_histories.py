@@ -205,9 +205,11 @@ class VersionHistories(runner.Runner):
             mapped_version=(minor_version if map_version else None),
             sections=self.sections,
             data=data,
-            entries={s: await changelog.entries(s)
-                     for s in self.sections
-                     if s in data},
+            entries={
+                s: sorted(await changelog.entries(s), key=self._sort_entries)
+                for s in self.sections
+                if s in data
+            },
             release_date=await changelog.release_date,
             changelog=changelog)
         version_path = root_path.joinpath(f"v{changelog_version}.rst")
@@ -271,6 +273,10 @@ class VersionHistories(runner.Runner):
             patch_versions=patch_versions)
         self.minor_index_path(minor_version).write_text(
             f"{version_history_minor_index.strip()}\n\n")
+
+    def _sort_entries(self, entry):
+        # TODO(phlax): fix sorting in `envoy.base.utils` and remove
+        return entry.area, entry.change
 
 
 def main(*args):

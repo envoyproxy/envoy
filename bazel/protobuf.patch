@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 1690d4219..eb3cfbc67 100644
+index 887e5e384..d5ecca55d 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -19,7 +19,7 @@ exports_files(["LICENSE"])
+@@ -21,7 +21,7 @@ exports_files(["LICENSE"])
  # ZLIB configuration
  ################################################################################
  
@@ -11,11 +11,9 @@ index 1690d4219..eb3cfbc67 100644
  
  ################################################################################
  # Protobuf Runtime Library
-@@ -510,14 +510,69 @@ cc_library(
-     deps = [":protobuf"],
+@@ -511,13 +511,68 @@ cc_library(
  )
  
-+
  cc_binary(
 -    name = "protoc",
 +    name = "compiled_protoc",
@@ -25,10 +23,9 @@ index 1690d4219..eb3cfbc67 100644
      deps = [":protoc_lib"],
  )
  
-+
 +# Lifted from `rules_proto`
 +config_setting(
-+    name = "linux-aarch64",
++    name = "linux-aarch_64",
 +    constraint_values = [
 +        "@platforms//os:linux",
 +        "@platforms//cpu:aarch64",
@@ -40,6 +37,14 @@ index 1690d4219..eb3cfbc67 100644
 +    constraint_values = [
 +        "@platforms//os:linux",
 +        "@platforms//cpu:x86_64",
++    ],
++)
++
++config_setting(
++    name = "osx-aarch_64",
++    constraint_values = [
++        "@platforms//os:osx",
++        "@platforms//cpu:aarch64",
 +    ],
 +)
 +
@@ -59,19 +64,13 @@ index 1690d4219..eb3cfbc67 100644
 +    ],
 +)
 +
-+config_setting(
-+    name = "windows",
-+    constraint_values = [
-+        "@platforms//os:windows",
-+    ],
-+)
-+
 +# Use precompiled binaries where possible.
 +alias(
 +    name = "protoc",
 +    actual = select({
-+        ":linux-aarch64": "@com_google_protobuf_protoc_linux_aarch_64//:protoc",
++        ":linux-aarch_64": "@com_google_protobuf_protoc_linux_aarch_64//:protoc",
 +        ":linux-x86_64": "@com_google_protobuf_protoc_linux_x86_64//:protoc",
++        ":osx-aarch_64": "@com_google_protobuf_protoc_osx_aarch_64//:protoc",
 +        ":osx-x86_64": "@com_google_protobuf_protoc_osx_x86_64//:protoc",
 +        ":win64": "@com_google_protobuf_protoc_win64//:protoc",
 +        "//conditions:default": ":compiled_protoc",
@@ -79,20 +78,21 @@ index 1690d4219..eb3cfbc67 100644
 +    visibility = ["//visibility:public"],
 +)
 +
+ 
  ################################################################################
- # Tests
- ################################################################################
+ # Generates protoc release artifacts.
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 9319c67f1..d85d53d4a 100644
+index 03f3b29ee..520c9ee4f 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
-@@ -31,3 +31,9 @@
+@@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '3.19.4'
+ __version__ = '3.20.1'
++
 +
 +if __name__ != '__main__':
-+  try:
-+    __import__('pkg_resources').declare_namespace(__name__)
-+  except ImportError:
-+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
++    try:
++        __import__('pkg_resources').declare_namespace(__name__)
++    except ImportError:
++        __path__ = __import__('pkgutil').extend_path(__path__, __name__)

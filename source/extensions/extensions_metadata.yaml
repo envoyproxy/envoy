@@ -905,13 +905,6 @@ envoy.tracers.dynamic_ot:
   status: stable
   type_urls:
   - envoy.config.trace.v3.DynamicOtConfig
-envoy.tracers.lightstep:
-  categories:
-  - envoy.tracers
-  security_posture: robust_to_untrusted_downstream
-  status: stable
-  type_urls:
-  - envoy.config.trace.v3.LightstepConfig
 envoy.tracers.opencensus:
   categories:
   - envoy.tracers
@@ -1241,6 +1234,7 @@ envoy.matching.inputs.subject:
   - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
 envoy.matching.custom_matchers.trie_matcher:
   categories:
+  - envoy.matching.http.custom_matchers
   - envoy.matching.network.custom_matchers
   security_posture: unknown
   status: alpha

@@ -8,7 +8,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "verify_build_examples" \
+          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "publish" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
@@ -502,7 +502,8 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   export TODAY_DATE
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
-        -- -v warn
+        -- -v warn \
+           -c cves release_dates releases
 
   # Run pip requirements tests
   echo "check pip..."
@@ -510,7 +511,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy|shared"
+  run_ci_verify "*" "win32-front-proxy|shared"
   exit 0
 elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
@@ -520,9 +521,9 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
     fi
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
     exit 0
-elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
-  run_ci_verify wasm-cc
-  exit 0
+elif [[ "$CI_TARGET" == "publish" ]]; then
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
+    exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1

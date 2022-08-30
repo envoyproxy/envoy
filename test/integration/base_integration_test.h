@@ -207,11 +207,15 @@ public:
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+                                 const std::string& version, FakeStream* stream = nullptr) {
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
@@ -220,7 +224,7 @@ public:
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    xds_stream_->sendGrpcMessage(discovery_response);
+    stream->sendGrpcMessage(discovery_response);
   }
 
   template <class T>

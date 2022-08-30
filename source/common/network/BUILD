@@ -126,6 +126,7 @@ envoy_cc_library(
         ":connection_base_lib",
         ":connection_lib",
         ":multi_connection_base_impl_lib",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 
@@ -364,7 +365,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
-        ":listen_socket_lib",
         "//envoy/api:os_sys_calls_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -434,6 +434,7 @@ envoy_cc_library(
         ":address_lib",
         ":default_socket_interface_lib",
         ":socket_lib",
+        ":socket_option_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
         "//envoy/stats:stats_interface",
@@ -470,6 +471,17 @@ envoy_cc_library(
     name = "filter_state_proxy_info_lib",
     srcs = ["filter_state_proxy_info.cc"],
     hdrs = ["filter_state_proxy_info.h"],
+    deps = [
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_state_dst_address_lib",
+    srcs = ["filter_state_dst_address.cc"],
+    hdrs = ["filter_state_dst_address.h"],
     deps = [
         "//envoy/network:address_interface",
         "//envoy/stream_info:filter_state_interface",

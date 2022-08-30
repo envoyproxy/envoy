@@ -9,6 +9,11 @@ VCL Socket Interface
 
   The VCL socket interface extension is experimental and is currently under active development.
 
+.. note::
+
+ These features are not supported on Windows, for details please refer to `VPP Supported Architectures <https://s3-docs.fd.io/vpp/22.10/aboutvpp/supported.html>`_.
+
+
 This socket interface extension provides Envoy with high speed L2-L7 user space networking by integrating with `fd.io VPP <https://fd.io>`_ through VPP's ``Comms`` Library (VCL).
 
 The VCL socket interface is only included in :ref:`contrib images <install_contrib>`
@@ -37,7 +42,7 @@ To support all of these indirect interactions, the socket interface makes use of
 Installing and running VPP/VCL
 ------------------------------
 
-For information on how to build and/or install VPP see the getting started guide `here <https://fd.io/docs/vpp/master/>`_. Assuming the use of DPDK interfaces, a minimal `startup.conf` file that also configures the host stack would consist of:
+For information on how to build and/or install VPP see the getting started guide `here <https://fd.io/docs/vpp/master/>`_. Assuming the use of DPDK interfaces, a minimal ``startup.conf`` file that also configures the host stack would consist of:
 
 .. code-block:: text
 
@@ -91,9 +96,9 @@ For information on how to build and/or install VPP see the getting started guide
     event-queue-length 100000
   }
 
-Manually start VPP, once a binary is obtained: `./vpp -c startup.conf`
+Manually start VPP, once a binary is obtained: ``./vpp -c startup.conf``
 
-VCL can be configured by either adding a configuration file to `/etc/vpp/vcl.conf` or by pointing the `VCL_CONFIG` environment variable to a configuration file. A minimal example that can be used for RPS load testing can be found lower:
+VCL can be configured by either adding a configuration file to ``/etc/vpp/vcl.conf`` or by pointing the ``VCL_CONFIG`` environment variable to a configuration file. A minimal example that can be used for RPS load testing can be found lower:
 
 .. code-block:: text
 

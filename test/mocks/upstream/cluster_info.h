@@ -29,6 +29,10 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
@@ -40,6 +44,8 @@ public:
   MOCK_METHOD(bool, isEnabled, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
               fallbackPolicy, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
+              metadataFallbackPolicy, (), (const));
   MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
   MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
   MOCK_METHOD(bool, localityWeightAware, (), (const));
@@ -139,7 +145,7 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(AddressSelectFn, sourceAddressFn, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
@@ -156,6 +162,13 @@ public:
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+              (const));
+
+  MOCK_METHOD(void, createFilterChain, (Http::FilterChainManager & manager), (const));
+  MOCK_METHOD(bool, createUpgradeFilterChain,
+              (absl::string_view upgrade_type,
+               const Http::FilterChainFactory::UpgradeMap* upgrade_map,
+               Http::FilterChainManager& manager),
               (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;

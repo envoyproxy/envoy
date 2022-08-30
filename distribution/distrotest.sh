@@ -48,6 +48,24 @@ run_log () {
     echo -e "[${DISTRO}/${PACKAGE}:${TESTNAME}] ${*}"
 }
 
+retry () {
+    local i=1 returns=1 seconds="$1"
+    shift
+    while ((i<=seconds)); do
+        if "${@}" 2> /dev/null; then
+            returns=0
+            break
+        else
+            sleep 1
+            ((i++))
+        fi
+    done
+    if [[ "$returns" != 0 ]]; then
+        echo "Wait (${seconds}) failed: ${*}" >&2
+    fi
+    return "$returns"
+}
+
 trap trap_errors ERR
 trap exit 1 INT
 
@@ -99,7 +117,8 @@ run_log envoy-running "Check envoy is running"
 pgrep envoy
 
 run_log proxy-responds "Check proxy responds"
-RESPONSE=$(curl -s http://localhost:10000/)
+# The website can be flakey, give it a minute of trying...
+RESPONSE="$(retry 60 curl -s http://localhost:10000/)"
 echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy, designed for cloud-native applications"
 
 run_log stop-envoy "Stop envoy"

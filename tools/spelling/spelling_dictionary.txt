@@ -43,6 +43,7 @@ DLE
 DSR
 DSS
 EBADF
+ECH
 ENDIF
 ENOTCONN
 ENQ
@@ -54,6 +55,7 @@ ETX
 FS
 HEXDIG
 HEXDIGIT
+HPE
 LRU
 NAK
 OWS
@@ -346,6 +348,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SIO
 SMTP
 SNI
@@ -806,6 +809,7 @@ iteratively
 javascript
 jitter
 jittered
+js
 kafka
 keepalive
 keepalives
@@ -1109,6 +1113,7 @@ retriable
 retriggers
 revalidated
 revalidation
+reverify
 rfield
 rmdir
 rocketmq

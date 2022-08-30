@@ -452,6 +452,7 @@ envoy_cc_test(
         "//test/common/http:common_lib",
         "//test/mocks:common_lib",
         "//test/mocks/router:router_filter_interface",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

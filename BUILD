@@ -32,7 +32,7 @@ package_group(
         "//test/extensions/...",
         "//test/server",
         "//test/server/config_validation",
-        "//test/tools/schema_validator/...",
+        "//test/tools/...",
         "//tools/extensions/...",
     ],
 )
