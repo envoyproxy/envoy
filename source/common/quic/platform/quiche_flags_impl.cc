@@ -73,21 +73,20 @@ QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)
 QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
 
-#define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                    \
+#define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \
   ABSL_FLAG(type, flag, maybeOverride(#flag, value), help);
 
-#define DEFINE_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                             \
+#define DEFINE_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                                  \
   DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
 
-#define DEFINE_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)      \
+#define DEFINE_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)           \
   DEFINE_PROTOCOL_FLAG_IMPL(type, flag, external_value, doc)
 
 // Select the right macro based on the number of arguments.
 #define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
 
-#define PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                      \
-  GET_6TH_ARG(__VA_ARGS__, DEFINE_PROTOCOL_FLAG_TWO_VALUES,                                   \
-              DEFINE_PROTOCOL_FLAG_SINGLE_VALUE)
+#define PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                           \
+  GET_6TH_ARG(__VA_ARGS__, DEFINE_PROTOCOL_FLAG_TWO_VALUES, DEFINE_PROTOCOL_FLAG_SINGLE_VALUE)
 
 #define QUIC_PROTOCOL_FLAG(...) PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 #include "quiche/quic/core/quic_protocol_flags_list.h"
