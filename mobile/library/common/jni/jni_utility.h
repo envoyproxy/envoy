@@ -23,10 +23,14 @@ void set_class_loader(jobject class_loader);
  * defined by the project. For finding classes of Java built in-types use
  * `env->FindClass(...)` method instead as it is lighter to use.
  *
+ * Read more about why you cannot use `env->FindClass(...)` to look for Java classes
+ * defined by the project and a pattern used by the implementation of `find_class` helper
+ * method at https://developer.android.com/training/articles/perf-jni#native-libraries.
+ *
  * The method works on Android targets only as the `set_class_loader` method is not
  * called by JVM-only targets.
  *
- * @param class_name, the name of the class to find (i.e. "org/chromium/net/AndroidNetworkLibrary").
+ * @param class_name, the name of the class to find (i.e. "org.chromium.net.AndroidNetworkLibrary").
  *
  * @return jclass, the class with a provided `class_name` or NULL if
  *         it couldn't be found.
