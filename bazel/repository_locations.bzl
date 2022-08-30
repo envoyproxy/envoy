@@ -641,6 +641,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-27",
         cpe = "cpe:2.3:a:gnu:zlib:*",
         license = "zlib",
+        license_url = "https://github.com/madler/zlib/blob/v{version}/zlib.h",
     ),
     org_boost = dict(
         project_name = "Boost",
@@ -945,6 +946,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
         ],
         cpe = "cpe:2.3:a:llvm:*:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/llvm/LICENSE.TXT",
     ),
     com_github_wamr = dict(
         project_name = "Webassembly Micro Runtime",
@@ -959,7 +962,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.wasm.runtime.wamr"],
         cpe = "N/A",
         license = "Apache-2.0",
-        license_url = "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE.txt",
+        license_url = "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
@@ -1085,6 +1088,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.wasm.runtime.v8"],
         release_date = "2022-05-31",
         cpe = "N/A",
+        license = "zlib",
+        license_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/+/{version}/LICENSE",
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
@@ -1097,6 +1102,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core"],
         release_date = "2022-08-19",
         cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
     ),
     com_googlesource_googleurl = dict(
         project_name = "Chrome URL parsing library",
@@ -1110,6 +1117,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [],
         release_date = "2022-04-04",
         cpe = "N/A",
+        license = "googleurl",
+        license_url = "https://quiche.googlesource.com/googleurl/+/{version}/LICENSE",
     ),
     com_google_cel_cpp = dict(
         project_name = "Common Expression Language (CEL) C++ library",
@@ -1158,6 +1167,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-05-10",
         cpe = "cpe:2.3:a:google:flatbuffers:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/flatbuffers/blob/v{version}/LICENSE.txt",
     ),
     com_googlesource_code_re2 = dict(
         project_name = "RE2",
@@ -1170,6 +1181,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-05-31",
         cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/google/re2/blob/{version}/LICENSE",
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but
     # provided as part of the compiler-rt source distribution. We can't use the
@@ -1186,6 +1199,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-23",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:llvm:compiler-rt:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/llvm/llvm-project/blob/llvmorg-{version}/compiler-rt/LICENSE.TXT",
     ),
     upb = dict(
         project_name = "upb",
@@ -1198,6 +1213,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/protocolbuffers/upb/archive/{version}.tar.gz"],
         use_category = ["controlplane"],
         cpe = "N/A",
+        license = "upb",
+        license_url = "https://github.com/protocolbuffers/upb/blob/{version}/LICENSE",
     ),
     kafka_source = dict(
         project_name = "Kafka (source)",
@@ -1211,6 +1228,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.network.kafka_broker", "envoy.filters.network.kafka_mesh"],
         release_date = "2022-05-03",
         cpe = "cpe:2.3:a:apache:kafka:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/apache/kafka/blob/{version}/LICENSE",
     ),
     edenhill_librdkafka = dict(
         project_name = "Kafka (C/C++ client)",
@@ -1224,6 +1243,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.network.kafka_mesh"],
         release_date = "2021-10-18",
         cpe = "N/A",
+        license = "librdkafka",
+        license_url = "https://github.com/edenhill/librdkafka/blob/v{version}/LICENSE",
     ),
     kafka_server_binary = dict(
         project_name = "Kafka (server binary)",
@@ -1246,6 +1267,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/dpkp/kafka-python/archive/{version}.tar.gz"],
         release_date = "2020-09-30",
         use_category = ["test_only"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/dpkp/kafka-python/blob/{version}/LICENSE",
     ),
     proxy_wasm_cpp_sdk = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
@@ -1270,6 +1293,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2022-03-15",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/{version}/LICENSE",
     ),
     proxy_wasm_cpp_host = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
@@ -1294,6 +1319,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2022-08-05",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/{version}/LICENSE",
     ),
     proxy_wasm_rust_sdk = dict(
         project_name = "WebAssembly for Proxies (Rust SDK)",
@@ -1306,6 +1333,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["test_only"],
         release_date = "2022-04-08",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE",
     ),
     emsdk = dict(
         project_name = "Emscripten SDK",
@@ -1318,6 +1347,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],
         release_date = "2022-03-09",
+        license = "Emscripten SDK",
+        license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
     rules_rust = dict(
         project_name = "Bazel rust rules",
@@ -1330,6 +1361,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.wasm.runtime.wasmtime"],
         release_date = "2022-04-26",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",
     ),
     com_github_fdio_vpp_vcl = dict(
         project_name = "VPP Comms Library",
@@ -1343,6 +1376,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.bootstrap.vcl"],
         release_date = "2022-03-02",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/FDio/vpp/blob/{version}/LICENSE",
     ),
     intel_dlb = dict(
         project_name = "Intel Dlb",
