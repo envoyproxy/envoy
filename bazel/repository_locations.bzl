@@ -239,6 +239,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2021-11-29",
         cpe = "N/A",
+        license = "BSD-2-Clause",
+        license_url = "https://github.com/Cyan4973/xxHash/blob/v{version}/LICENSE",
     ),
     com_github_envoyproxy_sqlparser = dict(
         project_name = "C++ SQL Parser Library",
@@ -255,6 +257,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2020-06-10",
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/envoyproxy/sql-parser/blob/{version}/LICENSE",
     ),
     com_github_mirror_tclap = dict(
         project_name = "tclap",
@@ -267,6 +271,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-11-01",
         use_category = ["other"],
         cpe = "cpe:2.3:a:tclap_project:tclap:*",
+        license = "MIT",
+        license_url = "https://github.com/mirror/tclap/blob/v{version}/COPYING",
     ),
     com_github_fmtlib_fmt = dict(
         project_name = "fmt",
@@ -279,6 +285,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-01-06",
         cpe = "cpe:2.3:a:fmt:fmt:*",
+        license = "fmt",
+        license_url = "https://github.com/fmtlib/fmt/blob/{version}/LICENSE.rst",
     ),
     com_github_gabime_spdlog = dict(
         project_name = "spdlog",
@@ -291,6 +299,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2021-08-12",
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/gabime/spdlog/blob/v{version}/LICENSE",
     ),
     com_github_google_libprotobuf_mutator = dict(
         project_name = "libprotobuf-mutator",
@@ -302,6 +312,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libprotobuf-mutator/archive/v{version}.tar.gz"],
         release_date = "2020-11-13",
         use_category = ["test_only"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/libprotobuf-mutator/blob/v{version}/LICENSE",
     ),
     com_github_google_libsxg = dict(
         project_name = "libsxg",
@@ -315,6 +327,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.http.sxg"],
         release_date = "2021-07-08",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/libsxg/blob/{version}/LICENSE",
     ),
     com_github_google_tcmalloc = dict(
         project_name = "tcmalloc",
@@ -327,6 +341,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-08-06",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/tcmalloc/blob/{version}/LICENSE",
     ),
     com_github_gperftools_gperftools = dict(
         project_name = "gperftools",
@@ -339,6 +355,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-05-31",
         use_category = ["dataplane_core", "controlplane"],
         cpe = "cpe:2.3:a:gperftools_project:gperftools:*",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING",
     ),
     com_github_grpc_grpc = dict(
         project_name = "gRPC",
@@ -351,6 +369,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-08-18",
         cpe = "cpe:2.3:a:grpc:grpc:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
     ),
     com_github_unicode_org_icu = dict(
         project_name = "ICU Library",
@@ -364,6 +384,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.http.language"],
         release_date = "2022-04-06",
         cpe = "N/A",
+        license = "ICU",
+        license_url = "https://github.com/unicode-org/icu/blob/release-{version}/icu4c/LICENSE",
     ),
     com_github_intel_ipp_crypto_crypto_mb = dict(
         project_name = "libipp-crypto",
@@ -377,6 +399,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/intel/ipp-crypto/blob/ippcp_{version}/LICENSE",
     ),
     com_github_intel_qatlib = dict(
         project_name = "qatlib",
@@ -390,6 +414,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-11-10",
         extensions = ["envoy.tls.key_providers.qat"],
         cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/intel/qatlib/blob/{version}/LICENSE",
     ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
@@ -405,6 +431,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.lua"],
         cpe = "cpe:2.3:a:luajit:luajit:*",
+        license = "MIT",
+        license_url = "https://github.com/LuaJIT/LuaJIT/blob/{version}/COPYRIGHT",
     ),
     com_github_moonjit_moonjit = dict(
         project_name = "Moonjit",
@@ -418,6 +446,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.http.lua"],
         release_date = "2020-01-14",
         cpe = "cpe:2.3:a:moonjit_project:moonjit:*",
+        license = "moonjit",
+        license_url = "https://github.com/moonjit/moonjit/blob/{version}/COPYRIGHT",
     ),
     com_github_nghttp2_nghttp2 = dict(
         project_name = "Nghttp2",
@@ -430,6 +460,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-06-24",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
+        license = "MIT",
+        license_url = "https://github.com/nghttp2/nghttp2/blob/v{version}/LICENSE",
     ),
     io_hyperscan = dict(
         project_name = "Hyperscan",
@@ -446,6 +478,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-01-13",
         cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/intel/hyperscan/blob/v{version}/LICENSE",
     ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
@@ -462,6 +496,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2019-01-16",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/opentracing/opentracing-cpp/blob/v{version}/LICENSE",
     ),
     skywalking_data_collect_protocol = dict(
         project_name = "skywalking-data-collect-protocol",
