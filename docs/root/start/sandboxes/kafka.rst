@@ -87,7 +87,6 @@ You can check the broker stats by querying the Envoy admin interface:
 .. code-block:: console
 
   $ curl -s "http://localhost:8001/stats?filter=kafka.kafka_broker" | grep -v ": 0"
-  kafka.kafka_broker.request.create_topics_request: 1
   kafka.kafka_broker.request.api_versions_request: 4
   kafka.kafka_broker.request.find_coordinator_request: 1
   kafka.kafka_broker.request.metadata_request: 4
