@@ -512,6 +512,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.skywalking"],
         release_date = "2021-12-11",
         cpe = "cpe:2.3:a:apache:skywalking:*",
+        license = "Apache-2.0",
     ),
     com_github_skyapm_cpp2sky = dict(
         project_name = "cpp2sky",
@@ -525,6 +526,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.skywalking"],
         release_date = "2022-03-28",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
         project_name = "Datadog OpenTracing C++ Client",
@@ -538,6 +541,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.datadog"],
         release_date = "2021-01-27",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/DataDog/dd-opentracing-cpp/blob/v{version}/LICENSE",
     ),
     com_github_google_benchmark = dict(
         project_name = "Benchmark",
@@ -549,6 +554,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/benchmark/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
         release_date = "2022-07-25",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/benchmark/blob/v{version}/LICENSE",
     ),
     com_github_libevent_libevent = dict(
         project_name = "libevent",
@@ -571,6 +578,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2020-07-28",
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/libevent/libevent/blob/{version}/LICENSE",
     ),
     net_colm_open_source_colm = dict(
         project_name = "Colm",
@@ -591,6 +600,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-12-28",
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/adrian-thurston/colm/blob/{version}/COPYING",
     ),
     net_colm_open_source_ragel = dict(
         project_name = "Ragel",
@@ -614,6 +625,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-12-28",
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/adrian-thurston/ragel/blob/{version}/COPYING",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
     net_zlib = dict(
@@ -627,6 +640,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-03-27",
         cpe = "cpe:2.3:a:gnu:zlib:*",
+        license = "zlib",
     ),
     org_boost = dict(
         project_name = "Boost",
@@ -643,6 +657,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-12-08",
         cpe = "cpe:2.3:a:boost:boost:*",
+        license = "Boost",
+        license_url = "https://www.boost.org/LICENSE_1_0.txt",
     ),
     org_brotli = dict(
         project_name = "brotli",
@@ -661,6 +677,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2020-09-08",
         cpe = "cpe:2.3:a:google:brotli:*",
+        license = "MIT",
+        license_url = "https://github.com/google/brotli/blob/{version}/LICENSE",
     ),
     com_github_facebook_zstd = dict(
         project_name = "zstd",
@@ -689,6 +707,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2021-12-24",
         cpe = "N/A",
+        license = "zlib",
+        license_url = "https://github.com/zlib-ng/zlib-ng/blob/{version}/LICENSE.md",
     ),
     com_github_jbeder_yaml_cpp = dict(
         project_name = "yaml-cpp",
@@ -703,6 +723,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-04-27",
         cpe = "cpe:2.3:a:yaml-cpp_project:yaml-cpp:*",
+        license = "MIT",
+        license_url = "https://github.com/jbeder/yaml-cpp/blob/{version}/LICENSE",
     ),
     com_github_msgpack_msgpack_c = dict(
         project_name = "msgpack for C/C++",
@@ -716,6 +738,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.datadog"],
         release_date = "2020-06-05",
         cpe = "N/A",
+        license = "Boost",
+        license_url = "https://github.com/msgpack/msgpack-c/blob/cpp-{version}/LICENSE_1_0.txt",
     ),
     com_github_google_jwt_verify = dict(
         project_name = "jwt_verify_lib",
@@ -729,6 +753,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.http.jwt_authn", "envoy.filters.http.gcp_authn"],
         release_date = "2021-03-05",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/jwt_verify_lib/blob/{version}/LICENSE",
     ),
     com_github_alibaba_hessian2_codec = dict(
         project_name = "hessian2-codec",
@@ -742,6 +768,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.network.dubbo_proxy"],
         release_date = "2021-04-05",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/alibaba/hessian2-codec/blob/{version}/LICENSE",
     ),
     com_github_tencent_rapidjson = dict(
         project_name = "RapidJSON",
@@ -756,6 +784,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
         release_date = "2019-12-03",
         cpe = "cpe:2.3:a:tencent:rapidjson:*",
+        license = "RapidJSON",
+        license_url = "https://github.com/Tencent/rapidjson/blob/{version}/license.txt",
     ),
     com_github_nlohmann_json = dict(
         project_name = "nlohmann JSON",
@@ -770,6 +800,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-08-12",
         cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
+        license = "MIT",
+        license_url = "https://github.com/nlohmann/json/blob/v{version}/LICENSE.MIT",
     ),
     # This is an external dependency needed while running the
     # envoy docker image. A bazel target has been created since
