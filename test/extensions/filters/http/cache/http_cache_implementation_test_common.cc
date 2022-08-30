@@ -103,7 +103,7 @@ absl::Status HttpCacheImplementationTest::insert(
     return absl::OkStatus();
   }
   if (body.empty() && trailers.has_value()) {
-    inserter->insertTrailers(trailers.value(), nullptr);
+    inserter->insertTrailers(trailers.value(), [](bool) {});
     return absl::OkStatus();
   }
 
