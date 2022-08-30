@@ -68,6 +68,8 @@ private:
   chooseHostForSelectorFallbackPolicy(const SubsetSelectorFallbackParams& fallback_params,
                                       LoadBalancerContext* context);
 
+  HostConstSharedPtr chooseHostIteration(LoadBalancerContext* context);
+
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
   public:
@@ -142,12 +144,15 @@ private:
   using ValueSubsetMap = absl::node_hash_map<HashedValue, LbSubsetEntryPtr>;
   using LbSubsetMap = absl::node_hash_map<std::string, ValueSubsetMap>;
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
+  using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
 
   class LoadBalancerContextWrapper : public LoadBalancerContext {
   public:
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
                                const std::set<std::string>& filtered_metadata_match_criteria_names);
 
+    LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
+                               const ProtobufWkt::Struct& metadata_match_criteria_override);
     // LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -251,6 +256,10 @@ private:
   std::vector<SubsetMetadata> extractSubsetMetadata(const std::set<std::string>& subset_keys,
                                                     const Host& host);
   std::string describeMetadata(const SubsetMetadata& kvs);
+  HostConstSharedPtr chooseHostWithMetadataFallbacks(LoadBalancerContext* context,
+                                                     const MetadataFallbacks& metadata_fallbacks);
+  const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
+  LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
@@ -266,6 +275,8 @@ private:
 
   const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
+  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
+      metadata_fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
 

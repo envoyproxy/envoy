@@ -20,12 +20,6 @@ public:
   virtual ~HeaderFormatter() = default;
 
   virtual const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
-
-  /**
-   * @return bool indicating whether the formatted header should be appended to the existing
-   *              headers or replace any existing values for the header
-   */
-  virtual bool append() const PURE;
 };
 
 using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
@@ -35,18 +29,16 @@ using HeaderFormatterPtr = std::unique_ptr<HeaderFormatter>;
  */
 class StreamInfoHeaderFormatter : public HeaderFormatter {
 public:
-  StreamInfoHeaderFormatter(absl::string_view field_name, bool append);
+  StreamInfoHeaderFormatter(absl::string_view field_name);
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override;
-  bool append() const override { return append_; }
 
   using FieldExtractor = std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>;
   using FormatterPtrMap = absl::node_hash_map<std::string, Envoy::Formatter::FormatterPtr>;
 
 private:
   FieldExtractor field_extractor_;
-  const bool append_;
 
   // Maps a string format pattern (including field name and any command operators between
   // parenthesis) to the list of FormatterProviderPtrs that are capable of formatting that pattern.
@@ -61,18 +53,16 @@ private:
  */
 class PlainHeaderFormatter : public HeaderFormatter {
 public:
-  PlainHeaderFormatter(const std::string& static_header_value, bool append)
-      : static_value_(static_header_value), append_(append) {}
+  PlainHeaderFormatter(const std::string& static_header_value)
+      : static_value_(static_header_value) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo&) const override {
     return static_value_;
   };
-  bool append() const override { return append_; }
 
 private:
   const std::string static_value_;
-  const bool append_;
 };
 
 /**
@@ -80,8 +70,8 @@ private:
  */
 class CompoundHeaderFormatter : public HeaderFormatter {
 public:
-  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append)
-      : formatters_(std::move(formatters)), append_(append) {}
+  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters)
+      : formatters_(std::move(formatters)) {}
 
   // HeaderFormatter::format
   const std::string format(const Envoy::StreamInfo::StreamInfo& stream_info) const override {
@@ -91,11 +81,9 @@ public:
     }
     return buf;
   };
-  bool append() const override { return append_; }
 
 private:
   const std::vector<HeaderFormatterPtr> formatters_;
-  const bool append_;
 };
 
 } // namespace Router

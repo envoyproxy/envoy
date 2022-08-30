@@ -242,7 +242,7 @@ To use the generic matching tree, specify a matcher on a virtual host with a Rou
                     key: x-route-header
                     value: new-value
 
-This allows resolving the same Route proto message used for the `routes`-based routing using the additional
+This allows resolving the same Route proto message used for the ``routes``-based routing using the additional
 matching flexibility provided by the generic matching framework.
 
 Note that the resulting Route also specifies a match criteria. This must be satisfied in addition to resolving
@@ -250,5 +250,5 @@ the route in order to achieve a route match. When path rewrites are used, the ma
 the match criteria of the resolved Route. Path matching done during the match tree traversal does not contribute
 to path rewrites.
 
-The only inputs supported are request headers (via `envoy.type.matcher.v3.HttpRequestHeaderMatchInput`). See
+The only inputs supported are request headers (via ``envoy.type.matcher.v3.HttpRequestHeaderMatchInput``). See
 the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.

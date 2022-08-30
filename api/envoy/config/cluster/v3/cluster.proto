@@ -209,7 +209,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message LbSubsetConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.LbSubsetConfig";
@@ -223,6 +223,52 @@ message Cluster {
       NO_FALLBACK = 0;
       ANY_ENDPOINT = 1;
       DEFAULT_SUBSET = 2;
+    }
+
+    enum LbSubsetMetadataFallbackPolicy {
+      // No fallback. Route metadata will be used as-is.
+      METADATA_NO_FALLBACK = 0;
+
+      // A special metadata key ``fallback_list`` will be used to provide variants of metadata to try.
+      // Value of ``fallback_list`` key has to be a list. Every list element has to be a struct - it will
+      // be merged with route metadata, overriding keys that appear in both places.
+      // ``fallback_list`` entries will be used in order until a host is found.
+      //
+      // ``fallback_list`` key itself is removed from metadata before subset load balancing is performed.
+      //
+      // Example:
+      //
+      // for metadata:
+      //
+      // .. code-block:: yaml
+      //
+      //   version: 1.0
+      //   fallback_list:
+      //     - version: 2.0
+      //       hardware: c64
+      //     - hardware: c32
+      //     - version: 3.0
+      //
+      // at first, metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "2.0", "hardware": "c64"}
+      //
+      // will be used for load balancing. If no host is found, metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "1.0", "hardware": "c32"}
+      //
+      // is next to try. If it still results in no host, finally metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "3.0"}
+      //
+      // is used.
+      FALLBACK_LIST = 1;
     }
 
     // Specifications for subsets.
@@ -349,6 +395,16 @@ message Cluster {
     // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
     // and any of the elements in the list matches the criteria.
     bool list_as_any = 7;
+
+    // Fallback mechanism that allows to try different route metadata until a host is found.
+    // If load balancing process, including all its mechanisms (like
+    // :ref:`fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.fallback_policy>`)
+    // fails to select a host, this policy decides if and how the process is repeated using another metadata.
+    //
+    // The value defaults to
+    // :ref:`METADATA_NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
+    LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
+        [(validate.rules).enum = {defined_only: true}];
   }
 
   // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
