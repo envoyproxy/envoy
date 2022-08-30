@@ -175,7 +175,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   response_has_trailers_ = !trailers.empty();
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers);
+    insert_->insertTrailers(trailers, [](bool) {});
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 

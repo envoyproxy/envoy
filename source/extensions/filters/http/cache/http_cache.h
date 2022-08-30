@@ -148,7 +148,8 @@ public:
                           bool end_stream) PURE;
 
   // Inserts trailers into the cache.
-  virtual void insertTrailers(const Http::ResponseTrailerMap& trailers) PURE;
+  virtual void insertTrailers(const Http::ResponseTrailerMap& trailers,
+                              InsertCallback insert_complete) PURE;
 
   // This routine is called prior to an InsertContext being destroyed. InsertContext is responsible
   // for making sure that any async activities are cleaned up before returning from onDestroy().

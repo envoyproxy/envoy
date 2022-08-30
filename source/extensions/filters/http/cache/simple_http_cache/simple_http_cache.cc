@@ -81,10 +81,12 @@ public:
     }
   }
 
-  void insertTrailers(const Http::ResponseTrailerMap& trailers) override {
+  void insertTrailers(const Http::ResponseTrailerMap& trailers,
+                      InsertCallback insert_complete) override {
     ASSERT(!committed_);
     trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers);
     commit();
+    insert_complete(true);
   }
 
   void onDestroy() override {}

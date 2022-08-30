@@ -103,30 +103,45 @@ absl::Status HttpCacheImplementationTest::insert(
     return absl::OkStatus();
   }
   if (body.empty() && trailers.has_value()) {
-    inserter->insertTrailers(trailers.value());
+    inserter->insertTrailers(trailers.value(), nullptr);
     return absl::OkStatus();
   }
 
   // For responses with body and trailers, wait for insertBody's callback before
-  // calling insertTrailers.
+  // calling insertTrailers. Note, in a multipart body test this would need to
+  // check for the callback having been called for *every* body part, but since
+  // the test only uses single-part bodies, inserting trailers in direct response
+  // to the callback works.
   auto insert_mutex = std::make_shared<absl::Mutex>();
   bool insert_done = false;
   auto insert_cancelled = std::make_shared<bool>(false);
   absl::Status insert_status;
   InsertCallback insert_callback = [&trailers, &inserter, insert_mutex, &insert_done,
                                     insert_cancelled, &insert_status](bool success_ready_for_more) {
-    absl::MutexLock lock(insert_mutex.get());
-    if (*insert_cancelled) {
-      return;
+    {
+      absl::MutexLock lock(insert_mutex.get());
+      if (*insert_cancelled) {
+        return;
+      }
+      if (!success_ready_for_more) {
+        insert_status = absl::UnknownError("Insert was aborted by cache");
+        insert_done = true;
+        return;
+      }
     }
-    if (!success_ready_for_more) {
-      insert_status = absl::UnknownError("Insert was aborted by cache");
+    inserter->insertTrailers(trailers.value(), [&insert_done, insert_mutex, insert_cancelled,
+                                                &insert_status](bool success) {
+      absl::MutexLock lock(insert_mutex.get());
+      if (*insert_cancelled) {
+        return;
+      }
+      if (!success) {
+        insert_status = absl::UnknownError("Insert was aborted by cache in insertTrailers");
+      } else {
+        insert_status = absl::OkStatus();
+      }
       insert_done = true;
-      return;
-    }
-    inserter->insertTrailers(trailers.value());
-    insert_status = absl::OkStatus();
-    insert_done = true;
+    });
   };
   inserter->insertBody(Buffer::OwnedImpl(body), insert_callback,
                        /*end_stream=*/!trailers.has_value());
