@@ -658,7 +658,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-12-08",
         cpe = "cpe:2.3:a:boost:boost:*",
         license = "Boost",
-        license_url = "https://www.boost.org/LICENSE_1_0.txt",
+        license_url = "https://github.com/boostorg/boost/blob/boost-{version}/LICENSE_1_0.txt",
     ),
     org_brotli = dict(
         project_name = "brotli",
