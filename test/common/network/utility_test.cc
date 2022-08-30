@@ -20,6 +20,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::DoAll;
+using testing::Eq;
 using testing::Return;
 
 namespace Envoy {
@@ -215,6 +217,38 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+ACTION_P(SetArg2Int, val) { *(static_cast<int*>(arg2)) = val; }
+
+ACTION_P(SetArg2Uint32, val) { *(static_cast<uint32_t*>(arg2)) = val; }
+
+ACTION_P(SetArg1Sockaddr, val) {
+  const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
+  (reinterpret_cast<sockaddr_in*>(arg1))->sin_addr = sin.sin_addr;
+  (reinterpret_cast<sockaddr_in*>(arg1))->sin_family = sin.sin_family;
+  (reinterpret_cast<sockaddr_in*>(arg1))->sin_port = sin.sin_port;
+}
+
+ACTION_P(SetArg1Sockaddr6, val) {
+  const sockaddr_in6& sin6 = reinterpret_cast<const sockaddr_in6&>(val);
+  (reinterpret_cast<sockaddr_in6*>(arg1))->sin6_addr = sin6.sin6_addr;
+  (reinterpret_cast<sockaddr_in6*>(arg1))->sin6_family = sin6.sin6_family;
+  (reinterpret_cast<sockaddr_in6*>(arg1))->sin6_port = sin6.sin6_port;
+}
+
+ACTION_P(SetArg2Sockaddr, val) {
+  const sockaddr_in& sin = reinterpret_cast<const sockaddr_in&>(val);
+  (static_cast<sockaddr_in*>(arg2))->sin_addr = sin.sin_addr;
+  (static_cast<sockaddr_in*>(arg2))->sin_family = sin.sin_family;
+  (static_cast<sockaddr_in*>(arg2))->sin_port = sin.sin_port;
+}
+
+ACTION_P(SetArg2Sockaddr6, val) {
+  const sockaddr_in6& sin6 = reinterpret_cast<const sockaddr_in6&>(val);
+  (static_cast<sockaddr_in6*>(arg2))->sin6_addr = sin6.sin6_addr;
+  (static_cast<sockaddr_in6*>(arg2))->sin6_family = sin6.sin6_family;
+  (static_cast<sockaddr_in6*>(arg2))->sin6_port = sin6.sin6_port;
+}
+
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   auto ip_version = GetParam();
   auto local_address = Utility::getLocalAddress(ip_version);
@@ -233,6 +267,72 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, addressType()).WillOnce(testing::Return(Address::Type::Pipe));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+#ifdef SOL_IP
+  sockaddr_storage storage;
+  testing::NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(socket, addressType()).WillRepeatedly(Return(Address::Type::Ip));
+
+  auto& sin = reinterpret_cast<sockaddr_in&>(storage);
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(9527);
+  sin.sin_addr.s_addr = inet_addr("12.34.56.78");
+  EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v4));
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+#ifndef WIN32
+  // Transparent socket gets original dst from local address while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(DoAll(SetArg1Sockaddr(storage), SetArg2Uint32(sizeof(sockaddr_in)),
+                      Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+  // Non-transparent socket fails to get original dst while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(IP_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+#endif // WIN32
+
+  auto& sin6 = reinterpret_cast<sockaddr_in6&>(storage);
+  sin6.sin6_family = AF_INET6;
+  sin6.sin6_port = htons(9527);
+  EXPECT_EQ(1, inet_pton(AF_INET6, "12::34", &sin6.sin6_addr));
+  EXPECT_CALL(socket, ipVersion()).WillRepeatedly(Return(Address::IpVersion::v6));
+  // Socket gets original dst from SO_ORIGINAL_DST while connection tracking enabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr6(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
+#ifndef WIN32
+  // Transparent socket gets original dst from local address while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(1), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(DoAll(SetArg1Sockaddr6(storage), SetArg2Uint32(sizeof(sockaddr_in6)),
+                      Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ("[12::34]:9527", Utility::getOriginalDst(socket)->asString());
+  // Non-transparent socket fails to get original dst while connection tracking disabled
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IP6T_SO_ORIGINAL_DST), _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, supportsIpTransparent()).WillOnce(Return(true));
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IPV6), Eq(IPV6_TRANSPARENT), _, _))
+      .WillOnce(DoAll(SetArg2Int(0), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+#endif // WIN32
+
+#endif // SOL_IP
 }
 
 TEST(NetworkUtility, LocalConnection) {
