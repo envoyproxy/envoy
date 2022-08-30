@@ -695,6 +695,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   new_config_helper.setLds("1");
 
   test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
 
   // Start a connection, and verify the upgrade headers are received upstream.
