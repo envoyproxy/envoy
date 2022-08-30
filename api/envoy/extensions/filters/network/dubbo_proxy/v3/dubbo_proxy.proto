@@ -4,7 +4,6 @@ package envoy.extensions.filters.network.dubbo_proxy.v3;
 
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/dubbo_proxy/v3/route.proto";
-import "envoy/type/tracing/v3/tracing.proto";
 
 import "google/protobuf/any.proto";
 
@@ -47,7 +46,7 @@ message Drds {
   string route_config_name = 2;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message DubboProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
@@ -81,8 +80,6 @@ message DubboProxy {
   // compatibility, if no dubbo_filters are specified, a default Dubbo router filter
   // (``envoy.filters.dubbo.router``) is used.
   repeated DubboFilter dubbo_filters = 5;
-
-  type.tracing.v3.Tracing tracing = 8;
 }
 
 // DubboFilter configures a Dubbo filter.

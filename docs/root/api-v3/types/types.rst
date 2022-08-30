@@ -26,4 +26,3 @@ Types
   ../type/matcher/v3/http_inputs.proto
   ../type/metadata/v3/metadata.proto
   ../type/tracing/v3/custom_tag.proto
-  ../type/tracing/v3/tracing.proto
