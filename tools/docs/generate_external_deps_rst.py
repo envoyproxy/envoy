@@ -127,8 +127,6 @@ def main():
         version = rst_link(render_version(v['version']), get_version_url(v))
         release_date = v['release_date']
         license = v.get('license', '')
-        if license == 'N/A':
-            license = ''
         if license:
             license_url = v.get('license_url', '')
             if license_url:
