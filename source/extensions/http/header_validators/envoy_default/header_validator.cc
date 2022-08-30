@@ -106,25 +106,10 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // the sake of robustness but should only produce lowercase scheme names for consistency.
   //
   // The validation mode controls whether uppercase letters are permitted.
-  const auto& value_string_view = value.getStringView();
+  absl::string_view scheme = value.getStringView();
 
-  if (value_string_view.empty()) {
+  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
-  }
-
-  auto character_it = value_string_view.begin();
-
-  // The first character must be an ALPHA
-  auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z') ||
-                               (*character_it >= 'A' && *character_it <= 'Z');
-  if (!valid_first_character) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
-  }
-
-  for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!testChar(kSchemeHeaderCharTable, *character_it)) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
-    }
   }
 
   return HeaderEntryValidationResult::success();
@@ -255,7 +240,10 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   //
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
-  const auto& value_string_view = value.getStringView();
+  const auto host = value.getStringView();
+  if (host.empty()) {
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  }
 
   // Check if the host/:authority contains the deprecated userinfo component. This is based on RFC
   // 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-4.2.4:
@@ -263,38 +251,96 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   // Before making use of an "http" or "https" URI reference received from an untrusted source, a
   // recipient SHOULD parse for userinfo and treat its presence as an error; it is likely being
   // used to obscure the authority for the sake of phishing attacks.
-  auto user_info_delimiter = value_string_view.find('@');
+  auto user_info_delimiter = host.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header
     return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo};
   }
 
-  // identify and validate the port, if present
-  auto port_delimiter = value_string_view.find(':');
-  auto host_string_view = value_string_view.substr(0, port_delimiter);
-
-  if (host_string_view.empty()) {
-    // reject empty host, which happens if the authority is just the port (e.g.- ":80").
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  // Determine if the host is in IPv4, reg-name, or IPv6 form.
+  auto result = host.at(0) == '[' ? validateHostHeaderIPv6(host) : validateHostHeaderRegName(host);
+  if (!result.ok()) {
+    return result;
   }
 
-  if (port_delimiter != absl::string_view::npos) {
-    // Validate the port is an integer and a valid port number (uint16_t)
-    auto port_string_view = value_string_view.substr(port_delimiter + 1);
+  const auto port_string = result.details();
+  if (!port_string.empty()) {
+    // Validate the port, which will be in the form of ":<uint16_t>"
+    bool is_valid = true;
+    if (port_string.at(0) != ':') {
+      // The port must begin with ":"
+      is_valid = false;
+    } else {
+      // parse the port number
+      std::uint16_t port_int{};
+      auto result = std::from_chars(std::next(port_string.begin()), port_string.end(), port_int);
 
-    std::uint16_t port_integer_value{};
-    auto result =
-        std::from_chars(port_string_view.begin(), port_string_view.end(), port_integer_value);
-    if (result.ec == std::errc::invalid_argument || result.ptr != port_string_view.end()) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+      if (result.ec == std::errc::invalid_argument || result.ptr != port_string.end() ||
+          port_int == 0) {
+        is_valid = false;
+      }
     }
 
-    if (port_integer_value == 0) {
+    if (!is_valid) {
       return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
   }
 
   return HeaderEntryValidationResult::success();
+}
+
+::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
+  // Validate an IPv6 address host header value. This is a simplified check based on RFC 3986,
+  // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only validates the characters,
+  // not the syntax of the address.
+
+  // Validate that the address is enclosed between "[" and "]".
+  std::size_t closing_bracket = host.find(']');
+  if (host.empty() || host.at(0) != '[' || closing_bracket == absl::string_view::npos) {
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  }
+
+  // Get the address substring between the brackets.
+  const auto address = host.substr(1, closing_bracket - 1);
+  // Get the trailing port substring
+  const auto port_string = host.substr(closing_bracket + 1);
+  // Validate the IPv6 address characters
+  bool is_valid = !address.empty();
+  for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
+    is_valid &= testChar(kHostIPv6AddressCharTable, *iter);
+  }
+
+  if (!is_valid) {
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  }
+
+  return {RejectAction::Accept, port_string};
+}
+
+::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
+  // Validate a reg-name address host header value. This is a simplified check based on RFC 3986,
+  // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only validates the characters,
+  // not the syntax of the address.
+
+  // Identify the port trailer
+  auto port_delimiter = host.find(':');
+  const auto address = host.substr(0, port_delimiter);
+  bool is_valid = !address.empty();
+
+  // Validate the reg-name characters
+  for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
+    is_valid &= testChar(kHostRegNameCharTable, *iter);
+  }
+
+  if (!is_valid) {
+    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  }
+
+  const auto port_string =
+      port_delimiter != absl::string_view::npos ? host.substr(port_delimiter) : absl::string_view();
+  return {RejectAction::Accept, port_string};
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult

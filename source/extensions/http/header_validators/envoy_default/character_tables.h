@@ -103,28 +103,6 @@ constexpr uint32_t kMethodHeaderCharTable[] = {
 };
 
 //
-// :scheme header character table.
-// From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.1
-//
-// scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
-//
-constexpr uint32_t kSchemeHeaderCharTable[] = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b00000000000101101111111111000000,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b01111111111111111111111111100000,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b01111111111111111111111111100000,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
-
-//
 // :path header character table.
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
 //
@@ -206,6 +184,51 @@ constexpr uint32_t kTransferEncodingHeaderCharTable[] = {
     0b01111111111111111111111111100011,
     //`abcdefghijklmnopqrstuvwxyz{|}~
     0b11111111111111111111111111101010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+//
+// An IPv6 address, excluding the surrounding "[" and "]" characters. This is based on RFC 3986,
+// https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only allows hex digits and the
+// ":" separator.
+//
+constexpr uint32_t kHostIPv6AddressCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b00000000000000001111111111100000,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111110000000000000000000000000,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111110000000000000000000000000,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+//
+// A host reg-name character table, which covers both IPv4 addresses and hostnames.
+// From RFC 3986: https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2
+//
+// SPELLCHECKER(off)
+// reg-name    = *( unreserved / pct-encoded / sub-delims )
+// SPELLCHECKER(on)
+//
+constexpr uint32_t kHostRegNameCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111101111111111010100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
     // extended ascii
     0b00000000000000000000000000000000,
     0b00000000000000000000000000000000,

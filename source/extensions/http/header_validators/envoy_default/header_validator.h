@@ -73,6 +73,16 @@ public:
   validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
 protected:
+  /*
+   * Validate an IPv6 host header value.
+   */
+  HeaderEntryValidationResult validateHostHeaderIPv6(absl::string_view host);
+
+  /*
+   * Validate a reg-name host header value.
+   */
+  HeaderEntryValidationResult validateHostHeaderRegName(absl::string_view host);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;

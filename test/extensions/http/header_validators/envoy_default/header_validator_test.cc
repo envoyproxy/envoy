@@ -180,13 +180,41 @@ TEST_F(BaseHeaderValidatorTest, ValidateContentLength) {
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValid) {
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValidRegName) {
   HeaderString valid{"envoy.com:443"};
   HeaderString valid_no_port{"envoy.com"};
   auto uhv = createBase(empty_config);
 
   EXPECT_TRUE(uhv->validateHostHeader(valid).ok());
   EXPECT_TRUE(uhv->validateHostHeader(valid_no_port).ok());
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidRegName) {
+  HeaderString invalid{"env<o>y.com"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValidIPv6) {
+  HeaderString valid{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:443"};
+  HeaderString valid_no_port{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_TRUE(uhv->validateHostHeader(valid).ok());
+  EXPECT_TRUE(uhv->validateHostHeader(valid_no_port).ok());
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6) {
+  HeaderString invalid_missing_closing_bracket{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
+  HeaderString invalid_chars{"[200z:0db8:85a3:0000:0000:8a2e:0370:7334]"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_missing_closing_bracket),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_chars),
+                             UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidEmpty) {
@@ -234,6 +262,14 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidPort0) {
   auto uhv = createBase(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_port_0),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6PortDelim) {
+  HeaderString invalid_port_delim{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]66000"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_port_delim),
                              UhvResponseCodeDetail::get().InvalidHost);
 }
 
