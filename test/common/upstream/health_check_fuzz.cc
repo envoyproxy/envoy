@@ -155,8 +155,15 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
                                Http::Headers::get().ConnectionValues.Close);
   }
 
-  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  // Check if there is a response body.
+  bool has_response_body = !respond.http_respond().body().empty();
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                               !has_response_body);
+  if (has_response_body) {
+    Buffer::OwnedImpl response_data(respond.http_respond().body());
+    test_sessions_[0]->stream_response_callbacks_->decodeData(response_data, true);
+    ENVOY_LOG_MISC(trace, "Responded body {}", respond.http_respond().body());
+  }
 
   // Interval timer gets turned on from decodeHeaders()
   if ((!reuse_connection_ || client_will_close) && !last_action) {

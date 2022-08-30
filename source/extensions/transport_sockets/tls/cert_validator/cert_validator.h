@@ -90,7 +90,7 @@ public:
                     Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl_ctx, const ExtraValidationContext& validation_context,
-                    bool is_server) PURE;
+                    bool is_server, absl::string_view host_name) PURE;
 
   /**
    * Called to initialize all ssl contexts

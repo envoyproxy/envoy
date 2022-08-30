@@ -20,6 +20,8 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_synchronization",
+        "abseil_stacktrace",
+        "abseil_symbolize",
     ],
     deps = [":minimal_logger_lib"],
 )

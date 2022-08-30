@@ -41,7 +41,8 @@ public:
       Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
       Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
       Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
-      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      quic::ConnectionIdGeneratorInterface& generator);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,

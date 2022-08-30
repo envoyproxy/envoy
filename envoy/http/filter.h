@@ -189,9 +189,10 @@ public:
   virtual ~StreamFilterCallbacks() = default;
 
   /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   * @return OptRef<const Network::Connection> the downstream connection, or nullptr if there is
+   * none.
    */
-  virtual const Network::Connection* connection() PURE;
+  virtual OptRef<const Network::Connection> connection() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
@@ -201,7 +202,9 @@ public:
   /**
    * Reset the underlying stream.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do

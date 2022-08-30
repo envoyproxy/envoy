@@ -218,7 +218,7 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
     SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& /*validation_context*/,
-    bool /*is_server*/) {
+    bool /*is_server*/, absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(

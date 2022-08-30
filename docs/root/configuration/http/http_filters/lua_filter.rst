@@ -3,12 +3,6 @@
 Lua
 ===
 
-.. attention::
-
-  By default Envoy is built without exporting symbols that you may need when interacting with Lua
-  modules installed as shared objects. Envoy may need to be built with support for exported symbols.
-  Please see the :repo:`Bazel docs <bazel/README.md>` for more information.
-
 Overview
 --------
 
@@ -155,6 +149,21 @@ Lua script as follows:
             response_handle:logInfo("Goodbye.")
           end
 
+Statistics
+----------
+.. _config_http_filters_lua_stats:
+
+The lua filter outputs statistics in the *.lua.* namespace by default. When
+there are multiple lua filters configured in a filter chain, stats from
+individual filter instance/script can be tracked by providing a per filter
+:ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix>`.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  error, Counter, Total script execution errors.
 
 Script examples
 ---------------

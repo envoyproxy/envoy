@@ -983,7 +983,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithInvalidHttpBodyAsOutput
   response_data.add("\x10\x80");
   Grpc::Common::prependGrpcFrameHeader(response_data);
 
-  EXPECT_CALL(encoder_callbacks_, resetStream());
+  EXPECT_CALL(encoder_callbacks_, resetStream(_, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(response_data, false));
 }
