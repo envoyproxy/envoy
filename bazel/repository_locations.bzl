@@ -819,6 +819,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["other"],
         release_date = "2019-09-18",
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/ncopa/su-exec/blob/{version}/LICENSE",
     ),
     com_google_googletest = dict(
         project_name = "Google Test",
@@ -833,6 +835,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-09-10",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:google:google_test:*",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/google/googletest/blob/{version}/LICENSE",
     ),
     com_google_protobuf = dict(
         project_name = "Protocol Buffers",
@@ -849,6 +853,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-04-22",
         cpe = "cpe:2.3:a:google:protobuf:*",
+        license = "Protocol Buffers",
+        license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
     ),
     grpc_httpjson_transcoding = dict(
         project_name = "grpc-httpjson-transcoding",
@@ -862,6 +868,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
         release_date = "2022-06-18",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE",
     ),
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
@@ -878,6 +886,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_google_protobuf",
             "org_golang_x_tools",
         ],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_go/blob/v{version}/LICENSE.txt",
     ),
     rules_foreign_cc = dict(
         project_name = "Rules for using foreign build systems in Bazel",
@@ -889,6 +899,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/{version}.tar.gz"],
         release_date = "2022-04-18",
         use_category = ["build", "dataplane_core", "controlplane"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_foreign_cc/blob/{version}/LICENSE",
     ),
     rules_python = dict(
         project_name = "Python rules for Bazel",
@@ -900,6 +912,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_python-{version}",
         urls = ["https://github.com/bazelbuild/rules_python/archive/{version}.tar.gz"],
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_python/blob/{version}/LICENSE",
     ),
     rules_pkg = dict(
         project_name = "Packaging rules for Bazel",
@@ -911,6 +925,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_pkg/archive/{version}.tar.gz"],
         use_category = ["build"],
         release_date = "2022-04-07",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE",
     ),
     org_llvm_llvm = dict(
         # When changing this, you must re-generate the list of llvm libs
@@ -942,6 +958,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wamr"],
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE.txt",
     ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
@@ -968,6 +986,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
         cpe = "cpe:2.3:a:bytecodealliance:wasmtime:*",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE",
     ),
     com_github_wasm_c_api = dict(
         project_name = "wasm-c-api",
@@ -983,6 +1003,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/WebAssembly/wasm-c-api/blob/{version}/LICENSE",
     ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
@@ -996,6 +1018,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tracers.opencensus"],
         release_date = "2020-10-08",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/census-instrumentation/opencensus-cpp/blob/{version}/LICENSE",
     ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/11816.
     com_github_curl = dict(
@@ -1015,6 +1039,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2022-06-27",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
+        license = "curl",
+        license_url = "https://github.com/curl/curl/blob/curl-{underscore_version}/COPYING",
     ),
     v8 = dict(
         project_name = "V8",
