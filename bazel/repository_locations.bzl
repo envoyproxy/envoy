@@ -26,6 +26,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
         release_date = "2021-09-10",
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/grailbio/bazel-compilation-database/blob/{version}/LICENSE",
     ),
     bazel_gazelle = dict(
         project_name = "Gazelle",
@@ -36,6 +38,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v{version}/bazel-gazelle-v{version}.tar.gz"],
         release_date = "2022-06-26",
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE",
     ),
     bazel_toolchains = dict(
         project_name = "bazel-toolchains",
@@ -49,6 +53,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2021-11-30",
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/bazel-toolchains/blob/v{version}/LICENSE",
     ),
     build_bazel_rules_apple = dict(
         project_name = "Apple Rules for Bazel",
@@ -59,6 +65,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
         release_date = "2022-06-17",
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE",
     ),
     rules_fuzzing = dict(
         project_name = "Fuzzing Rules for Bazel",
@@ -75,6 +83,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             # engine target from the CFLAGS/CXXFLAGS environment.
             "rules_fuzzing_oss_fuzz",
         ],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_fuzzing/blob/v{version}/LICENSE",
     ),
     envoy_build_tools = dict(
         project_name = "envoy-build-tools",
@@ -86,6 +96,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/{version}.tar.gz"],
         release_date = "2022-05-18",
         use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/envoyproxy/envoy-build-tools/blob/{version}/LICENSE",
     ),
     boringssl = dict(
         project_name = "BoringSSL",
@@ -104,6 +116,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2022-07-19",
         cpe = "cpe:2.3:a:google:boringssl:*",
+        license = "Mixed",
+        license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
     ),
     boringssl_fips = dict(
         project_name = "BoringSSL (FIPS)",
@@ -127,6 +141,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         release_date = "2022-08-12",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/aspect-build/bazel-lib/blob/v{version}/LICENSE",
     ),
     com_google_absl = dict(
         project_name = "Abseil",
@@ -139,6 +155,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-07-05",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE",
     ),
     com_github_aignas_rules_shellcheck = dict(
         project_name = "Shellcheck rules for bazel",
@@ -151,6 +169,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-05-30",
         use_category = ["build"],
         cpe = "N/A",
+        license = "MIT",
+        license_url = "https://github.com/aignas/rules_shellcheck/blob/v{version}/LICENSE",
     ),
     com_github_axboe_liburing = dict(
         project_name = "liburing",
@@ -177,6 +197,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2022-08-02",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/perfetto/blob/v{version}/LICENSE",
     ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
@@ -189,6 +211,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2021-10-27",
         cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
+        license = "c-ares",
+        license_url = "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md",
     ),
     com_github_circonus_labs_libcircllhist = dict(
         project_name = "libcircllhist",
@@ -201,6 +225,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "observability_core", "dataplane_core"],
         release_date = "2019-02-11",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/circonus-labs/libcircllhist/blob/{version}/LICENSE",
     ),
     com_github_cyan4973_xxhash = dict(
         project_name = "xxHash",
