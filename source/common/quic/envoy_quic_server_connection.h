@@ -31,8 +31,10 @@ public:
 
   bool deferSend() const { return defer_send_; }
 
+  bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
+
 private:
-  bool defer_send_{false};
+  const bool defer_send_;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.

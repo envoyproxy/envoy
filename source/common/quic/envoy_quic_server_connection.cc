@@ -17,17 +17,17 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_SERVER, supported_versions),
-      QuicNetworkConnection(std::move(connection_socket)) {
-  if (Runtime::runtimeFeatureEnabled(
+      QuicNetworkConnection(std::move(connection_socket)),
+      defer_send_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_send_in_response_to_packet")) {
 #ifndef WIN32
+  if (defer_send_) {
     // Defer sending while processing UDP packets till the end of the current event loop to optimize
     // UDP GSO sendmsg efficiency. But this optimization causes some test failures under Windows,
     // and Windows doesn't support GSO, do not apply this optimization on Windows.
     set_defer_send_in_response_to_packets(GetQuicFlag(FLAGS_quic_defer_send_in_response));
-#endif
-    defer_send_ = true;
   }
+#endif
 }
 
 bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& header) {
