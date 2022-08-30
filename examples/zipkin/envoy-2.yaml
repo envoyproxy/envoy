@@ -1,9 +1,15 @@
+# This proxy listens on port 10000 and routes all queries to `service-2`.
+
+node:
+  # The cluster name is used by Zipkin to identify the proxy.
+  cluster: envoy-proxy-2
+
 static_resources:
   listeners:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 8000
+        port_value: 10000
     traffic_direction: INBOUND
     filter_chains:
     - filters:
@@ -20,8 +26,12 @@ static_resources:
                 collector_endpoint_version: HTTP_JSON
           codec_type: AUTO
           stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
-            name: local_route
+            name: service2_route
             virtual_hosts:
             - name: service2
               domains:
@@ -30,25 +40,22 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: local_service
+                  cluster: service_cluster2
                 decorator:
-                  operation: checkStock
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                  operation: routeToService2
+
   clusters:
-  - name: local_service
+  - name: service_cluster2
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: local_service
+      cluster_name: service_cluster2
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: service-2
                 port_value: 8080
   - name: zipkin
     type: STRICT_DNS

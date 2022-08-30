@@ -18,6 +18,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Return;
 
@@ -218,7 +219,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
             return Http::LocalErrorStatus::Continue;
           }));
-  EXPECT_CALL(filter_manager_callbacks_, resetStream());
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _));
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                              Grpc::Status::Internal, "details");
 

@@ -235,6 +235,37 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   checkStats();
 }
 
+TEST_P(SslIntegrationTest, Http1StreamInfoDownstreamHandshakeTiming) {
+  ASSERT_TRUE(downstreamProtocol() == Http::CodecType::HTTP1);
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection({}));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_FALSE(
+      response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
+}
+
+TEST_P(SslIntegrationTest, Http2StreamInfoDownstreamHandshakeTiming) {
+  // See MultiplexedIntegrationTest for equivalent test for HTTP/3.
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeSslClientConnection({}));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_FALSE(
+      response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
+}
+
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
