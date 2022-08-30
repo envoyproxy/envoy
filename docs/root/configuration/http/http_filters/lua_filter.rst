@@ -444,7 +444,7 @@ the supported keys are:
 
   Then if *allows_repeat* is set to false, the returned headers will be:
 
-  -- code-block:: lua
+  .. code-block:: lua
 
     {
       [":status"] = "200",
