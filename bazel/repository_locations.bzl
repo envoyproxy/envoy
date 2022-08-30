@@ -1405,6 +1405,8 @@ def _compiled_protoc_deps(locations, versions):
             use_category = ["dataplane_core", "controlplane"],
             release_date = "2022-04-22",
             cpe = "N/A",
+            license = "Protocol Buffers",
+            license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
         )
 
 _compiled_protoc_deps(REPOSITORY_LOCATIONS_SPEC, PROTOC_VERSIONS)
