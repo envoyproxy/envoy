@@ -20,8 +20,8 @@ Thrift health checker is shown below:
     name: envoy.health_checkers.thrift
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.thrift.v3.Thrift
-        method_name: "ping"
-        transport: FRAMED
+        method_name: ping
+        transport: HEADER
         protocol: BINARY
 
 * :ref:`v3 API reference <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`
