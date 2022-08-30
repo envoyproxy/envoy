@@ -162,7 +162,7 @@ message ExtAuthz {
   // 1. In addition to the the user's supplied matchers, ``Host``, ``Method``, ``Path``,
   //   ``Content-Length``, and ``Authorization`` are **automatically included** to the list.
   //
-  // 2. For requestst to an HTTP authorization server: *Content-Length* will be set to 0 and the request to the
+  // 2. For requests to an HTTP authorization server: *Content-Length* will be set to 0 and the request to the
   // authorization server will not have a message body. However, the check request can include the buffered
   // client request body (controlled by :ref:`with_request_body
   // <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.with_request_body>` setting),
