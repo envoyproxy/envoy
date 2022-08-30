@@ -10,6 +10,16 @@ Kafka broker
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
+This example demonstrates some basic operations with a Kafka broker proxied through Envoy.
+
+For your convenience, the :download:`composition <_include/kafka/docker-compose.yaml>` provides
+a dockerized Kafka client.
+
+If you have the ``kafka-console-*`` binaries installed on your host system, you can instead follow
+the examples using the host binary with ``--bootstrap-server localhost:10000``.
+
+Statistics collected by Envoy for the Kafka broker extension and related cluster metrics are also demonstrated.
+
 
 Step 1: Start all of our containers
 ***********************************
