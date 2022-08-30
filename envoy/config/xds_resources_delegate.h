@@ -43,8 +43,8 @@ public:
   /**
    * Returns a list of xDS resources for the given source and names. The implementation is not
    * required to return all (or any) of the requested resources, but the resources it does return
-   * are required to be in the set of requested resources. A resource list of size one with only
-   * the wildcard entry (i.e. "*") will return all known resources from the given xDS source.
+   * are required to be in the set of requested resources. An empty resource list will return all
+   * known resources from the given xDS source (i.e. the "wildcard").
    *
    * This function is intended to only be called on xDS fetch startup, and allows the
    * implementation to return a set of resources to be loaded and used by the Envoy instance

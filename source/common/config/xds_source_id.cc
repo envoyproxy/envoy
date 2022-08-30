@@ -10,13 +10,10 @@ XdsConfigSourceId::XdsConfigSourceId(absl::string_view authority_id,
     : authority_id_(authority_id), resource_type_url_(resource_type_url) {}
 
 std::string XdsConfigSourceId::toKey() const {
-  // The delimiter between parts of the key.
+  // The delimiter between parts of the key. The type URL cannot contain a "+" character, so we
+  // don't run the risk of collisions with different parts of the key having a "+" in them.
   static constexpr char DELIMITER[] = "+";
-
-  // Base64 URL-encoding the authority_id and resource_type_url so that the resulting string does
-  // not contain a "+" character, so that we can use it as a delimiter.
-  return absl::StrCat(Base64Url::encode(authority_id_.data(), authority_id_.size()), DELIMITER,
-                      Base64Url::encode(resource_type_url_.data(), resource_type_url_.size()));
+  return absl::StrCat(authority_id_, DELIMITER, resource_type_url_);
 }
 
 } // namespace Config

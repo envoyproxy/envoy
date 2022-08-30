@@ -380,7 +380,6 @@ envoy_cc_library(
     hdrs = ["xds_source_id.h"],
     deps = [
         "//envoy/config:xds_resources_delegate_interface",
-        "//source/common/common:base64_lib",
     ],
 )
 

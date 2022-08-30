@@ -236,7 +236,10 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   EXPECT_EQ("saz", getRuntimeKey("baz"));
   ASSERT_EQ(TestXdsResourcesDelegate::ResourcesMap.size(), 1);
   envoy::service::runtime::v3::Runtime retrieved_rtds_layer;
-  TestXdsResourcesDelegate::ResourcesMap.begin()->second.resource().UnpackTo(&retrieved_rtds_layer);
+  TestXdsResourcesDelegate::ResourcesMap
+      ["xds_cluster+type.googleapis.com/envoy.service.runtime.v3.Runtime+some_rtds_layer"]
+          .resource()
+          .UnpackTo(&retrieved_rtds_layer);
   EXPECT_TRUE(TestUtility::protoEqual(retrieved_rtds_layer, some_rtds_layer));
 }
 

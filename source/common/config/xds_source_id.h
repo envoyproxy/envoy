@@ -2,8 +2,6 @@
 
 #include "envoy/config/xds_resources_delegate.h"
 
-#include "source/common/common/base64.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
