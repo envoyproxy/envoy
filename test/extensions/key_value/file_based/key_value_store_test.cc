@@ -3,11 +3,11 @@
 
 #include "source/common/common/key_value_store_base.h"
 #include "source/extensions/key_value/file_based/config.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

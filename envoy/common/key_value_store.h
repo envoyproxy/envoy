@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
@@ -8,7 +10,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include <chrono>
 
 namespace Envoy {
 
@@ -22,9 +23,11 @@ public:
    * Adds or updates a key:value pair in the store.
    * @param key supplies a key to add or update.
    * @param value supplies the value to set for that key.
-   * @param ttl optionally give a ttl>0.  If it's an update, ttl will be updated as well.  If no ttl, we default to infinite retention
+   * @param ttl optionally give a ttl>0. If it's an update, ttl will be updated as well. If no ttl,
+   * we default to infinite retention
    */
-  virtual void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) PURE;
+  virtual void addOrUpdate(absl::string_view key, absl::string_view value,
+                           absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) PURE;
 
   /**
    * Removes a key:value pair from the store. This is a no-op if the key is not present.

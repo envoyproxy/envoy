@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/common/key_value_store.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -8,7 +10,6 @@
 #include "source/common/config/ttl.h"
 
 #include "quiche/common/quiche_linked_hash_map.h"
-#include <chrono>
 
 namespace Envoy {
 
@@ -30,7 +31,8 @@ public:
 
   std::string error;
   // KeyValueStore
-  void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) override;
+  void addOrUpdate(absl::string_view key, absl::string_view value,
+                   absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) override;
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;

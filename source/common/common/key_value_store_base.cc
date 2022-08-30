@@ -1,9 +1,10 @@
 #include "source/common/common/key_value_store_base.h"
 
-#include "absl/cleanup/cleanup.h"
 #include <algorithm>
 #include <chrono>
 #include <optional>
+
+#include "absl/cleanup/cleanup.h"
 
 namespace Envoy {
 namespace {
@@ -40,7 +41,7 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush_timer_->enableTimer(flush_interval);
       })),
       ttl_manager_([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
-                  dispatcher.timeSource()) {
+                   dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
   }
@@ -75,7 +76,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   std::string key(key_view);
   std::string value(value_view);
   // Remove ttl if <= 0
-  if (ttl && ttl <= std::chrono::milliseconds(0)){
+  if (ttl && ttl <= std::chrono::milliseconds(0)) {
     ASSERT(false);
     ttl = absl::nullopt;
   }
@@ -91,8 +92,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
   }
-  if (ttl)
-  {
+  if (ttl) {
     ttl_manager_.add(ttl.value(), key);
   }
   if (!flush_timer_->enabled()) {
