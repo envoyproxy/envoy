@@ -15,7 +15,7 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
       .WillByDefault(Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                    Stats::Scope&, SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoderSharedPtr&,
+                                   OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) -> SubscriptionPtr {
         auto ret = std::make_unique<NiceMock<MockSubscription>>();
         subscription_ = ret.get();

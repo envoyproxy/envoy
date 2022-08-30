@@ -9,7 +9,7 @@ namespace XdsMux {
 SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              Event::Dispatcher& dispatcher,
-                                             OpaqueResourceDecoderSharedPtr& resource_decoder)
+                                             OpaqueResourceDecoderSharedPtr resource_decoder)
     : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher),
       resource_decoder_(resource_decoder) {}
 

@@ -21,7 +21,7 @@ envoy::config::core::v3::PathConfigSource makePathConfigSource(const std::string
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     Event::Dispatcher& dispatcher,
     const envoy::config::core::v3::PathConfigSource& path_config_source,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
       stats_(stats), api_(api), validation_visitor_(validation_visitor) {
@@ -107,7 +107,7 @@ void FilesystemSubscriptionImpl::refresh() {
 FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
     Event::Dispatcher& dispatcher,
     const envoy::config::core::v3::PathConfigSource& path_config_source,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks, resource_decoder, stats,
                                  validation_visitor, api) {}

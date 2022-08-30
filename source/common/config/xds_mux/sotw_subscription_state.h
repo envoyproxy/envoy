@@ -22,7 +22,7 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                         Event::Dispatcher& dispatcher,
-                        OpaqueResourceDecoderSharedPtr& resource_decoder);
+                        OpaqueResourceDecoderSharedPtr resource_decoder);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -69,7 +69,7 @@ public:
   ~SotwSubscriptionStateFactory() override = default;
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoderSharedPtr& resource_decoder) override {
+                        OpaqueResourceDecoderSharedPtr resource_decoder) override {
     return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
                                                    resource_decoder);
   }

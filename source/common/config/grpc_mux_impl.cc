@@ -106,7 +106,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoderSharedPtr& resource_decoder,
+                                      OpaqueResourceDecoderSharedPtr resource_decoder,
                                       const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);

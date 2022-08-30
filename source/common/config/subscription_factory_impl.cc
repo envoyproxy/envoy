@@ -29,7 +29,7 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoderSharedPtr& resource_decoder, const SubscriptionOptions& options) {
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   SubscriptionStats stats = Utility::generateStats(scope);
 
@@ -145,7 +145,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoderSharedPtr& resource_decoder) {
+    OpaqueResourceDecoderSharedPtr resource_decoder) {
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {

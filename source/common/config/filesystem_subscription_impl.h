@@ -26,7 +26,7 @@ public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher,
                              const envoy::config::core::v3::PathConfigSource& path_config_source,
                              SubscriptionCallbacks& callbacks,
-                             OpaqueResourceDecoderSharedPtr& resource_decoder,
+                             OpaqueResourceDecoderSharedPtr resource_decoder,
                              SubscriptionStats stats,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
@@ -62,7 +62,7 @@ public:
   FilesystemCollectionSubscriptionImpl(
       Event::Dispatcher& dispatcher,
       const envoy::config::core::v3::PathConfigSource& path_config_source,
-      SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr& resource_decoder,
+      SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
       SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor,
       Api::Api& api);
 

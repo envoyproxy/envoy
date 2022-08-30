@@ -22,7 +22,7 @@ class GrpcSubscriptionImpl : public Subscription,
                              Logger::Loggable<Logger::Id::config> {
 public:
   GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
-                       OpaqueResourceDecoderSharedPtr& resource_decoder, SubscriptionStats stats,
+                       OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
                        absl::string_view type_url, Event::Dispatcher& dispatcher,
                        std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
                        const SubscriptionOptions& options);
@@ -75,7 +75,7 @@ class GrpcCollectionSubscriptionImpl : public GrpcSubscriptionImpl {
 public:
   GrpcCollectionSubscriptionImpl(const xds::core::v3::ResourceLocator& collection_locator,
                                  GrpcMuxSharedPtr grpc_mux, SubscriptionCallbacks& callbacks,
-                                 OpaqueResourceDecoderSharedPtr& resource_decoder,
+                                 OpaqueResourceDecoderSharedPtr resource_decoder,
                                  SubscriptionStats stats, Event::Dispatcher& dispatcher,
                                  std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
                                  const SubscriptionOptions& options);

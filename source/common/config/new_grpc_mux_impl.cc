@@ -154,7 +154,7 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoderSharedPtr& resource_decoder,
+                                         OpaqueResourceDecoderSharedPtr resource_decoder,
                                          const SubscriptionOptions& options) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {

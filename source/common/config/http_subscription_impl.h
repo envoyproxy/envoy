@@ -28,7 +28,7 @@ public:
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
                        SubscriptionCallbacks& callbacks,
-                       OpaqueResourceDecoderSharedPtr& resource_decoder, SubscriptionStats stats,
+                       OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 

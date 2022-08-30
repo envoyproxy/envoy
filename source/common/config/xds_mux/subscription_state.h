@@ -123,7 +123,7 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   virtual std::unique_ptr<T>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoderSharedPtr& resource_decoder) PURE;
+                        OpaqueResourceDecoderSharedPtr resource_decoder) PURE;
 };
 
 } // namespace XdsMux

@@ -77,7 +77,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::onDynamicContextUpdate(absl::string_view resourc
 template <class S, class F, class RQ, class RS>
 Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     const SubscriptionOptions& options) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
@@ -390,7 +390,7 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,
                                                   SubscriptionCallbacks&,
-                                                  OpaqueResourceDecoderSharedPtr&,
+                                                  OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }

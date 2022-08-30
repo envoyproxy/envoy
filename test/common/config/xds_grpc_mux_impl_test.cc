@@ -110,7 +110,7 @@ public:
   Config::GrpcMuxWatchPtr makeWatch(const std::string& type_url,
                                     const absl::flat_hash_set<std::string>& resources,
                                     NiceMock<MockSubscriptionCallbacks>& callbacks,
-                                    Config::OpaqueResourceDecoderSharedPtr& resource_decoder) {
+                                    Config::OpaqueResourceDecoderSharedPtr resource_decoder) {
     return grpc_mux_->addWatch(type_url, resources, callbacks, resource_decoder, {});
   }
 
