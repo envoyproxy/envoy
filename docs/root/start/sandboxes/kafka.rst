@@ -96,10 +96,10 @@ You can check the broker stats by querying the Envoy admin interface:
   kafka.kafka_broker.response.metadata_response: 4
 
 
-Step 7: Check admin ``kafka_service`` stats
-*******************************************
+Step 7: Check admin ``kafka_service`` cluster stats
+***************************************************
 
-Envoy also records stats fot the Kafka service:
+Envoy also records cluster stats for the Kafka service:
 
 .. code-block:: console
 

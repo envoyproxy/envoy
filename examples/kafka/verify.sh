@@ -31,7 +31,6 @@ kafka_client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPI
 
 run_log "Check admin kafka_broker stats"
 EXPECTED_BROKER_STATS=(
-    # "kafka.kafka_broker.request.create_topics_request: 1"
     "kafka.kafka_broker.request.api_versions_request: 4"
     "kafka.kafka_broker.request.find_coordinator_request: 1"
     "kafka.kafka_broker.request.metadata_request: 4"
