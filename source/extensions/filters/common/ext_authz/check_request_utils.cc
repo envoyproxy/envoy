@@ -127,10 +127,7 @@ void CheckRequestUtils::setHttpRequest(
       const std::string key(e.key().getStringView());
 
       if (request_header_matchers != nullptr) {
-
-        ENVOY_LOG_MISC(trace, "request header matchers are set");
         if (request_header_matchers->matches(key)) {
-          ENVOY_LOG_MISC(trace, "found a match for key {}", key);
           if (mutable_headers->find(key) == mutable_headers->end()) {
             (*mutable_headers)[key] = std::string(e.value().getStringView());
           } else {
