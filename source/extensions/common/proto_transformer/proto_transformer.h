@@ -25,7 +25,7 @@ public:
   virtual std::unique_ptr<ProtoTransformer<ProtoType>>
   createProtoTransformer(const Protobuf::Message& config) PURE;
 
-  std::string category() const override { return "envoy.proto_transformer"; };
+  std::string category() const override { return "envoy.common.proto_transformer"; };
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Envoy::ProtobufWkt::Struct>();

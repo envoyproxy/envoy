@@ -452,10 +452,10 @@ public:
   }
 
   std::string name() const override {
-    return "envoy.proto_transformer.transcoder_test_proto_transformer";
+    return "envoy.common.proto_transformer.transcoder_test_proto_transformer";
   }
 
-  std::string category() const override { return "envoy.proto_transformer"; };
+  std::string category() const override { return "envoy.common.proto_transformer"; };
 };
 
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
@@ -1649,7 +1649,7 @@ private:
     auto proto_config = bookstoreProtoConfig();
     proto_config.set_convert_grpc_status(true);
     proto_config.mutable_grpc_status_proto_transformer()->set_name(
-        "envoy.proto_transformer.transcoder_test_proto_transformer");
+        "envoy.common.proto_transformer.transcoder_test_proto_transformer");
     return proto_config;
   }
 };

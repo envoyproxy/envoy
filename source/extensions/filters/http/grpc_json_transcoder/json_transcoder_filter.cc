@@ -227,13 +227,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   if (proto_config.has_grpc_status_proto_transformer()) {
-    auto* factory = Envoy::Config::Utility::getFactoryByName<
+    auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
         ProtoTransformer::ProtoTransformerFactory<google::rpc::Status>>(
         proto_config.grpc_status_proto_transformer().name());
-    if (factory) {
-      grpc_status_proto_transformer_ = factory->createProtoTransformer(
-          proto_config.grpc_status_proto_transformer().typed_config());
-    }
+    grpc_status_proto_transformer_ =
+        factory.createProtoTransformer(proto_config.grpc_status_proto_transformer().typed_config());
   }
 }
 
