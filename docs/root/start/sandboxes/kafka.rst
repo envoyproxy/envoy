@@ -34,7 +34,7 @@ Change to the ``examples/kafka`` directory.
 Step 2: Create a Kafka topic
 ****************************
 
-Let's start by creating a Kafka topic called ``envoy-kafka-broker``:
+Start by creating a Kafka topic with the name ``envoy-kafka-broker``:
 
 .. code-block:: console
 
@@ -45,8 +45,9 @@ Let's start by creating a Kafka topic called ``envoy-kafka-broker``:
 Step 3: Check the Kafka topic
 *****************************
 
-You can view the topics that Kafka is aware of with the ``--list`` argument.
-Let's check that the topic you created exists:
+You can view the topics that Kafka is aware of with the ``kafka-topics --list`` argument.
+
+Check that the topic you created exists:
 
 .. code-block:: console
 
@@ -56,7 +57,7 @@ Let's check that the topic you created exists:
 Step 4: Send a message using the Kafka producer
 ***********************************************
 
- Next, let's send a message using the topic you have created using the ``kafka-console-producer``:
+Next, send a message for the topic you have created using the ``kafka-console-producer``:
 
 .. code-block:: console
 
@@ -69,7 +70,7 @@ Step 4: Send a message using the Kafka producer
 Step 5: Receive a message using the Kafka consumer
 **************************************************
 
- Now you can receive the message using the ``kafka-console-consumer`` :
+Now you can receive the message using the ``kafka-console-consumer`` :
 
 .. code-block:: console
 
@@ -78,6 +79,10 @@ Step 5: Receive a message using the Kafka consumer
 
 Step 6: Check admin ``kafka_broker`` stats
 ******************************************
+
+When you proxy to the Kafka broker, Envoy records various stats.
+
+You can check the broker stats by querying the Envoy admin interface:
 
 .. code-block:: console
 
@@ -93,6 +98,8 @@ Step 6: Check admin ``kafka_broker`` stats
 
 Step 7: Check admin ``kafka_service`` stats
 *******************************************
+
+Envoy also records stats fot the Kafka service:
 
 .. code-block:: console
 
