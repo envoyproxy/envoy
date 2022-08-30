@@ -10,6 +10,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -162,7 +163,7 @@ message ExtAuthz {
   //   ``Content-Length``, and ``Authorization`` are **automatically included** to the list.
   //
   // 2. For requestst to an HTTP authorization server: *Content-Length* will be set to 0 and the request to the
-  // authorization server will not have a message body. However, the check request can include the buffered 
+  // authorization server will not have a message body. However, the check request can include the buffered
   // client request body (controlled by :ref:`with_request_body
   // <envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.with_request_body>` setting),
   // consequently the value of *Content-Length* of the authorization request reflects the size of
@@ -264,7 +265,8 @@ message AuthorizationRequest {
   //
   //   This field has been deprecated in favor of :ref:`allowed_headers
   //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
-  type.matcher.v3.ListStringMatcher allowed_headers = 1 [deprecated = true];
+  type.matcher.v3.ListStringMatcher allowed_headers = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Sets a list of headers that will be included to the request to authorization service. Note that
   // client request of the same key will be overridden.
