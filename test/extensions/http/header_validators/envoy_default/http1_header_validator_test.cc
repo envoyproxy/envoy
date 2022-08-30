@@ -295,10 +295,9 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingValid) 
   EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateConnectPathIsAuthorityForm) {
+TEST_F(Http1HeaderValidatorTest, ValidateConnectRegName) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "www.envoy.com:443"},
                                                   {":authority", "www.envoy.com:443"},
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
@@ -306,11 +305,20 @@ TEST_F(Http1HeaderValidatorTest, ValidateConnectPathIsAuthorityForm) {
   EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateConnectPathInvalidAuthorityForm) {
+TEST_F(Http1HeaderValidatorTest, ValidateConnectIPv6) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "user:pass@envoy.com"},
-                                                  {":authority", "envoy.com"},
+                                                  {":authority", "[2001:8080]:9000"},
+                                                  {"x-foo", "bar"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateConnectInvalidUserInfo) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "CONNECT"},
+                                                  {":authority", "user:pass@envoy.com"},
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
@@ -321,7 +329,6 @@ TEST_F(Http1HeaderValidatorTest, ValidateConnectPathInvalidAuthorityForm) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingConnect) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
                                                   {":authority", "envoy.com"},
                                                   {"transfer-encoding", "chunked"}};
   auto uhv = createH1(empty_config);
@@ -359,8 +366,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectReject) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
-                                                  {":authority", "envoy.com"},
+                                                  {":authority", "envoy.com:80"},
                                                   {"content-length", "10"}};
   auto uhv = createH1(empty_config);
 
@@ -368,11 +374,28 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectRej
                              "uhv.http1.content_length_not_allowed");
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectRegNameMissingPort) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "envoy.com"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectIPv6MissingPort) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "[2001:8080]"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectAccept) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
-                                                  {":authority", "envoy.com"},
+                                                  {":authority", "envoy.com:80"},
                                                   {"content-length", "0"}};
   auto uhv = createH1(empty_config);
 
@@ -383,8 +406,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectAcc
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudo) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
-                                                  {":authority", "envoy.com"},
+                                                  {":authority", "envoy.com:80"},
                                                   {":status", "200"}};
   auto uhv = createH1(empty_config);
 
@@ -393,11 +415,8 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudo) {
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapEmptyGeneric) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
-                                                  {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
-                                                  {":authority", "envoy.com"},
-                                                  {"", "bar"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "envoy.com:80"}, {"", "bar"}};
   auto uhv = createH1(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
@@ -407,8 +426,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapEmptyGeneric) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapInvalidGeneric) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
-                                                  {":path", "envoy.com"},
-                                                  {":authority", "envoy.com"},
+                                                  {":authority", "envoy.com:80"},
                                                   {"foo header", "bar"}};
   auto uhv = createH1(empty_config);
 

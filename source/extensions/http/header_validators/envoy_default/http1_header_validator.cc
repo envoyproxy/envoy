@@ -117,15 +117,15 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
+  absl::string_view host = header_map.getHostValue();
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
-  // :method and :path headers based on RFC 9112
+  // :method header based on RFC 9112
   // https://www.rfc-editor.org/rfc/rfc9112.html#section-3:
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
-  if (path.empty()) {
-    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
-  }
-
+  //
+  // The request-target will be stored in :path except for CONNECT requests which store the
+  // request-target in :authority. So we only check that :method is set initially.
   if (header_map.getMethodValue().empty()) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
   }
@@ -140,7 +140,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // ...
   // If the authority component is missing or undefined for the target URI, then a
   // client MUST send a Host header field with an empty field-value.
-  if (header_map.getHostValue().empty()) {
+  if (host.empty()) {
     return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
@@ -160,8 +160,14 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // TODO(meilya) - should this be implemented here in UHV or the H1 codec?
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+
+  if (!is_connect_method && path.empty()) {
+    // The :path is required for non-CONNECT requests.
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
+  }
+
   auto path_is_asterisk = path == "*";
-  auto path_is_absolute = path.at(0) == '/';
+  auto path_is_absolute = path.empty() ? false : path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
@@ -221,7 +227,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
 
   // Step 3: Normalize and validate :path header
   if (is_connect_method) {
-    // The :path must be authority-form for CONNECT method requests. From RFC
+    // The :authority must be authority-form for CONNECT method requests. From RFC
     // 9112: https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.3:
     //
     // The "authority-form" of request-target is only used for CONNECT requests (Section 9.3.6 of
@@ -239,14 +245,29 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     //    CONNECT www.example.com:80 HTTP/1.1
     //    Host: www.example.com
     //
-    // TODO(meilya): implement RFC guidance
+    // Also from RFC 9110, the CONNECT request-target must have a valid port number,
     // https://www.rfc-editor.org/rfc/rfc9110.html#section-9.3.6:
-    //   A server MUST reject a CONNECT request that targets an empty or invalid port number,
-    //   typically by responding with a 400 (Bad Request) status code
-    auto host_result = validateHostHeader(header_map.Path()->value());
-    if (!host_result) {
-      return {RejectOrRedirectAction::Reject, host_result.details()};
+    //
+    // A server MUST reject a CONNECT request that targets an empty or invalid port number,
+    // typically by responding with a 400 (Bad Request) status code
+    //
+    // This is a lazy check to see that the port delimiter exists because the actual host and
+    // port value will be validated later on. For a host in reg-name form the delimiter existence
+    // check is sufficient. For IPv6, we need to verify that the port delimiter occurs *after* the
+    // IPv6 address (following a "]" character).
+    std::size_t port_delim = host.rfind(":");
+    if (port_delim == absl::string_view::npos || port_delim == 0) {
+      // The uri-host is missing the port
+      return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
     }
+
+    if (host.at(0) == '[' && host.at(port_delim - 1) != ']') {
+      // This is an IPv6 address and we would expect to see the closing "]" bracket just prior to
+      // the port delimiter.
+      return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    }
+  } else if (path.empty()) {
+    return {RejectOrRedirectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
              path_is_absolute) {
     // Validate and normalize the path, which must be a valid URI
