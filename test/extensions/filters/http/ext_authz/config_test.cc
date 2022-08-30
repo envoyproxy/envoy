@@ -192,7 +192,8 @@ private:
     EXPECT_NE(filter, nullptr);
     Http::TestRequestHeaderMapImpl request_headers;
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    ON_CALL(decoder_callbacks, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_callbacks, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     filter->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter->decodeHeaders(request_headers, false));
