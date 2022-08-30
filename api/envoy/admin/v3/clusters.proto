@@ -84,6 +84,9 @@ message ClusterStatus {
 
   // Observability name of the cluster.
   string observability_name = 7;
+
+  // eds_service_name from EDS config of the cluster.
+  string eds_service_name = 8;
 }
 
 // Current state of a particular host.
