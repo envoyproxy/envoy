@@ -11,6 +11,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
@@ -19,31 +20,56 @@ namespace {
 
 constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
 
-// A test implementation of the XdsResourcesDelegate extension.
+// A test implementation of the XdsResourcesDelegate extension. It just saves and retrieves the xDS
+// resources in a map.
 class TestXdsResourcesDelegate : public Config::XdsResourcesDelegate {
 public:
-  TestXdsResourcesDelegate() { OnConfigUpdatedCount = 0; }
+  TestXdsResourcesDelegate() {
+    OnConfigUpdatedCount = 0;
+    ResourcesMap.clear();
+  }
 
-  void onConfigUpdated(const Config::XdsSourceId& /*source_id*/,
-                       const std::vector<Config::DecodedResourceRef>& /*resources*/) override {
-    OnConfigUpdatedCount++;
+  void onConfigUpdated(const Config::XdsSourceId& source_id,
+                       const std::vector<Config::DecodedResourceRef>& resources) override {
+    ++OnConfigUpdatedCount;
+    for (const auto& resource_ref : resources) {
+      const auto& decoded_resource = resource_ref.get();
+      if (decoded_resource.hasResource()) {
+        envoy::service::discovery::v3::Resource r;
+        r.set_name(decoded_resource.name());
+        r.set_version(decoded_resource.version());
+        r.mutable_resource()->PackFrom(decoded_resource.resource());
+        ResourcesMap[makeKey(source_id, decoded_resource.name())] = std::move(r);
+      }
+    }
   }
 
   std::vector<envoy::service::discovery::v3::Resource>
-  getResources(const Config::XdsSourceId& /*source_id*/) override {
-    // TODO(abeyad): implement this and test for it when we add support for loading config from the
-    // delegate in a subsequent PR.
-    return {};
+  getResources(const Config::XdsSourceId& source_id,
+               const std::vector<std::string>& resource_names) const override {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
+    for (const auto& resource_name : resource_names) {
+      auto it = ResourcesMap.find(makeKey(source_id, resource_name));
+      if (it != ResourcesMap.end()) {
+        resources.push_back(it->second);
+      }
+    }
+    return resources;
   }
 
-  void reset(const Config::XdsSourceId& /*source_id*/) override { OnConfigUpdatedCount = 0; }
-
-  static int getOnConfigUpdatedCount() { return OnConfigUpdatedCount; }
+  static std::atomic<int> OnConfigUpdatedCount;
+  static std::map<std::string, envoy::service::discovery::v3::Resource> ResourcesMap;
 
 private:
-  static std::atomic<int> OnConfigUpdatedCount;
+  std::string makeKey(const Config::XdsSourceId& source_id,
+                      const std::string& resource_name) const {
+    static constexpr char DELIMITER[] = "+";
+    return absl::StrCat(source_id.toKey(), DELIMITER, resource_name);
+  }
 };
-std::atomic<int> TestXdsResourcesDelegate::OnConfigUpdatedCount{0};
+std::atomic<int> TestXdsResourcesDelegate::OnConfigUpdatedCount;
+std::map<std::string, envoy::service::discovery::v3::Resource>
+    TestXdsResourcesDelegate::ResourcesMap;
 
 // A factory for creating the TestXdsResourcesDelegate test implementation.
 class TestXdsResourcesDelegateFactory : public Config::XdsResourcesDelegateFactory {
@@ -152,7 +178,7 @@ public:
   void waitforOnConfigUpdatedCount(const int expected_count) {
     absl::MutexLock l(&lock_);
     const auto reached_expected_count = [expected_count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-      return TestXdsResourcesDelegate::getOnConfigUpdatedCount() == expected_count;
+      return TestXdsResourcesDelegate::OnConfigUpdatedCount == expected_count;
     };
     timeSystem().waitFor(lock_, absl::Condition(&reached_expected_count),
                          TestUtility::DefaultTimeout);
@@ -165,6 +191,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsDelegateExtensionIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+// Verifies that, if an XdsResourcesDelegate is configured, then it is invoked whenever there is a
+// set of updated resources in the DiscoveryResponse from an xDS server.
 TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated) {
   TestXdsResourcesDelegateFactory factory;
   Registry::InjectFactory<Config::XdsResourcesDelegateFactory> registered(factory);
@@ -172,7 +200,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   initialize();
   acceptXdsConnection();
 
-  int current_on_config_updated_count = TestXdsResourcesDelegate::getOnConfigUpdatedCount();
+  int current_on_config_updated_count = TestXdsResourcesDelegate::OnConfigUpdatedCount;
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -187,7 +215,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   int expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
-  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::getOnConfigUpdatedCount());
+  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::OnConfigUpdatedCount);
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("meh", getRuntimeKey("baz"));
 
@@ -204,8 +232,12 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
-  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::getOnConfigUpdatedCount());
+  EXPECT_EQ(expected_on_config_updated_count, TestXdsResourcesDelegate::OnConfigUpdatedCount);
   EXPECT_EQ("saz", getRuntimeKey("baz"));
+  ASSERT_EQ(TestXdsResourcesDelegate::ResourcesMap.size(), 1);
+  envoy::service::runtime::v3::Runtime retrieved_rtds_layer;
+  TestXdsResourcesDelegate::ResourcesMap.begin()->second.resource().UnpackTo(&retrieved_rtds_layer);
+  EXPECT_TRUE(TestUtility::protoEqual(retrieved_rtds_layer, some_rtds_layer));
 }
 
 } // namespace

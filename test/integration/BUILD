@@ -1964,6 +1964,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_delegate_extension_integration_test",
     srcs = ["xds_delegate_extension_integration_test.cc"],
+    external_deps = ["abseil_strings"],
     deps = [
         ":http_integration_lib",
         ":xds_delegate_test_config_proto_cc_proto",

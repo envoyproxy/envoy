@@ -127,14 +127,6 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     subscriptions_.emplace_back(type_url);
   }
 
-  if (xds_resources_delegate_.has_value() && !mux_started_) {
-    // The mux has already been started (i.e. on startup) but the list of watched resources has
-    // changed. We want to first reset the delegate before responding to onConfigUpdated() events.
-    // We don't want to reset the delegate on startup because we may want to use the contents of
-    // the delegates resources (e.g. loading resources from the delegate on startup).
-    xds_resources_delegate_->reset(XdsConfigSourceId(target_xds_authority_, type_url));
-  }
-
   // This will send an updated request on each subscription.
   // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
   // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
@@ -288,14 +280,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     // All config updates have been applied without throwing an exception, so we'll call the xDS
     // resources delegate, if any.
     if (xds_resources_delegate_.has_value()) {
-      const XdsConfigSourceId source_id(target_xds_authority_, type_url);
-      if (mux_started_) {
-        // Reset the delegate for the type and source, before populating with the new resources.
-        xds_resources_delegate_->reset(source_id);
-      }
-      xds_resources_delegate_->onConfigUpdated(source_id, all_resource_refs);
+      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
+                                               all_resource_refs);
     }
-    mux_started_ = false;
 
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.

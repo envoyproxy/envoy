@@ -41,18 +41,22 @@ public:
   virtual ~XdsResourcesDelegate() = default;
 
   /**
-   * Returns a list of xDS resources for the given authority and type. It is up to the
-   * implementation to determine what resources to supply, if any.
+   * Returns a list of xDS resources for the given source and names. The implementation is not
+   * required to return all (or any) of the requested resources, but the resources it does return
+   * are required to be in the set of requested resources. A resource list of size one with only
+   * the wildcard entry (i.e. "*") will return all known resources from the given xDS source.
    *
    * This function is intended to only be called on xDS fetch startup, and allows the
    * implementation to return a set of resources to be loaded and used by the Envoy instance
    * (e.g. persisted resources in local storage).
    *
    * @param source_id The xDS source for the requested resources.
-   * @return A set of xDS resources for the given authority and type.
+   * @param resource_names The names of the requested resources.
+   * @return A set of xDS resources for the given source.
    */
   virtual std::vector<envoy::service::discovery::v3::Resource>
-  getResources(const XdsSourceId& source_id) PURE;
+  getResources(const XdsSourceId& source_id,
+               const std::vector<std::string>& resource_names) const PURE;
 
   /**
    * Invoked when SotW xDS configuration updates have been received from an xDS authority, have been
@@ -63,15 +67,6 @@ public:
    */
   virtual void onConfigUpdated(const XdsSourceId& source_id,
                                const std::vector<DecodedResourceRef>& resources) PURE;
-
-  /**
-   * Reset the delegate for the given xDS source. Reset in the context of this interface means that
-   * for the given config source and type, a new subscription was initiated or an existing
-   * subscription reset for a set of resources.
-   *
-   * @param source_id The xDS source being reset.
-   */
-  virtual void reset(const XdsSourceId& source_id) PURE;
 };
 
 using XdsResourcesDelegatePtr = std::unique_ptr<XdsResourcesDelegate>;
