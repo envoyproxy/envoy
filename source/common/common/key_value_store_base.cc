@@ -3,6 +3,7 @@
 #include "absl/cleanup/cleanup.h"
 #include <algorithm>
 #include <chrono>
+#include <optional>
 
 namespace Envoy {
 namespace {
@@ -38,7 +39,7 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush();
         flush_timer_->enableTimer(flush_interval);
       })),
-      ttl_manager([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
+      ttl_manager_([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
                   dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
@@ -69,23 +70,31 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view,
-                                    const absl::optional<std::chrono::milliseconds> ttl) {
+                                    absl::optional<std::chrono::milliseconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
+  // Remove ttl if <= 0
+  if (ttl && ttl <= std::chrono::milliseconds(0)){
+    ASSERT(false);
+    ttl = absl::nullopt;
+  }
+
   // Attempt to insert the entry into the store. If it already exists, remove
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
   if (!store_.emplace(key, value).second) {
     store_.erase(key);
     store_.emplace(key, value);
+    ttl_manager_.clear(key);
   }
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
   }
   if (ttl)
-    ttl_manager.add(ttl.value(), key);
-
+  {
+    ttl_manager_.add(ttl.value(), key);
+  }
   if (!flush_timer_->enabled()) {
     flush();
   }

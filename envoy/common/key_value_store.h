@@ -22,6 +22,7 @@ public:
    * Adds or updates a key:value pair in the store.
    * @param key supplies a key to add or update.
    * @param value supplies the value to set for that key.
+   * @param ttl optionally give a ttl>0 for the key.  If it's an update, ttl will be updated as well.
    */
   virtual void addOrUpdate(absl::string_view key, absl::string_view value, absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) PURE;
 

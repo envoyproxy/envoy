@@ -38,7 +38,7 @@ public:
 protected:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
-  Config::TtlManager ttl_manager;
+  Config::TtlManager ttl_manager_;
   quiche::QuicheLinkedHashMap<std::string, std::string> store_;
   // Used for validation only.
   mutable bool under_iterate_{};
