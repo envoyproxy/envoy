@@ -53,7 +53,8 @@ FilterConfig::FilterConfig(
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
-                                   envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03) {
+                                   envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
+      vh_rate_limits_(config.vh_rate_limits()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -227,9 +228,31 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
+  populateDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
+  VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
+
+  switch (vh_rate_limit_option) {
+  case VhRateLimitOptions::Ignore:
+    break;
+  case VhRateLimitOptions::Include:
+    populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+    break;
+  case VhRateLimitOptions::Override:
+    if (route_entry->rateLimitPolicy().empty()) {
+      populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+    }
+    break;
+  default:
+    PANIC("not reached");
+  }
+}
+
+void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+                                 std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                 Http::RequestHeaderMap& headers) {
   const auto* config = getConfig();
   for (const Router::RateLimitPolicyEntry& rate_limit :
-       route_entry->rateLimitPolicy().getApplicableRateLimit(config->stage())) {
+       rate_limit_policy.getApplicableRateLimit(config->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
 
     if (!disable_key.empty()) {
@@ -248,6 +271,30 @@ const FilterConfig* Filter::getConfig() const {
   }
 
   return config_.get();
+}
+
+VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route) {
+  if (route->routeEntry()->includeVirtualHostRateLimits()) {
+    vh_rate_limits_ = VhRateLimitOptions::Include;
+  } else {
+    const auto* specific_per_route_config = getConfig();
+    if (specific_per_route_config != nullptr) {
+      switch (specific_per_route_config->virtualHostRateLimits()) {
+      case envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit::INCLUDE:
+        vh_rate_limits_ = VhRateLimitOptions::Include;
+        break;
+      case envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit::IGNORE:
+        vh_rate_limits_ = VhRateLimitOptions::Ignore;
+        break;
+      case envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit::OVERRIDE:
+      default:
+        vh_rate_limits_ = VhRateLimitOptions::Override;
+      }
+    } else {
+      vh_rate_limits_ = VhRateLimitOptions::Override;
+    }
+  }
+  return vh_rate_limits_;
 }
 
 } // namespace LocalRateLimitFilter

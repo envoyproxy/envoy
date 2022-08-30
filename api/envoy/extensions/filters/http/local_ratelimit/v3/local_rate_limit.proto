@@ -113,4 +113,18 @@ message LocalRateLimit {
   // Disabled by default.
   common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
       [(validate.rules).enum = {defined_only: true}];
+
+  enum VhRateLimitsOptions {
+    // Use the virtual host rate limits unless the route has a rate limit policy.
+    OVERRIDE = 0;
+
+    // Use the virtual host rate limits even if the route has a rate limit policy.
+    INCLUDE = 1;
+
+    // Ignore the virtual host rate limits even if the route does not have a rate limit policy.
+    IGNORE = 2;
+  }
+
+  // Specifies if the local rate limit filter should include the virtual host rate limits.
+  VhRateLimitsOptions vh_rate_limits = 13 [(validate.rules).enum = {defined_only: true}];
 }
