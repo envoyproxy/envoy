@@ -148,7 +148,8 @@ def main():
             if ext_name != 'core':
                 content += render_title(ext_name)
             output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-            content += csv_table(['Name', 'Version', 'Release date', 'CPE', 'License'], [2, 1, 1, 2, 1],
+            content += csv_table(['Name', 'Version', 'Release date', 'CPE', 'License'],
+                                 [2, 1, 1, 2, 1],
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
 
