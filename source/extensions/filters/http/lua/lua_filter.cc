@@ -1,7 +1,10 @@
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
+#include <lua.h>
+
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/http/codes.h"
@@ -23,13 +26,47 @@ namespace Lua {
 
 namespace {
 
+using OptionHandler =
+    std::function<void(lua_State* state, StreamHandleWrapper::HttpCallOptions& options)>;
+using OptionHandlers = std::map<absl::string_view, OptionHandler>;
+
+const OptionHandlers& optionHandlers() {
+  CONSTRUCT_ON_FIRST_USE(OptionHandlers,
+                         {
+                             {"asynchronous",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["asynchronous"] =
+                                // <boolean>} entry.
+                                options.is_async_request_ = lua_toboolean(state, -1);
+                              }},
+                             {"timeout_ms",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["timeout_ms"] = <int>}
+                                // entry.
+                                const int timeout_ms = luaL_checkint(state, -1);
+                                if (timeout_ms < 0) {
+                                  luaL_error(state, "http call timeout must be >= 0");
+                                } else {
+                                  options.request_options_.setTimeout(
+                                      std::chrono::milliseconds(timeout_ms));
+                                }
+                              }},
+                             {"trace_sampled",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                const bool sampled = lua_toboolean(state, -1);
+                                options.request_options_.setSampled(sampled);
+                              }},
+                             {"allows_repeat",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["allows_repeat"] =
+                                // <boolean>} entry.
+                                options.return_multiple_ = lua_toboolean(state, -1);
+                              }},
+                         });
+}
+
 constexpr int AsyncFlagIndex = 6;
 constexpr int HttpCallOptionsIndex = 5;
-
-constexpr absl::string_view SampledOption{"sampled"};
-constexpr absl::string_view TimeoutOPtion{"timeout"};
-constexpr absl::string_view AsyncOption{"async"};
-constexpr absl::string_view MultipleOption{"multiple"};
 
 struct HttpResponseCodeDetailValues {
   const absl::string_view LuaResponse = "lua_response";
@@ -39,6 +76,8 @@ using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 // Parse http call options by inspecting the provided table.
 void parseOptionsFromTable(lua_State* state, int index,
                            StreamHandleWrapper::HttpCallOptions& options) {
+  const auto& handlers = optionHandlers();
+
   lua_pushnil(state);
   while (lua_next(state, index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1). We only care for string keys.
@@ -47,43 +86,12 @@ void parseOptionsFromTable(lua_State* state, int index,
     if (key == nullptr) {
       continue;
     }
-    if (key_length == 0) {
-      luaL_error(state, "empty string is not a valid key for httpCall() options");
-    }
 
-    switch (*key) {
-    case 's': {
-      // Handle the case when the table has: {["sampled"] = <boolean>} entry.
-      ASSERT(absl::string_view(key, key_length) == SampledOption);
-      const bool sampled = lua_toboolean(state, -1);
-      options.request_options_.setSampled(sampled);
-      break;
-    }
-    case 't': {
-      ASSERT(absl::string_view(key, key_length) == TimeoutOPtion);
-      // Handle the case when the table has: {["timeout"] = <int>} entry.
-      const int timeout_ms = luaL_checkint(state, -1);
-      if (timeout_ms < 0) {
-        luaL_error(state, "http call timeout must be >= 0");
-      } else {
-        options.request_options_.setTimeout(std::chrono::milliseconds(timeout_ms));
-      }
-      break;
-    }
-    case 'a': {
-      ASSERT(absl::string_view(key, key_length) == AsyncOption);
-      // Handle the case when the table has: {["async"] = <boolean>} entry.
-      options.is_async_request_ = lua_toboolean(state, -1);
-      break;
-    }
-    case 'm': {
-      ASSERT(absl::string_view(key, key_length) == MultipleOption);
-      // Handle the case when the table has: {["multiple_headers"] = <boolean>} entry.
-      options.return_multiple_ = lua_toboolean(state, -1);
-      break;
-    }
-    default:
-      luaL_error(state, "\"%s\" is not a valid key for httpCall() options", key);
+    auto iter = handlers.find(absl::string_view(key, key_length));
+    if (iter != handlers.end()) {
+      iter->second(state, options);
+    } else {
+      luaL_error(state, "\"%s\" is not valid key for httpCall() options", key);
     }
 
     // Pop value of key/value pair.

@@ -125,8 +125,8 @@ new_features:
 - area: lua
   change: |
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
-    by setting ``{["sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
-    ``{["multiple"] = true}`` as the ``options``.
+    by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
+    ``{["allows_repeat"] = true}`` as the ``options``.
 
 deprecated:
 - area: http

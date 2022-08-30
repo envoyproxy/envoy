@@ -896,7 +896,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 }
 
 // HTTP request flow with multiple header values for same header name.
-TEST_F(LuaHttpFilterTest, HttpCallWithMultipleHeaders) {
+TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -908,7 +908,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithMultipleHeaders) {
         },
         "hello world",
         {
-          ["multiple"] = true
+          ["allows_repeat"] = true
         })
       for key, value in pairs(headers) do
         if type(value) == "table" then
@@ -1088,7 +1088,7 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronousInOptions) {
             },
             "hello world",
             {
-              ["async"] = true
+              ["asynchronous"] = true
             })
         end
       )EOF"};
@@ -1580,8 +1580,8 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
         },
         "hello world",
         {
-          ["timeout"] = 5000,
-          ["sampled"] = false,
+          ["timeout_ms"] = 5000,
+          ["trace_sampled"] = false,
         })
     end
   )EOF"};

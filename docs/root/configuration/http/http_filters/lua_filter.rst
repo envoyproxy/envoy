@@ -399,7 +399,7 @@ httpCall()
 
 .. code-block:: lua
 
-  local headers, body = handle:httpCall(cluster, headers, body, timeout, async)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout_ms, asynchronous)
 
   -- Alternative function signature.
   local headers, body = handle:httpCall(cluster, headers, body, options)
@@ -407,9 +407,9 @@ httpCall()
 Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
-data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+data to send. *timeout_ms* is an integer that specifies the call timeout in milliseconds.
 
-*async* is a boolean flag. If async is set to true, Envoy will make the HTTP request and continue,
+*asynchronous* is a boolean flag. If async is set to true, Envoy will make the HTTP request and continue,
 regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
@@ -420,31 +420,67 @@ body. May be nil if there is no body.
 The alternative function signature allows caller to specify *options* as a table. Currently,
 the supported keys are:
 
-- *async* is a boolean flag that controls the asynchronicity of the HTTP call.
-  It refers to the same *async* flag as the first function signature.
-- *timeout* is an integer that specifies the call timeout in milliseconds.
-  It refers to the same *timeout* argument as the first function signature.
-- *sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
-- *multiple* is boolean flag that decides whether the returned headers could have multiple values for same header name.
+- *asynchronous* is a boolean flag that controls the asynchronicity of the HTTP call.
+  It refers to the same *asynchronous* flag as the first function signature.
+- *timeout_ms* is an integer that specifies the call timeout in milliseconds.
+  It refers to the same *timeout_ms* argument as the first function signature.
+- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
+- *allows_repeat* is boolean flag that decides whether the repeated headers are allowed in response headers.
+  If the *allows_repeat* is set to false (default), the returned *headers* is table with value type of string.
+  If the *allows_repeat* is set to true, the returned *headers* is table with value type of string or value type
+  of table.
 
-Some examples of specifying *request_options* are shown below:
+  For example, the following upstream response headers have repeated headers.
+
+  .. code-block:: none
+
+    {
+      { ":status", "200" },
+      { "foo", "bar" },
+      { "key", "value_0" },
+      { "key", "value_1" },
+      { "key", "value_2" },
+    }
+
+  Then if *allows_repeat* is set to false, the returned headers will be:
+
+  -- code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = "value_2",
+    }
+
+  If *allows_repeat* is set to true, the returned *headers* will be:
+
+  .. code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = { "value_0", "value_1", "value_2" },
+    }
+
+
+Some examples of specifying *options* are shown below:
 
 .. code-block:: lua
 
   -- Create a fire-and-forget HTTP call.
-  local request_options = {["async"] = true}
+  local request_options = {["asynchronous"] = true}
 
   -- Create a synchronous HTTP call with 1000 ms timeout.
-  local request_options = {["timeout"] = 1000}
+  local request_options = {["timeout_ms"] = 1000}
 
   -- Create a synchronous HTTP call, but do not sample the trace span.
-  local request_options = {["sampled"] = false}
+  local request_options = {["trace_sampled"] = false}
 
-  -- The same as above, but explicitly set the "async" flag to false.
-  local request_options = {["async"] = false, ["sampled"] = false }
+  -- The same as above, but explicitly set the "asynchronous" flag to false.
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false }
 
   -- The same as above, but with 1000 ms timeout.
-  local request_options = {["async"] = false, ["sampled"] = false }
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false, ["timeout_ms"] = 1000 }
 
 
 respond()
