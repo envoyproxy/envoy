@@ -106,6 +106,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "passthrough_decoder_event_handler_lib",
+    hdrs = ["passthrough_decoder_event_handler.h"],
+    deps = [
+        ":decoder_events_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
