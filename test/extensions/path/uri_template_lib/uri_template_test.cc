@@ -84,12 +84,14 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   EXPECT_THAT(parseRewritePattern(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
+class ParseRewriteSuccess
+    : public testing::TestWithParam<
+          std::pair<std::string, std::vector<absl::variant<int, std::string>>>> {
 protected:
   const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
-  envoy::extensions::uri_template::RewriteSegments expectedProto() const {
-    envoy::extensions::uri_template::RewriteSegments expected_proto;
-    Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
+  RewriteSegments expectedProto() const {
+    RewriteSegments expected_proto;
+    expected_proto.segments = std::get<1>(GetParam());
     return expected_proto;
   }
 };
@@ -98,58 +100,53 @@ TEST(ParseRewrite, InvalidRegex) {
   EXPECT_THAT(parseRewritePattern("/{var1}", "+[abc"), StatusIs(absl::StatusCode::kInternal));
 }
 
-INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
-                         testing::ValuesIn(std::vector<std::pair<std::string, std::string>>({
-                             {"/static", R"EOF(segments: {literal: "/static"} )EOF"},
-                             {"/{var1}", R"EOF(segments:
-                          - literal: "/"
-                          - capture_index: 1)EOF"},
-                             {"/{var1}", R"EOF(segments:
-                          - literal: "/"
-                          - capture_index: 1)EOF"},
-                             {"/{var1}/{var1}/{var1}", R"EOF(segments:
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 1)EOF"},
-                             {"/{var3}/{var1}/{var2}", R"EOF(segments
-                                        - literal: "/"
-                                        - capture_index: 3
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 2)EOF"},
-                             {"/{var3}/abc/def/{var2}.suffix", R"EOF(segments:
-                                                - literal: "/"
-                                                - capture_index: 3
-                                                - literal: "/abc/def/"
-                                                - capture_index: 2
-                                                - literal: ".suffix")EOF"},
-                             {"/abc/{var1}/{var2}/def", R"EOF(segments
-                                         - literal: "/abc/"
-                                         - capture_index: 1
-                                         - literal: "/"
-                                         - capture_index: 2
-                                         - literal: "/def")EOF"},
-                             {"/{var1}{var2}", R"EOF(segments
-                                - literal: "/"
-                                - capture_index: 1
-                                - ar_index: 2)EOF"},
-                             {"/{var1}-{var2}/bucket-{var3}.suffix", R"EOF(segments
-                                                      - literal: "/"
-                                                      - capture_index: 1
-                                                      - literal: "-"
-                                                      - capture_index: 2
-                                                      - literal: "/bucket-"
-                                                      - capture_index: 3
-                                                      - literal: ".suffix")EOF"},
-                         })));
+INSTANTIATE_TEST_SUITE_P(
+    ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
+    testing::ValuesIn(
+        std::vector<std::pair<std::string, std::vector<absl::variant<int, std::string>>>>({
+            {"/static",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/static")}},
+            {"/{var1}",
+             std::vector<absl::variant<int, std::string>>{absl::variant<int, std::string>("/"),
+                                                          absl::variant<int, std::string>(1)}},
+            {"/{var1}",
+             std::vector<absl::variant<int, std::string>>{absl::variant<int, std::string>("/"),
+                                                          absl::variant<int, std::string>(1)}},
+            {"/{var1}/{var1}/{var1}",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1)}},
+            {"/{var3}/{var1}/{var2}",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(3),
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(2)}},
+            {"/{var3}/abc/def/{var2}.suffix",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(3),
+                 absl::variant<int, std::string>("/abc/def/"), absl::variant<int, std::string>(2),
+                 absl::variant<int, std::string>(".suffix")}},
+            {"/abc/{var1}/{var2}/def",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/abc/"), absl::variant<int, std::string>(1),
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(2),
+                 absl::variant<int, std::string>("/def")}},
+            {"/{var1}/{var2}",
+             std::vector<absl::variant<int, std::string>>{absl::variant<int, std::string>("/"),
+                                                          absl::variant<int, std::string>(1),
+                                                          absl::variant<int, std::string>(2)}},
+            {"/{var1}-{var2}/bucket-{var3}.suffix",
+             std::vector<absl::variant<int, std::string>>{
+                 absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                 absl::variant<int, std::string>("-"), absl::variant<int, std::string>(2),
+                 absl::variant<int, std::string>("/bucket-"), absl::variant<int, std::string>(3),
+                 absl::variant<int, std::string>(".suffix")}},
+        })));
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
-  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite =
-      parseRewritePattern(rewritePattern(), kCaptureRegex);
+  absl::StatusOr<RewriteSegments> rewrite = parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
 }
 
@@ -168,64 +165,56 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 }
 
 class RewritePathTemplateSuccess
-    : public testing::TestWithParam<std::pair<std::string, std::string>> {
+    : public testing::TestWithParam<
+          std::pair<std::vector<absl::variant<int, std::string>>, std::string>> {
 protected:
-  envoy::extensions::uri_template::RewriteSegments rewriteProto() const {
-    envoy::extensions::uri_template::RewriteSegments proto;
-    Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
+  RewriteSegments rewriteProto() const {
+    RewriteSegments proto;
+    proto.segments = std::get<0>(GetParam());
     return proto;
   }
+
   const std::string& expectedRewrittenPath() const { return std::get<1>(GetParam()); }
 };
 
-INSTANTIATE_TEST_SUITE_P(RewritePathTemplateSuccessTestSuite, RewritePathTemplateSuccess,
-                         testing::ValuesIn(std::vector<std::pair<std::string, std::string>>(
-                             {{R"EOF(segments: { literal: "/static" })EOF", "/static"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1/val1/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 2)EOF",
-                               "/val3/val1/val2"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - literal: "/abc/def/"
-              - capture_index: 2
-              - literal: ".suffix")EOF",
-                               "/val3/abc/def/val2.suffix"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - capture_index: 2
-              - literal: "."
-              - capture_index: 1)EOF",
-                               "/val3val2.val1"},
-                              {R"EOF(segments:
-              - literal: "/abc/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 5
-              - literal: "/def")EOF",
-                               "/abc/val1/val5/def"}})));
+INSTANTIATE_TEST_SUITE_P(
+    RewritePathTemplateSuccessTestSuite, RewritePathTemplateSuccess,
+    testing::ValuesIn(
+        std::vector<std::pair<std::vector<absl::variant<int, std::string>>, std::string>>(
+            {{std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/static")},
+              "/static"},
+             {std::vector<absl::variant<int, std::string>>{absl::variant<int, std::string>("/"),
+                                                           absl::variant<int, std::string>(1)},
+              "/val1"},
+             {std::vector<absl::variant<int, std::string>>{absl::variant<int, std::string>("/"),
+                                                           absl::variant<int, std::string>(1)},
+              "/val1"},
+             {std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1)},
+              "/val1/val1/val1"},
+             {std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(3),
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1),
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(2)},
+              "/val3/val1/val2"},
+             {std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(3),
+                  absl::variant<int, std::string>("/abc/def/"), absl::variant<int, std::string>(2),
+                  absl::variant<int, std::string>(".suffix")},
+              "/val3/abc/def/val2.suffix"},
+             {std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(3),
+                  absl::variant<int, std::string>(2), absl::variant<int, std::string>("."),
+                  absl::variant<int, std::string>(1)},
+              "/val3val2.val1"},
+             {std::vector<absl::variant<int, std::string>>{
+                  absl::variant<int, std::string>("/abc/"), absl::variant<int, std::string>(1),
+                  absl::variant<int, std::string>("/"), absl::variant<int, std::string>(5),
+                  absl::variant<int, std::string>("/def")},
+              "/abc/val1/val5/def"}})));
 
 TEST_P(RewritePathTemplateSuccess, RewritePathTemplateSuccessTest) {
   absl::StatusOr<std::string> rewritten_path =
@@ -235,59 +224,36 @@ TEST_P(RewritePathTemplateSuccess, RewritePathTemplateSuccessTest) {
 }
 
 TEST(RewritePathTemplateFailure, BadRegex) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 1
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
+  RewriteSegments rewrite_proto;
+  rewrite_proto.segments = std::vector<absl::variant<int, std::string>>{
+      absl::variant<int, std::string>("/static"), absl::variant<int, std::string>(1)};
 
   EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "+/bad_regex", rewrite_proto),
               StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST(RewritePathTemplateFailure, RegexNoMatch) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 1
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
+  RewriteSegments rewrite_proto;
+  rewrite_proto.segments = std::vector<absl::variant<int, std::string>>{
+      absl::variant<int, std::string>("/"), absl::variant<int, std::string>(1)};
 
   EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "/no_match_regex", rewrite_proto),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(RewritePathTemplateFailure, RegexCaptureIndexZero) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 0
-  )EOF";
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
+  RewriteSegments rewrite_proto;
+  rewrite_proto.segments = std::vector<absl::variant<int, std::string>>{
+      absl::variant<int, std::string>("/"), absl::variant<int, std::string>(0)};
 
   EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_proto),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(RewritePathTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 6
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
+  RewriteSegments rewrite_proto;
+  rewrite_proto.segments = std::vector<absl::variant<int, std::string>>{
+      absl::variant<int, std::string>("/"), absl::variant<int, std::string>(6)};
 
   EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_proto),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -320,7 +286,7 @@ TEST_P(PathPatternMatchAndRewrite, PathPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertPathPatternSyntaxToRegex(pattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite_proto =
+  absl::StatusOr<RewriteSegments> rewrite_proto =
       parseRewritePattern(rewritePattern(), regex.value());
   ASSERT_OK(rewrite_proto);
 

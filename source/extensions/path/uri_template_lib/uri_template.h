@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "source/extensions/path/uri_template_lib/proto/rewrite_segments.pb.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -29,6 +28,10 @@ struct ParsedSegment {
   RewriteStringKind kind_;
 };
 
+struct RewriteSegments {
+  std::vector<absl::variant<int, std::string>> segments;
+};
+
 /**
  * Returns the safe regex that Envoy understands that is equivalent to the given pattern.
  */
@@ -43,8 +46,8 @@ absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view
 /**
  * Returns the parsed path rewrite pattern and processes variables.
  */
-absl::StatusOr<envoy::extensions::uri_template::RewriteSegments>
-parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex);
+absl::StatusOr<RewriteSegments> parseRewritePattern(absl::string_view pattern,
+                                                    absl::string_view capture_regex);
 
 /**
  * Returns true if provided rewrite pattern is valid.
@@ -74,9 +77,9 @@ absl::Status isValidMatchPattern(absl::string_view match_pattern);
  * capture_regex: "(1)/(2)"
  * Rewrite would result in rewrite of "/var/cat".
  */
-absl::StatusOr<std::string>
-rewritePathTemplatePattern(absl::string_view path, absl::string_view capture_regex,
-                           const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern);
+absl::StatusOr<std::string> rewritePathTemplatePattern(absl::string_view path,
+                                                       absl::string_view capture_regex,
+                                                       const RewriteSegments& rewrite_pattern);
 
 } // namespace UriTemplate
 } // namespace Extensions
