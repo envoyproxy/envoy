@@ -11,6 +11,8 @@ load(
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
 
+EnvoyProtoDepsInfo = provider(fields = ["deps"])
+
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
 _CC_GRPC_SUFFIX = "_cc_grpc"
@@ -177,14 +179,10 @@ def api_proto_package(
 
     # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
     # which share the same go proto library, it causes duplicative dependencies.
-    # Thus, we use depset().to_list() to remove duplicated depenencies.
-    go_proto_library(
-        name = name + _GO_PROTO_SUFFIX,
-        compilers = compilers,
-        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
-        proto = name,
-        visibility = ["//visibility:public"],
-        deps = depset([_go_proto_mapping(dep) for dep in deps] + [
+    # Thus, we use a dictionary below to simulate a set and remove duplicated dependencies.
+    deps = (
+        [_go_proto_mapping(dep) for dep in deps] +
+        [
             "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
             "@com_github_golang_protobuf//ptypes:go_default_library_gen",
             "@go_googleapis//google/api:annotations_go_proto",
@@ -194,5 +192,13 @@ def api_proto_package(
             "@io_bazel_rules_go//proto/wkt:struct_go_proto",
             "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
-        ]).to_list(),
+        ]
+    )
+    go_proto_library(
+        name = name + _GO_PROTO_SUFFIX,
+        compilers = compilers,
+        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = {dep: True for dep in deps}.keys(),
     )

@@ -137,8 +137,9 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket = createConnectionSocket(
-      connectionSocket()->connectionInfoProvider().remoteAddress(), new_local_address, nullptr);
+  auto probing_socket =
+      createConnectionSocket(connectionSocket()->connectionInfoProvider().remoteAddress(),
+                             new_local_address, connectionSocket()->options());
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
@@ -258,7 +259,7 @@ EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidatio
     : connection_(connection) {}
 
 void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationSuccess(
-    std::unique_ptr<quic::QuicPathValidationContext> context) {
+    std::unique_ptr<quic::QuicPathValidationContext> context, quic::QuicTime /*start_time*/) {
   connection_.onPathValidationSuccess(std::move(context));
 }
 

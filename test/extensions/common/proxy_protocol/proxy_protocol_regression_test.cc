@@ -46,22 +46,31 @@ public:
         connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
-    EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
-    EXPECT_CALL(socket_factory_, localAddress())
+    socket_factories_.emplace_back(std::make_unique<Network::MockListenSocketFactory>());
+    EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+                socketType())
+        .WillOnce(Return(Network::Socket::Type::Stream));
+    EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+                localAddress())
         .WillRepeatedly(ReturnRef(socket_->connectionInfoProvider().localAddress()));
-    EXPECT_CALL(socket_factory_, getListenSocket(_)).WillOnce(Return(socket_));
+    EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(socket_factories_[0].get()),
+                getListenSocket(_))
+        .WillOnce(Return(socket_));
     connection_handler_->addListener(absl::nullopt, *this, runtime_);
     conn_ = dispatcher_->createClientConnection(socket_->connectionInfoProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
-                                                Network::Test::createRawBufferSocket(), nullptr);
+                                                Network::Test::createRawBufferSocket(), nullptr,
+                                                nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
-  bool bindToPort() override { return true; }
+  std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
+    return socket_factories_;
+  }
+  bool bindToPort() const override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
@@ -79,7 +88,9 @@ public:
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
-  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
+  Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
+    return connection_balancer_;
+  }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return empty_access_logs_;
   }
@@ -166,7 +177,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
-  Network::MockListenSocketFactory socket_factory_;
+  std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;

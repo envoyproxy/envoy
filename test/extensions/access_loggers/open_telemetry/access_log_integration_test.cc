@@ -33,8 +33,8 @@ constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
           - key: "node_name"
             value:
               string_value: "node_name"
-      instrumentation_library_logs:
-        - logs:
+      scope_logs:
+        - log_records:
             body:
               string_value: "GET HTTP/1.1 404"
             attributes:
@@ -118,8 +118,8 @@ public:
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     // Clear start time which is not deterministic.
     request_msg.mutable_resource_logs(0)
-        ->mutable_instrumentation_library_logs(0)
-        ->mutable_logs(0)
+        ->mutable_scope_logs(0)
+        ->mutable_log_records(0)
         ->clear_time_unix_nano();
 
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,

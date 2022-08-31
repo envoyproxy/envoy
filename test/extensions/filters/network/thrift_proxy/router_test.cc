@@ -548,7 +548,7 @@ public:
   }
 
   void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
-                      bool is_drain = false) {
+                      bool is_drain = false, bool is_partial = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -565,13 +565,21 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
 
+    if (is_partial) {
+      return;
+    }
+
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
                 released(Ref(upstream_connection_)));
 
     if (is_drain) {
-      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush))
+          .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+            // Simulate the upstream connection being closed.
+            upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+          }));
     }
 
     upstream_callbacks_->onUpstreamData(buffer, false);
@@ -720,7 +728,8 @@ TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 0 : 1);
@@ -771,7 +780,7 @@ TEST_P(ThriftRouterRainidayTest, PoolTimeout) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure: timeout.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(
@@ -979,6 +988,10 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
 
   upstream_callbacks_->onUpstreamData(buffer, true);
   destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.downstream_cx_underflow_response_close")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
@@ -1029,7 +1042,8 @@ TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_CALL(callbacks_, onReset()).Times(0);
@@ -1061,7 +1075,8 @@ TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure: remote connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -1328,7 +1343,7 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure: timeout.*"));
         EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
@@ -1724,12 +1739,30 @@ TEST_F(ThriftRouterTest, UpstreamDraining) {
   Stats::MockStore cluster_scope;
   expectStatCalls(cluster_scope);
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
-
+  // Keep the downstream connection.
+  EXPECT_CALL(callbacks_, resetDownstreamConnection()).Times(0);
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
   returnResponse(MessageType::Reply, true, true /* is_drain */);
   destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamPartialResponse) {
+  initializeRouter();
+
+  EXPECT_CALL(callbacks_, resetDownstreamConnection());
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, false, true /* is_partial*/);
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  destroyRouter();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.downstream_cx_partial_response_close")
+                     .value());
 }
 
 TEST_F(ThriftRouterTest, ShadowRequests) {

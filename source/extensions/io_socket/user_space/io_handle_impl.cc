@@ -54,9 +54,10 @@ const Network::Address::InstanceConstSharedPtr& IoHandleImpl::getCommonInternalA
                              "internal_address_for_user_space_io_handle"));
 }
 
-IoHandleImpl::IoHandleImpl()
+IoHandleImpl::IoHandleImpl(PassthroughStateSharedPtr passthrough_state)
     : pending_received_data_([&]() -> void { this->onBelowLowWatermark(); },
-                             [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}) {}
+                             [&]() -> void { this->onAboveHighWatermark(); }, []() -> void {}),
+      passthrough_state_(passthrough_state) {}
 
 IoHandleImpl::~IoHandleImpl() {
   if (!closed_) {
@@ -375,6 +376,30 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
     write_shutdown_ = true;
   }
   return {0, 0};
+}
+
+void PassthroughStateImpl::initialize(
+    std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+    const StreamInfo::FilterState::Objects& filter_state_objects) {
+  ASSERT(state_ == State::Created);
+  metadata_ = std::move(metadata);
+  filter_state_objects_ = filter_state_objects;
+  state_ = State::Initialized;
+}
+void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata,
+                                     StreamInfo::FilterState& filter_state) {
+  ASSERT(state_ == State::Created || state_ == State::Initialized);
+  if (metadata_) {
+    metadata.MergeFrom(*metadata_);
+  }
+  for (const auto& object : filter_state_objects_) {
+    // This should not throw as stream info is new and filter objects are uniquely named.
+    filter_state.setData(object.name_, object.data_, object.state_type_,
+                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
+  }
+  metadata_ = nullptr;
+  filter_state_objects_.clear();
+  state_ = State::Done;
 }
 } // namespace UserSpace
 } // namespace IoSocket

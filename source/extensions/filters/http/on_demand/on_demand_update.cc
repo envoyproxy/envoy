@@ -122,7 +122,7 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
 }
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  auto config = getConfig(callbacks_->route());
+  auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
   return filter_iteration_state_;
@@ -159,10 +159,8 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
       odcds.requestOnDemandClusterDiscovery(cluster_name, std::move(callback), timeout);
 }
 
-const OnDemandFilterConfig*
-OnDemandRouteUpdate::getConfig(const Router::RouteConstSharedPtr& route) {
-  auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(
-      HttpFilterNames::get().OnDemand, route);
+const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
+  auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(callbacks_);
   if (config != nullptr) {
     return config;
   }

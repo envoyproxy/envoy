@@ -39,6 +39,32 @@ struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+inline constexpr absl::string_view ExtProcLoggingInfoName = "ext-proc-logging-info";
+
+class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  struct GrpcCall {
+    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus status,
+             const ProcessorState::CallbackState callback_state)
+        : latency_(latency), status_(status), callback_state_(callback_state) {}
+    const std::chrono::microseconds latency_;
+    const Grpc::Status::GrpcStatus status_;
+    const ProcessorState::CallbackState callback_state_;
+  };
+  using GrpcCalls = std::vector<GrpcCall>;
+
+  void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
+                      ProcessorState::CallbackState callback_state,
+                      envoy::config::core::v3::TrafficDirection traffic_direction);
+
+  const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
+
+private:
+  GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
+  GrpcCalls decoding_processor_grpc_calls_;
+  GrpcCalls encoding_processor_grpc_calls_;
+};
+
 class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
@@ -126,6 +152,7 @@ public:
   const FilterConfig& config() const { return *config_; }
 
   ExtProcFilterStats& stats() { return stats_; }
+  ExtProcLoggingInfo& loggingInfo() { return *logging_info_; }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -166,7 +193,7 @@ private:
   StreamOpenState openStream();
   void closeStream();
 
-  void cleanUpTimers();
+  void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
@@ -181,6 +208,7 @@ private:
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
   ExtProcFilterStats stats_;
+  ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
 
   // The state of the filter on both the encoding and decoding side.

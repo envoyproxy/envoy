@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/utility.h"
@@ -16,17 +17,13 @@ namespace Tls {
 
 std::string getCertValidatorName(const Envoy::Ssl::CertificateValidationContextConfig* config);
 
-class CertValidatorFactory {
+class CertValidatorFactory : public Config::UntypedFactory {
 public:
-  virtual ~CertValidatorFactory() = default;
-
   virtual CertValidatorPtr
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       TimeSource& time_source) PURE;
 
-  virtual absl::string_view name() PURE;
-
-  std::string category() { return "envoy.tls.cert_validator"; }
+  std::string category() const override { return "envoy.tls.cert_validator"; }
 };
 
 } // namespace Tls

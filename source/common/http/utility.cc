@@ -445,7 +445,8 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
       params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
                      decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
-      params.emplace(StringUtil::subspan(data, start, end), "");
+      const auto param_name = StringUtil::subspan(data, start, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
     }
 
     start = end + 1;
@@ -513,14 +514,15 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
-  auto status = Utility::getResponseStatusNoThrow(headers);
+  auto status = Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value()) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    IS_ENVOY_BUG("No status in headers");
+    return 0;
   }
   return status.value();
 }
 
-absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
+absl::optional<uint64_t> Utility::getResponseStatusOrNullopt(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
@@ -1027,19 +1029,21 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     if (ch == '%' && i + 2 < encoded.size()) {
       const char& hi = encoded[i + 1];
       const char& lo = encoded[i + 2];
-      if (absl::ascii_isdigit(hi)) {
-        ch = hi - '0';
-      } else {
-        ch = absl::ascii_toupper(hi) - 'A' + 10;
-      }
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
 
-      ch *= 16;
-      if (absl::ascii_isdigit(lo)) {
-        ch += lo - '0';
-      } else {
-        ch += absl::ascii_toupper(lo) - 'A' + 10;
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        i += 2;
       }
-      i += 2;
     }
     decoded.push_back(ch);
   }

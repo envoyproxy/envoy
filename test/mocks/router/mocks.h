@@ -72,6 +72,9 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const absl::optional<bool>& allowPrivateNetworkAccess() const override {
+    return allow_private_network_access_;
+  };
   bool enabled() const override { return enabled_; };
   bool shadowEnabled() const override { return shadow_enabled_; };
 
@@ -81,6 +84,7 @@ public:
   std::string expose_headers_;
   std::string max_age_{};
   absl::optional<bool> allow_credentials_;
+  absl::optional<bool> allow_private_network_access_;
   bool enabled_{};
   bool shadow_enabled_{};
 };
@@ -403,6 +407,10 @@ public:
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
 
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    return RouteStatsContextOptRef();
+  }
+
   std::string cluster_name_{"fake_cluster"};
   std::string route_name_{"fake_route_name"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -570,7 +578,7 @@ class MockGenericConnPool : public GenericConnPool {
 
 class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
-  MOCK_METHOD(const RouteEntry&, routeEntry, (), (const));
+  MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(const Network::Connection&, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));

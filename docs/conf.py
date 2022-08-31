@@ -21,6 +21,9 @@ import yaml
 from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
+# TODO(phlax): move the pygments style to envoy.docs.sphinx_runner and remove this
+sys.path.append(os.path.abspath("./_pygments"))
+
 
 class SphinxConfigError(Exception):
     pass
@@ -91,9 +94,10 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
-    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block',
-    'sphinxext.rediraffe', 'powershell_lexer'
+    'envoy.docs.sphinx_runner.ext.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx', 'sphinx_tabs.tabs', 'sphinx_copybutton',
+    'envoy.docs.sphinx_runner.ext.validating_code_block', 'sphinxext.rediraffe',
+    'envoy.docs.sphinx_runner.ext.powershell_lexer'
 ]
 
 release_level = _config('release_level')
@@ -316,3 +320,5 @@ htmlhelp_basename = 'envoydoc'
 rediraffe_redirects = "redirects.txt"
 
 intersphinx_mapping = _config("intersphinx_mapping")
+
+pygments_style = "style.EnvoyCodeStyle"

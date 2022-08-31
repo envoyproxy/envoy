@@ -511,6 +511,17 @@ protected:
   void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
     header_string.setCopyUnvalidatedForTestOnly(value);
   }
+
+  bool skipForUhv() {
+#ifdef ENVOY_ENABLE_UHV
+    if (http2_implementation_ == Http2Impl::Oghttp2) {
+      initialize();
+      return true;
+    }
+#endif
+
+    return false;
+  }
 };
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
@@ -620,6 +631,10 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 
 // nghttp2 rejects trailers with :status.
 TEST_P(Http2CodecImplTest, TrailerStatus) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -693,6 +708,10 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
 
 // nghttp2 treats 101 inside an HTTP/2 stream as an invalid HTTP header field.
 TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -827,6 +846,10 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -861,6 +884,10 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
+  if (skipForUhv()) {
+    return;
+  }
+
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
 
@@ -1305,6 +1332,13 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
 
   EXPECT_EQ(min_observed.count(), min_expected.count());
   EXPECT_EQ(max_observed.count(), max_expected.count());
+}
+
+TEST_P(Http2CodecImplTest, EarlyReset) {
+  initialize();
+
+  // Reset the stream before sending headers to make sure this corner case is handled.
+  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 }
 
 TEST_P(Http2CodecImplTest, IdlePing) {
@@ -3613,7 +3647,8 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
 }
 
 // CONNECT without upgrade type gets tagged with "bytestream"
-TEST_P(Http2CodecImplTest, ConnectTest) {
+TEST_P(Http2CodecImplTest, ConnectTestOld) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
   initialize();
@@ -3629,6 +3664,31 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   expected_headers.setReferenceKey(Headers::get().Method,
                                    Http::Headers::get().MethodValues.Connect);
   expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
+  response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectTest) {
+  client_http2_options_.set_allow_connect(true);
+  server_http2_options_.set_allow_connect(true);
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
+  request_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
+  TestRequestHeaderMapImpl expected_headers;
+  expected_headers.setReferenceKey(Headers::get().Host, "host");
+  expected_headers.setReferenceKey(Headers::get().Method,
+                                   Http::Headers::get().MethodValues.Connect);
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();

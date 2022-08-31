@@ -22,7 +22,7 @@ class TestPauseFilter;
 
 namespace Network {
 
-class HappyEyeballsConnectionImpl;
+class MultiConnectionBaseImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -82,7 +82,10 @@ public:
     return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override {
+    // SSL info may be overwritten by a filter in the provider.
+    return socket_->connectionInfoProvider().sslConnection();
+  }
   State state() const override;
   bool connecting() const override {
     ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
@@ -187,7 +190,7 @@ protected:
   bool bind_error_{false};
 
 private:
-  friend class HappyEyeballsConnectionImpl;
+  friend class MultiConnectionBaseImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -262,11 +265,14 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
   ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
   // Network::ClientConnection
   void connect() override;

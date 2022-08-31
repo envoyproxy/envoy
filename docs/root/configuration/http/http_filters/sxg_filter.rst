@@ -4,8 +4,8 @@
 SXG
 ======
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.sxg.v3alpha.SXG``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>`
-* This filter should be configured with the name *envoy.filters.http.sxg*.
 
 .. attention::
 
@@ -24,6 +24,10 @@ Transaction flow:
 If there is an error generating the SXG package we fall back to the original HTML.
 
 For more information on Signed HTTP Exchanges see `this doc <https://developers.google.com/web/updates/2018/11/signed-exchanges>`_.
+
+.. note::
+
+ These features are only supported on Linux amd64.
 
 Example configuration
 ---------------------

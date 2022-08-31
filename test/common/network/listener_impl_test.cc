@@ -42,7 +42,7 @@ static void errorCallbackTest(Address::IpVersion version) {
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
@@ -99,7 +99,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -143,10 +143,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
 
   auto initiate_connections = [&](const int count) {
     for (int i = 0; i < count; ++i) {
-      client_connections.emplace_back(
-          dispatcher_->createClientConnection(socket->connectionInfoProvider().localAddress(),
-                                              Network::Address::InstanceConstSharedPtr(),
-                                              Network::Test::createRawBufferSocket(), nullptr));
+      client_connections.emplace_back(dispatcher_->createClientConnection(
+          socket->connectionInfoProvider().localAddress(),
+          Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+          nullptr, nullptr));
       client_connections.back()->connect();
     }
   };
@@ -208,10 +208,10 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
 
   auto initiate_connections = [&](const int count) {
     for (int i = 0; i < count; ++i) {
-      client_connections.emplace_back(
-          dispatcher_->createClientConnection(socket->connectionInfoProvider().localAddress(),
-                                              Network::Address::InstanceConstSharedPtr(),
-                                              Network::Test::createRawBufferSocket(), nullptr));
+      client_connections.emplace_back(dispatcher_->createClientConnection(
+          socket->connectionInfoProvider().localAddress(),
+          Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+          nullptr, nullptr));
       client_connections.back()->connect();
     }
   };
@@ -247,7 +247,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
       socket->connectionInfoProvider().localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
@@ -295,7 +295,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
       socket->connectionInfoProvider().localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->connect();
 
   StreamInfo::StreamInfoImpl stream_info(dispatcher_->timeSource(), nullptr);
@@ -333,7 +333,7 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
 
   ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
 
@@ -382,7 +382,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
 
   ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -422,7 +422,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   {
     ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket(), nullptr);
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
     client_connection->addConnectionCallbacks(connection_callbacks);
     client_connection->connect();
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -445,7 +445,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   {
     ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket(), nullptr);
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
     client_connection->addConnectionCallbacks(connection_callbacks);
     client_connection->connect();
     dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -484,7 +484,7 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
 
   ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, nullptr);
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
   dispatcher_->run(Event::Dispatcher::RunType::Block);

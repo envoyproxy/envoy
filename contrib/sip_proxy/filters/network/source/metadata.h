@@ -26,6 +26,8 @@ namespace SipProxy {
   FUNCTION(HandleAffinity)                                                                         \
   FUNCTION(Done)
 
+using TraContextMap = absl::flat_hash_map<std::string, std::string>;
+
 /**
  * ProtocolState represents a set of states used in a state machine to decode
  * Sip requests and responses.
@@ -111,11 +113,11 @@ public:
   MethodType methodType() { return method_type_; }
   void setMethodType(MethodType data) { method_type_ = data; }
 
-  MethodType respMethodType() { return resp_method_type_; }
-  void setRespMethodType(MethodType data) { resp_method_type_ = data; }
-
   absl::optional<absl::string_view> ep() { return ep_; }
   void setEP(absl::string_view data) { ep_ = data; }
+
+  absl::optional<absl::string_view> opaque() { return opaque_; }
+  void setOpaque(absl::string_view data) { opaque_ = data; }
 
   std::vector<Operation>& operationList() { return operation_list_; }
   void setOperation(Operation op) { operation_list_.emplace_back(op); }
@@ -178,14 +180,23 @@ public:
 
   std::vector<SipHeader>& listHeader(HeaderType type) { return headers_[type]; }
 
+  TraContextMap traContext() {
+    if (tra_context_map_.empty()) {
+      auto fromHeader = listHeader(HeaderType::From).front().text();
+      tra_context_map_.emplace(std::make_pair("method_type", methodStr[methodType()]));
+      tra_context_map_.emplace(std::make_pair("from_header", fromHeader));
+    }
+    return tra_context_map_;
+  }
+
 private:
   MsgType msg_type_;
   MethodType method_type_;
-  MethodType resp_method_type_;
   std::vector<std::vector<SipHeader>> headers_{HeaderType::HeaderMaxNum};
 
   std::vector<Operation> operation_list_;
   absl::optional<absl::string_view> ep_{};
+  absl::optional<absl::string_view> opaque_{};
 
   absl::optional<std::pair<std::string, std::string>> p_cookie_ip_map_{};
 
@@ -199,6 +210,8 @@ private:
   std::string raw_msg_{};
   State state_{State::TransportBegin};
   bool stop_load_balance_{};
+
+  TraContextMap tra_context_map_{};
 
   bool isDomainMatched(
       absl::string_view& header,

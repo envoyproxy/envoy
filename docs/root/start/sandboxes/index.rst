@@ -65,6 +65,7 @@ The following sandboxes are available:
     lua
     mysql
     postgres
+    rbac
     redis
     skywalking_tracing
     tls-inspector

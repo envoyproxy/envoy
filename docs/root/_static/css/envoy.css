@@ -16,9 +16,18 @@ table.docutils div.line-block {
 }
 
 /* To style the API version label of a search result item */
-.api-version-label {
+.api-v3-version-label {
   border-radius: 20%;
   background-color: #c0c0c0;
+  color: #ffffff;
+  margin-left: 4px;
+  padding: 4px;
+}
+
+/* To style the API version label of a search result item */
+.xds-version-label {
+  border-radius: 20%;
+  background-color: #aaa;
   color: #ffffff;
   margin-left: 4px;
   padding: 4px;
@@ -35,4 +44,16 @@ table.docutils div.line-block {
     background-color: rgba(27, 31, 35, 0.05);
     padding: 2px 2px;
     border: solid #eee 1px;
+}
+
+/* suppress errs on pseudo-json code highlights */
+.highlight-json .highlight .err {
+    border: inherit;
+    box-sizing: inherit;
+}
+
+/* tame the search highlight colours */
+.rst-content .highlighted {
+    background: #f6f5db;
+    box-shadow: 0 0 0 2px #e7e6b6;
 }

@@ -1,8 +1,10 @@
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y python3 python3-pip python3-setuptools \
-    && apt-get autoremove -y && apt-get clean \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+    && apt-get -qq install -qq --no-install-recommends -y python3 python3-pip python3-setuptools \
+    && apt-get -qq autoremove -y && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
 RUN pip3 install -q Flask==2.0.3

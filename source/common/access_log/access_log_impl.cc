@@ -308,9 +308,11 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
   return default_match_;
 }
 
-InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::CommonFactoryContext& context) {
+namespace {
+
+template <typename FactoryContext>
+InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::AccessLog& config,
+                                        FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context.runtime(),
@@ -324,6 +326,20 @@ AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& confi
       config, context.messageValidationVisitor(), factory);
 
   return factory.createAccessLogInstance(*message, std::move(filter), context);
+}
+
+} // namespace
+
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return makeAccessLogInstance(config, context);
+}
+
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::CommonFactoryContext& context) {
+  return makeAccessLogInstance(config, context);
 }
 
 } // namespace AccessLog

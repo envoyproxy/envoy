@@ -85,7 +85,7 @@ IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type, bool wait_till_connected)
-    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher, random, nullptr),
       dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this),
       codec_client_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
@@ -750,6 +750,32 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 
   test_server_->waitForCounterEq("vhost.integration.vcluster.test_vcluster.upstream_rq_total", 1);
   test_server_->waitForCounterEq("vhost.integration.vcluster.other.upstream_rq_total", 1);
+}
+
+// Make sure route level stats are generated correctly.
+void HttpIntegrationTest::testRouteStats() {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_config = hcm.mutable_route_config();
+        ASSERT_EQ(1, route_config->virtual_hosts_size());
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        route->set_stat_prefix("test_route");
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "sni.lyft.com"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  checkSimpleRequestSuccess(0, 0, response.get());
+
+  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_total", 1);
+  test_server_->waitForCounterEq("vhost.integration.route.test_route.upstream_rq_completed", 1);
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {

@@ -12,6 +12,7 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -95,9 +96,11 @@ public:
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
 
   /**
+   * @param address is used to query the address specific router.
    * @return the UdpListenerWorkerRouter for this listener.
    */
-  virtual UdpListenerWorkerRouter& listenerWorkerRouter() PURE;
+  virtual UdpListenerWorkerRouter&
+  listenerWorkerRouter(const Network::Address::Instance& address) PURE;
 
   /**
    * @return the configuration for the listener.
@@ -146,16 +149,16 @@ public:
   virtual FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return ListenSocketFactory& the factory to create listen socket.
+   * @return std::vector<ListenSocketFactoryPtr>& the factories to create listen sockets.
    */
-  virtual ListenSocketFactory& listenSocketFactory() PURE;
+  virtual std::vector<ListenSocketFactoryPtr>& listenSocketFactories() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
    *         A listener that doesn't listen on a port can only receive connections
    *         redirected from other listeners.
    */
-  virtual bool bindToPort() PURE;
+  virtual bool bindToPort() const PURE;
 
   /**
    * @return bool if a connection should be handed off to another Listener after the original
@@ -215,10 +218,11 @@ public:
   virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
+   * @param address is used for query the address specific connection balancer.
    * @return the connection balancer for this listener. All listeners have a connection balancer,
    *         though the implementation may be a NOP balancer.
    */
-  virtual ConnectionBalancer& connectionBalancer() PURE;
+  virtual ConnectionBalancer& connectionBalancer(const Network::Address::Instance& address) PURE;
 
   /**
    * Open connection resources for this listener.

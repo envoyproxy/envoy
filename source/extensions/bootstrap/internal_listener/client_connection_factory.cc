@@ -20,7 +20,8 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   // OS does not fill the address automatically so a pivotal address is populated.
   // TODO(lambdai): provide option to fill the downstream remote address here.
   if (source_address == nullptr) {
@@ -38,7 +39,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
       dispatcher,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_client), source_address,
                                                       address),
-      source_address, std::move(transport_socket), options);
+      source_address, std::move(transport_socket), options, transport_options);
 
   if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
     ENVOY_LOG_MISC(debug,

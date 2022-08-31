@@ -23,11 +23,11 @@ class TransportSocketMatcherImpl : public Logger::Loggable<Logger::Id::upstream>
                                    public TransportSocketMatcher {
 public:
   struct FactoryMatch {
-    FactoryMatch(std::string match_name, Network::TransportSocketFactoryPtr socket_factory,
+    FactoryMatch(std::string match_name, Network::UpstreamTransportSocketFactoryPtr socket_factory,
                  TransportSocketMatchStats match_stats)
         : name(std::move(match_name)), factory(std::move(socket_factory)), stats(match_stats) {}
     const std::string name;
-    Network::TransportSocketFactoryPtr factory;
+    Network::UpstreamTransportSocketFactoryPtr factory;
     Config::Metadata::LabelSet label_set;
     mutable TransportSocketMatchStats stats;
   };
@@ -36,7 +36,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
-      Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
+      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
   MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const override;
 

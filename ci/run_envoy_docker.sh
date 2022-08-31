@@ -62,13 +62,29 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
 
+VOLUMES=(
+    -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
+    -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}")
+
+if ! is_windows; then
+    # Create a "shared" directory that has the same path in/outside the container
+    # This allows the host docker engine to see artefacts using a temporary path created inside the container,
+    # at the same path.
+    # For example, a directory created with `mktemp -d --tmpdir /tmp/bazel-shared` can be mounted as a volume
+    # from within the build container.
+    SHARED_TMP_DIR=/tmp/bazel-shared
+    mkdir -p "${SHARED_TMP_DIR}"
+    chmod +rwx "${SHARED_TMP_DIR}"
+    VOLUMES+=(-v "${SHARED_TMP_DIR}":"${SHARED_TMP_DIR}")
+fi
+
 time docker pull "${ENVOY_BUILD_IMAGE}"
+
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
-       -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}" \
-       -v "${SOURCE_DIR}":"${SOURCE_DIR_MOUNT_DEST}" \
+       "${VOLUMES[@]}" \
        -e AZP_BRANCH \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \

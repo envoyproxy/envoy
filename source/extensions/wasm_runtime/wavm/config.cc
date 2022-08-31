@@ -13,7 +13,7 @@ class WavmRuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createWavmVm(); }
 
-  absl::string_view name() override { return "envoy.wasm.runtime.wavm"; }
+  std::string name() const override { return "envoy.wasm.runtime.wavm"; }
 };
 
 #if defined(PROXY_WASM_HAS_RUNTIME_WAVM)

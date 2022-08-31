@@ -18,13 +18,15 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
     : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)),
-      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}) {
+      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}),
+      udp_listener_worker_router_(config_->udpListenerConfig()->listenerWorkerRouter(
+          *listen_socket.connectionInfoProvider().localAddress())) {
   ASSERT(worker_index_ < concurrency_);
-  config_->udpListenerConfig()->listenerWorkerRouter().registerWorkerForListener(*this);
+  udp_listener_worker_router_.registerWorkerForListener(*this);
 }
 
 ActiveUdpListenerBase::~ActiveUdpListenerBase() {
-  config_->udpListenerConfig()->listenerWorkerRouter().unregisterWorkerForListener(*this);
+  udp_listener_worker_router_.unregisterWorkerForListener(*this);
 }
 
 void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
@@ -38,13 +40,14 @@ void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
   auto data_to_post = std::make_shared<Network::UdpRecvData>();
   *data_to_post = std::move(data);
 
-  udp_listener_->dispatcher().post(
-      [data_to_post, tag = config_->listenerTag(), &parent = parent_]() {
-        Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag);
-        if (listener.has_value()) {
-          listener->get().onDataWorker(std::move(*data_to_post));
-        }
-      });
+  auto address = listen_socket_.connectionInfoProvider().localAddress();
+  udp_listener_->dispatcher().post([data_to_post, tag = config_->listenerTag(), &parent = parent_,
+                                    address]() {
+    Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
+    if (listener.has_value()) {
+      listener->get().onDataWorker(std::move(*data_to_post));
+    }
+  });
 }
 
 void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
@@ -59,17 +62,9 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
   if (dest == worker_index_) {
     onDataWorker(std::move(data));
   } else {
-    config_->udpListenerConfig()->listenerWorkerRouter().deliver(dest, std::move(data));
+    udp_listener_worker_router_.deliver(dest, std::move(data));
   }
 }
-
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                                           Network::UdpConnectionHandler& parent,
-                                           Event::Dispatcher& dispatcher,
-                                           Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_index, concurrency, parent,
-                           config.listenSocketFactory().getListenSocket(worker_index), dispatcher,
-                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,

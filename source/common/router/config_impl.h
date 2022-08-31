@@ -160,6 +160,9 @@ public:
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const absl::optional<bool>& allowPrivateNetworkAccess() const override {
+    return allow_private_network_access_;
+  };
   bool enabled() const override {
     if (config_.has_filter_enabled()) {
       const auto& filter_enabled = config_.filter_enabled();
@@ -186,6 +189,7 @@ private:
   const std::string expose_headers_;
   const std::string max_age_;
   absl::optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_private_network_access_{};
 };
 
 class ConfigImpl;
@@ -528,6 +532,12 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    if (route_stats_context_ != nullptr) {
+      return *route_stats_context_;
+    }
+    return RouteStatsContextOptRef();
+  }
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
@@ -623,6 +633,10 @@ public:
   void traversePerFilterConfig(
       const std::string& filter_name,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+
+  // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
+  // path matching to ignore the path-parameters.
+  absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
 
   class DynamicRouteEntry : public RouteEntry, public Route {
   public:
@@ -730,6 +744,9 @@ public:
     }
     const absl::optional<ConnectConfig>& connectConfig() const override {
       return parent_->connectConfig();
+    }
+    const RouteStatsContextOptRef routeStatsContext() const override {
+      return parent_->routeStatsContext();
     }
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     const EarlyDataPolicy& earlyDataPolicy() const override { return parent_->earlyDataPolicy(); }
@@ -928,6 +945,7 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const bool append_xfh_;
   const std::string cluster_name_;
+  RouteStatsContextPtr route_stats_context_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
@@ -960,7 +978,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
 
   UpgradeMap upgrade_map_;
-  const uint64_t total_cluster_weight_;
+  uint64_t total_cluster_weight_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
@@ -984,6 +1002,39 @@ private:
   TimeSource& time_source_;
   const std::string random_value_header_name_;
   EarlyDataPolicyPtr early_data_policy_;
+};
+
+/**
+ * Route entry implementation for pattern path match routing.
+ */
+class PathTemplateRouteEntryImpl : public RouteEntryImplBase {
+public:
+  PathTemplateRouteEntryImpl(const VirtualHostImpl& vhost,
+                             const envoy::config::route::v3::Route& route,
+                             const OptionalHttpFilters& optional_http_filters,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             ProtobufMessage::ValidationVisitor& validator);
+
+  // Router::PathMatchCriterion
+  const std::string& matcher() const override { return url_pattern_; }
+
+  PathMatchType matchType() const override { return PathMatchType::Pattern; }
+
+  // Router::Matchable
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::RequestHeaderMap& headers,
+                         bool insert_envoy_original_path) const override;
+
+  // Router::RouteEntry
+  absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
+
+private:
+  std::string url_pattern_{nullptr};
 };
 
 /**
@@ -1265,6 +1316,9 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
 
   ClusterSpecifierPluginSharedPtr clusterSpecifierPlugin(absl::string_view provider) const;
+  bool ignorePathParametersInPathMatching() const {
+    return ignore_path_parameters_in_path_matching_;
+  }
 
 private:
   std::unique_ptr<RouteMatcher> route_matcher_;
@@ -1279,6 +1333,7 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
+  const bool ignore_path_parameters_in_path_matching_;
 };
 
 /**
