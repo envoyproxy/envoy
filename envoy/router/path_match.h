@@ -20,7 +20,7 @@ public:
   virtual ~PathMatcher() = default;
 
   /**
-   * Used to determine if the current path matches the pattern.
+   * Determines if the current path matches the pattern.
    *
    * @param url current url of route
    * @return true if route url matches the predicate pattern.
@@ -28,7 +28,7 @@ public:
   virtual bool match(absl::string_view path) const PURE;
 
   /**
-   * @return the match pattern
+   * @return the match pattern.
    */
   virtual absl::string_view pattern() const PURE;
 

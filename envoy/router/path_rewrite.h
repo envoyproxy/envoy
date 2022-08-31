@@ -21,7 +21,7 @@ public:
   virtual ~PathRewriter() = default;
 
   /**
-   * Used to determine if the matcher policy is compatible.
+   * Determines if the matcher policy is compatible.
    *
    * @param path_match_policy current path match policy for route
    * @param active_policy true if user provided policy
@@ -31,7 +31,7 @@ public:
                                                bool active_policy) const PURE;
 
   /**
-   * Used to rewrite the current path to the specified output. Can return a failure in case rewrite
+   * Rewrites the current path to the specified output. Return a failure in case rewrite
    * is not successful.
    *
    * @param path current path of route
