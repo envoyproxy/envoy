@@ -146,7 +146,7 @@ public:
   struct HttpCallOptions {
     Http::AsyncClient::RequestOptions request_options_;
     bool is_async_request_{false};
-    bool return_multiple_{false};
+    bool return_duplicate_headers_{false};
   };
 
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
@@ -338,7 +338,7 @@ private:
   bool headers_continued_{};
   bool buffered_body_{};
   bool saw_body_{};
-  bool return_multiple_{};
+  bool return_duplicate_headers_{};
   Filter& filter_;
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};

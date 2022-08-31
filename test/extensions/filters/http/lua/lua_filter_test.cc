@@ -908,7 +908,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
         },
         "hello world",
         {
-          ["allows_repeat"] = true
+          ["return_duplicate_headers"] = true
         })
       for key, value in pairs(headers) do
         if type(value) == "table" then
@@ -1542,6 +1542,30 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidTimeout) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
+// Invalid HTTP call timeout in options.
+TEST_F(LuaHttpFilterTest, HttpCallInvalidTimeoutInOptions) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {},
+        nil,
+        {
+          ["timeout_ms"] = -1
+        })
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
+                                  StrEq("[string \"...\"]:3: http call timeout must be >= 0")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
 // Invalid HTTP call cluster.
 TEST_F(LuaHttpFilterTest, HttpCallInvalidCluster) {
   const std::string SCRIPT{R"EOF(
@@ -1619,6 +1643,38 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   callbacks->onBeforeFinalizeUpstreamSpan(child_span_, &response_message->headers());
   callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// HTTP request flow with timeout and sampled flag in options.
+TEST_F(LuaHttpFilterTest, HttpCallWithInvalidOption) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+        },
+        "hello world",
+        {
+          ["timeout_ms"] = 5000,
+          ["invalid_option"] = false,
+        })
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(
+      *filter_,
+      scriptLog(
+          spdlog::level::err,
+          StrEq("[string \"...\"]:3: \"invalid_option\" is not valid key for httpCall() options")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
 // Invalid HTTP call headers.

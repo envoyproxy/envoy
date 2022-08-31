@@ -56,11 +56,11 @@ const OptionHandlers& optionHandlers() {
                                 const bool sampled = lua_toboolean(state, -1);
                                 options.request_options_.setSampled(sampled);
                               }},
-                             {"allows_repeat",
+                             {"return_duplicate_headers",
                               [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
-                                // Handle the case when the table has: {["allows_repeat"] =
-                                // <boolean>} entry.
-                                options.return_multiple_ = lua_toboolean(state, -1);
+                                // Handle the case when the table has: {["return_duplicate_headers"]
+                                // = <boolean>} entry.
+                                options.return_duplicate_headers_ = lua_toboolean(state, -1);
                               }},
                          });
 }
@@ -378,7 +378,7 @@ int StreamHandleWrapper::doHttpCall(lua_State* state, const HttpCallOptions& opt
   http_request_ = makeHttpCall(state, filter_, options.request_options_, *this);
   if (http_request_ != nullptr) {
     state_ = State::HttpCall;
-    return_multiple_ = options.return_multiple_;
+    return_duplicate_headers_ = options.return_duplicate_headers_;
     return lua_yield(state, 0);
   } else {
     // Immediate failure case. The return arguments are already on the stack.
@@ -396,7 +396,7 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
 
-  if (return_multiple_) {
+  if (return_duplicate_headers_) {
     absl::flat_hash_map<absl::string_view, absl::InlinedVector<absl::string_view, 1>> headers;
     headers.reserve(response->headers().size());
 

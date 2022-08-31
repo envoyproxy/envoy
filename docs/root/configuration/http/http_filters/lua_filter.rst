@@ -425,9 +425,9 @@ the supported keys are:
 - *timeout_ms* is an integer that specifies the call timeout in milliseconds.
   It refers to the same *timeout_ms* argument as the first function signature.
 - *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
-- *allows_repeat* is boolean flag that decides whether the repeated headers are allowed in response headers.
-  If the *allows_repeat* is set to false (default), the returned *headers* is table with value type of string.
-  If the *allows_repeat* is set to true, the returned *headers* is table with value type of string or value type
+- *return_duplicate_headers* is boolean flag that decides whether the repeated headers are allowed in response headers.
+  If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
+  If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
   of table.
 
   For example, the following upstream response headers have repeated headers.
@@ -442,7 +442,7 @@ the supported keys are:
       { "key", "value_2" },
     }
 
-  Then if *allows_repeat* is set to false, the returned headers will be:
+  Then if *return_duplicate_headers* is set to false, the returned headers will be:
 
   .. code-block:: lua
 
@@ -452,7 +452,7 @@ the supported keys are:
       ["key"] = "value_2",
     }
 
-  If *allows_repeat* is set to true, the returned *headers* will be:
+  If *return_duplicate_headers* is set to true, the returned *headers* will be:
 
   .. code-block:: lua
 

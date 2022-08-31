@@ -126,7 +126,7 @@ new_features:
   change: |
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
     by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
-    ``{["allows_repeat"] = true}`` as the ``options``.
+    ``{["return_duplicate_headers"] = true}`` as the ``options``.
 
 deprecated:
 - area: http
