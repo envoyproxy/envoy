@@ -39,7 +39,7 @@ public:
    * @return the rewritten path.
    */
   virtual absl::StatusOr<std::string> rewritePath(absl::string_view path,
-                                                 absl::string_view rewrite_pattern) const PURE;
+                                                  absl::string_view rewrite_pattern) const PURE;
 
   /**
    * @return the rewrite pattern.

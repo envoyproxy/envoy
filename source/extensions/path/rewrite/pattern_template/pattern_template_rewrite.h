@@ -44,7 +44,7 @@ public:
   absl::string_view pattern() const override { return rewrite_pattern_; }
 
   absl::StatusOr<std::string> rewritePath(absl::string_view pattern,
-                                         absl::string_view matched_path) const override;
+                                          absl::string_view matched_path) const override;
 
   absl::Status isCompatibleMatchPolicy(Router::PathMatcherSharedPtr match_policy,
                                        bool active_policy) const override;

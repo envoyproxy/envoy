@@ -47,7 +47,7 @@ PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr pa
 
 absl::StatusOr<std::string>
 PatternTemplateRewriter::rewritePath(absl::string_view pattern,
-                                    absl::string_view matched_path) const {
+                                     absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertPathPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse matched_path");
