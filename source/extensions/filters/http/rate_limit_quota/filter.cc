@@ -47,8 +47,8 @@ void RateLimitQuotaFilter::onDestroy() { rate_limit_client_->closeStream(); }
 // TODO(tyxia) CEL expression.
 // C++ exception with description "Didn't find a registered implementation for 'test_action' with
 // type URL: 'envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings'"
-// thrown in the test body. Looks like I need to implement the action factory????
-// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/test/common/http/match_delegate/config_test.cc;rcl=453698037;l=211
+// thrown in the test body.
+// Looks like I need to implement the action factory and register it staticly.
 // 1. use action to create the matcher tree
 // 2. use test action in the test to trigger the action???
 
@@ -157,14 +157,9 @@ void RateLimitQuotaFilter::createMatcherTree() {
   matcher_ = factory.create(config_->bucket_matchers())();
 }
 
-// Example route matcher
-// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/common/router/config_impl.cc;rcl=469339328;l=1776
-// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/test/common/matcher/matcher_test.cc;rcl=468950517;l=80
 // TODO(tyxia) This caused the error above but maybe we don't even need this at all along with match
 // action etc
 BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
-  // TODO(tyxia) action context RouteActionContext/FilterChainActionContext
-  // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/common/router/config_impl.h;rcl=466968687;l=1199
   BucketId id;
   std::cout << "Perform request matching!!!" << std::endl;
   // Initialize the data pointer on first use and reuse it for subsequent requests.
@@ -194,9 +189,8 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
     }
   } else {
     data_ptr_->onRequestHeaders(headers);
-    // TODO(tyxia) This function perform the parsing of CEL matching???
-    // Should be implemented from the overridden function here
-    // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/common/matcher/field_matcher.h;rcl=470499012;l=39
+    // TODO(tyxia) This function should trigger the CEL expression matching
+    // We need to implement the custom_matcher and factory and register so that CEL matching will be triggerred with its own match() method.
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
     if (match.result_) {
       std::cout << "Matcher succeed!!!" << std::endl;
