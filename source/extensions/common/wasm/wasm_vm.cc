@@ -78,14 +78,11 @@ bool isWasmEngineAvailable(absl::string_view runtime) {
 }
 
 absl::string_view getFirstAvailableWasmEngineName() {
-  if (isWasmEngineAvailable("envoy.wasm.runtime.v8")) {
-    return "envoy.wasm.runtime.v8";
-  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wasmtime")) {
-    return "envoy.wasm.runtime.wasmtime";
-  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wamr")) {
-    return "envoy.wasm.runtime.wamr";
-  } else if (isWasmEngineAvailable("envoy.wasm.runtime.wavm")) {
-    return "envoy.wasm.runtime.wavm";
+  static const std::vector<absl::string_view> wasm_engines{"envoy.wasm.runtime.v8", "envoy.wasm.runtime.wasmtime", "envoy.wasm.runtime.wamr", "envoy.wasm.runtime.wavm"};
+  for (const auto wasm_engine : wasm_engines) {
+    if (isWasmEngineAvailable(wasm_engine)) {
+      return wasm_engine;
+    }
   }
   return "";
 }
