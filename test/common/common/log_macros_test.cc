@@ -330,7 +330,7 @@ TEST(FineGrainLog, SetLevel) {
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
-TEST(FineGrainLog, SetJsonStringEscapedFormat) {
+TEST(FineGrainLog, SetJsonEscapedFormat) {
   // This uses "%j", the added custom flag that JSON escape the characters inside the log message
   // payload. Further info can be found at LoggerCustomFlagsTest.
   getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(spdlog::level::info, "%j");
@@ -343,7 +343,7 @@ TEST(FineGrainLog, SetJsonStringEscapedFormat) {
             "\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\"");
 }
 
-TEST(FineGrainLog, SetEscapedFormat) {
+TEST(FineGrainLog, SetNewLineEscapedFormat) {
   // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
   getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(spdlog::level::info, "%_");
   FINE_GRAIN_LOG(info, "\n\nmessage\n\n");
