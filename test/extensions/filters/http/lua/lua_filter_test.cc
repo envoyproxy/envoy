@@ -855,9 +855,9 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             const Http::TestRequestHeaderMapImpl expected_headers{
                 {":method", "POST"},
                 {":path", "/"},
@@ -867,6 +867,9 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
                 {"set-cookie", "variant=chewy; Path=/"},
                 {"content-length", "11"}};
             EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+            // The parent span always be set for lua http call.
+            EXPECT_NE(options.parent_span_, nullptr);
+
             callbacks = &cb;
             return &request;
           }));
