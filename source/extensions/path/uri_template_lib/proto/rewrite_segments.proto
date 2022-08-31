@@ -10,6 +10,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/url_template/url_template";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// TODO(silverstar194): Convert proto to struct
 // Holds the segments for rewriting urls base on uri pattern templates
 message RewriteSegments {
   message RewriteSegment {
