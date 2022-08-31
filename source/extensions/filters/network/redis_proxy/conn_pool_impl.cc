@@ -268,7 +268,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     transaction.client_ =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
                                auth_username_, auth_password_, true);
-    transaction.client_->addConnectionCallbacks(transaction.parent_);
+    if (transaction.connection_cb_) {
+      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+    }
     transaction.connection_established_ = true;
   }
 

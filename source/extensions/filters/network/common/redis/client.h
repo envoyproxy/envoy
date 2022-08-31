@@ -228,7 +228,7 @@ public:
 // A class representing a Redis transaction.
 class Transaction {
 public:
-  Transaction(Network::ConnectionCallbacks& parent) : parent_(parent) {}
+  Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
   ~Transaction() {
     if (connection_established_) {
       client_->close();
@@ -253,22 +253,12 @@ public:
   bool should_close_{false};
   std::string key_;
   ClientPtr client_;
-  Network::ConnectionCallbacks& parent_;
-};
-
-class NoOpConnectionCallbacks : public Network::ConnectionCallbacks {
-public:
-  void onEvent(Network::ConnectionEvent) override {}
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  Network::ConnectionCallbacks* connection_cb_;
 };
 
 class NoOpTransaction : public Transaction {
 public:
-  NoOpTransaction() : Transaction(callbacks_) {}
-
-private:
-  NoOpConnectionCallbacks callbacks_;
+  NoOpTransaction() : Transaction(nullptr) {}
 };
 
 } // namespace Client
