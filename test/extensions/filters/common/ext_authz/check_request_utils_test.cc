@@ -1,3 +1,6 @@
+#include <string>
+
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/network/address_impl.h"
@@ -31,6 +34,7 @@ public:
     protocol_ = Envoy::Http::Protocol::Http10;
     buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
+    request_header_matchers_ = testTmp();
   };
 
   void expectBasicHttp() {
@@ -64,7 +68,7 @@ public:
     CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
                                        std::move(metadata_context), request,
                                        /*max_request_bytes=*/0, /*pack_as_bytes=*/false,
-                                       include_peer_certificate, labels);
+                                       include_peer_certificate, labels, nullptr);
 
     EXPECT_EQ("source", request.attributes().source().principal());
     EXPECT_EQ("destination", request.attributes().destination().principal());
@@ -98,6 +102,12 @@ public:
     return buffer;
   }
 
+  MatcherSharedPtr testTmp() {
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_autz_proto_;
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("foo");
+    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers());
+  }
+
   Network::Address::InstanceConstSharedPtr addr_;
   absl::optional<Http::Protocol> protocol_;
   CheckRequestUtils check_request_generator_;
@@ -109,6 +119,7 @@ public:
   Buffer::InstancePtr buffer_;
   const std::string cert_data_{"cert-data"};
   const absl::string_view requested_server_name_{"server.name"};
+  MatcherSharedPtr request_header_matchers_;
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -172,7 +183,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::config::core::v3::Metadata(), request_, size,
                                      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>());
+                                     Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(request_.attributes().request().http().headers().end(),
@@ -200,13 +211,42 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::config::core::v3::Metadata(), request_, size,
                                      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>());
+                                     Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ(",foo,bar", request_.attributes().request().http().headers().at("x-duplicate-header"));
   EXPECT_EQ("foo", request_.attributes().request().http().headers().at("x-normal-header"));
   EXPECT_EQ("", request_.attributes().request().http().headers().at("x-empty-header"));
   EXPECT_TRUE(request_.attributes().request().has_time());
+}
+
+// Verify that check request only contains allowlisted headers,
+// and that duplicate headers are merged.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithAllowlistedHeaders) {
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"foo", "bar"},       {"hello", "there"},        {"duplicate", "one"},
+      {"duplicate", "two"}, {"not-this-one", "sorry"},
+  };
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  expectBasicHttp();
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
+      envoy::config::core::v3::Metadata(), request_, size,
+      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
+      Protobuf::Map<std::string, std::string>(), request_header_matchers_);
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("duplicate"));
+  EXPECT_EQ("bar", request_.attributes().request().http().headers().at("foo"));
+  EXPECT_EQ("there", request_.attributes().request().http().headers().at("hello"));
+  EXPECT_FALSE(request_.attributes().request().http().headers().contains("not-this-one"));
 }
 
 // Verify that check request object has only a portion of the request data.
@@ -223,7 +263,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
                                      Protobuf::Map<std::string, std::string>(),
                                      envoy::config::core::v3::Metadata(), request_, size,
                                      /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-                                     Protobuf::Map<std::string, std::string>());
+                                     Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("true", request_.attributes().request().http().headers().at(
@@ -242,7 +282,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/false,
-      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>());
+      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
@@ -274,7 +314,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBodyPackAsBytes) {
   CheckRequestUtils::createHttpCheck(
       &callbacks_, headers_, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), request_, buffer_->length(), /*pack_as_bytes=*/true,
-      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>());
+      /*include_peer_certificate=*/false, Protobuf::Map<std::string, std::string>(), nullptr);
 
   // TODO(dio): Find a way to test this without using function from testing::internal namespace.
   testing::internal::CaptureStderr();
