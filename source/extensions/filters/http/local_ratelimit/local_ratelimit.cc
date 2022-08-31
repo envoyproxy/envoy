@@ -280,13 +280,13 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     const auto* specific_per_route_config = getConfig();
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
-      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
+      case envoy::extensions::common::ratelimit::v3::INCLUDE:
         vh_rate_limits_ = VhRateLimitOptions::Include;
         break;
-      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::IGNORE:
+      case envoy::extensions::common::ratelimit::v3::IGNORE:
         vh_rate_limits_ = VhRateLimitOptions::Ignore;
         break;
-      case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OVERRIDE:
+      case envoy::extensions::common::ratelimit::v3::OVERRIDE:
       default:
         vh_rate_limits_ = VhRateLimitOptions::Override;
       }

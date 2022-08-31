@@ -116,6 +116,6 @@ message LocalRateLimit {
       [(validate.rules).enum = {defined_only: true}];
 
   // Specifies if the local rate limit filter should include the virtual host rate limits.
-  ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions vh_rate_limits = 13
+  common.ratelimit.v3.VhRateLimitsOptions vh_rate_limits = 13
       [(validate.rules).enum = {defined_only: true}];
 }
