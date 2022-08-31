@@ -330,6 +330,25 @@ TEST(FineGrainLog, SetLevel) {
   EXPECT_EQ(getFineGrainLogContext().getFineGrainLogEntry(__FILE__)->level(), spdlog::level::info);
 }
 
+TEST(FineGrainLog, SetJsonStringEscapedFormat) {
+  // This uses "%j", the added custom flag that JSON escape the characters inside the log message
+  // payload. Further info can be found at LoggerCustomFlagsTest.
+  getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(spdlog::level::info, "%j");
+  FINE_GRAIN_LOG(info, "message");
+  FINE_GRAIN_LOG(info, "\n\nmessage\n\n");
+  FINE_GRAIN_LOG(info, "\x01ok\x0e");
+  FINE_GRAIN_LOG(info, "\tok\t");
+  FINE_GRAIN_LOG(
+      info, "StreamAggregatedResources gRPC config stream closed: 14, connection error: desc = "
+            "\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\"");
+}
+
+TEST(FineGrainLog, SetEscapedFormat) {
+  // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
+  getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(spdlog::level::info, "%_");
+  FINE_GRAIN_LOG(info, "\n\nmessage\n\n");
+}
+
 TEST(FineGrainLog, Iteration) {
   FINE_GRAIN_LOG(info, "Info: iteration test begins.");
   getFineGrainLogContext().setAllFineGrainLoggers(spdlog::level::info);
