@@ -8,6 +8,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -37,7 +38,9 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-              CustomConfigValidatorsPtr&& config_validators);
+              CustomConfigValidatorsPtr&& config_validators,
+              XdsResourcesDelegateOptRef xds_resources_delegate,
+              const std::string& target_xds_authority);
 
   ~GrpcMuxImpl() override;
 
@@ -171,6 +174,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   CustomConfigValidatorsPtr config_validators_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
+  const std::string target_xds_authority_;
   bool first_stream_request_;
 
   // Helper function for looking up and potentially allocating a new ApiState.

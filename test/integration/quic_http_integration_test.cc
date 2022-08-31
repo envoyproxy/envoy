@@ -1079,9 +1079,11 @@ typed_config:
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config);
 
   // Change the configured cert validation to defer 1s.
-  auto cert_validator_factory =
+  auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
@@ -1123,6 +1125,8 @@ typed_config:
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
@@ -1143,6 +1147,21 @@ typed_config:
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
+}
+
+TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
+  config_helper_.addNetworkFilter(R"EOF(
+      name: envoy.test.test_network_filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
+)EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  test_server_->waitForCounterEq("test_network_filter.on_new_connection", 1);
+  EXPECT_EQ(test_server_->counter("test_network_filter.on_data")->value(), 0);
+  codec_client_->close();
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
@@ -1358,6 +1377,39 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
       static_cast<EnvoyQuicClientSession*>(codec_client_2->connection());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
   codec_client_2->close();
+}
+
+TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
+  enable_quic_early_data_ = true;
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client0 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client0);
+  // Make the next connection use the same connection ID.
+  designated_connection_ids_.push_back(quic_connection_->connection_id());
+  codec_client0->close();
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForGaugeEq("listener.127.0.0.1_0.downstream_cx_active", 0u);
+  } else {
+    test_server_->waitForGaugeEq("listener.[__1]_0.downstream_cx_active", 0u);
+  }
+
+  // This new connection would be reset.
+  auto codec_client1 =
+      makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client1->disconnected());
+
+  quic::QuicErrorCode error =
+      static_cast<EnvoyQuicClientSession*>(codec_client1->connection())->error();
+  EXPECT_TRUE(error == quic::QUIC_NETWORK_IDLE_TIMEOUT || error == quic::QUIC_HANDSHAKE_TIMEOUT);
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterGe(
+        "listener.127.0.0.1_0.quic.dispatcher.stateless_reset_packets_sent", 1u);
+  } else {
+    test_server_->waitForCounterGe("listener.[__1]_0.quic.dispatcher.stateless_reset_packets_sent",
+                                   1u);
+  }
 }
 
 } // namespace Quic

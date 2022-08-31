@@ -33,7 +33,7 @@ Example of a LocalReplyConfig
       - header:
           key: "foo"
           value: "bar"
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
     status_code: 401
     body:
       inline_string: "not allowed"

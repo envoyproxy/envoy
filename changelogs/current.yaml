@@ -21,6 +21,9 @@ minor_behavior_changes:
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
+- area: original_dst
+  change: |
+    transparent listener can use original_dst filter without nf_conntrack enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -65,18 +68,26 @@ new_features:
 - area: http
   change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
+  change: |
+    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
 - area: dns_resolver
   change: |
     added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: load balancer
+  change: |
+    added a new field to subset load balancer config: :ref:`metadata_fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
@@ -86,6 +97,9 @@ new_features:
 - area: upstream
   change: |
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: upstream
+  change: |
+    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
 - area: admin
   change: |
     added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
@@ -114,5 +128,15 @@ new_features:
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: subset load balancer
+  change: |
+    added multiple keys or multiple selectors support for :ref:`single host per subset mode <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
 
 deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
+    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.

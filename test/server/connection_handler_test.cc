@@ -35,6 +35,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Invoke;
 using testing::MockFunction;
@@ -2085,39 +2086,50 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   TestListener* test_listener =
       addListener(1, true, false, "test_listener", listener, &listener_callbacks);
   handler_->addListener(absl::nullopt, *test_listener, runtime_);
-
-  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(123);
+  size_t max_size = 10;
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(max_size);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
-  Network::ListenerFilterCallbacks* listener_filter_cb{};
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  std::string data = "test";
   EXPECT_CALL(*test_filter, onAccept(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        listener_filter_cb = &cb;
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-  Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
-  Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
-  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
+  Network::MockIoHandle io_handle;
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(io_handle,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle, activateFileEvents(_));
 
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
+  EXPECT_CALL(io_handle, recv(_, _, _))
+      .WillOnce(Return(ByMove(
+          Api::IoCallUint64Result(max_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
+  EXPECT_CALL(*test_filter, onData(_))
+      .WillOnce(Invoke([](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
+        return Network::FilterStatus::Continue;
+      }));
+  EXPECT_CALL(io_handle, resetFileEvents());
   EXPECT_CALL(*test_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   EXPECT_CALL(*timeout, disableTimer());
-  listener_filter_cb->continueFilterChain(true);
 
-  Event::FileEvent* file_event2 = new NiceMock<Event::MockFileEvent>();
-  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event2));
+  file_event_callback(Event::FileReadyType::Read);
+
+  EXPECT_CALL(io_handle, createFileEvent_(_, _, _, _));
   EXPECT_CALL(*listener, onDestroy());
 
   // Verify the file event created by listener filter was reset. If not
