@@ -85,6 +85,8 @@ protected:
 private:
   void configureComponentLogLevels();
   void configureHotRestarter(Random::RandomGenerator& random_generator);
+
+  Thread::MainThread main_thread_;
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to
