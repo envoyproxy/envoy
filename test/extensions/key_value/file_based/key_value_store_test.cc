@@ -57,8 +57,8 @@ TEST_F(KeyValueStoreTest, Ttl) {
   EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
   EXPECT_EQ("bar", store_->get("foo").value());
-  // Advance timer to trigger expiry
-  test_time_.setSystemTime(std::chrono::milliseconds(10000));
+  // Advance time to when the timer is scheduled to fire
+  test_time_.setSystemTime(std::chrono::milliseconds(5000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
@@ -68,11 +68,9 @@ TEST_F(KeyValueStoreTest, TtlUpdate) {
   EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(10));
-
   test_time_.setSystemTime(std::chrono::milliseconds(1000));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
-
-  // Advance timer to trigger expiry
+  // Advance time to when the timer is scheduled to fire
   test_time_.setSystemTime(std::chrono::milliseconds(6000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
@@ -91,6 +89,7 @@ TEST_F(KeyValueStoreTest, TtlUpdateFromNull) {
   store_->addOrUpdate("foo", "bar", absl::nullopt);
   EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+  // Advance time to when the timer is scheduled to fire
   test_time_.setSystemTime(std::chrono::milliseconds(10000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
