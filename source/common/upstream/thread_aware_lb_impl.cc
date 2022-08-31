@@ -135,17 +135,16 @@ void ThreadAwareLoadBalancerBase::refresh() {
   }
 }
 
-HostConstSharedPtr
-ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+HostData ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   // Make sure we correctly return nullptr for any early chooseHost() calls.
   if (per_priority_state_ == nullptr) {
-    return nullptr;
+    return {nullptr};
   }
 
   HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
       cross_priority_host_map_.get(), override_host_status_, context);
   if (host != nullptr) {
-    return host;
+    return {host};
   }
 
   // If there is no hash in the context, just choose a random value (this effectively becomes
@@ -172,10 +171,10 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     // If host selection failed or the host is accepted by the filter, return.
     // Otherwise, try again.
     if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
-      return host;
+      return {host};
     }
   }
-  return host;
+  return {host};
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {

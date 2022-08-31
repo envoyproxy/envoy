@@ -1111,7 +1111,8 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = lb_->chooseHost(context);
+  HostData host_data = lb_->chooseHost(context);
+  const HostConstSharedPtr& logical_host = host_data.host_;
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1119,10 +1120,17 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     if ((cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
-      auto& conn_map = parent_.host_tcp_conn_map_[logical_host];
-      conn_map.emplace(conn_info.connection_.get(),
-                       std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
-                           parent_, logical_host, *conn_info.connection_));
+      auto conn_map_iter = parent_.host_tcp_conn_map_.find(logical_host);
+      if (conn_map_iter == parent_.host_tcp_conn_map_.end()) {
+        TcpConnectionsMap container{host_data.in_use_};
+        conn_map_iter =
+            parent_.host_tcp_conn_map_.emplace(logical_host, std::move(container)).first;
+      }
+      auto& conn_map = conn_map_iter->second;
+      conn_map.connections_.emplace(
+          conn_info.connection_.get(),
+          std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
+              parent_, logical_host, *conn_info.connection_));
     }
     return conn_info;
   } else {
@@ -1425,7 +1433,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
     const HostConstSharedPtr& host, Network::ClientConnection& connection) {
   auto host_tcp_conn_map_it = host_tcp_conn_map_.find(host);
   ASSERT(host_tcp_conn_map_it != host_tcp_conn_map_.end());
-  TcpConnectionsMap& connections_map = host_tcp_conn_map_it->second;
+  auto& connections_map = host_tcp_conn_map_it->second.connections_;
   auto it = connections_map.find(&connection);
   ASSERT(it != connections_map.end());
   connection.dispatcher().deferredDelete(std::move(it->second));
@@ -1491,20 +1499,20 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
   }
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
-    const HostConstSharedPtr& host, bool allocate) {
+    const HostConstSharedPtr& host, bool allocate, HostInUseConstSharedPtr in_use) {
   auto container_iter = host_http_conn_pool_map_.find(host);
   if (container_iter == host_http_conn_pool_map_.end()) {
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_, host};
+    ConnPoolsContainer container{thread_local_dispatcher_, host, in_use};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }
 
@@ -1648,7 +1656,8 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostData host_data = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  const HostConstSharedPtr& host = host_data.host_;
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1698,7 +1707,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     context->downstreamConnection()->hashKey(hash_key);
   }
 
-  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
+  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true, host_data.in_use_);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
@@ -1755,7 +1764,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostData host_data = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  const HostConstSharedPtr& host = host_data.host_;
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1788,7 +1798,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
   }
 
-  TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
+  auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
+  if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
+    TcpConnPoolsContainer container{host_data.in_use_};
+    container_iter = parent_.host_tcp_conn_pool_map_.emplace(host, std::move(container)).first;
+  }
+  TcpConnPoolsContainer& container = container_iter->second;
   auto pool_iter = container.pools_.find(hash_key);
   if (pool_iter == container.pools_.end()) {
     bool inserted;

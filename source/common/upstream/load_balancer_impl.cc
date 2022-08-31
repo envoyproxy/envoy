@@ -578,11 +578,11 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   return nullptr;
 }
 
-HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+HostData ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
       cross_priority_host_map_.get(), override_host_status_, context);
   if (host != nullptr) {
-    return host;
+    return {host};
   }
 
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
@@ -593,12 +593,12 @@ HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* co
     // Otherwise, try again.
     // Note: in the future we might want to allow retrying when chooseHostOnce returns nullptr.
     if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
-      return host;
+      return {host};
     }
   }
 
   // If we didn't find anything, return the last host.
-  return host;
+  return {host};
 }
 
 bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) const {
@@ -925,14 +925,14 @@ bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
   return true;
 }
 
-HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
+HostData EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
   if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
-    return nullptr;
+    return {nullptr};
   }
 
   const absl::optional<HostsSource> hosts_source = hostSourceToUse(context, random(true));
   if (!hosts_source) {
-    return nullptr;
+    return {nullptr};
   }
 
   auto scheduler_it = scheduler_.find(*hosts_source);
@@ -946,13 +946,13 @@ HostConstSharedPtr EdfLoadBalancerBase::peekAnotherHost(LoadBalancerContext* con
   // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original
   // weights of 2 or more hosts differ.
   if (scheduler.edf_ != nullptr) {
-    return scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); });
+    return {scheduler.edf_->peekAgain([this](const Host& host) { return hostWeight(host); })};
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
     if (hosts_to_use.empty()) {
-      return nullptr;
+      return {nullptr};
     }
-    return unweightedHostPeek(hosts_to_use, *hosts_source);
+    return {unweightedHostPeek(hosts_to_use, *hosts_source)};
   }
 }
 
@@ -1047,11 +1047,11 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   return candidate_host;
 }
 
-HostConstSharedPtr RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
+HostData RandomLoadBalancer::peekAnotherHost(LoadBalancerContext* context) {
   if (tooManyPreconnects(stashed_random_.size(), total_healthy_hosts_)) {
-    return nullptr;
+    return {nullptr};
   }
-  return peekOrChoose(context, true);
+  return {peekOrChoose(context, true)};
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {

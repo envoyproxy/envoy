@@ -124,10 +124,10 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
 }
 } // namespace
 
-Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
+Upstream::HostData RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
     Envoy::Upstream::LoadBalancerContext* context) {
   if (!slot_array_) {
-    return nullptr;
+    return {nullptr};
   }
   absl::optional<uint64_t> hash;
   if (context) {
@@ -135,7 +135,7 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   }
 
   if (!hash) {
-    return nullptr;
+    return {nullptr};
   }
 
   auto shard = shard_vector_->at(
@@ -145,26 +145,26 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   if (redis_context && redis_context->isReadCommand()) {
     switch (redis_context->readPolicy()) {
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Primary:
-      return shard->primary();
+      return {shard->primary()};
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferPrimary:
       if (shard->primary()->health() == Upstream::Host::Health::Healthy) {
-        return shard->primary();
+        return {shard->primary()};
       } else {
-        return chooseRandomHost(shard->allHosts(), random_);
+        return {chooseRandomHost(shard->allHosts(), random_)};
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Replica:
-      return chooseRandomHost(shard->replicas(), random_);
+      return {chooseRandomHost(shard->replicas(), random_)};
     case NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica:
       if (!shard->replicas().healthyHosts().empty()) {
-        return chooseRandomHost(shard->replicas(), random_);
+        return {chooseRandomHost(shard->replicas(), random_)};
       } else {
-        return chooseRandomHost(shard->allHosts(), random_);
+        return {chooseRandomHost(shard->allHosts(), random_)};
       }
     case NetworkFilters::Common::Redis::Client::ReadPolicy::Any:
-      return chooseRandomHost(shard->allHosts(), random_);
+      return {chooseRandomHost(shard->allHosts(), random_)};
     }
   }
-  return shard->primary();
+  return {shard->primary()};
 }
 
 bool RedisLoadBalancerContextImpl::isReadRequest(

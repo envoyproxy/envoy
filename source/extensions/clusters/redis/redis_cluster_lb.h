@@ -199,9 +199,9 @@ private:
           random_(random) {}
 
     // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
-    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
+    Upstream::HostData chooseHost(Upstream::LoadBalancerContext*) override;
+    Upstream::HostData peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return {nullptr};
     }
     // Pool selection not implemented.
     absl::optional<Upstream::SelectedPoolAndConnection>

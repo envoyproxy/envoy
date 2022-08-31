@@ -90,9 +90,9 @@ public:
   void initialize() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
+  HostData chooseHost(LoadBalancerContext*) override { return {nullptr}; }
   // Preconnect not implemented for hash based load balancing
-  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+  HostData peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
   // Pool selection not implemented.
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -125,9 +125,9 @@ private:
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    HostData chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
-    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    HostData peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,

@@ -18,16 +18,13 @@
 namespace Envoy {
 namespace Upstream {
 
-// Container for synthetic hosts produced by workers. Because each worker binds
-// the connection pool to the pointer value of a host, there may be multiple
-// Host structs for the same address.
-struct SyntheticHosts {
-  std::list<Upstream::HostSharedPtr> hosts_;
-  std::atomic<bool> used_{true};
-};
-
+// A list of hosts and in-use tokens for the same address. Hosts may be added
+// concurrently by multiple workers, but are eventually cleaned up if the
+// tokens are released.
+using SyntheticHosts = std::vector<std::pair<HostSharedPtr, std::weak_ptr<const HostInUse>>>;
 using SyntheticHostsSharedPtr = std::shared_ptr<SyntheticHosts>;
-using HostMultiMap = absl::flat_hash_map<std::string, SyntheticHostsSharedPtr>;
+using SyntheticHostsConstSharedPtr = std::shared_ptr<const SyntheticHosts>;
+using HostMultiMap = absl::flat_hash_map<std::string, SyntheticHostsConstSharedPtr>;
 using HostMultiMapSharedPtr = std::shared_ptr<HostMultiMap>;
 using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
 
@@ -65,9 +62,9 @@ public:
           host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    HostData chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
-    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    HostData peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
     // Pool selection not implemented for OriginalDstCluster
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -125,7 +122,7 @@ private:
     host_map_ = new_host_map;
   }
 
-  void addHost(HostSharedPtr&);
+  void addHost(HostSharedPtr, std::weak_ptr<const HostInUse>);
   void cleanup();
 
   // ClusterImplBase

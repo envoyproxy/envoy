@@ -78,8 +78,8 @@ public:
   void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
-  Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-  Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
+  Upstream::HostData chooseHost(Upstream::LoadBalancerContext* context) override;
+  Upstream::HostData peekAnotherHost(Upstream::LoadBalancerContext*) override;
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                            const Upstream::Host& /*host*/,
@@ -99,10 +99,10 @@ private:
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostData chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not yet implemented for extensions.
-    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
-      return nullptr;
+    Upstream::HostData peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return {nullptr};
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,

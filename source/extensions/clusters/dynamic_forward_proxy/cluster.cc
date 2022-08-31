@@ -149,10 +149,9 @@ void Cluster::onDnsHostRemove(const std::string& host) {
   updatePriorityState({}, hosts_removed);
 }
 
-Upstream::HostConstSharedPtr
-Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostData Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
-    return nullptr;
+    return {nullptr};
   }
 
   absl::string_view host;
@@ -163,19 +162,19 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   }
 
   if (host.empty()) {
-    return nullptr;
+    return {nullptr};
   }
   {
     absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
     const auto host_it = cluster_.host_map_.find(host);
     if (host_it == cluster_.host_map_.end()) {
-      return nullptr;
+      return {nullptr};
     } else {
       if (host_it->second.logical_host_->health() == Upstream::Host::Health::Unhealthy) {
-        return nullptr;
+        return {nullptr};
       }
       host_it->second.shared_host_info_->touch();
-      return host_it->second.logical_host_;
+      return {host_it->second.logical_host_};
     }
   }
 }

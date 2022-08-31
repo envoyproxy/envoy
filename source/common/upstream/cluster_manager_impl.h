@@ -434,8 +434,9 @@ private:
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject,
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
-      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
+      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
+                         const HostInUseConstSharedPtr& in_use)
+          : pools_{std::make_shared<ConnPools>(dispatcher, host)}, in_use_(in_use) {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
@@ -446,13 +447,19 @@ private:
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
       bool do_not_delete_{false};
+
+      const HostInUseConstSharedPtr in_use_;
     };
 
     struct TcpConnPoolsContainer {
+      TcpConnPoolsContainer(const HostInUseConstSharedPtr& in_use) : in_use_(in_use) {}
+
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
       bool draining_{false};
+
+      const HostInUseConstSharedPtr in_use_;
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -479,8 +486,13 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    using TcpConnectionsMap =
-        absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
+    struct TcpConnectionsMap {
+      TcpConnectionsMap(const HostInUseConstSharedPtr& in_use) : in_use_(in_use) {}
+
+      absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
+          connections_;
+      const HostInUseConstSharedPtr in_use_;
+    };
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
@@ -572,7 +584,8 @@ private:
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
-                                                  bool allocate = false);
+                                                  bool allocate = false,
+                                                  HostInUseConstSharedPtr in_use = nullptr);
 
     // Upstream::ClusterLifecycleCallbackHandler
     ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;
