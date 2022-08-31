@@ -59,7 +59,8 @@ IoHandlePtr TestIoSocketHandle::duplicate() {
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
+                                            absl::optional<int> domain,
+                                            const Io::IoUringFactory*) const {
   return std::make_unique<TestIoSocketHandle>(write_override_proc_, socket_fd, socket_v6only,
                                               domain);
 }
