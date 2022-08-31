@@ -10,7 +10,6 @@ namespace EnvoyDefault {
 namespace {
 
 using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 
 class Http1HeaderValidatorTest : public HeaderValidatorTest {

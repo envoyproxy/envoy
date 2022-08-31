@@ -318,8 +318,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       });
 
   if (!reject_details.empty()) {
-    return RequestHeaderMapValidationResult(RequestHeaderMapValidationResult::Action::Reject,
-                                            reject_details);
+    return {RequestHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
   for (auto& name : drop_headers) {
@@ -382,8 +381,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
       });
 
   if (!reject_details.empty()) {
-    return ResponseHeaderMapValidationResult(ResponseHeaderMapValidationResult::Action::Reject,
-                                             reject_details);
+    return {ResponseHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
   for (auto& name : drop_headers) {
