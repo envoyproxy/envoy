@@ -20,7 +20,7 @@ bool is_cleartext_permitted(absl::string_view hostname) {
   envoy_data host = Envoy::Data::Utility::copyToBridgeData(hostname);
   JNIEnv* env = get_env();
   jstring java_host = native_data_to_string(env, host);
-  jclass jcls_AndroidNetworkLibrary = env->FindClass("org/chromium/net/AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
   jmethodID jmid_isCleartextTrafficPermitted = env->GetStaticMethodID(
       jcls_AndroidNetworkLibrary, "isCleartextTrafficPermitted", "(Ljava/lang/String;)Z");
   jboolean result = env->CallStaticBooleanMethod(jcls_AndroidNetworkLibrary,
