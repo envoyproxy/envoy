@@ -281,7 +281,6 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
-  // stats_.counterFromElements("", "local-generated-response").inc();
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
@@ -330,7 +329,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  // stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
@@ -395,7 +393,6 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
-  // cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
 
   return FilterStatus::Continue;
 }
@@ -545,14 +542,12 @@ ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata) 
     return SipFilters::ResponseStatus::MoreData;
   } catch (const AppException& ex) {
     ENVOY_LOG(error, "sip response application error: {}", ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     sendLocalReply(ex, false);
     return SipFilters::ResponseStatus::Reset;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     onError(ex.what());
     return SipFilters::ResponseStatus::Reset;
