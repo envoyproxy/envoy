@@ -88,7 +88,8 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidMethod};
   }
 
   return HeaderEntryValidationResult::success();
@@ -109,7 +110,8 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   absl::string_view scheme = value.getStringView();
 
   if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidScheme};
   }
 
   return HeaderEntryValidationResult::success();
@@ -135,11 +137,13 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
   std::uint32_t status_value{};
   auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), status_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != value_string_view.end()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   if (status_value < kMinimumResponseStatusCode || status_value > kMaximumResponseStatusCode) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidStatus};
   }
 
   return HeaderEntryValidationResult::success();
@@ -161,10 +165,12 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores = !config_.reject_headers_with_underscores();
+  bool allow_underscores =
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
   // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   bool is_valid = true;
@@ -175,10 +181,14 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
     is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
   }
 
-  if (!is_valid) {
+  if (!is_valid && c == '_' &&
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
+    return {HeaderEntryValidationResult::Action::DropHeader,
+            UhvResponseCodeDetail::get().InvalidUnderscore};
+  } else if (!is_valid) {
     auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
                             : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {RejectAction::Reject, details};
+    return {HeaderEntryValidationResult::Action::Reject, details};
   }
 
   return HeaderEntryValidationResult::success();
@@ -207,7 +217,8 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidCharacters};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidCharacters};
   }
 
   return HeaderEntryValidationResult::success();
@@ -221,13 +232,15 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
   std::uint64_t int_value{};
   auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), int_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != value_string_view.end()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
   return HeaderEntryValidationResult::success();
@@ -242,7 +255,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   // uri-host   = IP-literal / IPv4address / reg-name
   const auto host = value.getStringView();
   if (host.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    return {HeaderEntryValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   // Check if the host/:authority contains the deprecated userinfo component. This is based on RFC
@@ -254,7 +267,8 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   auto user_info_delimiter = host.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo};
   }
 
   // Determine if the host is in IPv4, reg-name, or IPv6 form.
@@ -282,7 +296,8 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     }
 
     if (!is_valid) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+      return {HeaderEntryValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidHost};
     }
   }
 
@@ -298,7 +313,7 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
   // Validate that the address is enclosed between "[" and "]".
   std::size_t closing_bracket = host.find(']');
   if (host.empty() || host.at(0) != '[' || closing_bracket == absl::string_view::npos) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    return {HeaderEntryValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   // Get the address substring between the brackets.
@@ -312,10 +327,10 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    return {HeaderEntryValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
-  return {RejectAction::Accept, port_string};
+  return {HeaderEntryValidationResult::Action::Accept, port_string};
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
@@ -335,12 +350,12 @@ HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    return {HeaderEntryValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
   }
 
   const auto port_string =
       port_delimiter != absl::string_view::npos ? host.substr(port_delimiter) : absl::string_view();
-  return {RejectAction::Accept, port_string};
+  return {HeaderEntryValidationResult::Action::Accept, port_string};
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
@@ -353,7 +368,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
+    return {HeaderEntryValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   return HeaderEntryValidationResult::success();

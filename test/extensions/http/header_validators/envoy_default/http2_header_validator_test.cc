@@ -161,6 +161,21 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  auto uhv = createH2(drop_headers_with_underscores_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(
+      headers,
+      ::Envoy::Http::TestRequestHeaderMapImpl(
+          {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
@@ -195,6 +210,14 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
   auto uhv = createH2(empty_config);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x_foo", "bar"}};
+  auto uhv = createH2(drop_headers_with_underscores_config);
+
+  EXPECT_TRUE(uhv->validateResponseHeaderMap(headers).ok());
+  EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateTE) {
@@ -501,6 +524,15 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_empty),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
+  HeaderString drop_underscore{"x_foo"};
+  auto uhv = createH2(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(drop_underscore);
+  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 } // namespace

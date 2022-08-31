@@ -10,6 +10,7 @@ namespace EnvoyDefault {
 namespace {
 
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 
 class Http1HeaderValidatorTest : public HeaderValidatorTest {
@@ -434,6 +435,21 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapInvalidGeneric) {
                              UhvResponseCodeDetail::get().InvalidCharacters);
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  auto uhv = createH1(drop_headers_with_underscores_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(
+      headers,
+      ::Envoy::Http::TestRequestHeaderMapImpl(
+          {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
@@ -499,6 +515,14 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapInvaidTransferEncoding
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderMap(headers),
                              "uhv.http1.invalid_transfer_encoding");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x_foo", "bar"}};
+  auto uhv = createH1(drop_headers_with_underscores_config);
+
+  EXPECT_TRUE(uhv->validateResponseHeaderMap(headers).ok());
+  EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
 }
 
 } // namespace

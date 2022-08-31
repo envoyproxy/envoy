@@ -100,6 +100,26 @@ message HeaderValidatorConfig {
     bool allow_chunked_length = 1;
   }
 
+  // Action to take when Envoy receives client request with header names containing underscore
+  // characters.
+  // Underscore character is allowed in header names by the RFC-7230 and this behavior is implemented
+  // as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by default allows client request headers with underscore
+  // characters.
+  enum HeadersWithUnderscoresAction {
+    // Allow headers with underscores. This is the default behavior.
+    ALLOW = 0;
+
+    // Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
+    // end with the stream reset. The "httpN.requests_rejected_with_underscores_in_headers" counter
+    // is incremented for each rejected request.
+    REJECT_REQUEST = 1;
+
+    // Drop the client header with name containing underscores. The header is dropped before the filter chain is
+    // invoked and as such filters will not see dropped headers. The
+    // "httpN.dropped_headers_with_underscores" is incremented for each dropped header.
+    DROP_HEADER = 2;
+  }
+
   Http1ProtocolOptions http1_protocol_options = 1;
 
   // The URI path normalization options.
@@ -116,6 +136,7 @@ message HeaderValidatorConfig {
   // By default methods with arbitrary names are accepted.
   bool restrict_http_methods = 3;
 
-  // Determines whether headers that contain underscores in their names should be accepted or not.
-  bool reject_headers_with_underscores = 4;
+  // Action to take when a client request with a header name containing underscore characters is received.
+  // If this setting is not specified, the value defaults to ALLOW.
+  HeadersWithUnderscoresAction headers_with_underscores_action = 4;
 }

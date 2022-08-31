@@ -44,7 +44,7 @@ public:
     const std::tuple<ActionType, std::string> result_;
   };
 
-  enum class RejectAction { Accept, Reject };
+  enum class RejectAction { Accept, Reject, DropHeader };
   enum class RejectOrRedirectAction { Accept, Reject, Redirect };
   using RejectResult = Result<RejectAction>;
   using RejectOrRedirectResult = Result<RejectOrRedirectAction>;

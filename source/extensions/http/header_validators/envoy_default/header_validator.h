@@ -74,12 +74,14 @@ public:
 
 protected:
   /*
-   * Validate an IPv6 host header value.
+   * Validate an IPv6 host header value. The port specifier, if included in the host string, is
+   * stored in the return details on success.
    */
   HeaderEntryValidationResult validateHostHeaderIPv6(absl::string_view host);
 
   /*
-   * Validate a reg-name host header value.
+   * Validate a reg-name host header value. The port specifier, if included in the host string, is
+   * stored in the return details on success.
    */
   HeaderEntryValidationResult validateHostHeaderRegName(absl::string_view host);
 
