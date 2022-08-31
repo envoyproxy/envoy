@@ -155,7 +155,8 @@ A few general notes on our error handling philosophy:
     debug-only builds) program invariants.
   - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
     should be used where it may be useful to detect if an efficient condition is violated in
-    production (and fatal check in debug-only builds).
+    production (and fatal check in debug-only builds). This will also log a stack trace
+    of the previous calls leading up to `ENVOY_BUG`.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
@@ -172,9 +173,9 @@ A few general notes on our error handling philosophy:
   debug-only checks and documentation. They may be `ENVOY_BUG`s if performance allows, see point
   below.
 * `ENVOY_BUG`s provide detectability and more confidence than an `ASSERT`. They are useful for
-  non-trivial conditions, those with complex control flow, and rapidly changing protocols. They
-  also log a stack trace of the previous calls leading up to `ENVOY_BUG`. Testing should be added
-  to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is violated.
+  non-trivial conditions, those with complex control flow, and rapidly changing protocols. Testing
+  should be added to ensure that Envoy can continue to operate even if an `ENVOY_BUG` condition is
+  violated.
 * Annotate conditions with comments on belief or reasoning, for example `Condition is guaranteed by
   caller foo` or `Condition is likely to hold after processing through external library foo`.
 * Macro usage should be understandable to a reader. Add comments if not. They should be robust to
