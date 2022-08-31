@@ -1,5 +1,3 @@
-# Adding a pure-upstream filter
-
 # Converting a downstream filter to be a dual filter
 
 Before coverting a filter to be an upstream filter you should do some basic
