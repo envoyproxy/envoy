@@ -30,7 +30,7 @@ message Clusters {
 }
 
 // Details an individual cluster's current status.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ClusterStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ClusterStatus";
 
