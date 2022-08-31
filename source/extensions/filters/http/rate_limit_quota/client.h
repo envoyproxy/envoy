@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+
 #include "envoy/common/pure.h"
 
 namespace Envoy {

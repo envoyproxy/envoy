@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+
 #include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {

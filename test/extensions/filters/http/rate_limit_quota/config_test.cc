@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
-
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/config.h"

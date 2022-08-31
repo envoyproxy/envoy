@@ -48,8 +48,6 @@ envoy_cc_library(
     deps = [
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
 )
 
@@ -59,12 +57,12 @@ envoy_cc_library(
     hdrs = ["client_impl.h"],
     deps = [
         ":client_interface",
-        "//envoy/grpc:status",
         "//envoy/grpc:async_client_interface",
+        "//envoy/grpc:status",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
-        "//source/common/tracing:http_tracer_lib",
     ],
 )

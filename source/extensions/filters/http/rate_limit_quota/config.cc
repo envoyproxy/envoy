@@ -1,8 +1,9 @@
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
-#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-#include "source/extensions/filters/http/rate_limit_quota/filter.h"
 
 #include "envoy/registry/registry.h"
+
+#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,8 +32,8 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 RateLimitQuotaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-    // TODO(tyxia) Not implemented.
-    return nullptr;
+  // TODO(tyxia) Not implemented.
+  return nullptr;
 }
 
 /*

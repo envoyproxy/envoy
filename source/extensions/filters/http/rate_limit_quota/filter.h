@@ -4,13 +4,13 @@
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
 // Needed for bucket id, temporary.
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
@@ -57,22 +57,14 @@ public:
                        RateLimitClientPtr client)
       : config_(std::move(config)), rate_limit_client_(std::move(client)),
         factory_context_(factory_context) {
-          createMatcherTree();
-        }
+    createMatcherTree();
+  }
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
-  // TODO(tyxia) temporaliy put it here, once we get the quotabucketseeting from filter config we
-  // don't need it.
-  BucketId buildBucketsId(
-      const Http::RequestHeaderMap&,
-      const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings&
-          settings);
-
-  std::vector<BucketSettings> buildMatcher();
   BucketId buildMatcherTree(const Http::RequestHeaderMap& headers);
   BucketId requestMatching(const Http::RequestHeaderMap& headers);
 

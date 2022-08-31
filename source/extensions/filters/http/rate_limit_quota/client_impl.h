@@ -7,8 +7,8 @@
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 
 #include "source/common/grpc/typed_async_client.h"
-#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +38,7 @@ class RateLimitClientImpl : public RateLimitClient,
 public:
   // TODO(tyxia) Why need the timeout here
   // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/ratelimit/ratelimit_impl.cc;rcl=399691660;l=22
-  // TODO(tyxia) rvalue referecne is not recommended
+  // TODO(tyxia) rvalue reference is not recommended
   // go/cstyle#Rvalue_references
   // TODO(tyxia) Remove this function we can just create the async_client in place inside of
   // this class, i.e., no need to pass/move around.
@@ -85,13 +85,13 @@ public:
   void closeStream();
 
 private:
-// TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it
-// should not require the ownership transfer.
-GrpcAsyncClientPtr client_;
-GrpcAsyncClient aync_client_;
-Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
-// TODO(tyxia) Do we need this flag??
-bool stream_closed = false;
+  // TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it
+  // should not require the ownership transfer.
+  GrpcAsyncClientPtr client_;
+  GrpcAsyncClient aync_client_;
+  Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
+  // TODO(tyxia) Do we need this flag??
+  bool stream_closed = false;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
