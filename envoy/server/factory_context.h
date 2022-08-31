@@ -327,6 +327,12 @@ public:
    *         the server will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /*
+   * @return the stats scope of the particulra context. This will last as long
+   * as the cluster is valid
+   * */
+  virtual Stats::Scope& scope() PURE;
 };
 
 } // namespace Configuration
