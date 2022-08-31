@@ -39,7 +39,7 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush();
         flush_timer_->enableTimer(flush_interval);
       })),
-      ttl_manager_([this](const std::vector<std::string>& expired) { removeBatch(expired); },
+      ttl_manager_([this](const std::vector<std::string>& expired) { ttlCallback(expired); },
                    dispatcher, dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
@@ -93,7 +93,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   }
 }
 
-void KeyValueStoreBase::removeBatch(const std::vector<std::string>& keys) {
+void KeyValueStoreBase::ttlCallback(const std::vector<std::string>& keys) {
   ENVOY_BUG(!under_iterate_, "remove_batch under the stack of iterate");
   for (const auto& key : keys) {
     store_.erase(std::string(key));
@@ -105,6 +105,7 @@ void KeyValueStoreBase::removeBatch(const std::vector<std::string>& keys) {
 
 void KeyValueStoreBase::remove(absl::string_view key) {
   ENVOY_BUG(!under_iterate_, "remove under the stack of iterate");
+  ttl_manager_.clear(std::string(key));
   store_.erase(std::string(key));
   if (!flush_timer_->enabled()) {
     flush();

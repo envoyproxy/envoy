@@ -52,7 +52,7 @@ TEST_F(KeyValueStoreTest, Basic) {
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
 
-TEST_F(KeyValueStoreTest, TTL) {
+TEST_F(KeyValueStoreTest, Ttl) {
   test_time_.setSystemTime(std::chrono::milliseconds(0));
   EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
@@ -63,22 +63,43 @@ TEST_F(KeyValueStoreTest, TTL) {
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
 
-TEST_F(KeyValueStoreTest, TTLUpdate) {
+TEST_F(KeyValueStoreTest, TtlUpdate) {
   test_time_.setSystemTime(std::chrono::milliseconds(0));
-
+  EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(10));
+
+  test_time_.setSystemTime(std::chrono::milliseconds(1000));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+
   // Advance timer to trigger expiry
-  test_time_.setSystemTime(std::chrono::milliseconds(8000));
+  test_time_.setSystemTime(std::chrono::milliseconds(6000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
 
-TEST_F(KeyValueStoreTest, TTLUpdateNull) {
+TEST_F(KeyValueStoreTest, TtlUpdateToNull) {
   test_time_.setSystemTime(std::chrono::milliseconds(0));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
   store_->addOrUpdate("foo", "bar", absl::nullopt);
   // Expect timer is disabled
+  EXPECT_FALSE(ttl_timer_->enabled());
+}
+
+TEST_F(KeyValueStoreTest, TtlUpdateFromNull) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+  test_time_.setSystemTime(std::chrono::milliseconds(10000));
+  ttl_timer_->invokeCallback();
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
+
+TEST_F(KeyValueStoreTest, TtlRemove) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+  store_->remove("foo");
   EXPECT_FALSE(ttl_timer_->enabled());
 }
 
