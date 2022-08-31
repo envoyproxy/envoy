@@ -107,7 +107,7 @@ Envoy::ProtobufTypes::MessagePtr KeyValueStoreXdsDelegateFactory::createEmptyCon
 }
 
 std::string KeyValueStoreXdsDelegateFactory::name() const {
-  return "envoy.xds_delegates.KeyValueStoreXdsDelegate";
+  return "envoy.xds_delegates.kv_store";
 };
 
 Envoy::Config::XdsResourcesDelegatePtr KeyValueStoreXdsDelegateFactory::createXdsResourcesDelegate(
