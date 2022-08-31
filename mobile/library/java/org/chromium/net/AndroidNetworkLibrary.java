@@ -104,6 +104,14 @@ public final class AndroidNetworkLibrary {
     }
   }
 
+  /*
+   * Returns true if cleartext traffic to a given host is allowed by the current app.
+   */
+  public static boolean isCleartextTrafficPermitted(String host) {
+    // TODO(alyssawilk) Implement this method.
+    return true;
+  }
+
   /**
    * Class to wrap FileDescriptor.setInt$() which is hidden and so must be accessed via
    * reflection.
