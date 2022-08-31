@@ -47,14 +47,14 @@ private:
 // Flag declarations
 #define QUIC_FLAG(flag, ...) ABSL_DECLARE_FLAG(bool, flag);
 #include "quiche/quic/core/quic_flags_list.h"
-QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false) // NOLINT
-QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true) // NOLINT
-QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false) // NOLINT
-QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true) // NOLINT
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)  // NOLINT
+QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)    // NOLINT
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_false, false)     // NOLINT
+QUIC_FLAG(quic_restart_flag_spdy_testonly_default_true, true)       // NOLINT
 QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_false, false) // NOLINT
-QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true) // NOLINT
-QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false) // NOLINT
-QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true) // NOLINT
+QUIC_FLAG(quic_reloadable_flag_http2_testonly_default_true, true)   // NOLINT
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_false, false)    // NOLINT
+QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)      // NOLINT
 #undef QUIC_FLAG
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) ABSL_DECLARE_FLAG(type, flag);
