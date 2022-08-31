@@ -31,15 +31,15 @@ public:
                                                bool active_policy) const PURE;
 
   /**
-   * Used to rewrite the current url to the specified output. Can return a failure in case rewrite
+   * Used to rewrite the current path to the specified output. Can return a failure in case rewrite
    * is not successful.
    *
-   * @param url current url of route
-   * @param matched_path pattern to rewrite the url to
-   * @return the rewritten url.
+   * @param path current path of route
+   * @param rewrite_pattern pattern to rewrite the path to
+   * @return the rewritten path.
    */
-  virtual absl::StatusOr<std::string> rewriteUrl(absl::string_view current_pattern,
-                                                 absl::string_view matched_path) const PURE;
+  virtual absl::StatusOr<std::string> rewritePath(absl::string_view path,
+                                                 absl::string_view rewrite_pattern) const PURE;
 
   /**
    * @return the rewrite pattern.
@@ -47,7 +47,7 @@ public:
   virtual absl::string_view pattern() const PURE;
 
   /**
-   * @return the name.
+   * @return the name of the pattern rewriter.
    */
   virtual absl::string_view name() const PURE;
 };
@@ -71,12 +71,12 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
   /**
-   * @return the name of the rewrite pattern to be created.
+   * @return the name of the pattern rewriter to be created.
    */
   std::string name() const override PURE;
 
   /**
-   * @return the category of the rewrite pattern to be created.
+   * @return the category of the pattern rewriter to be created.
    */
   std::string category() const override { return "envoy.path.rewrite"; }
 };

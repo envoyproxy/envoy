@@ -20,7 +20,7 @@ public:
   virtual ~PathMatcher() = default;
 
   /**
-   * Used to determine if the current url matches the predicate pattern.
+   * Used to determine if the current path matches the pattern.
    *
    * @param url current url of route
    * @return true if route url matches the predicate pattern.
@@ -28,12 +28,12 @@ public:
   virtual bool match(absl::string_view path) const PURE;
 
   /**
-   * @return the match pattern of the predicate.
+   * @return the match pattern
    */
   virtual absl::string_view pattern() const PURE;
 
   /**
-   * @return the name of the current predicate.
+   * @return the name of the path matcher.
    */
   virtual absl::string_view name() const PURE;
 };
@@ -41,15 +41,15 @@ public:
 using PathMatcherSharedPtr = std::shared_ptr<PathMatcher>;
 
 /**
- * Factory for PathMatchPredicateFactory.
+ * Factory for PathMatcher.
  */
 class PathMatcherFactory : public Envoy::Config::TypedFactory {
 public:
   ~PathMatcherFactory() override = default;
 
   /**
-   * @param config contains the proto stored in TypedExtensionConfig for the predicate.
-   * @return an PathMatchPredicateSharedPtr.
+   * @param config contains the proto stored in TypedExtensionConfig.
+   * @return an PathMatcherSharedPtr.
    */
   virtual absl::StatusOr<PathMatcherSharedPtr>
   createPathMatcher(const Protobuf::Message& config) PURE;
@@ -57,12 +57,12 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override PURE;
 
   /**
-   * @return the name of the match pattern predicate to be created.
+   * @return the name of the path matcher to be created.
    */
   std::string name() const override PURE;
 
   /**
-   * @return the category of the match pattern predicate to be created.
+   * @return the category of the path matcher to be created.
    */
   std::string category() const override { return "envoy.path.match"; }
 };

@@ -38,12 +38,12 @@ public:
   explicit PatternTemplateRewriter(
       const envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig&
           rewrite_config)
-      : url_rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
+      : rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
   // Router::PathRewriter
-  absl::string_view pattern() const override { return url_rewrite_pattern_; }
+  absl::string_view pattern() const override { return rewrite_pattern_; }
 
-  absl::StatusOr<std::string> rewriteUrl(absl::string_view pattern,
+  absl::StatusOr<std::string> rewritePath(absl::string_view pattern,
                                          absl::string_view matched_path) const override;
 
   absl::Status isCompatibleMatchPolicy(Router::PathMatcherSharedPtr match_policy,
@@ -52,7 +52,7 @@ public:
   absl::string_view name() const override { return NAME; }
 
 private:
-  std::string url_rewrite_pattern_{nullptr};
+  std::string rewrite_pattern_{nullptr};
 };
 
 } // namespace Rewrite

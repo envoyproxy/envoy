@@ -1030,7 +1030,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
 
     absl::StatusOr<std::string> new_path =
-        path_rewrite_policy_.pathRewriter()->rewriteUrl(just_path, matched_path);
+        path_rewrite_policy_.pathRewriter()->rewritePath(just_path, matched_path);
 
     // if rewrite fails return old path.
     if (!new_path.ok()) {

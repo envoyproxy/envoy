@@ -67,7 +67,7 @@ TEST(RewriteTest, BasicUsage) {
 )EOF";
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(predicate->rewriteUrl("/bar/en/usa", "/bar/{country}/{lang}").value(), "/bar/usa/en");
+  EXPECT_EQ(predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}").value(), "/bar/usa/en");
   EXPECT_EQ(predicate->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
 }
 
@@ -81,9 +81,9 @@ TEST(RewriteTest, RewriteInvalidRegex) {
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
   absl::StatusOr<std::string> rewrite_or_error =
-      predicate->rewriteUrl("/bar/en/usa", "/bar/invalid}/{lang}");
+      predicate->rewritePath("/bar/en/usa", "/bar/invalid}/{lang}");
   EXPECT_FALSE(rewrite_or_error.ok());
-  EXPECT_EQ(rewrite_or_error.status().message(), "Unable to parse url pattern regex");
+  EXPECT_EQ(rewrite_or_error.status().message(), "Unable to parse matched_path");
 }
 
 TEST(RewriteTest, MatchPatternValidation) {

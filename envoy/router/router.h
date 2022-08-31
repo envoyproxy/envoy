@@ -312,7 +312,7 @@ public:
   virtual ~PathMatchPolicy() = default;
 
   /**
-   * @return whether path match based on custom policy is enabled on this route.
+   * @return whether path match policy is enabled on this route.
    */
   virtual bool enabled() const PURE;
 
@@ -331,7 +331,7 @@ public:
   virtual ~PathRewritePolicy() = default;
 
   /**
-   * @return whether path rewrite based on custom policy is enabled on this route.
+   * @return whether path rewrite policy is enabled on this route.
    */
   virtual bool enabled() const PURE;
 

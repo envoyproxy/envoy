@@ -36,29 +36,29 @@ PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr pa
 
   // This is needed to match up variable values.
   // Validation between extensions as they share rewrite pattern variables.
-  if (!isValidSharedVariableSet(url_rewrite_pattern_, path_match_predicate->pattern()).ok()) {
+  if (!isValidSharedVariableSet(rewrite_pattern_, path_match_predicate->pattern()).ok()) {
     return absl::InvalidArgumentError(
         fmt::format("mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
-                    path_match_predicate->pattern(), url_rewrite_pattern_));
+                    path_match_predicate->pattern(), rewrite_pattern_));
   }
 
   return absl::OkStatus();
 }
 
 absl::StatusOr<std::string>
-PatternTemplateRewriter::rewriteUrl(absl::string_view pattern,
+PatternTemplateRewriter::rewritePath(absl::string_view pattern,
                                     absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertPathPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
-    return absl::InvalidArgumentError("Unable to parse url pattern regex");
+    return absl::InvalidArgumentError("Unable to parse matched_path");
   }
   std::string regex_pattern_str = *std::move(regex_pattern);
 
   absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite_pattern =
-      parseRewritePattern(url_rewrite_pattern_, regex_pattern_str);
+      parseRewritePattern(rewrite_pattern_, regex_pattern_str);
 
   if (!rewrite_pattern.ok()) {
-    return absl::InvalidArgumentError("Unable to parse url rewrite pattern");
+    return absl::InvalidArgumentError("Unable to parse path rewrite pattern");
   }
 
   const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern_proto =
