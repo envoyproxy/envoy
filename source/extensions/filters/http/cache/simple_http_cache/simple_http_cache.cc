@@ -59,13 +59,15 @@ public:
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata, bool end_stream) override {
+                     const ResponseMetadata& metadata, InsertCallback insert_success,
+                     bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
     metadata_ = metadata;
     if (end_stream) {
       commit();
     }
+    insert_success(true);
   }
 
   void insertBody(const Buffer::Instance& chunk, InsertCallback ready_for_next_chunk,
@@ -76,9 +78,8 @@ public:
     body_.add(chunk);
     if (end_stream) {
       commit();
-    } else {
-      ready_for_next_chunk(true);
     }
+    ready_for_next_chunk(true);
   }
 
   void insertTrailers(const Http::ResponseTrailerMap& trailers,

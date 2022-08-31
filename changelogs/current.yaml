@@ -26,7 +26,7 @@ minor_behavior_changes:
     transparent listener can use original_dst filter without nf_conntrack enabled.
 - area: cache_filter
   change: |
-    added a completion callback to insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+    added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -133,8 +133,12 @@ using InsertCallback = std::function<void(bool success_ready_for_more)>;
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
+  //
+  // Implementers must call insert_complete(true) on success, or
+  // insert_complete(false) to attempt to abort the insertion.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                             const ResponseMetadata& metadata, bool end_stream) PURE;
+                             const ResponseMetadata& metadata, InsertCallback insert_complete,
+                             bool end_stream) PURE;
 
   // The insertion is streamed into the cache in chunks whose size is determined
   // by the client, but with a pace determined by the cache. To avoid streaming
