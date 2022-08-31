@@ -134,7 +134,7 @@ class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
   //
-  // Implementers must call insert_complete(true) on success, or
+  // Implementations must call insert_complete(true) on success, or
   // insert_complete(false) to attempt to abort the insertion.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                              const ResponseMetadata& metadata, InsertCallback insert_complete,
