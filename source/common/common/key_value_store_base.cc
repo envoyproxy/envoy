@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <optional>
 
 #include "absl/cleanup/cleanup.h"
 
@@ -40,16 +39,10 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush();
         flush_timer_->enableTimer(flush_interval);
       })),
-      ttl_manager_([this](const auto& expired) { ttlCallback(expired); }, dispatcher,
-                   dispatcher.timeSource()) {
+      ttl_manager_([this](const std::vector<std::string>& expired) { removeBatch(expired); },
+                   dispatcher, dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
-  }
-}
-
-void KeyValueStoreBase::ttlCallback(const std::vector<std::string>& expired) {
-  for (const auto& key : expired) {
-    remove(key);
   }
 }
 
@@ -65,20 +58,20 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       ENVOY_LOG(warn, error);
       return false;
     }
-    addOrUpdate(key.value(), value.value());
+    addOrUpdate(key.value(), value.value(), absl::nullopt);
   }
   return true;
 }
 
 void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view,
-                                    absl::optional<std::chrono::milliseconds> ttl) {
+                                    absl::optional<std::chrono::seconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
-  // Remove ttl if <= 0
-  if (ttl && ttl <= std::chrono::milliseconds(0)) {
+  // Do not add if ttl is <= 0
+  if (ttl && ttl <= std::chrono::seconds(0)) {
     ASSERT(false);
-    ttl = absl::nullopt;
+    return;
   }
 
   // Attempt to insert the entry into the store. If it already exists, remove
@@ -93,7 +86,17 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
     store_.pop_front();
   }
   if (ttl) {
-    ttl_manager_.add(ttl.value(), key);
+    ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
+  }
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
+}
+
+void KeyValueStoreBase::removeBatch(const std::vector<std::string>& keys) {
+  ENVOY_BUG(!under_iterate_, "remove_batch under the stack of iterate");
+  for (const auto& key : keys) {
+    store_.erase(std::string(key));
   }
   if (!flush_timer_->enabled()) {
     flush();

@@ -1323,7 +1323,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   // Make sure the store gets the first insert.
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|6|0"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|6|0", absl::nullopt));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
   EXPECT_CALL(callbacks,
@@ -1349,7 +1349,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   // Address does not change.
   EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|6|0"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|6|0", absl::nullopt));
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
                                       Network::DnsResolver::ResolutionStatus::Success));
@@ -1371,7 +1371,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   // Make sure the store gets the updated addresses
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|6|0\n10.0.0.1:80|6|0"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|6|0\n10.0.0.1:80|6|0", absl::nullopt));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
   EXPECT_CALL(update_callbacks_,
@@ -1394,7 +1394,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   // Address does not change.
   EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|40|0\n10.0.0.1:80|40|0"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|40|0\n10.0.0.1:80|40|0", absl::nullopt));
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false),
                                       Network::DnsResolver::ResolutionStatus::Success));

@@ -44,9 +44,9 @@ protected:
 
 TEST_F(KeyValueStoreTest, Basic) {
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
-  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
   EXPECT_EQ("bar", store_->get("foo").value());
-  store_->addOrUpdate("foo", "eep");
+  store_->addOrUpdate("foo", "eep", absl::nullopt);
   EXPECT_EQ("eep", store_->get("foo").value());
   store_->remove("foo");
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
@@ -54,38 +54,57 @@ TEST_F(KeyValueStoreTest, Basic) {
 
 TEST_F(KeyValueStoreTest, TTL) {
   test_time_.setSystemTime(std::chrono::milliseconds(0));
-  store_->addOrUpdate("foo", "bar", std::chrono::milliseconds(5));
+  EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
   EXPECT_EQ("bar", store_->get("foo").value());
-
   // Advance timer to trigger expiry
-  test_time_.setSystemTime(std::chrono::milliseconds(10));
+  test_time_.setSystemTime(std::chrono::milliseconds(10000));
   ttl_timer_->invokeCallback();
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
+
+TEST_F(KeyValueStoreTest, TTLUpdate) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
+
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(10));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+  // Advance timer to trigger expiry
+  test_time_.setSystemTime(std::chrono::milliseconds(8000));
+  ttl_timer_->invokeCallback();
+  EXPECT_EQ(absl::nullopt, store_->get("foo"));
+}
+
+TEST_F(KeyValueStoreTest, TTLUpdateNull) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
+  store_->addOrUpdate("foo", "bar", std::chrono::seconds(5));
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  // Expect timer is disabled
+  EXPECT_FALSE(ttl_timer_->enabled());
 }
 
 TEST_F(KeyValueStoreTest, MaxEntries) {
   createStore(2);
   // Add 2 entries.
-  store_->addOrUpdate("1", "a");
-  store_->addOrUpdate("2", "b");
+  store_->addOrUpdate("1", "a", absl::nullopt);
+  store_->addOrUpdate("2", "b", absl::nullopt);
   EXPECT_EQ("a", store_->get("1").value());
   EXPECT_EQ("b", store_->get("2").value());
 
   // Adding '3' should evict '1'.
-  store_->addOrUpdate("3", "c");
+  store_->addOrUpdate("3", "c", absl::nullopt);
   EXPECT_EQ("c", store_->get("3").value());
   EXPECT_EQ("b", store_->get("2").value());
   EXPECT_EQ(absl::nullopt, store_->get("1"));
 }
 
 TEST_F(KeyValueStoreTest, Persist) {
-  store_->addOrUpdate("foo", "bar");
-  store_->addOrUpdate("ba\nz", "ee\np");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  store_->addOrUpdate("ba\nz", "ee\np", absl::nullopt);
   ASSERT_TRUE(flush_timer_->enabled_);
   flush_timer_->invokeCallback(); // flush
   EXPECT_TRUE(flush_timer_->enabled_);
   // Not flushed as 5ms didn't pass.
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
 
   flush_interval_ = std::chrono::seconds(0);
   createStore();
@@ -100,7 +119,7 @@ TEST_F(KeyValueStoreTest, Persist) {
   store_->iterate(validate);
 
   // This will flush due to 0ms flush interval
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
   createStore();
   EXPECT_TRUE(store_->get("baz").has_value());
 
@@ -111,8 +130,8 @@ TEST_F(KeyValueStoreTest, Persist) {
 }
 
 TEST_F(KeyValueStoreTest, Iterate) {
-  store_->addOrUpdate("foo", "bar");
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
 
   int full_counter = 0;
   KeyValueStore::ConstIterateCb validate = [&full_counter](const std::string& key,
@@ -136,12 +155,12 @@ TEST_F(KeyValueStoreTest, Iterate) {
 
 #ifndef NDEBUG
 TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
-  store_->addOrUpdate("foo", "bar");
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
   KeyValueStore::ConstIterateCb update_value_callback = [this](const std::string& key,
                                                                const std::string&) {
     EXPECT_TRUE(key == "foo" || key == "baz");
-    store_->addOrUpdate("foo", "updated-bar");
+    store_->addOrUpdate("foo", "updated-bar", absl::nullopt);
     return KeyValueStore::Iterate::Continue;
   };
 
@@ -151,7 +170,7 @@ TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
                                                           const std::string&) {
     EXPECT_TRUE(key == "foo" || key == "baz" || key == "new-key");
     if (key == "foo") {
-      store_->addOrUpdate("new-key", "new-value");
+      store_->addOrUpdate("new-key", "new-value", absl::nullopt);
     }
     return KeyValueStore::Iterate::Continue;
   };

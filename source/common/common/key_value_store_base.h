@@ -27,12 +27,13 @@ public:
   // parses key value pairs from |contents| and inserts into store_.
   // Returns true on success and false on failure.
   bool parseContents(absl::string_view contents);
-  void ttlCallback(const std::vector<std::string>& expired);
 
   std::string error;
   // KeyValueStore
   void addOrUpdate(absl::string_view key, absl::string_view value,
-                   absl::optional<std::chrono::milliseconds> ttl = absl::nullopt) override;
+                   absl::optional<std::chrono::seconds> ttl) override;
+  // Removes all keys before calling flush()
+  void removeBatch(const std::vector<std::string>& keys);
   void remove(absl::string_view key) override;
   absl::optional<absl::string_view> get(absl::string_view key) override;
   void iterate(ConstIterateCb cb) const override;
