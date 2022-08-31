@@ -228,8 +228,8 @@ class HttpsInspectionIntegrationTest : public testing::TestWithParam<Network::Ad
 public:
   HttpsInspectionIntegrationTest() : BaseIntegrationTest(GetParam()) {}
   void initialize() override;
-  void setupDnsCacheConfigTest( envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig&
-                                dns_cache_config);
+  void setupDnsCacheConfig(envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig&
+                           dns_cache_config);
   void setupBootstrapExtension();
   void setupTransportSocket(envoy::config::listener::v3::FilterChain& filter_chain);
   void setupExternalListenerConfig();
@@ -308,12 +308,16 @@ void HttpsInspectionIntegrationTest::initialize() {
 //  Test utility functions used by internal listener integration test
 //*************************************************************************
 
-// Test utility function to setup DNS cache config.
-void HttpsInspectionIntegrationTest::setupDnsCacheConfigTest(
+// Setup DNS cache config.
+void HttpsInspectionIntegrationTest::setupDnsCacheConfig(
     envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig&
     dns_cache_config) {
   dns_cache_config.set_name("dynamic_forward_proxy_cache_config");
-  dns_cache_config.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    dns_cache_config.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
+  } else {
+    dns_cache_config.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V6_ONLY);
+  }
 }
 
 // Setup the bootstrap extension config to enable the internal listener feature.
@@ -388,11 +392,6 @@ void HttpsInspectionIntegrationTest::setupInternalUpstreamConfig() {
         name: envoy.transport_sockets.internal_upstream
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-          passthrough_metadata:
-          - name: host_metadata
-            kind: { host: {}}
-          - name: cluster_metadata
-            kind: { cluster: {}}
           transport_socket:
             name: envoy.transport_sockets.raw_buffer
             typed_config:
@@ -407,12 +406,6 @@ void HttpsInspectionIntegrationTest::setupInternalUpstreamConfig() {
     auto* endpoint = lb_endpoint->mutable_endpoint();
     auto* addr = endpoint->mutable_address()->mutable_envoy_internal_address();
     addr->set_server_listener_name("internal_address");
-    auto* metadata = lb_endpoint->mutable_metadata();
-    Config::Metadata::mutableMetadataValue(*metadata, "host_metadata", "value")
-            .set_string_value("HOST");
-    // Insert cluster metadata.
-    Config::Metadata::mutableMetadataValue(*(cluster->mutable_metadata()), "cluster_metadata",
-                                           "value").set_string_value("CLUSTER");
   });
 }
 
@@ -445,7 +438,7 @@ void HttpsInspectionIntegrationTest::setupInternalListenerCofnig() {
     envoy::extensions::filters::http::dynamic_forward_proxy::
                     v3::FilterConfig filter_config;
     auto *dns_cache_config = filter_config.mutable_dns_cache_config();
-    setupDnsCacheConfigTest(*dns_cache_config);
+    setupDnsCacheConfig(*dns_cache_config);
     // Setup DFP HTTP filter.
     auto* dfp_filter = hcm.add_http_filters();
     dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
@@ -472,7 +465,7 @@ void HttpsInspectionIntegrationTest::setupExternalUpstreamConfig() {
     // Setup DFP ClusterConfig.
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig dfp_cluster_config;
     auto *dns_cache_config = dfp_cluster_config.mutable_dns_cache_config();
-    setupDnsCacheConfigTest(*dns_cache_config);
+    setupDnsCacheConfig(*dns_cache_config);
     cluster_0->mutable_cluster_type()->mutable_typed_config()->PackFrom(dfp_cluster_config);
     cluster_0->clear_load_assignment();
   });
@@ -498,27 +491,41 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
 
   // Open clear-text connection.
   conn_->connect();
+
+  // Sends a HTTP CONNECT message.
   Buffer::OwnedImpl buffer;
-  std::string request_msg =
+  std::string connect_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
     "Host: www.cnn.com:80\r\n"
     "\r\n\r\n";
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK");
-  buffer.add(request_msg);
+  buffer.add(connect_msg);
   conn_->write(buffer, false);
-   // Wait for confirmation
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Send few messages over encrypted connection.
+  // Sends a HTTP GET message.
   auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
-  request_msg.clear();
-  request_msg =
+  std::string get_msg =
     "GET / HTTP/1.1\r\n"
     "Host: localhost:"+ port_str  + "\r\n"
     "\r\n\r\n";
-  buffer.add(request_msg);
+  buffer.add(get_msg);
   conn_->write(buffer, false);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  while (client_write_buffer_->bytesDrained() != connect_msg.length() +
+         get_msg.length()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("GET / HTTP/1.1")));
+  // Sends a response back to client.
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 503 Service Unavailable");
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 503 Service Unavailable\r\n\r\n"));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -528,7 +535,8 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
 // internal listener and trigger DNS resolving.
 //
 // This test is not working yet since the TLS handshake is failing with below error message:
-// remote address:envoy://internal_client_address/,TLS error: 268435703:SSL routines:OPENSSL_internal:WRONG_VERSION_NUMBER
+// remote address:envoy://internal_client_address/,TLS error: 268435703:SSL
+// routines:OPENSSL_internal:WRONG_VERSION_NUMBER
 
 
 TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
@@ -558,7 +566,6 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
   while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-
 
   // Send few messages over encrypted connection.
   auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
