@@ -216,6 +216,11 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
+    auto eds_service_name = cluster.info()->edsServiceName();
+    if (eds_service_name.has_value()) {
+      response.add(
+          fmt::format("{}::eds_service_name::{}\n", cluster_name, *eds_service_name));
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
         const std::string& host_address = host->address()->asString();
