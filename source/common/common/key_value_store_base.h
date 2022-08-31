@@ -27,9 +27,9 @@ public:
   // parses key value pairs from |contents| and inserts into store_.
   // Returns true on success and false on failure.
   bool parseContents(absl::string_view contents);
-  void ttlCallback(const std::vector<std::string>& keys);
+  // Callback function for ttlManager.
+  void onExpiredKeys(const std::vector<std::string>& keys);
 
-  std::string error;
   // KeyValueStore
   void addOrUpdate(absl::string_view key, absl::string_view value,
                    absl::optional<std::chrono::seconds> ttl) override;

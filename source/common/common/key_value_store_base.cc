@@ -93,8 +93,8 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   }
 }
 
-void KeyValueStoreBase::ttlCallback(const std::vector<std::string>& keys) {
-  ENVOY_BUG(!under_iterate_, "remove_batch under the stack of iterate");
+void KeyValueStoreBase::onExpiredKeys(const std::vector<std::string>& keys) {
+  ENVOY_BUG(!under_iterate_, "onExpiredKeys under the stack of iterate");
   for (const auto& key : keys) {
     store_.erase(std::string(key));
   }
