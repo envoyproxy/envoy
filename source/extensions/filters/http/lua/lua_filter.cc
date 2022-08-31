@@ -366,6 +366,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
+  options.request_options_.setParentSpan(callbacks_.activeSpan());
   return doHttpCall(state, options);
 }
 
