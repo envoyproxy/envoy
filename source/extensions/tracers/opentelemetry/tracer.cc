@@ -16,8 +16,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-// TODO: handle tracestate as well.
 constexpr absl::string_view kTraceParent = "traceparent";
+constexpr absl::string_view kTraceState = "tracestate";
 constexpr absl::string_view kDefaultVersion = "00";
 constexpr absl::string_view kServiceNameKey = "service.name";
 constexpr absl::string_view kDefaultServiceName = "unknown_service:envoy";
@@ -40,7 +40,7 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled());
+  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
   return parent_tracer_.startSpan(config, name, start_time, span_context);
 }
 
@@ -63,6 +63,8 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
+  // Also set the tracestate.
+  trace_context.setByReferenceKey(kTraceState, span_.trace_state());
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -174,6 +176,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   new_span.setId(Hex::uint64ToHex(span_id));
   // Respect the previous span's sampled flag.
   new_span.setSampled(previous_span_context.sampled());
+  if (!previous_span_context.tracestate().empty()) {
+    new_span.setTracestate(std::string{previous_span_context.tracestate()});
+  }
   return std::make_unique<Span>(new_span);
 }
 

@@ -5299,7 +5299,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::MockListenerFilterManager manager;
 
   // Return error when trying to retrieve the original dst on the invalid handle
-  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillRepeatedly(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),

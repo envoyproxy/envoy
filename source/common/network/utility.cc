@@ -22,6 +22,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -343,19 +344,32 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
+  SocketOptionName opt_dst;
+  SocketOptionName opt_tp;
+  if (*ipVersion == Address::IpVersion::v4) {
+    opt_dst = ENVOY_SOCKET_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IP_TRANSPARENT;
+  } else {
+    opt_dst = ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IPV6_TRANSPARENT;
+  }
+
   sockaddr_storage orig_addr;
   memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status;
-
-  if (*ipVersion == Address::IpVersion::v4) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  } else {
-    status =
-        sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  }
+  int status =
+      sock.getSocketOption(opt_dst.level(), opt_dst.option(), &orig_addr, &addr_len).return_value_;
 
   if (status != 0) {
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+      socklen_t flag_len = sizeof(int);
+      int is_tp;
+      status =
+          sock.getSocketOption(opt_tp.level(), opt_tp.option(), &is_tp, &flag_len).return_value_;
+      if (status == 0 && is_tp) {
+        return sock.ioHandle().localAddress();
+      }
+    }
     return nullptr;
   }
 
