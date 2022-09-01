@@ -19,7 +19,7 @@ The local response content returned by Envoy can be customized. A list of :ref:`
 
 Example of a LocalReplyConfig
 
-.. code-block::
+.. code-block:: yaml
 
   mappers:
   - filter:
@@ -33,7 +33,7 @@ Example of a LocalReplyConfig
       - header:
           key: "foo"
           value: "bar"
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
     status_code: 401
     body:
       inline_string: "not allowed"
@@ -53,7 +53,7 @@ Optionally, content-type can be modified further via :ref:`content_type <envoy_v
 
 Example of a LocalReplyConfig with ``body_format`` field.
 
-.. code-block::
+.. code-block:: yaml
 
   mappers:
   - filter:

@@ -61,9 +61,7 @@ public:
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
-    ON_CALL(file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
-        .WillByDefault(Return("access_token"));
-    ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
+    ON_CALL(file_system_, fileReadToEnd(_))
         .WillByDefault(Invoke([&](const std::string& file) -> std::string {
           return api_->fileSystem().fileReadToEnd(file);
         }));
@@ -91,6 +89,19 @@ public:
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
+
+    // Emulate main implementation of initializing bootstrap extensions.
+    std::vector<Server::BootstrapExtensionPtr> bootstrap_extensions;
+    for (const auto& bootstrap_extension : bootstrap.bootstrap_extensions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::BootstrapExtensionFactory>(
+              bootstrap_extension);
+      auto config = Config::Utility::translateAnyToFactoryConfig(
+          bootstrap_extension.typed_config(),
+          server_.messageValidationContext().staticValidationVisitor(), factory);
+      bootstrap_extensions.push_back(
+          factory.createBootstrapExtension(*config, server_factory_context_));
+    }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),

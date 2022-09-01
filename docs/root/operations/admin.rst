@@ -63,7 +63,9 @@ modify different aspects of the server:
 
 .. http:get:: /
 
-  Render an HTML home page with a table of links to all available options.
+  Render an HTML home page with a table of links to all available options. This can be
+  disabled by compiling Envoy with ``--define=admin_html=disabled`` in which case an error
+  message is printed. Disabling the HTML mode reduces the Envoy binary size.
 
 .. http:get:: /help
 
@@ -199,7 +201,7 @@ modify different aspects of the server:
 .. http:get:: /config_dump?name_regex={}
 
   Dump only the currently loaded configurations whose names match the specified regex. Can be used with
-  both `resource` and `mask` query parameters.
+  both ``resource`` and ``mask`` query parameters.
 
   For example, ``/config_dump?name_regex=.*substring.*`` would return all resource types
   whose name field matches the given regex.
@@ -236,6 +238,13 @@ modify different aspects of the server:
 .. http:post:: /heapprofiler
 
   Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
+
+.. _operations_admin_interface_heap_dump:
+
+.. http:get:: /heap_dump
+
+  Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
 
 .. _operations_admin_interface_healthcheck_fail:
 
@@ -446,7 +455,7 @@ modify different aspects of the server:
   with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
   By default, the regular expression is evaluated using the
-  `Google RE2 <https://github.com/google/re2>` engine. To switch
+  `Google RE2 <https://github.com/google/re2>`_ engine. To switch
   to std::regex using Ecmascript syntax, POST an admin :ref:`runtime <arch_overview_runtime>` request:
   ``/runtime_modify?envoy.reloadable_features.admin_stats_filter_use_re2=false``
 

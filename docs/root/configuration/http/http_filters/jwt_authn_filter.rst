@@ -20,7 +20,7 @@ Following are supported JWT alg:
 Configuration
 -------------
 
-This filter should be configured with the name *envoy.filters.http.jwt_authn*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication``.
 
 This HTTP :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>` has two fields:
 
@@ -57,10 +57,10 @@ and query parameter key *access_token* as::
 
 If a request has two tokens, one from the header and the other from the query parameter, all of them must be valid.
 
-In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` in its *provider_name* field.
+In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtAuthentication>`, ``providers`` is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtProvider>`. The ``provider_name`` must be unique, it is referred in the :ref:`JwtRequirement <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JwtRequirement>` in its ``provider_name`` field.
 
 .. important::
-   For *remote_jwks*, a **jwks_cluster** cluster is required.
+   For ``remote_jwks``, a ``jwks_cluster`` cluster is required.
 
 Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
 

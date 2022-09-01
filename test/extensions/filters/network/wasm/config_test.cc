@@ -353,10 +353,6 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);
-
-  TestUtility::loadFromYaml(invalid_yaml, proto_config);
-  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
@@ -413,6 +409,41 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   threadlocal.registered_ = true;
   EXPECT_NE(filter_config->createFilter(), nullptr);
+}
+
+TEST_P(WasmNetworkFilterConfigTest, FailedToGetThreadLocalPlugin) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "valid"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  threadlocal.registered_ = true;
+  auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
+  ASSERT_EQ(threadlocal.current_slot_, 1);
+  ASSERT_NE(filter_config->createFilter(), nullptr);
+
+  // If the thread local plugin handle returns nullptr, `createFilter` should return nullptr
+  threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createFilter(), nullptr);
 }
 
 } // namespace Wasm

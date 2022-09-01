@@ -348,11 +348,16 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();
-  for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
-    if (listen_addr->type() == Network::Address::Type::Ip) {
-      ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
-      registerPort(*port_it, listen_addr->ip()->port());
+  for (; port_it != port_names.end() && listener_it != listeners.end(); ++listener_it) {
+    auto socket_factory_it = listener_it->get().listenSocketFactories().begin();
+    for (; socket_factory_it != listener_it->get().listenSocketFactories().end() &&
+           port_it != port_names.end();
+         ++socket_factory_it, ++port_it) {
+      const auto listen_addr = (*socket_factory_it)->localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
+        registerPort(*port_it, listen_addr->ip()->port());
+      }
     }
   }
   const auto admin_addr =
@@ -573,9 +578,14 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
+  if (stream == nullptr) {
+    stream = xds_stream_.get();
+  }
+
   envoy::service::discovery::v3::DiscoveryRequest discovery_request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+  VERIFY_ASSERTION(stream->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
     EXPECT_TRUE(discovery_request.has_node());

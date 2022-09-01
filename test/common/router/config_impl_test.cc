@@ -182,7 +182,7 @@ protected:
     return factory_context_.scope().symbolTable().toString(name);
   }
 
-  std::string responseHeadersConfig(const bool most_specific_wins, const bool append) {
+  std::string responseHeadersConfig(const bool most_specific_wins, HeaderAppendAction action) {
     factory_context_.cluster_manager_.initializeClusters(
         {"www2", "root_www2", "www2_staging", "instant-server"}, {});
 
@@ -194,11 +194,11 @@ virtual_hosts:
       - header:
           key: x-global-header1
           value: vhost-override
-        append: {1}
+        append_action: {1}
       - header:
           key: x-vhost-header1
           value: vhost1-www2
-        append: {1}
+        append_action: {1}
     response_headers_to_remove: ["x-vhost-remove"]
     routes:
       - match:
@@ -210,15 +210,15 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-override
-            append: {1}
+            append_action: {1}
           - header:
               key: x-global-header1
               value: route-override
-            append: {1}
+            append_action: {1}
           - header:
               key: x-vhost-header1
               value: route-override
-            append: {1}
+            append_action: {1}
       - match:
           path: "/"
         route:
@@ -227,7 +227,7 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-allpath
-            append: {1}
+            append_action: {1}
         response_headers_to_remove: ["x-route-remove"]
       - match:
           prefix: "/"
@@ -239,7 +239,7 @@ virtual_hosts:
       - header:
           key: x-vhost-header1
           value: vhost1-www2_staging
-        append: {1}
+        append_action: {1}
     routes:
       - match:
           prefix: "/"
@@ -249,7 +249,7 @@ virtual_hosts:
           - header:
               key: x-route-header
               value: route-allprefix
-            append: {1}
+            append_action: {1}
   - name: default
     domains: ["*"]
     routes:
@@ -262,12 +262,22 @@ response_headers_to_add:
   - header:
       key: x-global-header1
       value: global1
-    append: {1}
+    append_action: {1}
 response_headers_to_remove: ["x-global-remove"]
 most_specific_header_mutations_wins: {0}
 )EOF";
 
-    return fmt::format(yaml, most_specific_wins, append);
+    std::string action_string;
+
+    if (action == HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
+      action_string = "APPEND_IF_EXISTS_OR_ADD";
+    } else if (action == HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD) {
+      action_string = "OVERWRITE_IF_EXISTS_OR_ADD";
+    } else if (action == HeaderValueOption::ADD_IF_ABSENT) {
+      action_string = "ADD_IF_ABSENT";
+    }
+
+    return fmt::format(yaml, most_specific_wins, action_string);
   }
 
   std::string requestHeadersConfig(const bool most_specific_wins) {
@@ -281,11 +291,11 @@ virtual_hosts:
       - header:
           key: x-global-header
           value: vhost-www2
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
       - header:
           key: x-vhost-header
           value: vhost-www2
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
     request_headers_to_remove: ["x-vhost-nope"]
     routes:
       - match:
@@ -294,15 +304,15 @@ virtual_hosts:
           - header:
               key: x-global-header
               value: route-endpoint
-            append: false
+            append_action: OVERWRITE_IF_EXISTS_OR_ADD
           - header:
               key: x-vhost-header
               value: route-endpoint
-            append: false
+            append_action: OVERWRITE_IF_EXISTS_OR_ADD
           - header:
               key: x-route-header
               value: route-endpoint
-            append: false
+            append_action: OVERWRITE_IF_EXISTS_OR_ADD
         request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
@@ -321,7 +331,7 @@ request_headers_to_add:
   - header:
       key: x-global-header
       value: global
-    append: false
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
 request_headers_to_remove: ["x-global-nope"]
 most_specific_header_mutations_wins: {0}
 )EOF";
@@ -1497,14 +1507,14 @@ request_headers_to_remove:
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-route-header"), "route-new_endpoint"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-header-to-remove-at-route-level-1"),
                               Http::LowerCaseString("x-header-to-remove-at-vhost-level-1"),
@@ -1520,12 +1530,12 @@ request_headers_to_remove:
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allpath"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-header-to-remove-at-route-level-2"),
                               Http::LowerCaseString("x-header-to-remove-at-vhost-level-1"),
@@ -1541,11 +1551,11 @@ request_headers_to_remove:
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allprefix"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2_staging"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-header-to-remove-at-route-level-3"),
                               Http::LowerCaseString("x-header-to-remove-at-vhost-level-2"),
@@ -1559,9 +1569,9 @@ request_headers_to_remove:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-header-to-remove-at-global-level")));
     }
@@ -1594,8 +1604,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
       EXPECT_FALSE(headers.has("x-vhost-nope"));
       EXPECT_FALSE(headers.has("x-route-nope"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-      EXPECT_THAT(transforms.headers_to_overwrite,
+      EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header"), "route-endpoint"),
                               Pair(Http::LowerCaseString("x-vhost-header"), "route-endpoint"),
                               Pair(Http::LowerCaseString("x-route-header"), "route-endpoint"),
@@ -1622,8 +1632,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
       EXPECT_FALSE(headers.has("x-vhost-nope"));
       EXPECT_TRUE(headers.has("x-route-nope"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-      EXPECT_THAT(transforms.headers_to_overwrite,
+      EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header"), "vhost-www2"),
                               Pair(Http::LowerCaseString("x-vhost-header"), "vhost-www2"),
                               Pair(Http::LowerCaseString("x-global-header"), "global")));
@@ -1646,8 +1656,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
       EXPECT_TRUE(headers.has("x-vhost-nope"));
       EXPECT_TRUE(headers.has("x-route-nope"));
       auto transforms = route->requestHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-      EXPECT_THAT(transforms.headers_to_overwrite,
+      EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header"), "global")));
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-global-nope")));
@@ -1675,8 +1685,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
     EXPECT_FALSE(headers.has("x-vhost-nope"));
     EXPECT_FALSE(headers.has("x-route-nope"));
     auto transforms = route->requestHeaderTransforms(stream_info);
-    EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-    EXPECT_THAT(transforms.headers_to_overwrite,
+    EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                 ElementsAre(Pair(Http::LowerCaseString("x-global-header"), "global"),
                             Pair(Http::LowerCaseString("x-global-header"), "vhost-www2"),
                             Pair(Http::LowerCaseString("x-vhost-header"), "vhost-www2"),
@@ -1702,8 +1712,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
     EXPECT_FALSE(headers.has("x-vhost-nope"));
     EXPECT_TRUE(headers.has("x-route-nope"));
     auto transforms = route->requestHeaderTransforms(stream_info);
-    EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-    EXPECT_THAT(transforms.headers_to_overwrite,
+    EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                 ElementsAre(Pair(Http::LowerCaseString("x-global-header"), "global"),
                             Pair(Http::LowerCaseString("x-global-header"), "vhost-www2"),
                             Pair(Http::LowerCaseString("x-vhost-header"), "vhost-www2")));
@@ -1715,7 +1725,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
 // and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false, /*append=*/true);
+  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false,
+                                                 HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1732,14 +1743,14 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                               Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-vhost-remove"),
                               Http::LowerCaseString("x-global-remove")));
@@ -1755,12 +1766,12 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allpath"),
                               Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-route-remove"),
                               Http::LowerCaseString("x-vhost-remove"),
@@ -1778,11 +1789,11 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
       EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-allprefix"),
                               Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2_staging"),
                               Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-global-remove")));
     }
@@ -1795,9 +1806,9 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       auto transforms = route->responseHeaderTransforms(stream_info);
-      EXPECT_THAT(transforms.headers_to_append,
+      EXPECT_THAT(transforms.headers_to_append_or_add,
                   ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "global1")));
-      EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+      EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
       EXPECT_THAT(transforms.headers_to_remove,
                   ElementsAre(Http::LowerCaseString("x-global-remove")));
     }
@@ -1807,8 +1818,9 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
               ContainerEq(config.internalOnlyHeaders()));
 }
 
-TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false, /*append=*/false);
+TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersOverwriteIfExistOrAdd) {
+  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/false,
+                                                 HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1823,8 +1835,39 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
 
   auto transforms = route->responseHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+              ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-override"),
+                          Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
+                          Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
+                          Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
+                          Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
+                          Pair(Http::LowerCaseString("x-global-header1"), "global1")));
+  EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-vhost-remove"),
+                                                        Http::LowerCaseString("x-global-remove")));
+}
+
+TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAddIfAbsent) {
+  const std::string yaml =
+      responseHeadersConfig(/*most_specific_wins=*/false, HeaderValueOption::ADD_IF_ABSENT);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl req_headers =
+      genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+  const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-route-header", "exist-value"}};
+  route->finalizeResponseHeaders(headers, stream_info);
+  EXPECT_EQ("route-override", headers.get_("x-global-header1"));
+  EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
+  // If related header is exist in the headers then do nothing.
+  EXPECT_EQ("exist-value", headers.get_("x-route-header"));
+
+  auto transforms = route->responseHeaderTransforms(stream_info);
+  EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_add_if_absent,
               ElementsAre(Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                           Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                           Pair(Http::LowerCaseString("x-vhost-header1"), "route-override"),
@@ -1836,7 +1879,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
 }
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
-  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/true, /*append=*/false);
+  const std::string yaml = responseHeadersConfig(/*most_specific_wins=*/true,
+                                                 HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1851,8 +1895,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   EXPECT_EQ("route-override", headers.get_("x-route-header"));
 
   auto transforms = route->responseHeaderTransforms(stream_info);
-  EXPECT_THAT(transforms.headers_to_append, IsEmpty());
-  EXPECT_THAT(transforms.headers_to_overwrite,
+  EXPECT_THAT(transforms.headers_to_append_or_add, IsEmpty());
+  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
               ElementsAre(Pair(Http::LowerCaseString("x-global-header1"), "global1"),
                           Pair(Http::LowerCaseString("x-global-header1"), "vhost-override"),
                           Pair(Http::LowerCaseString("x-vhost-header1"), "vhost1-www2"),
@@ -1880,7 +1924,7 @@ protected:
     - header:
         key: x-has-variable
         value: "%PER_REQUEST_STATE(testing)%"
-      append: false
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
   )EOF";
     const std::string yaml =
         fmt::format(yaml_template,
@@ -1907,14 +1951,14 @@ protected:
     auto transforms = run_request_header_test
                           ? route->requestHeaderTransforms(stream_info, /*do_formatting=*/true)
                           : route->responseHeaderTransforms(stream_info, /*do_formatting=*/true);
-    EXPECT_THAT(transforms.headers_to_overwrite,
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
                 ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "test_value")));
 
     transforms = run_request_header_test
                      ? route->requestHeaderTransforms(stream_info, /*do_formatting=*/false)
                      : route->responseHeaderTransforms(stream_info, /*do_formatting=*/false);
     EXPECT_THAT(
-        transforms.headers_to_overwrite,
+        transforms.headers_to_overwrite_or_add,
         ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "%PER_REQUEST_STATE(testing)%")));
   }
 };
@@ -1981,7 +2025,7 @@ virtual_hosts:
       - header:
           key: {}
           value: vhost-www2
-        append: false
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
 )EOF",
                                          header);
 
@@ -3856,6 +3900,27 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
+TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig500) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "not_found"
+          cluster_not_found_response_code: INTERNAL_SERVER_ERROR
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+
+  EXPECT_EQ("not_found", config.route(headers, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(Http::Code::InternalServerError,
+            config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
+}
+
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCodeConfig404) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5081,24 +5146,6 @@ virtual_hosts:
       "Cannot specify both prefix_rewrite and regex_rewrite");
 }
 
-TEST_F(RouteMatcherTest, TestPatternRewriteConfigLoad) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: path_template_rewrite
-  domains: ["*"]
-  routes:
-  - match:
-      path_template: "/bar/{country}/{lang}"
-    route:
-      path_template_rewrite: "/bar/{lang}/{country}"
-      cluster: www2
-  )EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-}
-
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -6018,12 +6065,12 @@ protected:
     const RouteEntry* route = config.route(req_headers, 0)->routeEntry();
     auto transforms = run_request_header_test ? route->requestHeaderTransforms(stream_info)
                                               : route->responseHeaderTransforms(stream_info);
-    EXPECT_THAT(transforms.headers_to_append,
+    EXPECT_THAT(transforms.headers_to_append_or_add,
                 ElementsAre(Pair(Http::LowerCaseString("x-cluster-header"), "cluster1"),
                             Pair(Http::LowerCaseString("x-route-header"), "route-override"),
                             Pair(Http::LowerCaseString("x-global-header1"), "route-override"),
                             Pair(Http::LowerCaseString("x-vhost-header1"), "route-override")));
-    EXPECT_THAT(transforms.headers_to_overwrite, IsEmpty());
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add, IsEmpty());
     EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-vhost-remove")));
   }
 };
@@ -6099,28 +6146,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
-  std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["www.lyft.com"]
-    routes:
-      - match: { prefix: "/" }
-        route:
-          weighted_clusters:
-            clusters:
-              - name: cluster1
-                weight: 3
-              - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 100");
-
-  yaml = R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
     domains: ["www.lyft.com"]
@@ -6405,22 +6431,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'prefix' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'path' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -6454,22 +6466,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|safe_regex)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'prefix' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'safe_regex' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -6502,23 +6500,8 @@ virtual_hosts:
     route:
       cluster: www2
   )EOF";
-
-#ifndef GTEST_USES_SIMPLE_RE
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|safe_regex)' "
-      "for "
-      "type oneof");
-#else
-  EXPECT_THAT_THROWS_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      ::testing::AnyOf(::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'path' for "
-                                                "type oneof"),
-                       ::testing::ContainsRegex("invalid value oneof field 'path_specifier' is "
-                                                "already set. Cannot set 'safe_regex' for "
-                                                "type oneof")));
-#endif
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -6537,9 +6520,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set.");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
@@ -6648,6 +6630,7 @@ virtual_hosts:
       expose_headers: "test-expose-headers"
       max_age: "test-max-age"
       allow_credentials: true
+      allow_private_network_access: true
       filter_enabled:
         runtime_key: "cors.www.enabled"
         default_value:
@@ -6692,6 +6675,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
 TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
@@ -6748,6 +6732,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
+  EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), absl::nullopt);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
@@ -7044,10 +7029,12 @@ TEST(MetadataMatchCriteriaImpl, Filter) {
   auto matches = MetadataMatchCriteriaImpl(metadata_matches);
   auto filtered_matches1 = matches.filterMatchCriteria({"b", "c"});
   auto filtered_matches2 = matches.filterMatchCriteria({"a"});
+  auto filtered_matches_empty = matches.filterMatchCriteria({"d"});
 
   EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria().size(), 2);
   EXPECT_EQ(filtered_matches2->metadataMatchCriteria().size(), 1);
+  EXPECT_EQ(filtered_matches_empty->metadataMatchCriteria().size(), 0);
 
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->name(), "b");
   EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->value().value().number_value(), 2.0);

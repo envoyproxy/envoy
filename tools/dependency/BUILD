@@ -13,9 +13,11 @@ envoy_entry_point(
     args = [
         "--repository_locations=$(location //bazel:all_repository_locations)",
         "--cve_config=$(location :cve.yaml)",
+        "--cve_data=$(location :cve_data)",
     ],
     data = [
         ":cve.yaml",
+        ":cve_data",
         "//bazel:all_repository_locations",
     ],
     pkg = "envoy.dependency.check",
@@ -49,4 +51,24 @@ py_binary(
     name = "validate_test",
     srcs = ["validate_test.py"],
     deps = [":validate"],
+)
+
+envoy_entry_point(
+    name = "cve_download",
+    pkg = "envoy.dependency.check",
+    deps = [requirement("orjson")],
+)
+
+genrule(
+    name = "cve_data",
+    outs = ["cve_data.json.tar"],
+    cmd = """
+    $(location :cve_download) \
+        --download_cves $@ \
+        --repository_locations=$(location //bazel:all_repository_locations)
+    """,
+    exec_tools = [
+        ":cve_download",
+        "//bazel:all_repository_locations",
+    ],
 )

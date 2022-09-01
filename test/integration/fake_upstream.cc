@@ -594,6 +594,11 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+  dispatcher_->post([this]() -> void {
+    socket_factories_[0]->doFinalPreWorkerInit();
+    handler_->addListener(absl::nullopt, listener_, runtime_);
+    server_initialized_.setReady();
+  });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
@@ -644,9 +649,6 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factories_[0]->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_, runtime_);
-  server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
   {
@@ -959,7 +961,10 @@ FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
     auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                       ->ioHandle()
                       .recv(peek_buf, 200, MSG_PEEK);
-    ASSERT(result.ok());
+    ASSERT(result.ok() || result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again);
+    if (!result.ok()) {
+      return false;
+    }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
     if (index != absl::string_view::npos) {
@@ -972,10 +977,15 @@ FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
     }
     return false;
   };
-  if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
-    return AssertionFailure() << "timed out waiting for raw data";
+  // Because the connection must be read disabled to not auto-consume the
+  // underlying data, waitFor hangs with no events to force the time system to
+  // continue. Break it up into smaller chunks.
+  for (int i = 0; i < timeout / 10ms; ++i) {
+    if (time_system_.waitFor(lock_, absl::Condition(&reached), 10ms)) {
+      return AssertionSuccess();
+    }
   }
-  return AssertionSuccess();
+  return AssertionFailure() << "timed out waiting for raw data";
 }
 
 void FakeHttpConnection::writeRawData(absl::string_view data) {

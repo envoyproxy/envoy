@@ -12,7 +12,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
-    "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
 ]
@@ -160,6 +159,10 @@ def envoy_dependencies(skip_targets = []):
         name = "ssl",
         actual = "@envoy//bazel:boringssl",
     )
+    native.bind(
+        name = "crypto",
+        actual = "@envoy//bazel:boringcrypto",
+    )
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
@@ -182,6 +185,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_grpc_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_intel_qatlib()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -204,9 +208,9 @@ def envoy_dependencies(skip_targets = []):
     _com_googlesource_chromium_zlib()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
-    _com_lightstep_tracer_cpp()
     _io_hyperscan()
     _io_opentracing_cpp()
+    _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
     _intel_dlb()
@@ -396,6 +400,18 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _com_github_intel_qatlib():
+    external_http_archive(
+        name = "com_github_intel_qatlib",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy//bazel/foreign_cc:qatlib-0001-qat-Enable-disable-systemd-support-with-configure.ac.patch",
+            "@envoy//bazel/foreign_cc:qatlib-0002-qatlib-Remove-remaining-shared-flags.patch",
+            "@envoy//bazel/foreign_cc:qatlib-0003-configure-Check-if-pkg-config-is-installed-before-us.patch",
+        ],
+    )
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
@@ -413,6 +429,16 @@ def _com_github_libevent_libevent():
     native.bind(
         name = "event",
         actual = "@envoy//bazel/foreign_cc:event",
+    )
+
+def _net_colm_open_source_colm():
+    external_http_archive(
+        name = "net_colm_open_source_colm",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "colm",
+        actual = "@envoy//bazel/foreign_cc:colm",
     )
 
 def _net_colm_open_source_ragel():
@@ -546,13 +572,6 @@ def _io_opentracing_cpp():
     native.bind(
         name = "opentracing",
         actual = "@io_opentracing_cpp//:opentracing",
-    )
-
-def _com_lightstep_tracer_cpp():
-    external_http_archive("com_lightstep_tracer_cpp")
-    native.bind(
-        name = "lightstep",
-        actual = "@com_lightstep_tracer_cpp//:manual_tracer_lib",
     )
 
 def _com_github_datadog_dd_opentracing_cpp():
@@ -918,7 +937,11 @@ def _org_llvm_releases_compiler_rt():
     )
 
 def _com_github_grpc_grpc():
-    external_http_archive("com_github_grpc_grpc")
+    external_http_archive(
+        name = "com_github_grpc_grpc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:grpc.patch"],
+    )
     external_http_archive("build_bazel_rules_apple")
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
@@ -929,6 +952,10 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "libssl",
         actual = "//external:ssl",
+    )
+    native.bind(
+        name = "libcrypto",
+        actual = "//external:crypto",
     )
     native.bind(
         name = "cares",
@@ -978,6 +1005,16 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+    native.bind(
+        name = "upb_reflection",
+        actual = "@upb//:reflection",
+    )
+
+    native.bind(
+        name = "upb_generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
+        actual = "@upb//:generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
     )
 
 def _re2():
@@ -1058,6 +1095,14 @@ def _com_github_google_tcmalloc():
     native.bind(
         name = "tcmalloc",
         actual = "@com_github_google_tcmalloc//tcmalloc",
+    )
+    native.bind(
+        name = "tcmalloc_profile_marshaler",
+        actual = "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
+    )
+    native.bind(
+        name = "tcmalloc_malloc_extension",
+        actual = "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
     )
 
 def _com_github_gperftools_gperftools():

@@ -31,8 +31,8 @@ This should also start two upstream ``HTTP`` echo servers, ``service1`` and ``se
 
     $ pwd
     envoy/examples/dynamic-config-fs
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
 
            Name                            Command                State                     Ports
@@ -102,7 +102,7 @@ You can do this using ``sed`` inside the container:
 
 .. note::
 
-   The above example uses ``sed -i``, which works as an inplace edit as `sed` does copy, edit and move in order to do this.
+   The above example uses ``sed -i``, which works as an inplace edit as ``sed`` does copy, edit and move in order to do this.
 
 Step 5: Check Envoy uses updated configuration
 **********************************************

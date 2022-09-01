@@ -78,7 +78,7 @@ def render_version(version):
 
 
 def render_title(title):
-    underline = '~' * len(title)
+    underline = '-' * len(title)
     return f'\n{title}\n{underline}\n\n'
 
 
@@ -133,8 +133,11 @@ def main():
 
     # Generate per-use category RST with CSV tables.
     for category, exts in use_categories.items():
-        content = ''
+        content = f"External dependencies: ``{category or 'core'}``"
+        content += f"\n{'=' * len(content)}\n\n"
         for ext_name, deps in sorted(exts.items()):
+            if not deps:
+                continue
             if ext_name != 'core':
                 content += render_title(ext_name)
             output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
