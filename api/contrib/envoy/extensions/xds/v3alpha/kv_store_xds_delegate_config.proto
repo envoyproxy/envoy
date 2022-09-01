@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.xds.v3;
+package envoy.extensions.xds.v3alpha;
 
 import "envoy/config/common/key_value/v3/config.proto";
 import "udpa/annotations/status.proto";
