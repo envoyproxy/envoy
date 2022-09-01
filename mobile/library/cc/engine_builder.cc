@@ -146,29 +146,31 @@ std::string EngineBuilder::generateConfigStr() {
   }
 #endif
 
-  std::vector<std::pair<std::string, std::string>> replacements{
-      {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
-      {"dns_fail_base_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_base_)},
-      {"dns_fail_max_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_max_)},
-      {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
-      {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
-      {"dns_query_timeout", fmt::format("{}s", this->dns_query_timeout_seconds_)},
-      {"dns_resolver_name", dns_resolver_name},
-      {"dns_resolver_config", dns_resolver_config},
-      {"h2_connection_keepalive_idle_interval",
-       fmt::format("{}s", this->h2_connection_keepalive_idle_interval_milliseconds_ / 1000.0)},
-      {"h2_connection_keepalive_timeout",
-       fmt::format("{}s", this->h2_connection_keepalive_timeout_seconds_)},
-      {
-          "metadata",
-          fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", this->device_os_,
-                      this->app_version_, this->app_id_),
-      },
-      {"stats_domain", this->stats_domain_},
-      {"stats_flush_interval", fmt::format("{}s", this->stats_flush_seconds_)},
-      {"stream_idle_timeout", fmt::format("{}s", this->stream_idle_timeout_seconds_)},
-      {"per_try_idle_timeout", fmt::format("{}s", this->per_try_idle_timeout_seconds_)},
-      {"virtual_clusters", this->virtual_clusters_},
+  std::vector<std::pair<std::string, std::string>> replacements {
+    {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
+        {"dns_fail_base_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_base_)},
+        {"dns_fail_max_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_max_)},
+        {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
+        {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
+        {"dns_query_timeout", fmt::format("{}s", this->dns_query_timeout_seconds_)},
+        {"dns_resolver_name", dns_resolver_name}, {"dns_resolver_config", dns_resolver_config},
+        {"h2_connection_keepalive_idle_interval",
+         fmt::format("{}s", this->h2_connection_keepalive_idle_interval_milliseconds_ / 1000.0)},
+        {"h2_connection_keepalive_timeout",
+         fmt::format("{}s", this->h2_connection_keepalive_timeout_seconds_)},
+        {
+            "metadata",
+            fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", this->device_os_,
+                        this->app_version_, this->app_id_),
+        },
+        {"stats_domain", this->stats_domain_},
+        {"stats_flush_interval", fmt::format("{}s", this->stats_flush_seconds_)},
+        {"stream_idle_timeout", fmt::format("{}s", this->stream_idle_timeout_seconds_)},
+        {"per_try_idle_timeout", fmt::format("{}s", this->per_try_idle_timeout_seconds_)},
+        {"virtual_clusters", this->virtual_clusters_},
+#if defined(__ANDROID_API__)
+        {"force_ipv6", "true"},
+#endif
   };
 
   // NOTE: this does not include support for custom filters
