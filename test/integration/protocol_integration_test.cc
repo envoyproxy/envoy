@@ -572,13 +572,17 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Missing host for CONNECT
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
-
-  auto response = std::move((codec_client_->startRequest(headers)).second);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
