@@ -76,6 +76,12 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->mutable_auto_host_rewrite()->set_value(true);
+      });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -572,13 +578,17 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Missing host for CONNECT
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
-
-  auto response = std::move((codec_client_->startRequest(headers)).second);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {

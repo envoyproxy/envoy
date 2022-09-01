@@ -424,11 +424,20 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
+}
+
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteOpen) {
+  quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
+      quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
+  EXPECT_TRUE(quic_stream_->rst_received());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {
