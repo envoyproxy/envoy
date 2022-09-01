@@ -26,7 +26,7 @@ class EngineBuilderTest {
     engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
+    assertThat(engine.envoyConfiguration.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
   }
 
   @Test
@@ -36,7 +36,7 @@ class EngineBuilderTest {
     engineBuilder.enableAdminInterface()
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.adminInterfaceEnabled).isTrue()
+    assertThat(engine.envoyConfiguration.adminInterfaceEnabled).isTrue()
   }
 
   @Test
@@ -46,7 +46,7 @@ class EngineBuilderTest {
     engineBuilder.enableHappyEyeballs(true)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.enableHappyEyeballs).isTrue()
+    assertThat(engine.envoyConfiguration.enableHappyEyeballs).isTrue()
   }
 
   @Test
@@ -56,7 +56,7 @@ class EngineBuilderTest {
     engineBuilder.enableInterfaceBinding(true)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.enableInterfaceBinding).isTrue()
+    assertThat(engine.envoyConfiguration.enableInterfaceBinding).isTrue()
   }
 
   @Test
@@ -66,7 +66,7 @@ class EngineBuilderTest {
     engineBuilder.addConnectTimeoutSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.connectTimeoutSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.connectTimeoutSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -76,7 +76,7 @@ class EngineBuilderTest {
     engineBuilder.addDNSMinRefreshSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsMinRefreshSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.dnsMinRefreshSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -86,7 +86,7 @@ class EngineBuilderTest {
     engineBuilder.addDNSRefreshSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsRefreshSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.dnsRefreshSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -96,8 +96,8 @@ class EngineBuilderTest {
     engineBuilder.addDNSFailureRefreshSeconds(1234, 5678)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsFailureRefreshSecondsBase).isEqualTo(1234)
-    assertThat(engine.envoyConfiguration!!.dnsFailureRefreshSecondsMax).isEqualTo(5678)
+    assertThat(engine.envoyConfiguration.dnsFailureRefreshSecondsBase).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.dnsFailureRefreshSecondsMax).isEqualTo(5678)
   }
 
   @Test
@@ -107,7 +107,7 @@ class EngineBuilderTest {
     engineBuilder.addDNSQueryTimeoutSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsQueryTimeoutSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.dnsQueryTimeoutSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -117,7 +117,7 @@ class EngineBuilderTest {
     engineBuilder.addDNSFallbackNameservers(listOf<String>("8.8.8.8"))
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsFallbackNameservers.size).isEqualTo(1)
+    assertThat(engine.envoyConfiguration.dnsFallbackNameservers.size).isEqualTo(1)
   }
 
   @Test
@@ -127,7 +127,7 @@ class EngineBuilderTest {
     engineBuilder.enableDNSFilterUnroutableFamilies(true)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.dnsFilterUnroutableFamilies).isTrue()
+    assertThat(engine.envoyConfiguration.dnsFilterUnroutableFamilies).isTrue()
   }
 
   @Test
@@ -137,7 +137,7 @@ class EngineBuilderTest {
     engineBuilder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.h2ConnectionKeepaliveIdleIntervalMilliseconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveIdleIntervalMilliseconds).isEqualTo(1234)
   }
 
   @Test
@@ -147,7 +147,7 @@ class EngineBuilderTest {
     engineBuilder.addH2ConnectionKeepaliveTimeoutSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.h2ConnectionKeepaliveTimeoutSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.h2ConnectionKeepaliveTimeoutSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -157,7 +157,7 @@ class EngineBuilderTest {
     engineBuilder.setMaxConnectionsPerHost(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.maxConnectionsPerHost).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.maxConnectionsPerHost).isEqualTo(1234)
   }
 
   @Test
@@ -167,7 +167,7 @@ class EngineBuilderTest {
     engineBuilder.h2ExtendKeepaliveTimeout(true)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.h2ExtendKeepaliveTimeout).isTrue()
+    assertThat(engine.envoyConfiguration.h2ExtendKeepaliveTimeout).isTrue()
   }
 
   @Test
@@ -177,7 +177,7 @@ class EngineBuilderTest {
     engineBuilder.addH2RawDomains(listOf<String>("h2-raw.domain"))
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.h2RawDomains.size).isEqualTo(1)
+    assertThat(engine.envoyConfiguration.h2RawDomains.size).isEqualTo(1)
   }
 
   @Test
@@ -187,7 +187,7 @@ class EngineBuilderTest {
     engineBuilder.addStatsFlushSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.statsFlushSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.statsFlushSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -197,7 +197,7 @@ class EngineBuilderTest {
     engineBuilder.addStreamIdleTimeoutSeconds(1234)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.streamIdleTimeoutSeconds).isEqualTo(1234)
+    assertThat(engine.envoyConfiguration.streamIdleTimeoutSeconds).isEqualTo(1234)
   }
 
   @Test
@@ -207,7 +207,7 @@ class EngineBuilderTest {
     engineBuilder.addPerTryIdleTimeoutSeconds(5678)
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.perTryIdleTimeoutSeconds).isEqualTo(5678)
+    assertThat(engine.envoyConfiguration.perTryIdleTimeoutSeconds).isEqualTo(5678)
   }
 
   @Test
@@ -217,7 +217,7 @@ class EngineBuilderTest {
     engineBuilder.addAppVersion("v1.2.3")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.appVersion).isEqualTo("v1.2.3")
+    assertThat(engine.envoyConfiguration.appVersion).isEqualTo("v1.2.3")
   }
 
   @Test
@@ -227,7 +227,7 @@ class EngineBuilderTest {
     engineBuilder.addAppId("com.envoymobile.android")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.appId).isEqualTo("com.envoymobile.android")
+    assertThat(engine.envoyConfiguration.appId).isEqualTo("com.envoymobile.android")
   }
 
   @Test
@@ -237,7 +237,7 @@ class EngineBuilderTest {
     engineBuilder.addVirtualClusters("[test]")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.virtualClusters).isEqualTo("[test]")
+    assertThat(engine.envoyConfiguration.virtualClusters).isEqualTo("[test]")
   }
 
   @Test
@@ -247,6 +247,6 @@ class EngineBuilderTest {
     engineBuilder.addNativeFilter("name", "config")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.nativeFilterChain.size).isEqualTo(1)
+    assertThat(engine.envoyConfiguration.nativeFilterChain.size).isEqualTo(1)
   }
 }
