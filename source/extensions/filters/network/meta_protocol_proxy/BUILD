@@ -25,10 +25,9 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/meta_protocol_proxy/filters/router:router_lib",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:codec_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -45,8 +44,6 @@ envoy_cc_extension(
         ":proxy_lib",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/network/meta_protocol_proxy/filters/router:config",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -71,7 +68,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -87,8 +83,6 @@ envoy_cc_library(
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:stream_interface",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
     ],
 )

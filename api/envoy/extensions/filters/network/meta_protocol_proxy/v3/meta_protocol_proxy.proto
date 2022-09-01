@@ -26,8 +26,8 @@ message MetaProtocolProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The application protocol built on top of the meta protocol proxy.
-  ApplicationProtocol application_protocol = 2 [(validate.rules).message = {required: true}];
+  // The codec which encodes and decodes the application protocol.
+  config.core.v3.TypedExtensionConfig codec = 2 [(validate.rules).message = {required: true}];
 
   oneof route_specifier {
     option (validate.required) = true;
@@ -41,17 +41,9 @@ message MetaProtocolProxy {
   }
 
   // A list of individual Layer-7 filters that make up the filter chain for requests made to the
-  // meta protocol proxy. Order matters as the filters are processed sequentially as request events
+  // proxy. Order matters as the filters are processed sequentially as request events
   // happen.
-  repeated config.core.v3.TypedExtensionConfig meta_protocol_filters = 5;
-}
-
-message ApplicationProtocol {
-  // The name of the application protocol.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // The codec which encodes and decodes the application protocol.
-  config.core.v3.TypedExtensionConfig codec = 2 [(validate.rules).message = {required: true}];
+  repeated config.core.v3.TypedExtensionConfig filters = 5;
 }
 
 // [#not-implemented-hide:]

@@ -276,7 +276,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButStreamDestroyBeforeResponse)
   EXPECT_NE(upstream_request->conn_data_, nullptr);
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
-  EXPECT_CALL(mock_conn, close(Network::ConnectionCloseType::NoFlush)).Times(1);
+  EXPECT_CALL(mock_conn, close(Network::ConnectionCloseType::NoFlush));
 
   filter_->onDestroy();
   EXPECT_EQ(upstream_request->conn_data_, nullptr);

@@ -15,7 +15,7 @@ namespace MetaProtocolProxy {
 
 class Factory : public Envoy::Extensions::NetworkFilters::Common::FactoryBase<ProxyConfig> {
 public:
-  Factory() : FactoryBase(Filter::name()) {}
+  Factory() : FactoryBase(Filter::name(), true) {}
 
   Envoy::Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,

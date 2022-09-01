@@ -264,7 +264,9 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  std::string configType() override { return "envoy.meta_protocol_proxy.codec.fake.type"; }
+  std::set<std::string> configTypes() override {
+    return {"envoy.meta_protocol_proxy.codec.fake.type"};
+  }
 
   std::string name() const override { return "envoy.meta_protocol_proxy.codec.fake"; }
 };

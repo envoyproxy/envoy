@@ -123,10 +123,10 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
 
   ON_CALL(mock_filter_config_0, name()).WillByDefault(Return("mock_meta_protocol_filter_name_0"));
   ON_CALL(mock_filter_config_1, name()).WillByDefault(Return("mock_meta_protocol_filter_name_1"));
-  ON_CALL(mock_filter_config_0, configType())
-      .WillByDefault(Return("mock_meta_protocol_filter_name_0"));
-  ON_CALL(mock_filter_config_1, configType())
-      .WillByDefault(Return("mock_meta_protocol_filter_name_1"));
+  ON_CALL(mock_filter_config_0, configTypes())
+      .WillByDefault(Return(std::set<std::string>{"mock_meta_protocol_filter_name_0"}));
+  ON_CALL(mock_filter_config_1, configTypes())
+      .WillByDefault(Return(std::set<std::string>{"mock_meta_protocol_filter_name_1"}));
 
   Registry::InjectFactory<NamedFilterConfigFactory> registration_0(mock_filter_config_0);
   Registry::InjectFactory<NamedFilterConfigFactory> registration_1(mock_filter_config_1);

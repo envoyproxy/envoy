@@ -25,14 +25,14 @@ TEST(RouterFactoryTest, RouterFactoryTest) {
   EXPECT_EQ(nullptr, factory.createRouteSpecificFilterConfig(
                          proto_config, factory_context.getServerFactoryContext(),
                          factory_context.messageValidationVisitor()));
-  EXPECT_EQ("envoy.filters.meta_protocol.router", factory.name());
+  EXPECT_EQ("envoy.filters.meta.router", factory.name());
   EXPECT_EQ(true, factory.isTerminalFilter());
 
   auto fn = factory.createFilterFactoryFromProto(proto_config, "test", factory_context);
 
   NiceMock<MockFilterChainFactoryCallbacks> mock_cb;
 
-  EXPECT_CALL(mock_cb, addDecoderFilter(_)).Times(1);
+  EXPECT_CALL(mock_cb, addDecoderFilter(_));
   fn(mock_cb);
 }
 

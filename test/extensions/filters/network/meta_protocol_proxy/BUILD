@@ -62,6 +62,35 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = [
+        "integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.network.meta_protocol_proxy"],
+    deps = [
+        ":fake_codec_lib",
+        "//envoy/event:timer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:thread_annotations",
+        "//source/common/network:socket_option_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/network/meta_protocol_proxy:config",
+        "//source/extensions/filters/network/meta_protocol_proxy:proxy_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//test/common/upstream:utility_lib",
+        "//test/extensions/filters/network/meta_protocol_proxy/mocks:codec_mocks",
+        "//test/extensions/filters/network/meta_protocol_proxy/mocks:filter_mocks",
+        "//test/extensions/filters/network/meta_protocol_proxy/mocks:route_mocks",
+        "//test/integration:base_integration_test_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "match_test",
     srcs = [
         "match_test.cc",

@@ -56,7 +56,7 @@ public:
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                ProtobufMessage::ValidationVisitor&));
   MOCK_METHOD(std::string, name, (), (const));
-  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(std::set<std::string>, configTypes, ());
   MOCK_METHOD(bool, isTerminalFilter, ());
 };
 

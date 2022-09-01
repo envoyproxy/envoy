@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3/router.pb.validate.h"
+
 #include "source/extensions/filters/network/meta_protocol_proxy/filters/router/router.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/interface/config.h"
 
@@ -16,7 +19,8 @@ public:
                                Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<
+        envoy::extensions::filters::network::meta_protocol_proxy::filters::router::v3::Router>();
   }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { return nullptr; }
   RouteSpecificFilterConfigConstSharedPtr
@@ -27,7 +31,7 @@ public:
   }
   bool isTerminalFilter() override { return true; }
 
-  std::string name() const override { return "envoy.filters.meta_protocol.router"; }
+  std::string name() const override { return "envoy.filters.meta.router"; }
 };
 
 } // namespace Router

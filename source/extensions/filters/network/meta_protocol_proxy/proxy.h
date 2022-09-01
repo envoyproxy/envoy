@@ -44,12 +44,10 @@ public:
         route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
 
   FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context)
-      : FilterConfig(
-            config.stat_prefix(),
-            codecFactoryFromProto(config.application_protocol().codec(), context),
-            routeMatcherFromProto(config.route_config(), context),
-            filtersFactoryFromProto(config.meta_protocol_filters(), config.stat_prefix(), context),
-            context) {}
+      : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec(), context),
+                     routeMatcherFromProto(config.route_config(), context),
+                     filtersFactoryFromProto(config.filters(), config.stat_prefix(), context),
+                     context) {}
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const {
     return route_matcher_->routeEntry(request);

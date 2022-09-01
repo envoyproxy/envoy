@@ -93,14 +93,14 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
   const std::string yaml_config = R"EOF(
     cluster: cluster_0
     per_filter_config:
-      envoy.filters.meta_protocol.mock_filter:
+      envoy.filters.meta.mock_filter:
         "@type": type.googleapis.com/google.protobuf.Struct
         value: { "key_0": "value_0" }
   )EOF";
   initialize(yaml_config);
 
-  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"),
-            route_config_map_.at("envoy.filters.meta_protocol.mock_filter").get());
+  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta.mock_filter"),
+            route_config_map_.at("envoy.filters.meta.mock_filter").get());
 };
 
 /**
@@ -121,13 +121,13 @@ TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
   const std::string yaml_config = R"EOF(
     cluster: cluster_0
     per_filter_config:
-      envoy.filters.meta_protocol.mock_filter:
+      envoy.filters.meta.mock_filter:
         "@type": type.googleapis.com/google.protobuf.Struct
         value: { "key_0": "value_0" }
   )EOF";
   initialize(yaml_config);
 
-  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"), nullptr);
+  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta.mock_filter"), nullptr);
 };
 
 /**
@@ -142,13 +142,13 @@ TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
   const std::string yaml_config = R"EOF(
     cluster: cluster_0
     per_filter_config:
-      envoy.filters.meta_protocol.mock_filter:
+      envoy.filters.meta.mock_filter:
         "@type": type.googleapis.com/google.protobuf.Struct
         value: { "key_0": "value_0" }
   )EOF";
   initialize(yaml_config);
 
-  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta_protocol.mock_filter"), nullptr);
+  EXPECT_EQ(route_->perFilterConfig("envoy.filters.meta.mock_filter"), nullptr);
 };
 
 /**
