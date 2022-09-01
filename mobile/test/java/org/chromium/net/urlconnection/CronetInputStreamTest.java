@@ -15,7 +15,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatchers;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -27,7 +26,7 @@ import org.mockito.stubbing.Answer;
 public class CronetInputStreamTest {
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
-  @Mock private CronetHttpURLConnection mMockConnection;
+  private CronetHttpURLConnection mMockConnection;
 
   @Before
   public void setUp() throws Exception {

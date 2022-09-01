@@ -234,8 +234,8 @@ public class CronvoyEngineTest {
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains("http://localhost:" + mockWebServer.getPort() + "/get/flowers",
-                  "http://localhost:" + mockWebServer.getPort() + "/get/chocolates");
+        .contains(mockWebServer.url("/get/flowers").toString(),
+                  mockWebServer.url("/get/chocolates").toString());
   }
 
   @Test
@@ -270,8 +270,8 @@ public class CronvoyEngineTest {
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains("http://localhost:" + mockWebServer.getPort() + "/get/flowers",
-                  "http://localhost:" + mockWebServer.getPort() + "/get/chocolates");
+        .contains(mockWebServer.url("/get/flowers").toString(),
+                  mockWebServer.url("/get/chocolates").toString());
   }
 
   @Test
@@ -311,8 +311,8 @@ public class CronvoyEngineTest {
     assertThat(response.getBodyAsString()).isEqualTo("Everything is awesome");
     assertThat(response.getCronetException()).withFailMessage(response.getErrorMessage()).isNull();
     assertThat(response.getUrlResponseInfo().getUrlChain())
-        .contains("http://localhost:" + mockWebServer.getPort() + "/get/flowers",
-                  "http://localhost:" + mockWebServer.getPort() + "/get/chocolates");
+        .contains(mockWebServer.url("/get/flowers").toString(),
+                  mockWebServer.url("/get/chocolates").toString());
   }
 
   private Response sendRequest(RequestScenario requestScenario) {
