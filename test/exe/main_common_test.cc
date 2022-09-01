@@ -104,6 +104,53 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+// This test verifies that validation can run from MainCommonBase, from a thread
+// other than the test thread. This is a desirable calling sequence in some
+// contexts. To make this work we must declare MainThread in MainCommonBase, in
+// addition to declaring it in MainCommon. There is no harm in double-declaring.
+TEST_P(MainCommonTest, ValidateUsingMainCommonBaseOutsideTestThread) {
+  EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
+  {
+    Event::TestRealTimeSystem real_time_system;
+    DefaultListenerHooks default_listener_hooks;
+    ProdComponentFactory prod_component_factory;
+
+    // This is an arbitrary valid yaml configuration. A smaller configuration
+    // would be nicer for this test, but this is OK.
+    const std::string yaml = R"(
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: "::"
+        port_value: 0
+    filter_chains:
+    - filters:
+      - name: http
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+)";
+
+    static const char* argv[] = {"envoy-static",  "--mode",     "validate",
+                                 "--config-yaml", yaml.c_str(), nullptr};
+    Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommon::hotRestartVersion,
+                               spdlog::level::info);
+    std::unique_ptr<Thread::Thread> thread = Thread::threadFactoryForTest().createThread([&]() {
+      MainCommonBase base(options, real_time_system, default_listener_hooks, prod_component_factory,
+                          std::make_unique<PlatformImpl>(),
+                          std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
+      EXPECT_TRUE(base.run());
+    });
+    thread->join();
+  }
+  EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
+}
+
 TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInitWithVectorArgs) {
   addArg("--disable-hot-restart");
   initOnly();
