@@ -1,15 +1,17 @@
 syntax = "proto3";
 
-package envoy.extensions.xds;
+package envoy.extensions.xds.v3;
 
 import "envoy/config/common/key_value/v3/config.proto";
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.xds";
 option java_outer_classname = "KeyValueStoreXdsDelegateConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/xds";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (.xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#extension: envoy.xds_delegates.kv_store]
 //

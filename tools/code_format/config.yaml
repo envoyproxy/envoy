@@ -165,6 +165,7 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
+    - contrib/xds/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - test/common/grpc/codec_fuzz_test.cc

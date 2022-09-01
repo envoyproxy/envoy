@@ -9,8 +9,8 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "contrib/envoy/extensions/xds/kv_store_xds_delegate_config.pb.h"
-#include "contrib/envoy/extensions/xds/kv_store_xds_delegate_config.pb.validate.h"
+#include "contrib/envoy/extensions/xds/v3/kv_store_xds_delegate_config.pb.h"
+#include "contrib/envoy/extensions/xds/v3/kv_store_xds_delegate_config.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +18,7 @@ namespace Config {
 namespace {
 
 using ::Envoy::Config::XdsSourceId;
-using ::envoy::extensions::xds::KeyValueStoreXdsDelegateConfig;
+using ::envoy::extensions::xds::v3::KeyValueStoreXdsDelegateConfig;
 
 // The supplied KeyValueStore may be shared with other parts of the application (e.g.
 // SharedPreferences on Android). Therefore, we introduce a prefix to the key to create a distinct

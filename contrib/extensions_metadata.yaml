@@ -92,4 +92,4 @@ envoy.xds_delegates.kv_store:
   categories:
   - envoy.xds_delegates
   security_posture: data_plane_agnostic
-  status: alpha
+  status: wip
