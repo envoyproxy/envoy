@@ -35,7 +35,13 @@ void RateLimitClientImpl::rateLimit() {
 
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
   // TODO(tyxia) This could be wrapped into a utility function.
-  stream_.sendMessage(std::move(reports), true);
+  // stream_.sendMessage(std::move(reports), true);
+  send(std::move(reports), true);
+}
+
+void RateLimitClientImpl::send(
+    envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream) {
+  stream_.sendMessage(std::move(reports), end_stream);
 }
 
 bool RateLimitClientImpl::startStream() {

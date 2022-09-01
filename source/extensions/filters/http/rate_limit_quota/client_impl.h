@@ -43,23 +43,26 @@ public:
   // TODO(tyxia) Remove this function we can just create the async_client in place inside of
   // this class, i.e., no need to pass/move around.
   RateLimitClientImpl(GrpcAsyncClientPtr client) { client_ = std::move(client); }
+  // RateLimitClientImpl(Server::Configuration::FactoryContext& context,
+  //                     const envoy::config::core::v3::GrpcService& grpc_service)
+  //     : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  //           grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)) {
+
+  //   // TODO(tyxia) Think about how to efficiently open grpc stream
+  //   // How about starting the stream on the first request.
+  //   // The difference is when to create the stream object.
+  //   // startStream();
+  // }
+
   RateLimitClientImpl(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)) {
 
-    // // TODO(tyxia) Think about how to efficiently open grpc stream
-    // // How about starting the stream on the first request.
-    // // The difference is when to create the stream object.
-    // Http::AsyncClient::StreamOptions options;
-    // stream_ = aync_client_.start(
-    //     *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-    //         "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-    //     *this, options);
-    // if (stream_ == nullptr) {
-    //   ENVOY_LOG(warn, "Unable to establish new stream");
-    //   // TODO(tyxia) Error handling
-    // }
+    // TODO(tyxia) Think about how to efficiently open grpc stream
+    // How about starting the stream on the first request.
+    // The difference is when to create the stream object.
+    // startStream();
   }
 
   // TODO(tyxia) I don't see why callbacks need to be implemented implemented as callback
@@ -79,10 +82,10 @@ public:
   void rateLimit() override;
 
   // TODO(tyxia) Do we need this to be abstract class in RateLimit
-  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports& reports);
-  // envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports buildBucketIds()
   bool startStream();
   void closeStream();
+  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports& reports);
+  void send(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream);
 
 private:
   // TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it

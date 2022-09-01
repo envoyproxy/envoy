@@ -157,8 +157,7 @@ void RateLimitQuotaFilter::createMatcherTree() {
   matcher_ = factory.create(config_->bucket_matchers())();
 }
 
-// TODO(tyxia) This caused the error above but maybe we don't even need this at all along with match
-// action etc
+// Perform the request matching.
 BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   BucketId id;
   std::cout << "Perform request matching!!!" << std::endl;

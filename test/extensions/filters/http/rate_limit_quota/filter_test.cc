@@ -93,9 +93,9 @@ constexpr char MatcherConfig[] = R"EOF(
 //                       string_value: "prod"
 //   )EOF";
 
-class RateLimitQuotaFilterTest : public testing::Test {
+class FilterTest : public testing::Test {
 public:
-  RateLimitQuotaFilterTest() {
+  FilterTest() {
     // Construct the filter config with matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
     TestUtility::loadFromYaml(MatcherConfig, matcher);
@@ -114,7 +114,7 @@ public:
   FilterConfig config_;
 };
 
-TEST_F(RateLimitQuotaFilterTest, BucketSettings) {
+TEST_F(FilterTest, BucketSettings) {
   // Add {"environment", "staging"} in the request header for exact value_match in the predicate.
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"},         {":path", "/"},
                                          {":scheme", "http"},        {":authority", "host"},
