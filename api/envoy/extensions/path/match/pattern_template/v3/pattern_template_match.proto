@@ -12,6 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/pat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Pattern Template Match Config]
+// [#extension: envoy.path.match.pattern_template.pattern_template_matcher]
 
 // If specified, the route is a template match rule meaning that the
 // ``:path`` header (without the query string) must match the given
@@ -38,7 +39,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
 //
 // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
-
 message PatternTemplateMatchConfig {
   string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }

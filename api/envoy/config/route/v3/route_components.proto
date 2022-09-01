@@ -572,6 +572,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
+    // [#extension-category: envoy.path.match]
     core.v3.TypedExtensionConfig path_match_policy = 15;
   }
 
@@ -1084,6 +1085,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
+  // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
   oneof host_rewrite_specifier {
