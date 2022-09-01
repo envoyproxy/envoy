@@ -53,7 +53,7 @@ public:
   std::string failure_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;
-  uint64_t num_streams_;
+  uint64_t num_streams_ = 0;
   absl::optional<Http::Protocol> upstream_protocol_;
 };
 

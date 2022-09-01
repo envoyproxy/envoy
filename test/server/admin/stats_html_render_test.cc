@@ -14,7 +14,7 @@ namespace Server {
 
 class StatsHtmlRenderTest : public StatsRenderTestBase {
 protected:
-  static Admin::RequestPtr handlerCallback(absl::string_view, AdminStream&) {
+  static Admin::RequestPtr handlerCallback(AdminStream&) {
     return Admin::makeStaticTextRequest("", Http::Code::OK);
   }
 

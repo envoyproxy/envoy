@@ -53,6 +53,7 @@ public:
         response_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
+    quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
     quic::test::QuicConnectionPeer::SetAddressValidated(&quic_connection_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
@@ -690,6 +691,41 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   // shouldn't be called because the connection is closed.
   quic_stream_->encodeData(buffer, false);
   EXPECT_EQ(quic_session_.bytesToSend(), 0u);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncodingEndStream) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_CALL(quic_connection_,
+              SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed in WriteHeaders"));
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .Times(testing::AtLeast(1u))
+      .WillRepeatedly(
+          Invoke([this](quic::QuicStreamId, size_t data_size, quic::QuicStreamOffset,
+                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+            if (data_size < 10) {
+              // Ietf QUIC sends a small data frame header before sending the data frame payload.
+              return quic::QuicConsumedData{data_size, false};
+            }
+            // Mimic write failure while writing data frame payload.
+            quic_connection_.CloseConnection(
+                quic::QUIC_INTERNAL_ERROR, "Closed in WriteHeaders",
+                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+            // This will cause the payload to be buffered.
+            return quic::QuicConsumedData{0, false};
+          }));
+
+  // Send a response which causes connection to close.
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+
+  std::string response(16 * 1024 + 1, 'a');
+  Buffer::OwnedImpl buffer(response);
+  // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
+  // shouldn't be called because the connection is closed.
+  quic_stream_->encodeData(buffer, true);
+  EXPECT_EQ(quic_session_.bytesToSend(), 0u);
+  EXPECT_TRUE(quic_stream_->write_side_closed() && quic_stream_->read_side_closed());
+  quic_session_.CleanUpClosedStreams();
 }
 
 // Tests that after end_stream is encoded, closing connection shouldn't call

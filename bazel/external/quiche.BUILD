@@ -3282,12 +3282,33 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_core_io_event_loop",
+    hdrs = select({
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": ["quiche/quic/core/io/quic_event_loop.h"],
+    }),
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_alarm_factory_lib",
+        ":quic_core_clock_lib",
+        ":quic_core_udp_socket_lib",
+        "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_io_socket_lib",
     srcs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
     }),
-    hdrs = ["quiche/quic/core/io/socket.h"],
+    hdrs = [
+        "quiche/quic/core/io/socket.h",
+        "quiche/quic/core/io/socket_factory.h",
+        "quiche/quic/core/io/stream_client_socket.h",
+    ],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -3304,6 +3325,40 @@ envoy_cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_io_event_loop_socket_factory_lib",
+    srcs = select({
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "quiche/quic/core/io/event_loop_socket_factory.cc",
+            "quiche/quic/core/io/event_loop_tcp_client_socket.cc",
+        ],
+    }),
+    hdrs = select({
+        "@envoy//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "quiche/quic/core/io/event_loop_socket_factory.h",
+            "quiche/quic/core/io/event_loop_tcp_client_socket.h",
+        ],
+    }),
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quic_core_io_event_loop",
+        ":quic_core_io_socket_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_socket_address",
+        ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_platform",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 

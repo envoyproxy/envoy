@@ -77,8 +77,10 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     state_ = State::Complete;
   }
 
+  // Stop the iteration for headers as well as data and trailers for the current filter and the
+  // filters following.
   return state_ == State::Complete ? FilterHeadersStatus::Continue
-                                   : Http::FilterHeadersStatus::StopIteration;
+                                   : Http::FilterHeadersStatus::StopAllIterationAndWatermark;
 }
 
 void GcpAuthnFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
