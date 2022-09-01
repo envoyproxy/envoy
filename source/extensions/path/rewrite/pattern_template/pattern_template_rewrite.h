@@ -43,6 +43,14 @@ public:
   // Router::PathRewriter
   absl::string_view pattern() const override { return rewrite_pattern_; }
 
+  /**
+ * Concatenates literals and extracts variable values to form the final rewritten path.
+ * For example:
+ * rewrite_pattern: [capture_index=2, literal="cat"]
+ * path: "/bar/var"
+ * capture_regex: "(1)/(2)"
+ * Rewrite would result in rewrite of "/var/cat".
+ */
   absl::StatusOr<std::string> rewritePath(absl::string_view pattern,
                                           absl::string_view matched_path) const override;
 

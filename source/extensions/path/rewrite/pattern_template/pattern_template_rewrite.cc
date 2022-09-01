@@ -7,7 +7,6 @@
 
 #include "source/common/http/path_utility.h"
 #include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-#include "source/extensions/path/uri_template_lib/proto/rewrite_segments.pb.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -54,14 +53,14 @@ PatternTemplateRewriter::rewritePath(absl::string_view pattern,
   }
   std::string regex_pattern_str = *std::move(regex_pattern);
 
-  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite_pattern =
+  absl::StatusOr<RewriteSegments> rewrite_pattern =
       parseRewritePattern(rewrite_pattern_, regex_pattern_str);
 
   if (!rewrite_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse path rewrite pattern");
   }
 
-  const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern_proto =
+  const RewriteSegments& rewrite_pattern_segments =
       *std::move(rewrite_pattern);
   RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
@@ -77,15 +76,16 @@ PatternTemplateRewriter::rewritePath(absl::string_view pattern,
   }
 
   std::string new_path;
-  for (const envoy::extensions::uri_template::RewriteSegments::RewriteSegment& segment :
-       rewrite_pattern_proto.segments()) {
-    if (segment.has_literal()) {
-      absl::StrAppend(&new_path, segment.literal());
-    } else if (segment.has_capture_index()) {
-      if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
+  for (const RewriteSegment& segment : rewrite_pattern_segments) {
+    auto* literal = absl::get_if<std::string>(&segment);
+    auto* capture_index = absl::get_if<int>(&segment);
+    if (literal != nullptr) {
+      absl::StrAppend(&new_path, *literal);
+    } else if (capture_index != nullptr) {
+      if (*capture_index < 1 || *capture_index >= capture_num) {
         return absl::InvalidArgumentError("Invalid variable index");
       }
-      absl::StrAppend(&new_path, absl::string_view(captures[segment.capture_index()].as_string()));
+      absl::StrAppend(&new_path, absl::string_view(captures[*capture_index].as_string()));
     }
   }
 
