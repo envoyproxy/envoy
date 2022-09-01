@@ -85,7 +85,7 @@ message ClusterStatus {
   // Observability name of the cluster.
   string observability_name = 7;
 
-  // eds_service_name from EDS config of the cluster.
+  // The :ref:`EDS service name <envoy_v3_api_field_config.cluster.v3.Cluster.EdsClusterConfig.service_name>` if the cluster is an EDS cluster.
   string eds_service_name = 8;
 }
 
