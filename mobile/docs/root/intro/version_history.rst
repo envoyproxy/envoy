@@ -8,7 +8,6 @@ Breaking changes:
 
 - api: replace the ``drainConnections()`` method with a broader ``resetConnectivityState()``. (:issue:`#2225 <2225>`).
 - api: disallow setting 'host' header directly (:issue:`#2275 <2275>`)
-- api: add experimental option to force all connections to use IPv6 (:issue: `#2379 <2379>`, :issue: `#2396 <2396>`)
 - android: respect Android's NetworkSecurityPolicy isCleartextTrafficPermitted APIs.
 - net: enable happy eyeballs by default (:issue:`#2272 <2272>`)
 - iOS: remove support for installing via CocoaPods, which had not worked since 2020 (:issue:`#2215 <2215>`)
@@ -47,6 +46,8 @@ Features:
 - api: improved C++ APIs compatibility with Java / Kotlin / Swift (:issue `#2362 <2362>`)
 - api: add option to use the a ``getaddrinfo``-based system DNS resolver instead of c-ares (:issue: `#2419 <2419>`)
 - iOS: add ``KeyValueStore`` protocol conformance to ``UserDefaults`` (:issue: `#2452 <2452>`)
+- iOS: add experimental option to force all connections to use IPv6. (:issue: `#2396 <2396>`)
+- android: force the use of IPv6 addresses for all connections. (:issue: `#2510 <2510>`)
 
 0.4.6 (April 26, 2022)
 ========================
