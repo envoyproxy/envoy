@@ -33,6 +33,9 @@ In addition, the following conventions should be followed:
 * Use a `[#not-implemented-hide:]` `protodoc` annotation in comments for fields that lack Envoy
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
+  
+* For extensions that are a work-in-progress or the documentation is hidden, set its `status`
+  field to `wip` in `extensions_metadata.yaml`.
 
 * Use a `(xds.annotations.v3.file_status).work_in_progress`,
   `(xds.annotations.v3.message_status).work_in_progress`, or
