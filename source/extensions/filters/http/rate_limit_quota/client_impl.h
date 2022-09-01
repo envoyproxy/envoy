@@ -10,6 +10,8 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -42,28 +44,27 @@ public:
   // go/cstyle#Rvalue_references
   // TODO(tyxia) Remove this function we can just create the async_client in place inside of
   // this class, i.e., no need to pass/move around.
-  RateLimitClientImpl(GrpcAsyncClientPtr client) { client_ = std::move(client); }
+  //RateLimitClientImpl(GrpcAsyncClientPtr client) { client_ = std::move(client); }
+  RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
+                      Server::Configuration::FactoryContext& context)
+      : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+            grpc_service, context.scope(), true)) {
+    // TODO(tyxia) Think about how to efficiently open grpc stream
+    // How about starting the stream on the first request.
+    // The difference is when to create the stream object.
+    // startStream();
+  }
+
   // RateLimitClientImpl(Server::Configuration::FactoryContext& context,
   //                     const envoy::config::core::v3::GrpcService& grpc_service)
-  //     : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-  //           grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)) {
+  //    aync_client_ = (context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+  //           grpc_service, context.scope(), true)) {
 
   //   // TODO(tyxia) Think about how to efficiently open grpc stream
   //   // How about starting the stream on the first request.
   //   // The difference is when to create the stream object.
   //   // startStream();
   // }
-
-  RateLimitClientImpl(Server::Configuration::FactoryContext& context,
-                      const envoy::config::core::v3::GrpcService& grpc_service)
-      : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)) {
-
-    // TODO(tyxia) Think about how to efficiently open grpc stream
-    // How about starting the stream on the first request.
-    // The difference is when to create the stream object.
-    // startStream();
-  }
 
   // TODO(tyxia) I don't see why callbacks need to be implemented implemented as callback
   // code here
@@ -82,7 +83,7 @@ public:
   void rateLimit() override;
 
   // TODO(tyxia) Do we need this to be abstract class in RateLimit
-  bool startStream();
+  absl::Status startStream();
   void closeStream();
   void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports& reports);
   void send(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream);
@@ -90,7 +91,7 @@ public:
 private:
   // TODO(tyxia) Use bare object or unique_ptr so far bare object seems works fine as it
   // should not require the ownership transfer.
-  GrpcAsyncClientPtr client_;
+  //GrpcAsyncClientPtr aync_client_;
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
   // TODO(tyxia) Do we need this flag??
@@ -116,7 +117,7 @@ createRateLimitClient(Server::Configuration::FactoryContext& context,
   //         context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
   //             grpc_service, context.scope(), true, Grpc::CacheOption::CacheWhenRuntimeEnabled)));
 
-  return std::make_unique<RateLimitClientImpl>(context, grpc_service);
+  return std::make_unique<RateLimitClientImpl>(grpc_service, context);
 }
 
 } // namespace RateLimitQuota

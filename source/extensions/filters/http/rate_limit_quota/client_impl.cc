@@ -44,7 +44,7 @@ void RateLimitClientImpl::send(
   stream_.sendMessage(std::move(reports), end_stream);
 }
 
-bool RateLimitClientImpl::startStream() {
+absl::Status RateLimitClientImpl::startStream() {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     Http::AsyncClient::StreamOptions options;
@@ -54,13 +54,14 @@ bool RateLimitClientImpl::startStream() {
         *this, options);
 
     if (stream_ == nullptr) {
-      ENVOY_LOG(error, "Unable to establish the new stream");
-      return false;
+      std::string error_string = "Unable to establish the new stream";
+      ENVOY_LOG(error, error_string);
+      return absl::InternalError(error_string);
       // TODO(tyxia) Error handling
       // re-try or other kinds of error handling actions
     }
   }
-  return true;
+  return absl::OkStatus();
 }
 
 void RateLimitClientImpl::closeStream() {

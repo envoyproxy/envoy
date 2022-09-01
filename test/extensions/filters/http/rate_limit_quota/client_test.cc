@@ -6,6 +6,7 @@
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,47 +26,84 @@ class RateLimitStreamTest : public testing::Test {
 public:
   void SetUp() override {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
-    // TODO(tyxia) Need to sync to head
-    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
-        .WillOnce(Invoke(this, &RateLimitStreamTest::doCreateAsyncClient));
+    // Set the expected behavior for async_client_manager in mock context.
+    // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
+    // directly because the rate limit client object below requires context argument.
+    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
+        .WillOnce(Invoke(this, &RateLimitStreamTest::mockCreateAsyncClient));
 
-    //client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, stats_store_);
     client_ = createRateLimitClient(context_, grpc_service_);
   }
 
-  Grpc::RawAsyncClientSharedPtr doCreateAsyncClient(Unused, Unused, Unused, Unused) {
+  Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
     auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client, startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
                                         "StreamRateLimitQuotas", _, _))
-        .WillOnce(Invoke(this, &RateLimitStreamTest::doStartRaw));
+        .WillOnce(Invoke(this, &RateLimitStreamTest::mockStartRaw));
+
     return async_client;
   }
 
-  Grpc::RawAsyncStream* doStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
-                                   const Http::AsyncClient::StreamOptions&) {
+  Grpc::RawAsyncStream* mockStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
+                                     const Http::AsyncClient::StreamOptions&) {
     stream_callbacks_ = &callbacks;
     return &stream_;
   }
+
+  // void onGrpcClose() override { grpc_closed_ = true; }
+  // void onGrpcError(Grpc::Status::GrpcStatus status) override { grpc_status_ = status; }
 
   ~RateLimitStreamTest() override = default;
 
   envoy::config::core::v3::GrpcService grpc_service_;
   NiceMock<MockFactoryContext> context_;
-  Grpc::MockAsyncClientManager client_manager_;
   Grpc::MockAsyncStream stream_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
-  // testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-
   RateLimitClientPtr client_;
+
+  Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
+  bool grpc_closed_ = false;
 };
 
-TEST_F(RateLimitStreamTest, OpenCloseStream) {
-  // client_->startStream();
-  // auto stream = client_->startStream();
-  // EXPECT_CALL(stream_, closeStream());
-  // EXPECT_CALL(stream_, resetStream());
-  // stream->close();
+TEST_F(RateLimitStreamTest, OpenAndCloseStream) {
+  EXPECT_OK(client_->startStream());
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
+  client_->closeStream();
 }
+
+TEST_F(RateLimitStreamTest, SendRequest) {
+  EXPECT_OK(client_->startStream());
+  // Send empty report and ensure that we get it.
+  EXPECT_CALL(stream_, sendMessageRaw_(_, /*end_stream=*/false));
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports report;
+  client_->send(std::move(report), /*end_stream=*/false);
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
+  client_->closeStream();
+}
+
+TEST_F(RateLimitStreamTest, CloseOnRemote) {
+  EXPECT_OK(client_->startStream());
+  // Send empty report and ensure that we get it.
+  EXPECT_CALL(stream_, sendMessageRaw_(_, /*end_stream=*/true));
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports report;
+  client_->send(std::move(report), /*end_stream=*/true);
+  // EXPECT_CALL(stream_, closeStream()).Times(0);
+  // EXPECT_CALL(stream_, resetStream()).Times(0);
+  // client_->closeStream();
+}
+
+// TEST_F(RateLimitStreamTest, StreamClosed) {
+//   EXPECT_OK(client_->startStream());
+//   ASSERT_NE(stream_callbacks_, nullptr);
+//   EXPECT_FALSE(grpc_closed_);
+//   EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
+//   stream_callbacks_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
+//   EXPECT_TRUE(grpc_closed_);
+//   EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
+//   client_->closeStream();
+// }
 
 } // namespace
 } // namespace RateLimitQuota
