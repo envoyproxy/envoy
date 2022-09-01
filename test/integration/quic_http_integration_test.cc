@@ -1379,5 +1379,38 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
   codec_client_2->close();
 }
 
+TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
+  enable_quic_early_data_ = true;
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client0 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client0);
+  // Make the next connection use the same connection ID.
+  designated_connection_ids_.push_back(quic_connection_->connection_id());
+  codec_client0->close();
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForGaugeEq("listener.127.0.0.1_0.downstream_cx_active", 0u);
+  } else {
+    test_server_->waitForGaugeEq("listener.[__1]_0.downstream_cx_active", 0u);
+  }
+
+  // This new connection would be reset.
+  auto codec_client1 =
+      makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client1->disconnected());
+
+  quic::QuicErrorCode error =
+      static_cast<EnvoyQuicClientSession*>(codec_client1->connection())->error();
+  EXPECT_TRUE(error == quic::QUIC_NETWORK_IDLE_TIMEOUT || error == quic::QUIC_HANDSHAKE_TIMEOUT);
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterGe(
+        "listener.127.0.0.1_0.quic.dispatcher.stateless_reset_packets_sent", 1u);
+  } else {
+    test_server_->waitForCounterGe("listener.[__1]_0.quic.dispatcher.stateless_reset_packets_sent",
+                                   1u);
+  }
+}
+
 } // namespace Quic
 } // namespace Envoy
