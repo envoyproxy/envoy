@@ -60,8 +60,7 @@ PatternTemplateRewriter::rewritePath(absl::string_view pattern,
     return absl::InvalidArgumentError("Unable to parse path rewrite pattern");
   }
 
-  const RewriteSegments& rewrite_pattern_segments =
-      *std::move(rewrite_pattern);
+  const RewriteSegments& rewrite_pattern_segments = *std::move(rewrite_pattern);
   RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
