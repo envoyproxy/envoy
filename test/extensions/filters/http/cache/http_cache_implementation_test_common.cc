@@ -180,12 +180,19 @@ std::string HttpCacheImplementationTest::getBody(LookupContext& context, uint64_
 }
 
 Http::TestResponseTrailerMapImpl HttpCacheImplementationTest::getTrailers(LookupContext& context) {
-  Http::TestResponseTrailerMapImpl trailers;
-  context.getTrailers([&trailers](Http::ResponseTrailerMapPtr&& data) {
+  auto trailers_promise =
+      std::make_shared<std::promise<std::shared_ptr<Http::ResponseTrailerMap>>>();
+  context.getTrailers([trailers_promise](Http::ResponseTrailerMapPtr&& data) {
     if (data) {
-      trailers = *data;
+      trailers_promise->set_value(std::move(data));
     }
   });
+  auto future = trailers_promise->get_future();
+  EXPECT_EQ(std::future_status::ready, future.wait_for(std::chrono::seconds(5)));
+  Http::TestResponseTrailerMapImpl trailers;
+  if (std::future_status::ready == future.wait_for(std::chrono::seconds(5))) {
+    trailers = *future.get();
+  }
   return trailers;
 }
 
