@@ -34,7 +34,6 @@ public:
     protocol_ = Envoy::Http::Protocol::Http10;
     buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
-    request_header_matchers_ = testTmp();
   };
 
   void expectBasicHttp() {
@@ -102,9 +101,11 @@ public:
     return buffer;
   }
 
-  MatcherSharedPtr testTmp() {
+  MatcherSharedPtr createRequestHeaderMatchers() {
     envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_autz_proto_;
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("foo");
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("hello");
+    ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("duplicate");
     return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers());
   }
 
@@ -119,7 +120,6 @@ public:
   Buffer::InstancePtr buffer_;
   const std::string cert_data_{"cert-data"};
   const absl::string_view requested_server_name_{"server.name"};
-  MatcherSharedPtr request_header_matchers_;
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -193,7 +193,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 }
 
 // Verify that check request merges the duplicate headers.
-TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
+TEST_F(CheckRequestUtilsTest, BasicHttpWithLegacyAllowlistedHeaders) {
   const uint64_t size = 0;
   envoy::service::auth::v3::CheckRequest request_;
 
@@ -240,7 +240,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithAllowlistedHeaders) {
       &callbacks_, request_headers, Protobuf::Map<std::string, std::string>(),
       envoy::config::core::v3::Metadata(), request_, size,
       /*pack_as_bytes=*/false, /*include_peer_certificate=*/false,
-      Protobuf::Map<std::string, std::string>(), request_header_matchers_);
+      Protobuf::Map<std::string, std::string>(), createRequestHeaderMatchers());
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
   EXPECT_EQ("one,two", request_.attributes().request().http().headers().at("duplicate"));

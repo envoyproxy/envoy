@@ -101,20 +101,6 @@ struct SuccessResponse {
 
 } // namespace
 
-// Matchers
-HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
-    : matchers_(std::move(list)) {}
-
-bool HeaderKeyMatcher::matches(absl::string_view key) const {
-  return std::any_of(matchers_.begin(), matchers_.end(),
-                     [&key](auto& matcher) { return matcher->match(key); });
-}
-
-NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
-    : matcher_(std::move(list)) {}
-
-bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
-
 // Config
 ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                            uint32_t timeout, absl::string_view path_prefix)

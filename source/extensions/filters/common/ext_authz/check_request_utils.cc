@@ -30,6 +30,20 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// Matchers
+HeaderKeyMatcher::HeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
+    : matchers_(std::move(list)) {}
+
+bool HeaderKeyMatcher::matches(absl::string_view key) const {
+  return std::any_of(matchers_.begin(), matchers_.end(),
+                     [&key](auto& matcher) { return matcher->match(key); });
+}
+
+NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::StringMatcherPtr>&& list)
+    : matcher_(std::move(list)) {}
+
+bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
+
 void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                            const Network::Connection& connection,
                                            const std::string& service, const bool local,
