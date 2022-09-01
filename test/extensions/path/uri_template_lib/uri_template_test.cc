@@ -151,7 +151,6 @@ TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
   absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite =
       parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
-  // EXPECT_THAT(rewrite.value(), testing::EqualsProto(expected_proto()));
 }
 
 class ParseRewriteFailure : public testing::TestWithParam<std::string> {};

@@ -69,7 +69,7 @@ absl::Status isValidMatchPattern(absl::string_view match_pattern);
 /**
  * Concatenates literals and extracts variable values to form the final rewritten path.
  * For example:
- * rewrite_pattern: [var_index=2, literal="cat"]
+ * rewrite_pattern: [capture_index=2, literal="cat"]
  * path: "/bar/var"
  * capture_regex: "(1)/(2)"
  * Rewrite would result in rewrite of "/var/cat".

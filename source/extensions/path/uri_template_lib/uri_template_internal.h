@@ -81,10 +81,10 @@ bool isValidRewriteLiteral(absl::string_view literal);
 bool isValidVariableName(absl::string_view variable);
 
 /**
- * Used by the following Parse{Literal.Operator,Variable} functions
+ * Used by the following Parse{Literal,Operator,Variable} functions
  * in the return value. The functions would take the given pattern,
- * parse what it can into |parsed_value| and return the unparse
- *  portion of the pattern in |unparsed_pattern|.
+ * parse what it can into |parsed_value| and return the unparsed
+ * portion of the pattern in |unparsed_pattern|.
  */
 template <typename T> struct ParsedResult {
   ParsedResult(T val, absl::string_view pattern) : parsed_value_(val), unparsed_pattern_(pattern) {}
