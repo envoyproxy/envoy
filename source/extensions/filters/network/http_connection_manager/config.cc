@@ -137,9 +137,11 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
 #ifdef ENVOY_ENABLE_UHV
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
   if (!config.has_typed_header_validation_config()) {
+    // If header validator is not configured ensure that the defaults match Envoy's original
+    // behavior.
     ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
         uhv_config;
-    // By default legacy config had path normalization disabled
+    // By default legacy config had path normalization and merge slashes disabled.
     uhv_config.mutable_uri_path_normalization_options()->set_skip_path_normalization(
         !config.has_normalize_path() || !config.normalize_path().value());
     uhv_config.mutable_uri_path_normalization_options()->set_skip_merging_slashes(

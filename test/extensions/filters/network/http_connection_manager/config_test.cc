@@ -2598,8 +2598,8 @@ public:
   }
 };
 
-// Override the default config factory for the proto that is expected to be created when
-// header validator config was not specified.
+// Override the default config factory such that the test can validate the UHV config proto that
+// HCM factory synthesized.
 class DefaultHeaderValidatorFactoryConfigOverride : public Http::HeaderValidatorFactoryConfig {
 public:
   DefaultHeaderValidatorFactoryConfigOverride(
