@@ -57,7 +57,7 @@ class MainActivity : Activity() {
       .addPlatformFilter(::AsyncDemoFilter)
       .h2ExtendKeepaliveTimeout(true)
       .enableInterfaceBinding(true)
-      .enableDNSUseSystemResolver(true)
+      .enableDNSUseSystemResolver(false)
       .enableSocketTagging(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })

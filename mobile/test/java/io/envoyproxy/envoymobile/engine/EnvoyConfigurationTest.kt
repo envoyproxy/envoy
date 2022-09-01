@@ -59,7 +59,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: String = "[hostname]",
     dnsFallbackNameservers: List<String> = emptyList(),
     enableDnsFilterUnroutableFamilies: Boolean = true,
-    dnsUseSystemResolver: Boolean = false,
+    dnsUseSystemResolver: Boolean = true,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = false,
     enableGzip: Boolean = true,
@@ -140,8 +140,8 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses false")
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
-    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[],\"use_resolvers_as_fallback\": false, \"filter_unroutable_families\": true}")
+    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.getaddrinfo")
+    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
 
     // Interface Binding
@@ -197,6 +197,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration(
       dnsFallbackNameservers = listOf("8.8.8.8"),
       enableDnsFilterUnroutableFamilies = false,
+      dnsUseSystemResolver = false,
       enableDrainPostDnsRefresh = true,
       enableHappyEyeballs = true,
       enableHttp3 = true,
@@ -233,17 +234,17 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `configuration resolves with system DNS resolver`() {
+  fun `configuration resolves with c ares DNS resolver`() {
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      dnsUseSystemResolver = true
+      dnsUseSystemResolver = false
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
       TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
     )
 
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}")
-    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.getaddrinfo")
+    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
+    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[],\"use_resolvers_as_fallback\": false, \"filter_unroutable_families\": true}")
   }
 
   @Test
@@ -289,7 +290,8 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving multiple dns fallback nameservers`() {
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      dnsFallbackNameservers = listOf("8.8.8.8", "1.1.1.1")
+      dnsFallbackNameservers = listOf("8.8.8.8", "1.1.1.1"),
+      dnsUseSystemResolver = false
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
