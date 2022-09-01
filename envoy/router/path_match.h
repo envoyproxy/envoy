@@ -22,8 +22,8 @@ public:
   /**
    * Determines if the current path matches the pattern.
    *
-   * @param url current url of route
-   * @return true if route url matches the predicate pattern.
+   * @param path current path of the matchable route
+   * @return true if path matches the pattern.
    */
   virtual bool match(absl::string_view path) const PURE;
 
