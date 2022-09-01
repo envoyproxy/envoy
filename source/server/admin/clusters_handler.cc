@@ -115,7 +115,7 @@ void ClustersHandler::writeClustersAsJson(Buffer::Instance& response) {
     envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
     cluster_status.set_observability_name(cluster_info->observabilityName());
-    auto eds_service_name = cluster_info->edsServiceName();
+    const auto& eds_service_name = cluster_info->edsServiceName();
     if (eds_service_name.has_value()) {
       cluster_status.set_eds_service_name(*eds_service_name);
     }
@@ -216,7 +216,7 @@ void ClustersHandler::writeClustersAsText(Buffer::Instance& response) {
 
     response.add(
         fmt::format("{}::added_via_api::{}\n", cluster_name, cluster.info()->addedViaApi()));
-    auto eds_service_name = cluster.info()->edsServiceName();
+    const auto& eds_service_name = cluster.info()->edsServiceName();
     if (eds_service_name.has_value()) {
       response.add(fmt::format("{}::eds_service_name::{}\n", cluster_name, *eds_service_name));
     }
