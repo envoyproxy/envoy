@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.local_ratelimit.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
-import "envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto";
 import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/token_bucket.proto";
 
