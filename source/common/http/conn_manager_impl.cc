@@ -867,7 +867,7 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
-bool ConnectionManagerImpl::ActiveStream::validateHeaders(bool end_stream) {
+bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
     auto validation_result = header_validator_->validateRequestHeaderMap(*request_headers_);
     if (!validation_result.ok()) {
@@ -887,12 +887,11 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders(bool end_stream) {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
-      // We have to make sure that the stream is ready to be closed.
-      maybeEndDecode(end_stream);
       sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
       return false;
     }
   }
+
   return true;
 }
 
@@ -932,7 +931,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // them as early as possible.
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
-  if (!validateHeaders(end_stream)) {
+
+  // We end the decode here to mark that the downstream stream is complete.
+  maybeEndDecode(end_stream);
+
+  if (!validateHeaders()) {
     ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
     return;
   }
@@ -949,9 +952,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   } else {
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
   }
-
-  // We end the decode here to mark that the downstream stream is complete.
-  maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.random_generator_.bernoulli(
