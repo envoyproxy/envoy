@@ -202,8 +202,10 @@ public class BidirectionalStreamTest {
   private void runBuilderCheckJavaImpl() {
     try {
       TestBidirectionalStreamCallback callback = new TestBidirectionalStreamCallback();
-      mTestRule.createJavaEngineBuilder().build().newBidirectionalStreamBuilder(
-          Http2TestServer.getServerUrl(), callback, callback.getExecutor());
+      CronetTestRule.createJavaEngineBuilder(CronetTestRule.getContext())
+          .build()
+          .newBidirectionalStreamBuilder(Http2TestServer.getServerUrl(), callback,
+                                         callback.getExecutor());
       fail("JavaCronetEngine doesn't support BidirectionalStream."
            + " Expected UnsupportedOperationException");
     } catch (UnsupportedOperationException e) {

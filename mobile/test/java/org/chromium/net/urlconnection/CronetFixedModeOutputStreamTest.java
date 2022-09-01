@@ -424,24 +424,15 @@ public class CronetFixedModeOutputStreamTest {
   private static class CauseMatcher extends TypeSafeMatcher<Throwable> {
     private final Class<? extends Throwable> mType;
     private final String mExpectedMessage;
-    private final Class<? extends Throwable> mInnerCauseType;
-    private final String mInnerCauseExpectedMessage;
 
-    public CauseMatcher(Class<? extends Throwable> type, String expectedMessage,
-                        Class<? extends Throwable> innerCauseType,
-                        String innerCauseExpectedMessage) {
+    public CauseMatcher(Class<? extends Throwable> type, String expectedMessage) {
       this.mType = type;
       this.mExpectedMessage = expectedMessage;
-      this.mInnerCauseType = innerCauseType;
-      this.mInnerCauseExpectedMessage = innerCauseExpectedMessage;
     }
 
     @Override
     protected boolean matchesSafely(Throwable item) {
-      return item.getClass().isAssignableFrom(mType) &&
-          item.getMessage().equals(mExpectedMessage) &&
-          item.getCause().getClass().isAssignableFrom(mInnerCauseType) &&
-          item.getCause().getMessage().equals(mInnerCauseExpectedMessage);
+      return item.getClass().isAssignableFrom(mType) && item.getMessage().equals(mExpectedMessage);
     }
     @Override
     public void describeTo(Description description) {}
@@ -459,11 +450,10 @@ public class CronetFixedModeOutputStreamTest {
     connection.setDoOutput(true);
     connection.setRequestMethod("POST");
     connection.setFixedLengthStreamingMode(TestUtil.UPLOAD_DATA.length);
-    thrown.expectMessage("Cronet Test failed.");
-    thrown.expectCause(instanceOf(CallbackExceptionImpl.class));
+    thrown.expect(instanceOf(CallbackExceptionImpl.class));
+    thrown.expectMessage("Exception received from UploadDataProvider");
     thrown.expectCause(
-        new CauseMatcher(CallbackExceptionImpl.class, "Exception received from UploadDataProvider",
-                         HttpRetryException.class, "Cannot retry streamed Http body"));
+        new CauseMatcher(HttpRetryException.class, "Cannot retry streamed Http body"));
     OutputStream out = connection.getOutputStream();
     out.write(TestUtil.UPLOAD_DATA);
     connection.getResponseCode();
