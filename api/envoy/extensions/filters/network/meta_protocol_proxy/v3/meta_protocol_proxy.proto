@@ -27,7 +27,7 @@ message MetaProtocolProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The codec which encodes and decodes the application protocol.
-  config.core.v3.TypedExtensionConfig codec = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig codec_config = 2 [(validate.rules).message = {required: true}];
 
   oneof route_specifier {
     option (validate.required) = true;

@@ -44,7 +44,7 @@ public:
         route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
 
   FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context)
-      : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec(), context),
+      : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec_config(), context),
                      routeMatcherFromProto(config.route_config(), context),
                      filtersFactoryFromProto(config.filters(), config.stat_prefix(), context),
                      context) {}

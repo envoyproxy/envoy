@@ -40,7 +40,7 @@ public:
           - name: envoy.filters.meta.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.filters.router.v3.Router
-          codec:
+          codec_config:
             name: fake
             typed_config:
               "@type": type.googleapis.com/xds.type.v3.TypedStruct

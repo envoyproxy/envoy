@@ -28,26 +28,36 @@ namespace {
  * Test creating codec factory from typed extension config.
  */
 TEST(BasicFilterConfigTest, CreatingCodecFactory) {
-  const std::string yaml_config = R"EOF(
-    name: envoy.meta_protocol_proxy.codec.fake
-    typed_config:
-      "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      type_url: envoy.meta_protocol_proxy.codec.fake.type
-      value: {}
-  )EOF";
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-
-  envoy::config::core::v3::TypedExtensionConfig proto_config;
-  TestUtility::loadFromYaml(yaml_config, proto_config);
 
   {
+    const std::string yaml_config = R"EOF(
+      name: envoy.meta_protocol_proxy.codec.fake
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: envoy.meta_protocol_proxy.codec.unknow
+        value: {}
+      )EOF";
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+    envoy::config::core::v3::TypedExtensionConfig proto_config;
+    TestUtility::loadFromYaml(yaml_config, proto_config);
+
     EXPECT_THROW(FilterConfig::codecFactoryFromProto(proto_config, factory_context),
                  EnvoyException);
   }
 
   {
-    FakeStreamCodecFactoryConfig codec_factory_config;
-    Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+    const std::string yaml_config = R"EOF(
+      name: envoy.meta_protocol_proxy.codec.fake
+      typed_config:
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
+        type_url: envoy.meta_protocol_proxy.codec.fake.type
+        value: {}
+      )EOF";
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+    envoy::config::core::v3::TypedExtensionConfig proto_config;
+    TestUtility::loadFromYaml(yaml_config, proto_config);
 
     EXPECT_NE(nullptr, FilterConfig::codecFactoryFromProto(proto_config, factory_context));
   }
