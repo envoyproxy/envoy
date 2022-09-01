@@ -55,8 +55,8 @@ TEST_F(BaseVmTest, UnspecifiedRuntime) {
   if (getFirstAvailableWasmEngineName().empty()) {
     EXPECT_TRUE(wasm_vm.get() == nullptr);
   } else {
-    EXPECT_TRUE(wasm_vm.get() != nullptr);
-    EXPECT_TRUE(std::string(getFirstAvailableWasmEngineName()).find(wasm_vm->getEngineName()));
+    ASSERT_TRUE(wasm_vm.get() != nullptr);
+    EXPECT_THAT(std::string(getFirstAvailableWasmEngineName()), HasSubstr(wasm_vm->getEngineName()));
   }
 }
 
