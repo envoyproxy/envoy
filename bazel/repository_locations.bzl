@@ -1012,7 +1012,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2022-08-31",
+        release_date = "2022-09-01",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
