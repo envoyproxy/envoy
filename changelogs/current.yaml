@@ -21,6 +21,9 @@ minor_behavior_changes:
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
+- area: original_dst
+  change: |
+    transparent listener can use original_dst filter without nf_conntrack enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -82,6 +85,9 @@ new_features:
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: load balancer
+  change: |
+    added a new field to subset load balancer config: :ref:`metadata_fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
@@ -119,5 +125,15 @@ new_features:
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: subset load balancer
+  change: |
+    added multiple keys or multiple selectors support for :ref:`single host per subset mode <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
 
 deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
+    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.

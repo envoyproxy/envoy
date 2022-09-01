@@ -84,72 +84,44 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   EXPECT_THAT(parseRewritePattern(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, std::string>> {
+class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, RewriteSegments>> {
 protected:
   const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
-  envoy::extensions::uri_template::RewriteSegments expectedProto() const {
-    envoy::extensions::uri_template::RewriteSegments expected_proto;
-    Envoy::TestUtility::loadFromYaml(std::get<1>(GetParam()), expected_proto);
-    return expected_proto;
-  }
+  RewriteSegments expectedSegments() const { return std::get<1>(GetParam()); }
 };
 
 TEST(ParseRewrite, InvalidRegex) {
   EXPECT_THAT(parseRewritePattern("/{var1}", "+[abc"), StatusIs(absl::StatusCode::kInternal));
 }
 
-INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
-                         testing::ValuesIn(std::vector<std::pair<std::string, std::string>>({
-                             {"/static", R"EOF(segments: {literal: "/static"} )EOF"},
-                             {"/{var1}", R"EOF(segments:
-                          - literal: "/"
-                          - capture_index: 1)EOF"},
-                             {"/{var1}", R"EOF(segments:
-                          - literal: "/"
-                          - capture_index: 1)EOF"},
-                             {"/{var1}/{var1}/{var1}", R"EOF(segments:
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 1)EOF"},
-                             {"/{var3}/{var1}/{var2}", R"EOF(segments
-                                        - literal: "/"
-                                        - capture_index: 3
-                                        - literal: "/"
-                                        - capture_index: 1
-                                        - literal: "/"
-                                        - capture_index: 2)EOF"},
-                             {"/{var3}/abc/def/{var2}.suffix", R"EOF(segments:
-                                                - literal: "/"
-                                                - capture_index: 3
-                                                - literal: "/abc/def/"
-                                                - capture_index: 2
-                                                - literal: ".suffix")EOF"},
-                             {"/abc/{var1}/{var2}/def", R"EOF(segments
-                                         - literal: "/abc/"
-                                         - capture_index: 1
-                                         - literal: "/"
-                                         - capture_index: 2
-                                         - literal: "/def")EOF"},
-                             {"/{var1}{var2}", R"EOF(segments
-                                - literal: "/"
-                                - capture_index: 1
-                                - ar_index: 2)EOF"},
-                             {"/{var1}-{var2}/bucket-{var3}.suffix", R"EOF(segments
-                                                      - literal: "/"
-                                                      - capture_index: 1
-                                                      - literal: "-"
-                                                      - capture_index: 2
-                                                      - literal: "/bucket-"
-                                                      - capture_index: 3
-                                                      - literal: ".suffix")EOF"},
-                         })));
+INSTANTIATE_TEST_SUITE_P(
+    ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
+    testing::ValuesIn(std::vector<std::pair<std::string, RewriteSegments>>({
+        {"/static", RewriteSegments({RewriteSegment("/static")})},
+        {"/{var1}", RewriteSegments({RewriteSegment("/"), RewriteSegment(1)})},
+        {"/{var1}", RewriteSegments({RewriteSegment("/"), RewriteSegment(1)})},
+        {"/{var1}/{var1}/{var1}",
+         RewriteSegments({RewriteSegment("/"), RewriteSegment(1), RewriteSegment("/"),
+                          RewriteSegment(1), RewriteSegment("/"), RewriteSegment(1)})},
+        {"/{var3}/{var1}/{var2}",
+         RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/"),
+                          RewriteSegment(1), RewriteSegment("/"), RewriteSegment(2)})},
+        {"/{var3}/abc/def/{var2}.suffix",
+         RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/abc/def/"),
+                          RewriteSegment(2), RewriteSegment(".suffix")})},
+        {"/abc/{var1}/{var2}/def",
+         RewriteSegments({RewriteSegment("/abc/"), RewriteSegment(1), RewriteSegment("/"),
+                          RewriteSegment(2), RewriteSegment("def")})},
+        {"/{var1}/{var2}", RewriteSegments({RewriteSegment("/"), RewriteSegment(1),
+                                            RewriteSegment(1), RewriteSegment(2)})},
+        {"/{var1}-{var2}/bucket-{var3}.suffix",
+         RewriteSegments({RewriteSegment("/"), RewriteSegment(1), RewriteSegment("-"),
+                          RewriteSegment(2), RewriteSegment("/bucket-"), RewriteSegment(3),
+                          RewriteSegment(".suffix")})},
+    })));
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
-  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite =
-      parseRewritePattern(rewritePattern(), kCaptureRegex);
+  absl::StatusOr<RewriteSegments> rewrite = parseRewritePattern(rewritePattern(), kCaptureRegex);
   ASSERT_OK(rewrite);
 }
 
@@ -168,128 +140,63 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 }
 
 class RewritePathTemplateSuccess
-    : public testing::TestWithParam<std::pair<std::string, std::string>> {
+    : public testing::TestWithParam<std::pair<RewriteSegments, std::string>> {
 protected:
-  envoy::extensions::uri_template::RewriteSegments rewriteProto() const {
-    envoy::extensions::uri_template::RewriteSegments proto;
-    Envoy::TestUtility::loadFromYaml(std::get<0>(GetParam()), proto);
-    return proto;
-  }
+  RewriteSegments rewriteSegments() const { return std::get<0>(GetParam()); }
+
   const std::string& expectedRewrittenPath() const { return std::get<1>(GetParam()); }
 };
 
-INSTANTIATE_TEST_SUITE_P(RewritePathTemplateSuccessTestSuite, RewritePathTemplateSuccess,
-                         testing::ValuesIn(std::vector<std::pair<std::string, std::string>>(
-                             {{R"EOF(segments: { literal: "/static" })EOF", "/static"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 1)EOF",
-                               "/val1/val1/val1"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - literal: "/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 2)EOF",
-                               "/val3/val1/val2"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - literal: "/abc/def/"
-              - capture_index: 2
-              - literal: ".suffix")EOF",
-                               "/val3/abc/def/val2.suffix"},
-                              {R"EOF(segments:
-              - literal: "/"
-              - capture_index: 3
-              - capture_index: 2
-              - literal: "."
-              - capture_index: 1)EOF",
-                               "/val3val2.val1"},
-                              {R"EOF(segments:
-              - literal: "/abc/"
-              - capture_index: 1
-              - literal: "/"
-              - capture_index: 5
-              - literal: "/def")EOF",
-                               "/abc/val1/val5/def"}})));
+INSTANTIATE_TEST_SUITE_P(
+    RewritePathTemplateSuccessTestSuite, RewritePathTemplateSuccess,
+    testing::ValuesIn(std::vector<std::pair<RewriteSegments, std::string>>(
+        {{RewriteSegments({RewriteSegment("/static")}), "/static"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1), RewriteSegment("/"),
+                           RewriteSegment(1), RewriteSegment("/"), RewriteSegment(1)}),
+          "/val1/val1/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/"),
+                           RewriteSegment(1), RewriteSegment("/"), RewriteSegment(2)}),
+          "/val3/val1/val2"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/abc/def/"),
+                           RewriteSegment(2), RewriteSegment(".suffix")}),
+          "/val3/abc/def/val2.suffix"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment(2),
+                           RewriteSegment("."), RewriteSegment(1)}),
+          "/val3val2.val1"},
+         {RewriteSegments({RewriteSegment("/abc/"), RewriteSegment(1), RewriteSegment("/"),
+                           RewriteSegment(5), RewriteSegment("/def")}),
+          "/abc/val1/val5/def"}})));
 
 TEST_P(RewritePathTemplateSuccess, RewritePathTemplateSuccessTest) {
   absl::StatusOr<std::string> rewritten_path =
-      rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewriteProto());
+      rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewriteSegments());
   ASSERT_OK(rewritten_path);
   EXPECT_EQ(rewritten_path.value(), expectedRewrittenPath());
 }
 
 TEST(RewritePathTemplateFailure, BadRegex) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 1
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
-
-  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "+/bad_regex", rewrite_proto),
+  RewriteSegments rewrite_segments({RewriteSegment("static"), RewriteSegment(1)});
+  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "+/bad_regex", rewrite_segments),
               StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST(RewritePathTemplateFailure, RegexNoMatch) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 1
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
-
-  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "/no_match_regex", rewrite_proto),
+  RewriteSegments rewrite_segments({RewriteSegment("/"), RewriteSegment(1)});
+  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, "/no_match_regex", rewrite_segments),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(RewritePathTemplateFailure, RegexCaptureIndexZero) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 0
-  )EOF";
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
-
-  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_proto),
+  RewriteSegments rewrite_segments({RewriteSegment("/"), RewriteSegment(0)});
+  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_segments),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(RewritePathTemplateFailure, RegexCaptureIndexAboveMaxCapture) {
-  envoy::extensions::uri_template::RewriteSegments rewrite_proto;
-
-  const std::string yaml = R"EOF(
-segments:
-- literal: "/"
-- capture_index: 6
-  )EOF";
-
-  Envoy::TestUtility::loadFromYaml(yaml, rewrite_proto);
-
-  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_proto),
+  RewriteSegments rewrite_segments({RewriteSegment("/"), RewriteSegment(6)});
+  EXPECT_THAT(rewritePathTemplatePattern(kMatchPath, kCaptureRegex, rewrite_segments),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -320,12 +227,12 @@ TEST_P(PathPatternMatchAndRewrite, PathPatternMatchAndRewriteTest) {
   absl::StatusOr<std::string> regex = convertPathPatternSyntaxToRegex(pattern());
   ASSERT_OK(regex);
 
-  absl::StatusOr<envoy::extensions::uri_template::RewriteSegments> rewrite_proto =
+  absl::StatusOr<RewriteSegments> rewrite_segment =
       parseRewritePattern(rewritePattern(), regex.value());
-  ASSERT_OK(rewrite_proto);
+  ASSERT_OK(rewrite_segment);
 
   absl::StatusOr<std::string> rewritten_path =
-      rewritePathTemplatePattern(matchPath(), regex.value(), rewrite_proto.value());
+      rewritePathTemplatePattern(matchPath(), regex.value(), rewrite_segment.value());
   ASSERT_OK(rewritten_path);
 
   EXPECT_EQ(rewritten_path.value(), expectedRewrittenPath());

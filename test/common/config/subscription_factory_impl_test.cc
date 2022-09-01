@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/subscription_factory_impl.h"
@@ -44,7 +45,8 @@ public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_) {}
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
+                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef()) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {

@@ -163,8 +163,10 @@ envoy_cc_library(
         ":grpc_stream_lib",
         ":ttl_lib",
         ":utility_lib",
+        ":xds_source_id_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/common:minimal_logger_lib",
@@ -327,6 +329,7 @@ envoy_cc_library(
         ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//envoy/server:instance_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
@@ -372,6 +375,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "xds_source_id_lib",
+    srcs = ["xds_source_id.cc"],
+    hdrs = ["xds_source_id.h"],
+    deps = [
+        "//envoy/config:xds_resources_delegate_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "update_ack_lib",
     hdrs = ["update_ack.h"],
     deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
@@ -381,6 +393,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
