@@ -96,14 +96,14 @@ absl::StatusOr<RewriteSegments> parseRewritePattern(absl::string_view pattern,
   for (const auto& [str, kind] : processed_pattern) {
     switch (kind) {
     case RewriteStringKind::Literal:
-      parsed_pattern.segments.push_back(absl::variant<int, std::string>(std::string(str)));
+      parsed_pattern.push_back(RewriteSegment(std::string(str)));
       break;
     case RewriteStringKind::Variable:
       auto it = capture_index_map.find(std::string(str));
       if (it == capture_index_map.end()) {
         return absl::InvalidArgumentError("Nonexisting variable name");
       }
-      parsed_pattern.segments.push_back(absl::variant<int, std::string>(it->second));
+      parsed_pattern.push_back(RewriteSegment(it->second));
       break;
     }
   }
@@ -144,7 +144,7 @@ absl::StatusOr<std::string> rewritePathTemplatePattern(absl::string_view path,
   }
 
   std::string rewritten_path;
-  for (absl::variant<int, std::string> segment : rewrite_pattern.segments) {
+  for (RewriteSegment segment : rewrite_pattern) {
     auto* literal = absl::get_if<std::string>(&segment);
     auto* capture_index = absl::get_if<int>(&segment);
     if (literal != nullptr) {

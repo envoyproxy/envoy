@@ -28,9 +28,8 @@ struct ParsedSegment {
   RewriteStringKind kind_;
 };
 
-struct RewriteSegments {
-  std::vector<absl::variant<int, std::string>> segments;
-};
+using RewriteSegment = absl::variant<int, std::string>;
+using RewriteSegments = std::vector<RewriteSegment>;
 
 /**
  * Returns the safe regex that Envoy understands that is equivalent to the given pattern.
