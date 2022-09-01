@@ -17,4 +17,4 @@ repos:
   rev: v2.1.0
   hooks:
     - id: codespell
-      args: [-L=uint, '-L=keyserver,inout']
+      args: ['-L=inout,keyserver,optin,uint']
