@@ -22,7 +22,6 @@ envoy_cc_library(
     deps = [
         ":uri_template_internal_cc",
         "//source/common/http:path_utility_lib",
-        "//source/extensions/path/uri_template_lib/proto:uri_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -35,7 +34,6 @@ envoy_cc_library(
     srcs = ["uri_template_internal.cc"],
     hdrs = ["uri_template_internal.h"],
     deps = [
-        "//source/extensions/path/uri_template_lib/proto:uri_template_rewrite_segements_cc_proto",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/functional:function_ref",
