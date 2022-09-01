@@ -39,7 +39,7 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush();
         flush_timer_->enableTimer(flush_interval);
       })),
-      ttl_manager_([this](const std::vector<std::string>& expired) { ttlCallback(expired); },
+      ttl_manager_([this](const std::vector<std::string>& expired) { onExpiredKeys(expired); },
                    dispatcher, dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
