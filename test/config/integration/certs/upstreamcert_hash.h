@@ -1,3 +1,3 @@
 // NOLINT(namespace-envoy)
-constexpr char TEST_UPSTREAM_CERT_HASH[] = "9E:4B:E7:83:5B:DE:82:A6:E5:CE:24:8D:DB:91:C1:0C:20:0F:"
-                                           "25:3A:D4:4C:5E:13:AB:CD:53:00:93:85:F3:BE";
+constexpr char TEST_UPSTREAM_CERT_HASH[] = "59:5B:9A:DD:4D:1E:F5:D5:1F:FB:07:B6:5F:55:12:17:06:0E:"
+                                           "59:8B:02:44:33:7B:29:C8:1A:2A:66:8D:98:CE";

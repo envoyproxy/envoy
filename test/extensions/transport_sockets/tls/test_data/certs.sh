@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+#set -e
 
 readonly DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-730}
 readonly HERE=$(cd "$(dirname "$0")" && pwd)
