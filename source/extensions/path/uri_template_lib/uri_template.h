@@ -28,7 +28,10 @@ struct ParsedSegment {
   RewriteStringKind kind_;
 };
 
+// Stores string literals and regex capture indexes for rewriting paths
 using RewriteSegment = absl::variant<int, std::string>;
+
+// Stores all segments in left to right order for a path rewrite
 using RewriteSegments = std::vector<RewriteSegment>;
 
 /**

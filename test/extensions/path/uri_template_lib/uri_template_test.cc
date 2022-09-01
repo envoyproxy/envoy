@@ -84,9 +84,7 @@ TEST_P(ParseRewriteHelperFailure, ParseRewriteHelperFailureTest) {
   EXPECT_THAT(parseRewritePattern(pattern), StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-class ParseRewriteSuccess
-    : public testing::TestWithParam<
-          std::pair<std::string, RewriteSegments>> {
+class ParseRewriteSuccess : public testing::TestWithParam<std::pair<std::string, RewriteSegments>> {
 protected:
   const std::string& rewritePattern() const { return std::get<0>(GetParam()); }
   RewriteSegments expectedSegments() const { return std::get<1>(GetParam()); }
@@ -142,8 +140,7 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
 }
 
 class RewritePathTemplateSuccess
-    : public testing::TestWithParam<
-          std::pair<RewriteSegments, std::string>> {
+    : public testing::TestWithParam<std::pair<RewriteSegments, std::string>> {
 protected:
   RewriteSegments rewriteSegments() const { return std::get<0>(GetParam()); }
 
@@ -152,26 +149,25 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     RewritePathTemplateSuccessTestSuite, RewritePathTemplateSuccess,
-    testing::ValuesIn(
-        std::vector<std::pair<RewriteSegments, std::string>>({
-            {RewriteSegments({RewriteSegment("/static")}), "/static"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(1), RewriteSegment("/"),
-                              RewriteSegment(1), RewriteSegment("/"), RewriteSegment(1)}),
-             "/val1/val1/val1"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/"),
-                              RewriteSegment(1), RewriteSegment("/"), RewriteSegment(2)}),
-             "/val3/val1/val2"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/abc/def/"),
-                              RewriteSegment(2), RewriteSegment(".suffix")}),
-             "/val3/abc/def/val2.suffix"},
-            {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment(2),
-                              RewriteSegment("."), RewriteSegment(1)}),
-             "/val3val2.val1"},
-            {RewriteSegments({RewriteSegment("/abc/"), RewriteSegment(1), RewriteSegment("/"),
-                              RewriteSegment(5), RewriteSegment("/def")}),
-             "/abc/val1/val5/def"}})));
+    testing::ValuesIn(std::vector<std::pair<RewriteSegments, std::string>>(
+        {{RewriteSegments({RewriteSegment("/static")}), "/static"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1)}), "/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(1), RewriteSegment("/"),
+                           RewriteSegment(1), RewriteSegment("/"), RewriteSegment(1)}),
+          "/val1/val1/val1"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/"),
+                           RewriteSegment(1), RewriteSegment("/"), RewriteSegment(2)}),
+          "/val3/val1/val2"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment("/abc/def/"),
+                           RewriteSegment(2), RewriteSegment(".suffix")}),
+          "/val3/abc/def/val2.suffix"},
+         {RewriteSegments({RewriteSegment("/"), RewriteSegment(3), RewriteSegment(2),
+                           RewriteSegment("."), RewriteSegment(1)}),
+          "/val3val2.val1"},
+         {RewriteSegments({RewriteSegment("/abc/"), RewriteSegment(1), RewriteSegment("/"),
+                           RewriteSegment(5), RewriteSegment("/def")}),
+          "/abc/val1/val5/def"}})));
 
 TEST_P(RewritePathTemplateSuccess, RewritePathTemplateSuccessTest) {
   absl::StatusOr<std::string> rewritten_path =
