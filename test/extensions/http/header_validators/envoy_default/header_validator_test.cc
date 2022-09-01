@@ -1,5 +1,6 @@
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
 
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
 namespace Envoy {
@@ -55,18 +56,23 @@ protected:
 
 TEST_F(BaseHeaderValidatorTest, ValidateMethodPermissive) {
   HeaderString valid{"GET"};
-  HeaderString custom{"CUSTOM-METHOD"};
+  HeaderString valid_lowercase{"post"};
+  HeaderString custom{"Custom-Method"};
   auto uhv = createBase(empty_config);
   EXPECT_TRUE(uhv->validateMethodHeader(valid).ok());
+  EXPECT_TRUE(uhv->validateMethodHeader(valid_lowercase).ok());
   EXPECT_TRUE(uhv->validateMethodHeader(custom).ok());
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateMethodStrict) {
+TEST_F(BaseHeaderValidatorTest, ValidateMethodRestricted) {
   HeaderString valid{"GET"};
+  HeaderString post_lowercase{"post"};
   HeaderString custom{"CUSTOM-METHOD"};
   auto uhv = createBase(restrict_http_methods_config);
   EXPECT_TRUE(uhv->validateMethodHeader(valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateMethodHeader(custom),
+                             UhvResponseCodeDetail::get().InvalidMethod);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateMethodHeader(post_lowercase),
                              UhvResponseCodeDetail::get().InvalidMethod);
 }
 
@@ -95,10 +101,11 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidStartChar) {
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeValid) {
+TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRange) {
   HeaderString valid{"200"};
   HeaderString invalid_max{"1024"};
   HeaderString invalid_min{"99"};
+  HeaderString invalid_overflow{"4294967297"}; // UINT32_MAX + 1
   auto uhv = createBase(empty_config);
 
   EXPECT_TRUE(uhv->validateStatusHeader(valid).ok());
@@ -106,13 +113,27 @@ TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeValid) {
                              UhvResponseCodeDetail::get().InvalidStatus);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_min),
                              UhvResponseCodeDetail::get().InvalidStatus);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_overflow),
+                             UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderNameValid) {
-  HeaderString valid{"x-foo"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
+  auto uhv = createBase(empty_config);
+  std::string name{"aaaaa"};
+  for (int i = 0; i < 0xff; ++i) {
+    char c = static_cast<char>(i);
+    HeaderString header_string{"x"};
+    name[2] = c;
 
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+    setHeaderStringUnvalidated(header_string, name);
+
+    auto result = uhv->validateGenericHeaderName(header_string);
+    if (testChar(kGenericHeaderNameCharTable, c)) {
+      EXPECT_TRUE(result.ok());
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+    }
+  }
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
@@ -123,32 +144,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
                              UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictValid) {
-  HeaderString valid{"x-foo"};
-  HeaderString valid_underscore{"x_foo"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid_underscore).ok());
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
   HeaderString invalid_empty{""};
   auto uhv = createBase(empty_config);
 
@@ -166,26 +162,34 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
-  HeaderString valid{"hello world"};
-  HeaderString valid_eascii{"value\x80"};
-  HeaderString invalid_newline;
   auto uhv = createBase(empty_config);
+  std::string name{"aaaaa"};
+  for (int i = 0; i < 0xff; ++i) {
+    char c = static_cast<char>(i);
+    HeaderString header_string{"x"};
+    name[2] = c;
 
-  setHeaderStringUnvalidated(invalid_newline, "hello\nworld");
+    setHeaderStringUnvalidated(header_string, name);
 
-  EXPECT_TRUE(uhv->validateGenericHeaderValue(valid).ok());
-  EXPECT_TRUE(uhv->validateGenericHeaderValue(valid_eascii).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderValue(invalid_newline),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+    auto result = uhv->validateGenericHeaderValue(header_string);
+    if (testChar(kGenericHeaderValueCharTable, c)) {
+      EXPECT_TRUE(result.ok());
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+    }
+  }
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateContentLength) {
   HeaderString valid{"100"};
   HeaderString invalid{"10a2"};
+  HeaderString invalid_overflow{"18446744073709551618"}; // UINT64_MAX + 1
   auto uhv = createBase(empty_config);
 
   EXPECT_TRUE(uhv->validateContentLengthHeader(valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_overflow),
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
@@ -280,6 +284,13 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6PortDelim) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_port_delim),
                              UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharacters) {
+  HeaderString valid{"/"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
 }
 
 } // namespace EnvoyDefault

@@ -34,13 +34,6 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
                              "uhv.http1.invalid_transfer_encoding");
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidatePathHeaderCharacters) {
-  HeaderString valid{"/"};
-  auto uhv = createH1(empty_config);
-
-  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
-}
-
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
   HeaderString empty{""};
   HeaderString value{"foo"};
@@ -50,23 +43,13 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryMethodPermissive) {
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryMethod) {
   HeaderString name{":method"};
   HeaderString valid{"GET"};
   HeaderString invalid{"CUSTOM-METHOD"};
   auto uhv = createH1(empty_config);
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, invalid).ok());
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryMethodStrict) {
-  HeaderString name{":method"};
-  HeaderString valid{"GET"};
-  HeaderString invalid{"CUSTOM-METHOD"};
-  auto uhv = createH1(restrict_http_methods_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
-                             UhvResponseCodeDetail::get().InvalidMethod);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
@@ -82,28 +65,11 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntrySchemeValid) {
   HeaderString scheme{":scheme"};
   HeaderString valid{"https"};
-  HeaderString valid_mixed_case{"hTtPs"};
-  auto uhv = createH1(empty_config);
-
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid).ok());
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid_mixed_case).ok());
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntrySchemeInvalidChar) {
-  HeaderString scheme{":scheme"};
   HeaderString invalid{"http_ssh"};
   auto uhv = createH1(empty_config);
 
+  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
-                             UhvResponseCodeDetail::get().InvalidScheme);
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntrySchemeInvalidStartChar) {
-  HeaderString scheme{":scheme"};
-  HeaderString invalid_first_char{"+http"};
-  auto uhv = createH1(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -138,30 +104,19 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestEntryHeaderContentLength) {
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGenericValid) {
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGeneric) {
   HeaderString valid_name{"x-foo"};
+  HeaderString invalid_name{"foo oo"};
   HeaderString valid_value{"bar"};
+
+  HeaderString invalid_value{};
+  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
+
   auto uhv = createH1(empty_config);
 
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(valid_name, valid_value).ok());
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGenericInvalidName) {
-  HeaderString invalid_name{"foo oo"};
-  HeaderString valid_value{"bar"};
-  auto uhv = createH1(empty_config);
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGenericInvalidValue) {
-  HeaderString valid_name{"x-foo"};
-  HeaderString invalid_value{};
-  auto uhv = createH1(empty_config);
-
-  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
 }
@@ -184,30 +139,19 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryStatus) {
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGenericValid) {
+TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGeneric) {
   HeaderString valid_name{"x-foo"};
+  HeaderString invalid_name{"foo oo"};
   HeaderString valid_value{"bar"};
+
+  HeaderString invalid_value{};
+  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
+
   auto uhv = createH1(empty_config);
 
   EXPECT_TRUE(uhv->validateResponseHeaderEntry(valid_name, valid_value).ok());
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGenericInvalidName) {
-  HeaderString invalid_name{"foo oo"};
-  HeaderString valid_value{"bar"};
-  auto uhv = createH1(empty_config);
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGenericInvalidValue) {
-  HeaderString valid_name{"x-foo"};
-  HeaderString invalid_value{};
-  auto uhv = createH1(empty_config);
-
-  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
 }
@@ -392,7 +336,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectIPv6MissingPort)
                              UhvResponseCodeDetail::get().InvalidHost);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectAccept) {
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLength0ConnectAccept) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
                                                   {":authority", "envoy.com:80"},

@@ -1,3 +1,4 @@
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
@@ -228,51 +229,16 @@ TEST_F(Http2HeaderValidatorTest, ValidateTE) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateTEHeader(deflate), "uhv.http2.invalid_te");
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidatePathHeaderCharacters) {
-  HeaderString valid{"/"};
-  auto uhv = createH2(empty_config);
-  // TODO(meilya) - after path normalization has been approved and implemented
-  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedTransferEncoding) {
-  HeaderString transfer_encoding{"transfer-encoding"};
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameRejectConnectionHeaders) {
+  HeaderString transfer_encodings[] = {HeaderString("transfer-encoding"),
+                                       HeaderString("connection"), HeaderString("keep-alive"),
+                                       HeaderString("upgrade"), HeaderString("proxy-connection")};
   auto uhv = createH2(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(transfer_encoding),
-                             "uhv.http2.connection_header_rejected");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedConnection) {
-  HeaderString connection{"connection"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(connection),
-                             "uhv.http2.connection_header_rejected");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedKeepAlive) {
-  HeaderString keep_alive{"keep-alive"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(keep_alive),
-                             "uhv.http2.connection_header_rejected");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedUpgrde) {
-  HeaderString upgrade{"upgrade"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(upgrade),
-                             "uhv.http2.connection_header_rejected");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedProxy) {
-  HeaderString proxy_connection{"proxy-connection"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(proxy_connection),
-                             "uhv.http2.connection_header_rejected");
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(transfer_encodings[i]),
+                               "uhv.http2.connection_header_rejected");
+  }
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
@@ -308,7 +274,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {
                              "uhv.http2.invalid_te");
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodAllowAllMethods) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethod) {
   HeaderString method{":method"};
   HeaderString valid{"GET"};
   HeaderString invalid{"CUSTOM-METHOD"};
@@ -316,17 +282,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodAllowAllMethods) {
 
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(method, valid).ok());
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(method, invalid).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodRestrictMethods) {
-  HeaderString method{":method"};
-  HeaderString valid{"GET"};
-  HeaderString invalid{"CUSTOM-METHOD"};
-  auto uhv = createH2(restrict_http_methods_config);
-
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(method, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(method, invalid),
-                             UhvResponseCodeDetail::get().InvalidMethod);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
@@ -340,58 +295,30 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeValid) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
   HeaderString scheme{":scheme"};
   HeaderString valid{"https"};
-  HeaderString valid_mixed_case{"hTtPs"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid).ok());
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid_mixed_case).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeInvalidChar) {
-  HeaderString scheme{":scheme"};
   HeaderString invalid{"http_ssh"};
   auto uhv = createH2(empty_config);
 
+  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeInvalidStartChar) {
-  HeaderString scheme{":scheme"};
-  HeaderString invalid_first_char{"+http"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
-                             UhvResponseCodeDetail::get().InvalidScheme);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericValid) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
   HeaderString valid_name{"x-foo"};
+  HeaderString invalid_name{""};
   HeaderString valid_value{"bar"};
+
+  HeaderString invalid_value;
+  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
+
   auto uhv = createH2(empty_config);
 
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(valid_name, valid_value).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericInvalidName) {
-  HeaderString invalid_name{""};
-  HeaderString valid_value{"bar"};
-  auto uhv = createH2(empty_config);
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericInvalidValue) {
-  HeaderString valid_name{"x-foo"};
-  HeaderString invalid_value;
-  auto uhv = createH2(empty_config);
-
-  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
 }
@@ -402,15 +329,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
   auto uhv = createH2(empty_config);
 
   EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, value).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderRejectUnderscores) {
-  HeaderString name{"x_foo"};
-  HeaderString value{"bar"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, value),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
@@ -424,65 +342,45 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericValid) {
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
   HeaderString valid_name{"x-foo"};
+  HeaderString valid_name_underscore{"x_foo"};
+  HeaderString invalid_name{""};
   HeaderString valid_value{"bar"};
+  HeaderString invalid_name_uppercase{"X-Foo"};
+
+  HeaderString invalid_value;
+  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
+
   auto uhv = createH2(empty_config);
 
   EXPECT_TRUE(uhv->validateResponseHeaderEntry(valid_name, valid_value).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericInvalidName) {
-  HeaderString invalid_name{""};
-  HeaderString valid_value{"bar"};
-  auto uhv = createH2(empty_config);
-
+  EXPECT_TRUE(uhv->validateResponseHeaderEntry(valid_name_underscore, valid_value).ok());
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericInvalidValue) {
-  HeaderString valid_name{"x-foo"};
-  HeaderString invalid_value;
-  auto uhv = createH2(empty_config);
-
-  setHeaderStringUnvalidated(invalid_value, "hello\nworld");
-
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
+                             UhvResponseCodeDetail::get().InvalidCharacters);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name_uppercase, valid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderAllowUnderscores) {
-  HeaderString name{"x_foo"};
-  HeaderString value{"bar"};
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderName) {
   auto uhv = createH2(empty_config);
+  std::string name{"aaaaa"};
+  for (int i = 0; i < 0xff; ++i) {
+    char c = static_cast<char>(i);
+    HeaderString header_string{"x"};
+    name[2] = c;
 
-  EXPECT_TRUE(uhv->validateResponseHeaderEntry(name, value).ok());
-}
+    setHeaderStringUnvalidated(header_string, name);
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderRejectUnderscores) {
-  HeaderString name{"x_foo"};
-  HeaderString value{"bar"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(name, value),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateLowercaseHeader) {
-  HeaderString valid{"x-foo"};
-  HeaderString invalid{"X-Foo"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid), "uhv.invalid_characters");
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameValid) {
-  HeaderString valid{"x-foo"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+    auto result = uhv->validateGenericHeaderName(header_string);
+    if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+      EXPECT_TRUE(result.ok());
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+    }
+  }
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
@@ -491,31 +389,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
                              UhvResponseCodeDetail::get().InvalidUnderscore);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictValid) {
-  HeaderString valid{"x-foo"};
-  HeaderString valid_underscore{"x_foo"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid_underscore).ok());
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
