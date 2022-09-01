@@ -301,16 +301,12 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
 
-        if (string_header_name.empty()) {
-          reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-        } else {
-          auto entry_result = validateRequestHeaderEntry(header_name, header_value);
-          if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-            // drop the header, continue processing the request
-            drop_headers.push_back(string_header_name);
-          } else if (!entry_result) {
-            reject_details = static_cast<std::string>(entry_result.details());
-          }
+        auto entry_result = validateRequestHeaderEntry(header_name, header_value);
+        if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the request
+          drop_headers.push_back(string_header_name);
+        } else if (!entry_result) {
+          reject_details = static_cast<std::string>(entry_result.details());
         }
 
         return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
@@ -364,16 +360,12 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
 
-        if (string_header_name.empty()) {
-          reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-        } else {
-          auto entry_result = validateResponseHeaderEntry(header_name, header_value);
-          if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-            // drop the header, continue processing the response
-            drop_headers.push_back(string_header_name);
-          } else if (!entry_result) {
-            reject_details = static_cast<std::string>(entry_result.details());
-          }
+        auto entry_result = validateResponseHeaderEntry(header_name, header_value);
+        if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the response
+          drop_headers.push_back(string_header_name);
+        } else if (!entry_result) {
+          reject_details = static_cast<std::string>(entry_result.details());
         }
 
         return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue

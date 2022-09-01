@@ -218,10 +218,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         bool is_pseudo_header =
             string_header_name.empty() ? false : string_header_name.at(0) == ':';
 
-        if (string_header_name.empty()) {
-          // reject empty header names
-          reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-        } else if (is_pseudo_header && !allowed_headers.contains(string_header_name)) {
+        if (is_pseudo_header && !allowed_headers.contains(string_header_name)) {
           // Reject unrecognized or unallowed pseudo header name, from RFC 9113,
           // https://www.rfc-editor.org/rfc/rfc9113#section-8.3:
           //
@@ -282,16 +279,12 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
 
-        if (string_header_name.empty()) {
-          reject_details = UhvResponseCodeDetail::get().EmptyHeaderName;
-        } else {
-          auto entry_result = validateResponseHeaderEntry(header_name, header_value);
-          if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
-            // drop the header, continue processing the response
-            drop_headers.push_back(string_header_name);
-          } else if (!entry_result) {
-            reject_details = static_cast<std::string>(entry_result.details());
-          }
+        auto entry_result = validateResponseHeaderEntry(header_name, header_value);
+        if (entry_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the response
+          drop_headers.push_back(string_header_name);
+        } else if (!entry_result) {
+          reject_details = static_cast<std::string>(entry_result.details());
         }
 
         return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
