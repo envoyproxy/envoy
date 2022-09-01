@@ -31,9 +31,12 @@ if [[ "$1" == "freeze" ]]; then
     PROTO_SYNC_CMD="fix"
 fi
 
+bazel_or_isk=bazelisk
+command -v bazelisk &> /dev/null || bazel_or_isk=bazel
+
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint.
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+$bazel_or_isk run "${BAZEL_BUILD_OPTIONS[@]}" \
     --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos \
     ${FREEZE_ARG} \
     //tools/proto_format:proto_sync \
@@ -46,12 +49,12 @@ if [[ "$1" == "freeze" ]]; then
 fi
 
 # Generate api/BUILD file based on updated type database.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
+$bazel_or_isk build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
 
 # Dont run this in git hooks by default
 if [[ -n "$AZP_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
     cd api/ || exit 1
-    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
+    $bazel_or_isk run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
 fi
