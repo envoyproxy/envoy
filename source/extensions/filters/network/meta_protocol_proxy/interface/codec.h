@@ -86,6 +86,8 @@ class RequestDecoder {
 public:
   virtual ~RequestDecoder() = default;
 
+  // The decode() method may be called multiple times for single request or response.
+  // So an independent setDecoderCallback() is used to set decoding callback.
   virtual void setDecoderCallback(RequestDecoderCallback& callback) PURE;
   virtual void decode(Buffer::Instance& buffer) PURE;
 };
@@ -97,6 +99,8 @@ class ResponseDecoder {
 public:
   virtual ~ResponseDecoder() = default;
 
+  // The decode() method may be called multiple times for single request or response.
+  // So an independent setDecoderCallback() is used to set decoding callback.
   virtual void setDecoderCallback(ResponseDecoderCallback& callback) PURE;
   virtual void decode(Buffer::Instance& buffer) PURE;
 };
@@ -128,8 +132,7 @@ public:
   /**
    * Create local response message for local reply.
    */
-  virtual ResponsePtr response(Status status, absl::string_view status_detail,
-                               const Request& origin_request) PURE;
+  virtual ResponsePtr response(Status status, const Request& origin_request) PURE;
 };
 
 using RequestDecoderPtr = std::unique_ptr<RequestDecoder>;

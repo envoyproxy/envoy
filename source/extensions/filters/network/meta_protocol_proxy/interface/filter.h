@@ -47,8 +47,7 @@ public:
 
 class DecoderFilterCallback : public StreamFilterCallbacks {
 public:
-  virtual void sendLocalReply(Status status, absl::string_view status_detail,
-                              ResponseUpdateFunction&& cb = nullptr) PURE;
+  virtual void sendLocalReply(Status status, ResponseUpdateFunction&& cb = nullptr) PURE;
 
   virtual void continueDecoding() PURE;
 
@@ -90,7 +89,7 @@ public:
 
 class StreamFilter : public DecoderFilter, public EncoderFilter {
 public:
-  bool isDualFilter() const override final { return true; }
+  bool isDualFilter() const final { return true; }
 };
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;

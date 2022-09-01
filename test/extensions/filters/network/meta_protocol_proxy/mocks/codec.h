@@ -58,8 +58,7 @@ public:
 
 class MockMessageCreator : public MessageCreator {
 public:
-  MOCK_METHOD(ResponsePtr, response,
-              (Status status, absl::string_view status_detail, const Request&));
+  MOCK_METHOD(ResponsePtr, response, (Status status, const Request&));
 };
 
 class MockCodecFactory : public CodecFactory {

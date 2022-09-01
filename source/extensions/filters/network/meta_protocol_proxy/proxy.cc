@@ -91,11 +91,10 @@ void ActiveStream::resetStream() {
   parent_.deferredStream(*this);
 }
 
-void ActiveStream::sendLocalReply(Status status, absl::string_view status_detail,
-                                  ResponseUpdateFunction&& func) {
+void ActiveStream::sendLocalReply(Status status, ResponseUpdateFunction&& func) {
   ASSERT(parent_.creator_ != nullptr);
   local_or_upstream_response_stream_ =
-      parent_.creator_->response(status, status_detail, *downstream_request_stream_);
+      parent_.creator_->response(status, *downstream_request_stream_);
 
   ASSERT(local_or_upstream_response_stream_ != nullptr);
 

@@ -79,7 +79,7 @@ public:
 
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
 public:
-  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction&&));
+  MOCK_METHOD(void, sendLocalReply, (Status, ResponseUpdateFunction&&));
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(void, upstreamResponse, (ResponsePtr response));
   MOCK_METHOD(void, completeDirectly, ());

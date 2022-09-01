@@ -8,6 +8,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,6 +20,14 @@ public:
   virtual ~StreamBase() = default;
 
   using IterateCallback = std::function<bool(absl::string_view key, absl::string_view val)>;
+
+  /**
+   * Get application protocol of meta protocol stream.
+   *
+   * @return A string view representing the application protocol of the meta protocol stream behind
+   * the context.
+   */
+  virtual absl::string_view protocol() const PURE;
 
   /**
    * Iterate over all meta protocol stream metadata entries.
@@ -65,14 +74,6 @@ public:
 class Request : public StreamBase {
 public:
   /**
-   * Get application protocol of meta protocol stream.
-   *
-   * @return A string view representing the application protocol of the meta protocol stream behind
-   * the context.
-   */
-  virtual absl::string_view protocol() const PURE;
-
-  /**
    * Get request host.
    *
    * @return The host of meta protocol request. It generally consists of the host and an
@@ -110,40 +111,19 @@ enum class Event {
   ConnectionFailure,
 };
 
-enum class Status {
-  NONE,
-  OK,
-  ExpectedError,
-  UnknowedError,
-  LocalOK,
-  LocalExpectedError,
-  LocalUnknowedError,
-};
+using Status = absl::Status;
+using StatusCode = absl::StatusCode;
 
 class Response : public StreamBase {
 public:
-  /**
-   * Get application protocol of meta protocol stream.
-   *
-   * @return A string view representing the application protocol of the meta protocol stream behind
-   * the context.
-   */
-  virtual absl::string_view protocol() const PURE;
-
   /**
    * Get response status.
    *
    * @return meta protocol response status.
    */
   virtual Status status() const PURE;
-
-  /**
-   * Get response status detail of string view type.
-   *
-   * @return meta protocol response status detail. Status detail is a specific supplement to status.
-   */
-  virtual absl::string_view statusDetail() const PURE;
 };
+
 using ResponsePtr = std::unique_ptr<Response>;
 using ResponseSharedPtr = std::shared_ptr<Response>;
 

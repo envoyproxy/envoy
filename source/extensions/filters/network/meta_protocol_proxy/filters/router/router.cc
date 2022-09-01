@@ -188,19 +188,19 @@ void RouterFilter::resetStream(StreamResetReason reason) {
   ASSERT(upstream_requests_.empty());
   switch (reason) {
   case StreamResetReason::LocalReset:
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ProtocolError:
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionFailure:
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::ConnectionTermination:
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   case StreamResetReason::Overflow:
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
 
@@ -208,6 +208,7 @@ void RouterFilter::resetStream(StreamResetReason reason) {
 }
 
 void RouterFilter::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
+  ENVOY_LOG(debug, "upstream request encoding success");
   upstream_request_buffer_.move(buffer);
   kickOffNewUpstreamRequest();
   expect_response_ = expect_response;
@@ -218,14 +219,14 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 
   auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, "cluster_not_found");
+    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     filter_complete_ = true;
     return;
   }
 
   auto cluster_info = thread_local_cluster->info();
   if (cluster_info->maintenanceMode()) {
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, "cluster_maintain_mode");
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     filter_complete_ = true;
     return;
   }
@@ -233,7 +234,7 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   auto tcp_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!tcp_data.has_value()) {
     filter_complete_ = true;
-    callbacks_->sendLocalReply(Status::LocalUnknowedError, "no_healthy_upstream");
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "no_healthy_upstream"));
     return;
   }
 
@@ -245,10 +246,13 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 }
 
 FilterStatus RouterFilter::onStreamDecoded(Request& request) {
+  ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
+
   setRouteEntry(callbacks_->routeEntry());
 
   if (route_entry_ == nullptr) {
-    callbacks_->sendLocalReply(Status::LocalExpectedError, "route_not_found");
+    ENVOY_LOG(debug, "No route for current request and send local reply");
+    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "route_not_found"));
     return FilterStatus::StopIteration;
   }
 

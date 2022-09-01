@@ -2,6 +2,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/interface/codec.h"
+#include <cstdint>
 
 namespace Envoy {
 namespace Extensions {
@@ -61,11 +62,9 @@ public:
   public:
     absl::string_view protocol() const override { return protocol_; }
     Status status() const override { return status_; }
-    absl::string_view statusDetail() const override { return status_detail_; }
 
     std::string protocol_;
     Status status_;
-    std::string status_detail_;
   };
 
   class FakeRequestDecoder : public RequestDecoder {
@@ -129,7 +128,7 @@ public:
   class FakeResponseDecoder : public ResponseDecoder {
   public:
     bool parseResponseBody() {
-      uint32_t status = buffer_.peekBEInt<uint32_t>();
+      int32_t status_code = buffer_.peekBEInt<int32_t>();
       buffer_.drain(4);
       message_size_ = message_size_.value() - 4;
 
@@ -145,9 +144,8 @@ public:
       }
 
       auto response = std::make_unique<FakeResponse>();
-      response->status_ = Status(status);
+      response->status_ = Status(StatusCode(status_code), result[1]);
       response->protocol_ = std::string(result[0]);
-      response->status_detail_ = std::string(result[1]);
       for (absl::string_view pair_str : absl::StrSplit(result[2], ';')) {
         auto pair = absl::StrSplit(pair_str, absl::MaxSplits(':', 1));
         response->data_.emplace(pair);
@@ -223,13 +221,13 @@ public:
 
       std::string body;
       body.reserve(512);
-      body = typed_response->protocol_ + "|" + typed_response->status_detail_ + "|";
+      body = typed_response->protocol_ + "|" + std::string(typed_response->status_.message()) + "|";
       for (const auto& pair : typed_response->data_) {
         body += pair.first + ":" + pair.second + ";";
       }
       // Additional 4 bytes for status.
       buffer_.writeBEInt<uint32_t>(body.size() + 4);
-      buffer_.writeBEInt<uint32_t>(static_cast<uint32_t>(typed_response->status_));
+      buffer_.writeBEInt<uint32_t>(static_cast<int32_t>(typed_response->status_.raw_code()));
       buffer_.add(body);
 
       callback.onEncodingSuccess(buffer_, false);
@@ -240,10 +238,9 @@ public:
 
   class FakeMessageCreator : public MessageCreator {
   public:
-    ResponsePtr response(Status status, absl::string_view status_detail, const Request&) override {
+    ResponsePtr response(Status status, const Request&) override {
       auto response = std::make_unique<FakeResponse>();
       response->status_ = status;
-      response->status_detail_ = std::string(status_detail);
       response->protocol_ = "fake_protocol_for_test";
       return response;
     }

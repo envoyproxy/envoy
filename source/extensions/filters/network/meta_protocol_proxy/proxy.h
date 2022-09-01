@@ -100,12 +100,17 @@ public:
 
   // FilterChainFactoryCallbacks
   void addDecoderFilter(DecoderFilterSharedPtr filter) override {
+    filter->setDecoderFilterCallbacks(*this);
     decoder_filters_.emplace_back(std::move(filter));
   }
   void addEncoderFilter(EncoderFilterSharedPtr filter) override {
+    filter->setEncoderFilterCallbacks(*this);
     encoder_filters_.emplace_back(std::move(filter));
   }
   void addFilter(StreamFilterSharedPtr filter) override {
+    filter->setDecoderFilterCallbacks(*this);
+    filter->setEncoderFilterCallbacks(*this);
+
     decoder_filters_.push_back(filter);
     encoder_filters_.emplace_back(std::move(filter));
   }
@@ -117,8 +122,7 @@ public:
   const RouteEntry* routeEntry() const override { return cached_route_entry_.get(); }
 
   // DecoderFilterCallback
-  void sendLocalReply(Status status, absl::string_view status_detail,
-                      ResponseUpdateFunction&&) override;
+  void sendLocalReply(Status status, ResponseUpdateFunction&&) override;
   void continueDecoding() override;
   void upstreamResponse(ResponsePtr response) override;
   void completeDirectly() override;

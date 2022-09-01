@@ -577,11 +577,10 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(*creator_, response(_, _, _))
-      .WillOnce(Invoke([&](Status status, absl::string_view detail, const Request&) -> ResponsePtr {
+  EXPECT_CALL(*creator_, response(_, _))
+      .WillOnce(Invoke([&](Status status, const Request&) -> ResponsePtr {
         auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
-        response->status_ = status;
-        response->status_detail_ = std::string(detail);
+        response->status_ = std::move(status);
         return response;
       }));
 
@@ -590,12 +589,12 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
   EXPECT_CALL(*encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Response& response, ResponseEncoderCallback& callback) {
         Buffer::OwnedImpl buffer;
-        EXPECT_EQ(response.statusDetail(), "test_detail");
+        EXPECT_EQ(response.status().message(), "test_detail");
         buffer.add("test");
         callback.onEncodingSuccess(buffer, true);
       }));
 
-  active_stream->sendLocalReply(Status::LocalExpectedError, "test_detail", [](Response&) {});
+  active_stream->sendLocalReply(Status(StatusCode::kUnknown, "test_detail"), [](Response&) {});
 }
 
 TEST_F(FilterTest, ActiveStreamCompleteDirectly) {

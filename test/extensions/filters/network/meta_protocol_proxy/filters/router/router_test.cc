@@ -63,10 +63,9 @@ public:
 
 TEST_F(RouterFilterTest, OnStreamDecodedAndNoRouteEntry) {
   EXPECT_CALL(mock_filter_callback_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _, _))
-      .WillOnce(Invoke([](Status status, absl::string_view detail, ResponseUpdateFunction&&) {
-        EXPECT_EQ(status, Status::LocalExpectedError);
-        EXPECT_EQ(detail, "route_not_found");
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "route_not_found");
       }));
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
@@ -110,7 +109,10 @@ TEST_F(RouterFilterTest, OnUpstreamCluster) {
   test_buffer.add("test");
 
   // No upstream cluster.
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_not_found", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "cluster_not_found");
+      }));
 
   filter_->onEncodingSuccess(test_buffer, false);
 }
@@ -133,7 +135,11 @@ TEST_F(RouterFilterTest, UpstreamClusterMaintainMode) {
   EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
               maintenanceMode())
       .WillOnce(Return(true));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_maintain_mode", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "cluster_maintain_mode");
+      }));
+
   filter_->onEncodingSuccess(test_buffer, false);
 }
 
@@ -154,7 +160,12 @@ TEST_F(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
   // No conn pool.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "no_healthy_upstream", _));
+
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "no_healthy_upstream");
+      }));
+
   filter_->onEncodingSuccess(test_buffer, false);
 }
 
@@ -173,7 +184,10 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   EXPECT_CALL(
       factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.back(),
       cancel(_));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "local_reset");
+      }));
 
   auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
 
@@ -185,7 +199,10 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
 TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
   kickOffNewUpstreamRequest(false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "overflow", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "overflow");
+      }));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
@@ -194,7 +211,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
 TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
   kickOffNewUpstreamRequest(false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_failure", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "connection_failure");
+      }));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
@@ -230,7 +250,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
   EXPECT_NE(upstream_request->conn_data_, nullptr);
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "local_reset");
+      }));
 
   mock_conn.close(Network::ConnectionCloseType::FlushWrite);
   // Mock connection close event.
@@ -253,7 +276,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
   EXPECT_NE(upstream_request->conn_data_, nullptr);
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_termination", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "connection_termination");
+      }));
 
   mock_conn.close(Network::ConnectionCloseType::FlushWrite);
   // Mock connection close event.
@@ -369,7 +395,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndEndStreamBeforeResponse) {
   EXPECT_CALL(*raw_mock_response_decoder, decode(BufferStringEqual("test_2")))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "protocol_error");
+      }));
 
   upstream_request->onUpstreamData(test_buffer, true);
 }
@@ -414,7 +443,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
 
   upstream_request->onUpstreamData(test_buffer, false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
+      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(status.message(), "protocol_error");
+      }));
 
   upstream_request->onDecodingFailure();
 }
