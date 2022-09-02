@@ -497,21 +497,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
 
   auto* headers = parent_.downstreamHeaders();
 
-  const auto* route_entry = parent_.route()->routeEntry();
-  if (route_entry->autoHostRewrite() && !upstream_host_->hostname().empty()) {
-    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), upstream_host_->hostname(),
-                                   route_entry->appendXfh());
-  }
-
-  if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), upstream_host_);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), upstream_host_);
-  }
-
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
   if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
@@ -816,13 +801,6 @@ void UpstreamRequest::onPoolReady(
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
-  for (auto* callback : upstream_callbacks_) {
-    callback->onUpstreamConnectionEstablished();
-    return;
-  }
-
-  calling_encode_headers_ = true;
-  auto* headers = parent_.downstreamHeaders();
   const auto* route_entry = parent_.route()->routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
@@ -838,6 +816,13 @@ void UpstreamRequest::onPoolReady(
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
+  for (auto* callback : upstream_callbacks_) {
+    callback->onUpstreamConnectionEstablished();
+    return;
+  }
+
+  auto* headers = parent_.downstreamHeaders();
+  calling_encode_headers_ = true;
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
