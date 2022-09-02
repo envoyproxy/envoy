@@ -1,5 +1,5 @@
 #include "source/common/config/utility.h"
-#include "source/extensions/path/rewrite/pattern_template/config.h"
+#include "source/extensions/path/rewrite/uri_template/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -8,14 +8,14 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PatternTemplate {
+namespace UriTemplate {
 namespace Rewrite {
 
 TEST(ConfigTest, TestEmptyConfig) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
@@ -26,7 +26,7 @@ TEST(ConfigTest, TestEmptyConfig) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -40,9 +40,9 @@ TEST(ConfigTest, TestEmptyConfig) {
 
 TEST(ConfigTest, InvalidConfigSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.uri_template.pattern_template_rewritere
+      name: envoy.path.rewrite.uri_template.uri_template_rewritere
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country"
 )EOF";
 
@@ -53,7 +53,7 @@ TEST(ConfigTest, InvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -70,9 +70,9 @@ TEST(ConfigTest, InvalidConfigSetup) {
 
 TEST(ConfigTest, TestConfigSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
@@ -83,7 +83,7 @@ TEST(ConfigTest, TestConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -98,9 +98,9 @@ TEST(ConfigTest, TestConfigSetup) {
 
 TEST(ConfigTest, TestInvalidConfigSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/country}"
 )EOF";
 
@@ -111,7 +111,7 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
       &Envoy::Config::Utility::getAndCheckFactory<Router::PathRewriterFactory>(config);
 
   EXPECT_NE(nullptr, factory);
-  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
+  EXPECT_EQ(factory->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
@@ -127,6 +127,6 @@ TEST(ConfigTest, TestInvalidConfigSetup) {
 }
 
 } // namespace Rewrite
-} // namespace PatternTemplate
+} // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy
