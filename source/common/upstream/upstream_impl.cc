@@ -397,17 +397,17 @@ Host::CreateConnectionData HostImpl::createConnection(
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address,
         source_address_fn ? source_address_fn(address) : nullptr,
-        socket_factory.createTransportSocket(transport_socket_options, host),
-        connection_options, transport_socket_options);
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
   } else if (address_list.size() > 1) {
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-        dispatcher, address_list, source_address_fn, socket_factory,
-        transport_socket_options, host, connection_options);
+        dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
+        connection_options);
   } else {
     connection = dispatcher.createClientConnection(
         address, source_address_fn ? source_address_fn(address) : nullptr,
-        socket_factory.createTransportSocket(transport_socket_options, host),
-        connection_options, transport_socket_options);
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
