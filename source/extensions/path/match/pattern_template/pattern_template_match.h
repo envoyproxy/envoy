@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.h"
-#include "envoy/router/path_match.h"
+#include "envoy/router/path_matcher.h"
 
 #include "source/extensions/path/uri_template_lib/uri_template.h"
 

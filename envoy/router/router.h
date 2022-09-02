@@ -20,8 +20,8 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
-#include "envoy/router/path_match.h"
-#include "envoy/router/path_rewrite.h"
+#include "envoy/router/path_matcher.h"
+#include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -312,11 +312,6 @@ public:
   virtual ~PathMatchPolicy() = default;
 
   /**
-   * @return whether path match policy is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
    * Returns the stored target route PathMatcher.
    * @return a PathMatcher instance.
    */
@@ -329,11 +324,6 @@ public:
 class PathRewritePolicy {
 public:
   virtual ~PathRewritePolicy() = default;
-
-  /**
-   * @return whether path rewrite policy is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
 
   /**
    * Returns the stored target route PathRewriter.
@@ -961,14 +951,14 @@ public:
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
   /**
-   * @return const PathMatchPolicy& the path match policy for the route.
+   * @return const PathMatcherPolicy& the path match policy for the route.
    */
-  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
+  virtual const std::unique_ptr<PathMatchPolicy> pathMatchPolicy() const PURE;
 
   /**
-   * @return const PathRewritePolicy& the path match rewrite for the route.
+   * @return const PathRewritertPolicy& the path match rewrite for the route.
    */
-  virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
+  virtual const std::unique_ptr<PathRewritePolicy> pathRewritePolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

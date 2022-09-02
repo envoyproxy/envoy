@@ -20,9 +20,9 @@ public:
   virtual ~PathMatcher() = default;
 
   /**
-   * Determines if the current path matches the pattern.
+   * Returns true if path matches the pattern.
    *
-   * @param path current path of the matchable route
+   * @param path the path to be matched
    * @return true if path matches the pattern.
    */
   virtual bool match(absl::string_view path) const PURE;

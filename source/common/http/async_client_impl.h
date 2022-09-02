@@ -231,8 +231,8 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
-    const Router::PathMatchPolicy& pathMatchPolicy() const override { return path_match_policy_; }
-    const Router::PathRewritePolicy& pathRewritePolicy() const override {
+    const std::unique_ptr<Router::PathMatchPolicy> pathMatchPolicy() const override { return path_match_policy_; }
+    const std::unique_ptr<Router::PathRewritePolicy> pathRewritePolicy() const override {
       return path_rewrite_policy_;
     }
     uint32_t retryShadowBufferLimit() const override {

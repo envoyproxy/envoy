@@ -25,9 +25,9 @@ namespace Rewrite {
 #endif
 
 absl::Status
-PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr path_match_predicate,
-                                                 bool active_policy) const {
-  if (!active_policy || path_match_predicate->name() != Extensions::UriTemplate::Match::NAME) {
+PatternTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
+                                                 bool active_matcher) const {
+  if (!active_matcher || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
                                                   Extensions::UriTemplate::Rewrite::NAME,
                                                   Extensions::UriTemplate::Match::NAME));
@@ -35,10 +35,10 @@ PatternTemplateRewriter::isCompatibleMatchPolicy(Router::PathMatcherSharedPtr pa
 
   // This is needed to match up variable values.
   // Validation between extensions as they share rewrite pattern variables.
-  if (!isValidSharedVariableSet(rewrite_pattern_, path_match_predicate->pattern()).ok()) {
+  if (!isValidSharedVariableSet(rewrite_pattern_, path_matcher->pattern()).ok()) {
     return absl::InvalidArgumentError(
         fmt::format("mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
-                    path_match_predicate->pattern(), rewrite_pattern_));
+                    path_matcher->pattern(), rewrite_pattern_));
   }
 
   return absl::OkStatus();

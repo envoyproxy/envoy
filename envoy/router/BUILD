@@ -149,7 +149,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "router_path_match_policy_interface",
-    hdrs = ["path_match.h"],
+    hdrs = ["path_matcher.h"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//source/common/common:minimal_logger_lib",
@@ -160,7 +160,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "router_path_rewrite_policy_interface",
-    hdrs = ["path_rewrite.h"],
+    hdrs = ["path_rewriter.h"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//source/common/common:minimal_logger_lib",
