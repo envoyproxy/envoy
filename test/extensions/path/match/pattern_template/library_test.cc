@@ -30,15 +30,15 @@ Router::PathMatcherSharedPtr createMatcherFromYaml(std::string yaml_string) {
 
 TEST(MatchTest, BasicUsage) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_matcher
+      name: envoy.path.match.uri_template.pattern_template_matcher
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
   Router::PathMatcherSharedPtr predicate = createMatcherFromYaml(yaml_string);
   EXPECT_EQ(predicate->pattern(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(), "envoy.path.match.pattern_template.pattern_template_matcher");
+  EXPECT_EQ(predicate->name(), "envoy.path.match.uri_template.pattern_template_matcher");
 
   EXPECT_TRUE(predicate->match("/bar/en/us"));
 }

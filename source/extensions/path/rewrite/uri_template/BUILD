@@ -7,26 +7,27 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Wildcard & Pattern Matching
+# Wildcard & Pattern Rewrites
 
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "pattern_template_match_lib",
-    srcs = ["pattern_template_match.cc"],
-    hdrs = ["pattern_template_match.h"],
+    name = "uri_template_rewrite_lib",
+    srcs = ["uri_template_rewrite.cc"],
+    hdrs = ["uri_template_rewrite.h"],
     visibility = [
         "//source/common/router:__subpackages__",
-        "//source/extensions/path/rewrite/pattern_template:__subpackages__",
-        "//test/extensions/path/match/pattern_template:__subpackages__",
-        "//test/extensions/path/rewrite/pattern_template:__subpackages__",
+        "//test/extensions/path/rewrite/uri_template:__subpackages__",
     ],
     deps = [
         "//envoy/router:router_path_match_policy_interface",
+        "//envoy/router:router_path_rewrite_policy_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "//source/extensions/path/uri_template_lib",
-        "@envoy_api//envoy/extensions/path/match/pattern_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/uri_template/v3:pkg_cc_proto",
     ],
 )
 
@@ -36,10 +37,10 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":pattern_template_match_lib",
+        ":uri_template_rewrite_lib",
         "//envoy/registry",
-        "//envoy/router:router_path_match_policy_interface",
+        "//envoy/router:router_path_rewrite_policy_interface",
         "//source/extensions/path/uri_template_lib",
-        "@envoy_api//envoy/extensions/path/match/pattern_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/path/rewrite/uri_template/v3:pkg_cc_proto",
     ],
 )

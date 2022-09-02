@@ -42,9 +42,9 @@ public:
                                                   absl::string_view rewrite_pattern) const PURE;
 
   /**
-   * @return the rewrite pattern.
+   * @return the rewrite uri_template.
    */
-  virtual absl::string_view pattern() const PURE;
+  virtual absl::string_view uri_template() const PURE;
 
   /**
    * @return the name of the pattern rewriter.

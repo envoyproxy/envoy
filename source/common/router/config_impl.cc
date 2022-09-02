@@ -48,8 +48,8 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
-#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
+#include "source/extensions/path/match/uri_template/uri_template_match.h"
+#include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
 #include "absl/strings/match.h"
 
@@ -1496,18 +1496,18 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      match_pattern_(path_match_policy_.pathMatcher()->pattern()){};
+      uri_template_(path_match_policy_.pathMatcher()->uri_template()){};
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, path_match_policy_.pathMatcher()->pattern(),
+  finalizePathHeader(headers, path_match_policy_.pathMatcher()->uri_template(),
                      insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
   return currentUrlPathAfterRewriteWithMatchedPath(headers,
-                                                   path_match_policy_.pathMatcher()->pattern());
+                                                   path_match_policy_.pathMatcher()->uri_template());
 }
 
 RouteConstSharedPtr

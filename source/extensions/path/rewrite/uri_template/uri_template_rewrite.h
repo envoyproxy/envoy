@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.h"
-#include "envoy/extensions/path/match/pattern_template/v3/pattern_template_match.pb.validate.h"
-#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.h"
-#include "envoy/extensions/path/rewrite/pattern_template/v3/pattern_template_rewrite.pb.validate.h"
+#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
+#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.validate.h"
+#include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.h"
+#include "envoy/extensions/path/rewrite/uri_template/v3/uri_template_rewrite.pb.validate.h"
 #include "envoy/router/path_matcher.h"
 #include "envoy/router/path_rewriter.h"
 
@@ -21,27 +21,27 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Rewrite {
 
-const absl::string_view NAME = "envoy.path.rewrite.pattern_template.pattern_template_rewriter";
+const absl::string_view NAME = "envoy.path.rewrite.uri_template.pattern_template_rewriter";
 
 /**
- * PatternTemplateRewriter allows rewriting paths based on match pattern variables provided
- * in PatternTemplateMatcher.
+ * UriTemplateRewriter allows rewriting paths based on match pattern variables provided
+ * in UriTemplateMatcher.
  *
  * Example:
- * PatternTemplateMatcher = /foo/bar/{var}
- * PatternTemplateRewriter = /foo/{var}
+ * UriTemplateMatcher = /foo/bar/{var}
+ * UriTemplateRewriter = /foo/{var}
  *    Will replace segment of path with value of {var}
  *    e.g. /foo/bar/cat -> /foo/cat
  */
-class PatternTemplateRewriter : public Router::PathRewriter {
+class UriTemplateRewriter : public Router::PathRewriter {
 public:
-  explicit PatternTemplateRewriter(
-      const envoy::extensions::path::rewrite::pattern_template::v3::PatternTemplateRewriteConfig&
+  explicit UriTemplateRewriter(
+      const envoy::extensions::path::rewrite::uri_template::v3::UriTemplateRewriteConfig&
           rewrite_config)
       : rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
   // Router::PathRewriter
-  absl::string_view pattern() const override { return rewrite_pattern_; }
+  absl::string_view uri_template() const override { return rewrite_pattern_; }
 
   /**
    * Concatenates literals and extracts variable values to form the final rewritten path.

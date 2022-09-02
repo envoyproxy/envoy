@@ -1,4 +1,4 @@
-#include "source/extensions/path/rewrite/pattern_template/pattern_template_rewrite.h"
+#include "source/extensions/path/rewrite/uri_template/uri_template_rewrite.h"
 
 #include <map>
 #include <string>
@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
+#include "source/extensions/path/match/uri_template/uri_template_match.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -25,7 +25,7 @@ namespace Rewrite {
 #endif
 
 absl::Status
-PatternTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
+UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
                                                  bool active_matcher) const {
   if (!active_matcher || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
@@ -35,17 +35,17 @@ PatternTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr pa
 
   // This is needed to match up variable values.
   // Validation between extensions as they share rewrite pattern variables.
-  if (!isValidSharedVariableSet(rewrite_pattern_, path_matcher->pattern()).ok()) {
+  if (!isValidSharedVariableSet(rewrite_pattern_, path_matcher->uri_template()).ok()) {
     return absl::InvalidArgumentError(
         fmt::format("mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
-                    path_matcher->pattern(), rewrite_pattern_));
+                    path_matcher->uri_template(), rewrite_pattern_));
   }
 
   return absl::OkStatus();
 }
 
 absl::StatusOr<std::string>
-PatternTemplateRewriter::rewritePath(absl::string_view pattern,
+UriTemplateRewriter::rewritePath(absl::string_view pattern,
                                      absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertPathPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {

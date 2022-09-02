@@ -28,9 +28,9 @@ public:
   virtual bool match(absl::string_view path) const PURE;
 
   /**
-   * @return the match pattern.
+   * @return the match uri_template.
    */
-  virtual absl::string_view pattern() const PURE;
+  virtual absl::string_view uri_template() const PURE;
 
   /**
    * @return the name of the path matcher.

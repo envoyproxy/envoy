@@ -1,4 +1,4 @@
-#include "source/extensions/path/match/pattern_template/pattern_template_match.h"
+#include "source/extensions/path/match/uri_template/uri_template_match.h"
 
 #include <map>
 #include <string>
@@ -17,13 +17,13 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Match {
 
-bool PatternTemplateMatcher::match(absl::string_view path) const {
+bool UriTemplateMatcher::match(absl::string_view path) const {
   RE2 matching_pattern_regex = RE2(convertPathPatternSyntaxToRegex(path_template_).value());
   return RE2::FullMatch(Internal::toStringPiece(Http::PathUtil::removeQueryAndFragment(path)),
                         matching_pattern_regex);
 }
 
-absl::string_view PatternTemplateMatcher::pattern() const { return path_template_; }
+absl::string_view UriTemplateMatcher::uri_template() const { return path_template_; }
 
 } // namespace Match
 } // namespace UriTemplate

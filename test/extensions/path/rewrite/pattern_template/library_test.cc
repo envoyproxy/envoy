@@ -47,35 +47,35 @@ Router::PathRewriterSharedPtr createRewriterFromYaml(std::string yaml_string) {
 
 TEST(RewriteTest, BasicSetup) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
   EXPECT_EQ(predicate->pattern(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
 }
 
 TEST(RewriteTest, BasicUsage) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
   EXPECT_EQ(predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}").value(), "/bar/usa/en");
-  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.pattern_template.pattern_template_rewriter");
+  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.pattern_template_rewriter");
 }
 
 TEST(RewriteTest, RewriteInvalidRegex) {
   const std::string yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
@@ -88,16 +88,16 @@ TEST(RewriteTest, RewriteInvalidRegex) {
 
 TEST(RewriteTest, MatchPatternValidation) {
   const std::string rewrite_yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/foo/{lang}/{country}"
 )EOF";
 
   const std::string match_yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_matcher
+      name: envoy.path.match.uri_template.pattern_template_matcher
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
@@ -109,16 +109,16 @@ TEST(RewriteTest, MatchPatternValidation) {
 
 TEST(RewriteTest, MatchPatternInactive) {
   const std::string rewrite_yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/foo/{lang}/{country}"
 )EOF";
 
   const std::string match_yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_matcher
+      name: envoy.path.match.uri_template.pattern_template_matcher
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
@@ -128,23 +128,23 @@ TEST(RewriteTest, MatchPatternInactive) {
   absl::Status error = rewrite_predicate->isCompatibleMatchPolicy(match_predicate, false);
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(),
-            "unable to use envoy.path.rewrite.pattern_template.pattern_template_rewriter "
-            "extension without envoy.path.match.pattern_template.pattern_template_matcher "
+            "unable to use envoy.path.rewrite.uri_template.pattern_template_rewriter "
+            "extension without envoy.path.match.uri_template.pattern_template_matcher "
             "extension");
 }
 
 TEST(RewriteTest, MatchPatternMismatchedVars) {
   const std::string rewrite_yaml_string = R"EOF(
-      name: envoy.path.rewrite.pattern_template.pattern_template_rewriter
+      name: envoy.path.rewrite.uri_template.pattern_template_rewriter
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
         path_template_rewrite: "/foo/{lang}/{missing}"
 )EOF";
 
   const std::string match_yaml_string = R"EOF(
-      name: envoy.path.match.pattern_template.pattern_template_matcher
+      name: envoy.path.match.uri_template.pattern_template_matcher
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
+        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
         path_template: "/bar/{lang}/{country}"
 )EOF";
 

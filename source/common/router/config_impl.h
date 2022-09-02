@@ -1080,7 +1080,7 @@ public:
                                 ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return match_pattern_; }
+  const std::string& matcher() const override { return uri_template_; }
   PathMatchType matchType() const override { return PathMatchType::Policy; }
 
   // Router::Matchable
@@ -1097,7 +1097,7 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string match_pattern_;
+  const std::string uri_template_;
 };
 
 /**

@@ -746,22 +746,22 @@ envoy.matching.matchers.ip:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
-envoy.path.match.pattern_template.pattern_template_matcher:
+envoy.path.match.pattern_template.uri_template_matcher:
     categories:
     - envoy.path.match
     security_posture: unknown
     status: stable
     undocumented: true
     type_urls:
-    - envoy.extensions.path.match.pattern_template.v3.PatternTemplateMatchConfig
-envoy.path.rewrite.pattern_template.pattern_template_rewriter:
+    - envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+envoy.path.rewrite.pattern_template.uri_template_rewriter:
       categories:
       - envoy.path.rewrite
       security_posture: unknown
       status: stable
       undocumented: true
       type_urls:
-      - envoy.extensions.path.rewrite.pattern_template.v3.PatternTemplateRewriteConfig
+      - envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source

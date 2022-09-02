@@ -1,4 +1,4 @@
-#include "source/extensions/path/match/pattern_template/config.h"
+#include "source/extensions/path/match/uri_template/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/path_matcher.h"
@@ -8,7 +8,7 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Match {
 
-REGISTER_FACTORY(PatternTemplateMatcherFactory, Router::PathMatcherFactory);
+REGISTER_FACTORY(UriTemplateMatcherFactory, Router::PathMatcherFactory);
 
 } // namespace Match
 } // namespace UriTemplate
