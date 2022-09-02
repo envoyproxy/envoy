@@ -5,8 +5,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace {
 
