@@ -110,22 +110,21 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 // addition to declaring it in MainCommon. There is no harm in double-declaring.
 TEST_P(MainCommonTest, ValidateUsingMainCommonBaseOutsideTestThread) {
   EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
-  {
-    Event::TestRealTimeSystem real_time_system;
-    DefaultListenerHooks default_listener_hooks;
-    ProdComponentFactory prod_component_factory;
-    const char* argv[] = {"envoy-static",       "--mode", "validate", "--config-path",
-                          config_file_.c_str(), nullptr};
-    Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommon::hotRestartVersion,
-                               spdlog::level::info);
-    std::unique_ptr<Thread::Thread> thread = Thread::threadFactoryForTest().createThread([&]() {
-      MainCommonBase base(options, real_time_system, default_listener_hooks, prod_component_factory,
-                          std::make_unique<PlatformImpl>(),
-                          std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
-      EXPECT_TRUE(base.run());
-    });
-    thread->join();
-  }
+  const char* argv[] = {"envoy-static",       "--mode", "validate", "--config-path",
+                        config_file_.c_str(), nullptr};
+  Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommon::hotRestartVersion,
+                             spdlog::level::info);
+  std::unique_ptr<Thread::Thread> thread =
+      Thread::threadFactoryForTest().createThread([&options]() {
+        Event::TestRealTimeSystem real_time_system;
+        DefaultListenerHooks default_listener_hooks;
+        ProdComponentFactory prod_component_factory;
+        MainCommonBase base(options, real_time_system, default_listener_hooks,
+                            prod_component_factory, std::make_unique<PlatformImpl>(),
+                            std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
+        EXPECT_TRUE(base.run());
+      });
+  thread->join();
   EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
 }
 
