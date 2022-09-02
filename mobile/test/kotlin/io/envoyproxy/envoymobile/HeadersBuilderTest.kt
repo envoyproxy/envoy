@@ -43,7 +43,7 @@ class HeadersBuilderTest {
   }
 
   @Test
-  fun `removing specific header key performs a case-insentive header name lookup`() {
+  fun `removing specific header key performs a case-insensitive header name lookup`() {
     val headers = RequestHeadersBuilder(mutableMapOf())
       .set("foo", mutableListOf("123"))
       .remove("fOo")
