@@ -344,6 +344,11 @@ public:
   static void setLogFormat(const std::string& log_format);
 
   /**
+   * Sets the log format for a specific logger.
+   */
+  static void setLogFormatForLogger(spdlog::logger* const logger, const std::string& log_format);
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }

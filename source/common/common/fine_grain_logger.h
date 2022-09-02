@@ -138,12 +138,6 @@ private:
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(fine_grain_log_lock_);
 
   /**
-   * Sets the log format.
-   */
-  void setLogFormat(spdlog::logger* const logger, const std::string& log_format)
-      ABSL_SHARED_LOCKS_REQUIRED(fine_grain_log_lock_);
-
-  /**
    * Append verbosity level updates to the VerbosityLogUpdateInfo vector.
    */
   void appendVerbosityLogUpdate(absl::string_view update_pattern,

@@ -77,7 +77,7 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
   absl::ReaderMutexLock rl(&fine_grain_log_lock_);
   for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
-    setLogFormat(logger.get(), format);
+    Logger::Registry::setLogFormatForLogger(logger.get(), format);
   }
 }
 
@@ -165,26 +165,11 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
   }
 
   new_logger->set_level(getLogLevel(key));
-  setLogFormat(new_logger.get(), Logger::Context::getFineGrainLogFormat());
+  Logger::Registry::setLogFormatForLogger(new_logger.get(),
+                                          Logger::Context::getFineGrainLogFormat());
   new_logger->flush_on(level_enum::critical);
   fine_grain_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();
-}
-
-void FineGrainLogContext::setLogFormat(spdlog::logger* const logger,
-                                       const std::string& log_format) {
-  auto formatter = std::make_unique<spdlog::pattern_formatter>();
-  formatter
-      ->add_flag<Logger::CustomFlagFormatter::EscapeMessageNewLine>(
-          Logger::CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
-      .set_pattern(log_format);
-
-  // Escape log payload as JSON string when it sees "%j".
-  formatter
-      ->add_flag<Logger::CustomFlagFormatter::EscapeMessageJsonString>(
-          Logger::CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
-      .set_pattern(log_format);
-  logger->set_formatter(std::move(formatter));
 }
 
 void FineGrainLogContext::updateVerbosityDefaultLevel(level_enum level) {
