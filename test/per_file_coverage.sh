@@ -71,6 +71,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/io_socket/user_space:96.2"
 "source/extensions/network/dns_resolver/getaddrinfo:96.3"
 "source/extensions/path/rewrite:88.1"
+"source/extensions/path/:96.1"
 "source/extensions/path/rewrite/pattern_template:88.1"
 "source/extensions/rate_limit_descriptors:95.5"
 "source/extensions/rate_limit_descriptors/expr:95.5"
