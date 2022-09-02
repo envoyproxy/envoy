@@ -224,9 +224,9 @@ public:
 
 // Fixture class for integration tests.
 class HttpsInspectionIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                       public BaseIntegrationTest {
+                                       public HttpIntegrationTest {
 public:
-  HttpsInspectionIntegrationTest() : BaseIntegrationTest(GetParam()) {}
+  HttpsInspectionIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
   void initialize() override;
   void setupDnsCacheConfig(envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig&
                            dns_cache_config);
@@ -491,39 +491,47 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
 
   // Open clear-text connection.
   conn_->connect();
-
   // Sends a HTTP CONNECT message.
   Buffer::OwnedImpl buffer;
   std::string connect_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
     "Host: www.cnn.com:80\r\n"
     "\r\n\r\n";
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK");
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
   buffer.add(connect_msg);
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-
   // Sends a HTTP GET message.
   auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
   std::string get_msg =
-    "GET / HTTP/1.1\r\n"
+    "POST / HTTP/1.1\r\n"
     "Host: localhost:"+ port_str  + "\r\n"
+    "Content-Length: 5"
     "\r\n\r\n";
   buffer.add(get_msg);
   conn_->write(buffer, false);
-  while (client_write_buffer_->bytesDrained() != connect_msg.length() +
-         get_msg.length()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  // Wait for them to arrive upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(
+      *dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "POST");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "localhost:" + port_str);
 
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForData(
-      FakeRawConnection::waitForInexactMatch("GET / HTTP/1.1")));
   // Sends a response back to client.
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 503 Service Unavailable");
-  ASSERT_TRUE(fake_upstream_connection->write(
-      "HTTP/1.1 503 Service Unavailable\r\n\r\n"));
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Make sure the bi-directional data can go through.
+  buffer.add("hello");
+  conn_->write(buffer, false);
+  // Wait for them to arrive upstream.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello"));
+  // Also test upstream to downstream data.
+  payload_reader_->set_data_to_wait_for("world", false);
+  upstream_request_->encodeData("world", false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
@@ -551,7 +559,7 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
     "Host: www.cnn.com:80\r\n"
     "\r\n\r\n";
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK");
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
   buffer.add(request_msg);
   conn_->write(buffer, false);
    // Wait for confirmation
