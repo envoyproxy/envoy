@@ -6,6 +6,22 @@ Pending Release
 
 Breaking changes:
 
+-
+
+Bugfixes:
+
+-
+
+Features:
+
+-
+
+
+0.5.0 (September 1, 2022)
+===========================
+
+Breaking changes:
+
 - api: replace the ``drainConnections()`` method with a broader ``resetConnectivityState()``. (:issue:`#2225 <2225>`).
 - api: disallow setting 'host' header directly (:issue:`#2275 <2275>`)
 - android: respect Android's NetworkSecurityPolicy isCleartextTrafficPermitted APIs.
