@@ -77,7 +77,7 @@ void FineGrainLogContext::setDefaultFineGrainLogLevelFormat(spdlog::level::level
   absl::ReaderMutexLock rl(&fine_grain_log_lock_);
   for (const auto& [key, logger] : *fine_grain_log_map_) {
     logger->set_level(getLogLevel(key));
-    Logger::Registry::setLogFormatForLogger(logger.get(), format);
+    Logger::LoggerUtil::setLogFormatForLogger(logger.get(), format);
   }
 }
 
@@ -165,8 +165,8 @@ spdlog::logger* FineGrainLogContext::createLogger(const std::string& key)
   }
 
   new_logger->set_level(getLogLevel(key));
-  Logger::Registry::setLogFormatForLogger(new_logger.get(),
-                                          Logger::Context::getFineGrainLogFormat());
+  Logger::LoggerUtil::setLogFormatForLogger(new_logger.get(),
+                                            Logger::Context::getFineGrainLogFormat());
   new_logger->flush_on(level_enum::critical);
   fine_grain_log_map_->insert(std::make_pair(key, new_logger));
   return new_logger.get();

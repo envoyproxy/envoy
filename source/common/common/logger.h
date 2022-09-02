@@ -344,11 +344,6 @@ public:
   static void setLogFormat(const std::string& log_format);
 
   /**
-   * Sets the log format for a specific logger.
-   */
-  static void setLogFormatForLogger(spdlog::logger* const logger, const std::string& log_format);
-
-  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -365,6 +360,17 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+};
+
+/**
+ * Defines a set of functions shared by Envoy and Find-grain loggers.
+ */
+class LoggerUtil {
+public:
+  /**
+   * Sets the log format for a specific logger.
+   */
+  static void setLogFormatForLogger(spdlog::logger* const logger, const std::string& log_format);
 };
 
 /**

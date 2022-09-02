@@ -35,7 +35,7 @@ public:
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
-  std::shared_ptr<spdlog::logger> getLogger() { return logger_; }
+  spdlog::logger& getLogger() { return *logger_; }
 
   /*
    * Exposes the log method of the logger. See `spdlog::logger` log method.

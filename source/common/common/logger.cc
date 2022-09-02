@@ -240,21 +240,33 @@ std::vector<Logger>& Registry::allLoggers() {
   return *all_loggers;
 }
 
-spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].getLogger(); }
+spdlog::logger& Registry::getLog(Id id) { return allLoggers()[static_cast<int>(id)].getLogger(); }
 
 void Registry::setLogLevel(spdlog::level::level_enum log_level) {
   for (Logger& logger : allLoggers()) {
-    logger.getLogger()->set_level(static_cast<spdlog::level::level_enum>(log_level));
+    logger.getLogger().set_level(static_cast<spdlog::level::level_enum>(log_level));
   }
 }
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    setLogFormatForLogger(logger.getLogger().get(), log_format);
+    LoggerUtil::setLogFormatForLogger(&logger.getLogger(), log_format);
   }
 }
 
-void Registry::setLogFormatForLogger(spdlog::logger* const logger, const std::string& log_format) {
+Logger* Registry::logger(const std::string& log_name) {
+  Logger* logger_to_return = nullptr;
+  for (Logger& logger : loggers()) {
+    if (logger.name() == log_name) {
+      logger_to_return = &logger;
+      break;
+    }
+  }
+  return logger_to_return;
+}
+
+void LoggerUtil::setLogFormatForLogger(spdlog::logger* const logger,
+                                       const std::string& log_format) {
   auto formatter = std::make_unique<spdlog::pattern_formatter>();
   formatter
       ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
@@ -267,17 +279,6 @@ void Registry::setLogFormatForLogger(spdlog::logger* const logger, const std::st
           CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
       .set_pattern(log_format);
   logger->set_formatter(std::move(formatter));
-}
-
-Logger* Registry::logger(const std::string& log_name) {
-  Logger* logger_to_return = nullptr;
-  for (Logger& logger : loggers()) {
-    if (logger.name() == log_name) {
-      logger_to_return = &logger;
-      break;
-    }
-  }
-  return logger_to_return;
 }
 
 namespace CustomFlagFormatter {
