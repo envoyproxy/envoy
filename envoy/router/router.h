@@ -312,6 +312,11 @@ public:
   virtual ~PathMatchPolicy() = default;
 
   /**
+   * @return whether path match policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
+
+  /**
    * Returns the stored target route PathMatcher.
    * @return a PathMatcher instance.
    */
@@ -324,6 +329,11 @@ public:
 class PathRewritePolicy {
 public:
   virtual ~PathRewritePolicy() = default;
+
+  /**
+   * @return whether path rewrite policy is enabled on this route.
+   */
+  virtual bool enabled() const PURE;
 
   /**
    * Returns the stored target route PathRewriter.
@@ -953,12 +963,12 @@ public:
   /**
    * @return const PathMatcherPolicy& the path match policy for the route.
    */
-  virtual const std::unique_ptr<PathMatchPolicy> pathMatchPolicy() const PURE;
+  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
 
   /**
-   * @return const PathRewritertPolicy& the path match rewrite for the route.
+   * @return const PathRewriterPolicy& the path match rewrite for the route.
    */
-  virtual const std::unique_ptr<PathRewritePolicy> pathRewritePolicy() const PURE;
+  virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

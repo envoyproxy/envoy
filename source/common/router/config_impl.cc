@@ -360,9 +360,12 @@ std::vector<InternalRedirectPredicateSharedPtr> InternalRedirectPolicyImpl::pred
   return predicates;
 }
 
+PathRewritePolicyImpl::PathRewritePolicyImpl() : enabled_(false){};
+
 PathRewritePolicyImpl::PathRewritePolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator) {
+    ProtobufMessage::ValidationVisitor& validator)
+    : enabled_(true) {
 
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathRewriterFactory>(typed_config);
 
@@ -380,9 +383,12 @@ PathRewritePolicyImpl::PathRewritePolicyImpl(
 
 PathRewriterSharedPtr PathRewritePolicyImpl::pathRewriter() const { return rewriter_; }
 
-PathMatchPolicy::PathMatchPolicy(
+PathMatchPolicyImpl::PathMatchPolicyImpl() : enabled_(false){};
+
+PathMatchPolicyImpl::PathMatchPolicyImpl(
     const envoy::config::core::v3::TypedExtensionConfig typed_config,
-    ProtobufMessage::ValidationVisitor& validator) {
+    ProtobufMessage::ValidationVisitor& validator)
+    : enabled_(true) {
 
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathMatcherFactory>(typed_config);
 
@@ -398,7 +404,7 @@ PathMatchPolicy::PathMatchPolicy(
   path_matcher_ = matcher.value();
 }
 
-PathMatcherSharedPtr PathMatchPolicy::pathMatcher() const { return path_matcher_; }
+PathMatcherSharedPtr PathMatchPolicyImpl::pathMatcher() const { return path_matcher_; }
 
 absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectResponseCodes(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const {
@@ -715,9 +721,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  if (path_rewrite_policy_.has_value()) {
+  if (path_rewrite_policy_.enabled()) {
     absl::Status compatible_status = path_rewrite_policy_.pathRewriter()->isCompatiblePathMatcher(
-        path_match_policy_.pathMatcher(), path_match_policy_.has_value());
+        path_match_policy_.pathMatcher(), path_match_policy_.enabled());
     if (!compatible_status.ok()) {
       throw EnvoyException(std::string(compatible_status.message()));
     }
@@ -888,7 +894,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   // Handle path rewrite
   absl::optional<std::string> container;
   if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
-      path_rewrite_policy_.has_value()) {
+      path_rewrite_policy_.enabled()) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -1024,7 +1030,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     }
   }
 
-  if (path_rewrite_policy_.has_value()) {
+  if (path_rewrite_policy_.enabled()) {
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
 
     absl::StatusOr<std::string> new_path =
@@ -1228,20 +1234,20 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   }
   return InternalRedirectPolicyImpl{policy_config, validator, current_route_name};
 }
-std::unique_ptr<PathRewritePolicyImpl
+PathRewritePolicyImpl
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const {
   if (route.route().has_path_rewrite_policy()) {
-    return {PathRewritePolicyImpl{route.route().path_rewrite_policy(), validator}};
+    return PathRewritePolicyImpl{route.route().path_rewrite_policy(), validator};
   }
   return {};
 }
 
-std::unique_ptr<PathMatchPolicy>
+PathMatchPolicyImpl
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
   if (route.match().has_path_match_policy()) {
-    return {PathMatchPolicy{route.match().path_match_policy(), validator}};
+    return PathMatchPolicyImpl{route.match().path_match_policy(), validator};
   }
 
   return {};

@@ -470,9 +470,12 @@ public:
   PathMatchPolicyImpl();
 
   // Router::PathMatchPolicy
+  bool enabled() const override { return enabled_; }
+
   PathMatcherSharedPtr pathMatcher() const override;
 
 private:
+  const bool enabled_;
   ProtobufTypes::MessagePtr config_;
   PathMatcherSharedPtr path_matcher_;
 };
@@ -490,9 +493,12 @@ public:
   PathRewritePolicyImpl();
 
   // Router::PathRewritePolicy
+  bool enabled() const override { return enabled_; }
+
   PathRewriterSharedPtr pathRewriter() const override;
 
 private:
+  const bool enabled_;
   ProtobufTypes::MessagePtr config_;
   PathRewriterSharedPtr rewriter_;
 };
@@ -609,8 +615,8 @@ public:
     return internal_redirect_policy_;
   }
 
-  const std::unique_ptr<PathMatchPolicy> pathMatchPolicy() const override { return path_match_policy_; }
-  const std::unique_ptr<PathRewritePolicy> pathRewritePolicy() const override { return path_rewrite_policy_; }
+  const PathMatchPolicyImpl& pathMatchPolicy() const override { return path_match_policy_; }
+  const PathRewritePolicyImpl& pathRewritePolicy() const override { return path_rewrite_policy_; }
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -725,10 +731,10 @@ public:
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
     }
-    const std::unique_ptr<PathMatchPolicy> pathMatchPolicy() const override {
+    const PathMatchPolicyImpl& pathMatchPolicy() const override {
       return parent_->pathMatchPolicy();
     }
-    const std::unique_ptr<PathRewritePolicy> pathRewritePolicy() const override {
+    const PathRewritePolicyImpl& pathRewritePolicy() const override {
       return parent_->pathRewritePolicy();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
@@ -896,8 +902,8 @@ protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  const std::unique_ptr<PathMatchPolicyImpl> path_match_policy_;
-  const std::unique_ptr<PathRewritePolicyImpl> path_rewrite_policy_;
+  const PathMatchPolicyImpl path_match_policy_;
+  const PathRewritePolicyImpl path_rewrite_policy_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -979,10 +985,10 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
-  absl::optional<PathMatchPolicyImpl> buildPathMatchPolicy(envoy::config::route::v3::Route route,
+  PathMatchPolicyImpl buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const;
 
-   absl::optional<PathRewritePolicyImpl> buildPathRewritePolicy(envoy::config::route::v3::Route route,
+  PathRewritePolicyImpl buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                                ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
