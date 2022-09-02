@@ -5,6 +5,8 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 
+using testing::HasSubstr;
+
 namespace Envoy {
 namespace {
 
@@ -25,7 +27,7 @@ public:
   void initialize() override {
     config_helper_.addFilter("{ name: header-to-proxy-filter }");
     if (upstream_tls_) {
-      config_helper_.configureUpstreamTls(false, false);
+      config_helper_.configureUpstreamTls(use_alpn_, false);
     }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
@@ -50,14 +52,14 @@ public:
     });
     BaseIntegrationTest::initialize();
     if (upstream_tls_) {
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1, false);
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1, false);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), codec_type_, false);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), codec_type_, false);
       // Read disable the fake upstreams, so we can rawRead rather than read data and decrypt.
       fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
       fake_upstreams_[2]->setDisableAllAndDoNotEnable(true);
     } else {
-      addFakeUpstream(Http::CodecType::HTTP1);
-      addFakeUpstream(Http::CodecType::HTTP1);
+      addFakeUpstream(codec_type_);
+      addFakeUpstream(codec_type_);
     }
   }
 
@@ -70,6 +72,8 @@ public:
     // Ship the CONNECT response.
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
   }
+  bool use_alpn_ = false;
+  Http::CodecType codec_type_ = Http::CodecType::HTTP1;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -234,6 +238,8 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
 
 // Test sending requests to different proxies.
 TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
+  // Also make sure that alpn negotiation works.
+  use_alpn_ = true;
   initialize();
 
   // Point at the second fake upstream. Envoy doesn't actually know about this one.
