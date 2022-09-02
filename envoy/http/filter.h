@@ -208,9 +208,9 @@ public:
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 
   // Setters and getters to determine if sending body payload is paused on
-  // confirmation of a CONNECT upgrade. These should only be used by the codec filter.
+  // confirmation of a CONNECT upgrade. These should only be used by the upstream codec filter.
   // TODO(alyssawilk) after deprecating the classic path, move this logic to the
-  // codec filter and remove these APIs
+  // upstream codec filter and remove these APIs
   virtual bool pausedForConnect() const PURE;
   virtual void setPausedForConnect(bool value) PURE;
 
@@ -222,8 +222,8 @@ public:
   // of the upstream stream.
   virtual void addUpstreamCallbacks(UpstreamCallbacks& callbacks) PURE;
 
-  // This should only be called by the CodecFilter, and is used to let the
-  // CodecFilter supply the interface used by the GenericUpstream to receive
+  // This should only be called by the UpstreamCodecFilter, and is used to let the
+  // UpstreamCodecFilter supply the interface used by the GenericUpstream to receive
   // response data from the upstream stream once it is established.
   virtual void
   setUpstreamToDownstream(Router::UpstreamToDownstream& upstream_to_downstream_interface) PURE;

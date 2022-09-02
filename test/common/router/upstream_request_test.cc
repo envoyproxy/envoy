@@ -29,7 +29,7 @@ public:
         .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
           Http::FilterFactoryCb factory_cb =
               [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<CodecFilter>());
+            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
           };
           manager.applyFilterFactoryCb({}, factory_cb);
         }));
@@ -93,7 +93,7 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
         manager.applyFilterFactoryCb({}, factory);
         Http::FilterFactoryCb factory_cb =
             [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<CodecFilter>());
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         };
         manager.applyFilterFactoryCb({}, factory_cb);
       }));

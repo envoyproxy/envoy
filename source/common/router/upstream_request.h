@@ -6,8 +6,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/codec/v3/codec.pb.h"
-#include "envoy/extensions/filters/http/codec/v3/codec.pb.validate.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.validate.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -36,7 +36,7 @@ class RouterFilterInterface;
 class UpstreamRequest;
 class UpstreamRequestFilterManagerCallbacks;
 class UpstreamFilterManager;
-class CodecFilter;
+class UpstreamCodecFilter;
 
 /* The Upstream request is the base class for forwarding HTTP upstream.
  *
@@ -58,13 +58,13 @@ class CodecFilter;
  * On the new request path, payload (headers/body/metadata/data) still arrives via
  * the accept[X]fromRouter functions. Said data is immediately passed off to the
  * UpstreamFilterManager, which passes each item through the filter chain until
- * it arrives at the last filter in the chain, the CodecFilter. If the upstream
- * stream is not established, the CodecFilter returns StopAllIteration, and the
+ * it arrives at the last filter in the chain, the UpstreamCodecFilter. If the upstream
+ * stream is not established, the UpstreamCodecFilter returns StopAllIteration, and the
  * FilterManager will buffer data, using watermarks to push back to the router
  * filter if buffers become overrun. When an upstream connection is established,
- * the CodecFilter will send data upstream.
+ * the UpstreamCodecFilter will send data upstream.
  *
- * On the new response path, payload arrives from upstream via the CodecFilter's
+ * On the new response path, payload arrives from upstream via the UpstreamCodecFilter's
  * CodecBridge. It is passed off directly to the FilterManager, traverses the
  * filter chain, and completion is signaled via the
  * UpstreamRequestFilterManagerCallbacks's encode[X] functions. These somewhat
@@ -74,7 +74,7 @@ class CodecFilter;
  * RouterFilterInterface onUpstream[X] functions.
  *
  * There is some required communication between the UpstreamRequest and
- * CodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
+ * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
  * interface, with the UpstreamFilterManager acting as intermediary.
  */
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
@@ -181,7 +181,7 @@ public:
 
 private:
   friend class UpstreamFilterManager;
-  friend class CodecFilter;
+  friend class UpstreamCodecFilter;
   friend class UpstreamRequestFilterManagerCallbacks;
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
@@ -390,12 +390,12 @@ public:
 // headers/body/data from the upstream stream and sends them to the filter manager.
 //
 // TODO(alyssawilk) move this to its own file in a follow-up PR.
-class CodecFilter : public Http::StreamDecoderFilter,
-                    public Logger::Loggable<Logger::Id::router>,
-                    public Http::DownstreamWatermarkCallbacks,
-                    public Http::UpstreamCallbacks {
+class UpstreamCodecFilter : public Http::StreamDecoderFilter,
+                            public Logger::Loggable<Logger::Id::router>,
+                            public Http::DownstreamWatermarkCallbacks,
+                            public Http::UpstreamCallbacks {
 public:
-  CodecFilter() : bridge_(*this), calling_encode_headers_(false), deferred_reset_(false) {}
+  UpstreamCodecFilter() : bridge_(*this), calling_encode_headers_(false), deferred_reset_(false) {}
 
   // Http::DownstreamWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
@@ -418,7 +418,7 @@ public:
   // This bridge connects the upstream stream to the filter manager.
   class CodecBridge : public UpstreamToDownstream {
   public:
-    CodecBridge(CodecFilter& filter) : filter_(filter) {}
+    CodecBridge(UpstreamCodecFilter& filter) : filter_(filter) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -457,7 +457,7 @@ public:
   private:
     void maybeEndDecode(bool end_stream);
     bool seen_1xx_headers_{};
-    CodecFilter& filter_;
+    UpstreamCodecFilter& filter_;
   };
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
@@ -472,22 +472,24 @@ private:
   }
 };
 
-class UpstreamCodecFilterFactory : public Extensions::HttpFilters::Common::CommonFactoryBase<
-                                       envoy::extensions::filters::http::codec::v3::Codec>,
-                                   public Server::Configuration::UpstreamHttpFilterConfigFactory {
+class UpstreamCodecFilterFactory
+    : public Extensions::HttpFilters::Common::CommonFactoryBase<
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec>,
+      public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
-  UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.codec") {}
+  UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.upstream_codec") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::UpstreamHttpFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamDecoderFilter(std::make_shared<CodecFilter>());
+      callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
     };
   }
-  bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::codec::v3::Codec&,
-                                    Server::Configuration::ServerFactoryContext&) override {
+  bool isTerminalFilterByProtoTyped(
+      const envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec&,
+      Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 };

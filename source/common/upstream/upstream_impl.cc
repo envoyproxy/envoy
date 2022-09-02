@@ -17,7 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/http/codec/v3/codec.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
@@ -1029,11 +1029,11 @@ ClusterInfoImpl::ClusterInfoImpl(
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
-      codec_filter->set_name("envoy.filters.http.codec");
+      codec_filter->set_name("envoy.filters.http.upstream_codec");
       codec_filter->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::codec::v3::Codec::default_instance());
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
     }
-    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.codec") {
+    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
       throw EnvoyException(
           fmt::format("The codec filter is the only valid terminal upstream filter"));
     }

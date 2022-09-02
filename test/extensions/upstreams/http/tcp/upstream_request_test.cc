@@ -41,7 +41,7 @@ public:
         .WillByDefault(Invoke([&](Envoy::Http::FilterChainManager& manager) -> void {
           Envoy::Http::FilterFactoryCb factory_cb =
               [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::CodecFilter>());
+            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
           };
           manager.applyFilterFactoryCb({}, factory_cb);
         }));
@@ -105,7 +105,7 @@ public:
         .WillByDefault(Invoke([&](Envoy::Http::FilterChainManager& manager) -> void {
           Envoy::Http::FilterFactoryCb factory_cb =
               [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::CodecFilter>());
+            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
           };
           manager.applyFilterFactoryCb({}, factory_cb);
         }));

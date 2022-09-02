@@ -41,17 +41,17 @@
 namespace Envoy {
 namespace Router {
 
-void CodecFilter::onBelowWriteBufferLowWatermark() {
+void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
   callbacks_->clusterInfo()->stats().upstream_flow_control_resumed_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
 }
 
-void CodecFilter::onAboveWriteBufferHighWatermark() {
+void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
   callbacks_->clusterInfo()->stats().upstream_flow_control_paused_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
 }
 
-void CodecFilter::onUpstreamConnectionEstablished() {
+void UpstreamCodecFilter::onUpstreamConnectionEstablished() {
   if (latched_end_stream_.has_value()) {
     bool end_stream = *latched_end_stream_;
     latched_end_stream_.reset();
@@ -63,8 +63,8 @@ void CodecFilter::onUpstreamConnectionEstablished() {
 }
 
 // This is the last stop in the filter chain: take the headers and ship them to the codec.
-Http::FilterHeadersStatus CodecFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                     bool end_stream) {
+Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                             bool end_stream) {
   ASSERT(callbacks_->upstreamCallbacks());
   if (!callbacks_->upstreamCallbacks()->upstream()) {
     latched_headers_ = headers;
@@ -102,7 +102,7 @@ Http::FilterHeadersStatus CodecFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 // This is the last stop in the filter chain: take the data and ship it to the codec.
-Http::FilterDataStatus CodecFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus UpstreamCodecFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
   ENVOY_STREAM_LOG(trace, "proxying {} bytes", *callbacks_, data.length());
   callbacks_->upstreamCallbacks()->upstreamStreamInfo().addBytesSent(data.length());
@@ -115,7 +115,7 @@ Http::FilterDataStatus CodecFilter::decodeData(Buffer::Instance& data, bool end_
 }
 
 // This is the last stop in the filter chain: take the trailers and ship them to the codec.
-Http::FilterTrailersStatus CodecFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+Http::FilterTrailersStatus UpstreamCodecFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
   ENVOY_STREAM_LOG(trace, "proxying trailers", *callbacks_);
   callbacks_->upstreamCallbacks()->upstream()->encodeTrailers(trailers);
@@ -124,7 +124,7 @@ Http::FilterTrailersStatus CodecFilter::decodeTrailers(Http::RequestTrailerMap& 
 }
 
 // This is the last stop in the filter chain: take the metadata and ship them to the codec.
-Http::FilterMetadataStatus CodecFilter::decodeMetadata(Http::MetadataMap& metadata_map) {
+Http::FilterMetadataStatus UpstreamCodecFilter::decodeMetadata(Http::MetadataMap& metadata_map) {
   ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
   ENVOY_STREAM_LOG(trace, "proxying metadata", *callbacks_);
   Http::MetadataMapVector metadata_map_vector;
@@ -134,7 +134,7 @@ Http::FilterMetadataStatus CodecFilter::decodeMetadata(Http::MetadataMap& metada
 }
 
 // Store the callbacks from the UpstreamFilterManager, for sending the response to.
-void CodecFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+void UpstreamCodecFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->addDownstreamWatermarkCallbacks(*this);
   callbacks_->upstreamCallbacks()->addUpstreamCallbacks(*this);
@@ -142,7 +142,7 @@ void CodecFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& 
 }
 
 // This is the response 1xx headers arriving from the codec. Send them through the filter manager.
-void CodecFilter::CodecBridge::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamCodecFilter::CodecBridge::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   // The filter manager can not handle more than 1 1xx header, so only forward
   // the first one.
   if (!seen_1xx_headers_) {
@@ -152,8 +152,8 @@ void CodecFilter::CodecBridge::decode1xxHeaders(Http::ResponseHeaderMapPtr&& hea
 }
 
 // This is the response headers arriving from the codec. Send them through the filter manager.
-void CodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                             bool end_stream) {
+void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                                     bool end_stream) {
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
   // byte.
   filter_.upstreamTiming().onFirstUpstreamRxByteReceived(
@@ -171,27 +171,27 @@ void CodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&& header
 }
 
 // This is response data arriving from the codec. Send it through the filter manager.
-void CodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
   filter_.callbacks_->encodeData(data, end_stream);
 }
 
 // This is response trailers arriving from the codec. Send them through the filter manager.
-void CodecFilter::CodecBridge::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
+void UpstreamCodecFilter::CodecBridge::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   maybeEndDecode(true);
   filter_.callbacks_->encodeTrailers(std::move(trailers));
 }
 
 // This is response metadata arriving from the codec. Send it through the filter manager.
-void CodecFilter::CodecBridge::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+void UpstreamCodecFilter::CodecBridge::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
   filter_.callbacks_->encodeMetadata(std::move(metadata_map));
 }
 
-void CodecFilter::CodecBridge::dumpState(std::ostream& os, int indent_level) const {
+void UpstreamCodecFilter::CodecBridge::dumpState(std::ostream& os, int indent_level) const {
   filter_.callbacks_->upstreamCallbacks()->dumpState(os, indent_level);
 }
 
-void CodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
+void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
   if (end_stream) {
     filter_.upstreamTiming().onLastUpstreamRxByteReceived(
         filter_.callbacks_->dispatcher().timeSource());
