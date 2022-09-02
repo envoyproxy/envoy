@@ -72,15 +72,15 @@ def upstream_envoy_overrides():
 def swift_repos():
     http_archive(
         name = "build_bazel_rules_apple",
-        sha256 = "d4c2f715b83b5884e1164fb0e9f3de5b053d77d4436a04510b7940274e91699e",
-        strip_prefix = "rules_apple-8533494fa029f0fc44009c4532c191f349acf193",
-        url = "https://github.com/bazelbuild/rules_apple/archive/8533494fa029f0fc44009c4532c191f349acf193.tar.gz",
+        sha256 = "5d58663f55aedbd6beffcc61f9f24ec6f2b1512ca1ab52a261ae41a8b880df97",
+        strip_prefix = "rules_apple-d04edf4136b4818662d7126582ec257aee372339",
+        url = "https://github.com/bazelbuild/rules_apple/archive/d04edf4136b4818662d7126582ec257aee372339.tar.gz",
     )
 
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "12057b7aa904467284eee640de5e33853e51d8e31aae50b3fb25d2823d51c6b8",
-        url = "https://github.com/bazelbuild/rules_swift/releases/download/1.0.0/rules_swift.1.0.0.tar.gz",
+        sha256 = "043897b483781cfd6cbd521569bfee339c8fbb2ad0f0bdcd1b3749523a262cf4",
+        url = "https://github.com/bazelbuild/rules_swift/releases/download/1.1.1/rules_swift.1.1.1.tar.gz",
     )
 
     http_archive(
