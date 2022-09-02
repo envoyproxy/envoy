@@ -94,13 +94,6 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());
 
-  EXPECT_ENVOY_BUG(filter->callbacks_->requestRouteConfigUpdate(nullptr),
-                   "requestRouteConfigUpdate called from upstream filter");
-  EXPECT_ENVOY_BUG(filter->callbacks_->setRoute(nullptr),
-                   "set route cache called from upstream filter");
-  EXPECT_ENVOY_BUG(filter->callbacks_->clearRouteCache(),
-                   "clear route cache called from upstream filter");
-
   EXPECT_CALL(*conn_pool_, newStream(_))
       .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
         std::stringstream out;

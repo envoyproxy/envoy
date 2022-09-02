@@ -326,7 +326,6 @@ public:
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   // Intentional no-op functions.
@@ -340,16 +339,9 @@ public:
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
   // Unsupported functions.
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    IS_ENVOY_BUG("requestRouteConfigUpdate called from upstream filter");
-  }
-  void setRoute(Router::RouteConstSharedPtr) override {
-    IS_ENVOY_BUG("set route cache called from upstream filter");
-  }
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream filter");
   }
-  void clearRouteCache() override { IS_ENVOY_BUG("clear route cache called from upstream filter"); }
   void upgradeFilterChainCreated() override {
     IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream filter");
   }

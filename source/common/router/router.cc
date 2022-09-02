@@ -663,11 +663,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
-  // runtime keys.
-  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
-    const auto& policy_ref = *shadow_policy;
-    if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref(policy_ref));
+  // runtime keys. Also the method CONNECT doesn't support shadowing.
+  auto method = headers.getMethodValue();
+  if (method != Http::Headers::get().MethodValues.Connect) {
+    for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+      const auto& policy_ref = *shadow_policy;
+      if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
+        active_shadow_policies_.push_back(std::cref(policy_ref));
+      }
     }
   }
 
@@ -1720,7 +1723,9 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
   downstream_headers.setPath(path_and_query);
 
-  callbacks_->clearRouteCache();
+  if (callbacks_->downstreamCallbacks()) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   const auto route = callbacks_->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {
