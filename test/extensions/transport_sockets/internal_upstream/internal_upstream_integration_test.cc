@@ -237,6 +237,9 @@ public:
   void setupInternalListenerCofnig();
   void setupExternalUpstreamConfig();
   void setupTestConfig();
+  void sendHttpPostMsg();
+  void sendBidirectionalData();
+  void startTlsNegotiation();
 
   // Contexts needed by raw buffer and tls transport sockets.
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
@@ -249,6 +252,10 @@ public:
   std::unique_ptr<ClientTestConnection> conn_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
   bool clear_http_test_{true};
+  bool tcp_proxy_filter_{true};
+  bool hcm_filter_{false};
+  std::string request_data_{"foo"};
+  std::string response_data_{"bar"};
 };
 
 void HttpsInspectionIntegrationTest::initialize() {
@@ -354,30 +361,38 @@ void HttpsInspectionIntegrationTest::setupExternalListenerConfig() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* listener = static_resources->mutable_listeners(0);
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
-    hcm.set_stat_prefix("ingress_http");
-    auto * route_config = hcm.mutable_route_config();
-    route_config->set_name("local_route");
-    auto * virtual_hosts = route_config->add_virtual_hosts();
-    virtual_hosts->set_name("local_service");
-    virtual_hosts->add_domains("*");
-    auto * routes = virtual_hosts->add_routes();
-    routes->mutable_match()->set_prefix("/");
-    routes->mutable_route()->set_cluster("internal_upstream");
-
-    // Setup router HTTP filter.
-    auto* router_filter = hcm.add_http_filters();
-    router_filter->set_name("envoy.filters.http.router");
-    envoy::extensions::filters::http::router::v3::Router router;
-    router_filter->mutable_typed_config()->PackFrom(router);
-    ConfigHelper::setConnectConfig(hcm, true, false);
     // Setup listener filter chain.
     auto* filter_chain = listener->mutable_filter_chains(0);
     // Clear existing http proxy filters.
     filter_chain->clear_filters();
     auto* filter = filter_chain->add_filters();
-    filter->set_name("envoy.filters.network.http_connection_manager");
-    filter->mutable_typed_config()->PackFrom(hcm);
+    if (hcm_filter_) {
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+      hcm.set_stat_prefix("ingress_http");
+      auto * route_config = hcm.mutable_route_config();
+      route_config->set_name("local_route");
+      auto * virtual_hosts = route_config->add_virtual_hosts();
+      virtual_hosts->set_name("local_service");
+      virtual_hosts->add_domains("*");
+      auto * routes = virtual_hosts->add_routes();
+      routes->mutable_match()->set_prefix("/");
+      routes->mutable_route()->set_cluster("internal_upstream");
+
+      // Setup router HTTP filter.
+      auto* router_filter = hcm.add_http_filters();
+      router_filter->set_name("envoy.filters.http.router");
+      envoy::extensions::filters::http::router::v3::Router router;
+      router_filter->mutable_typed_config()->PackFrom(router);
+      ConfigHelper::setConnectConfig(hcm, true, false);
+      filter->set_name("envoy.filters.network.http_connection_manager");
+      filter->mutable_typed_config()->PackFrom(hcm);
+    } else if (tcp_proxy_filter_) {
+      filter->set_name("tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+      tcp_proxy.set_cluster("internal_upstream");
+      tcp_proxy.set_stat_prefix("internal_address");
+      filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    }
   });
 }
 
@@ -479,12 +494,57 @@ void HttpsInspectionIntegrationTest::setupTestConfig() {
   setupExternalUpstreamConfig();
 }
 
+void HttpsInspectionIntegrationTest::sendHttpPostMsg() {
+  auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
+  std::string get_msg =
+    "POST / HTTP/1.1\r\n"
+    "Host: localhost:"+ port_str  + "\r\n"
+    "Content-Length: " + std::to_string(request_data_.size()) +
+    "\r\n\r\n";
+  Buffer::OwnedImpl buffer;
+  buffer.add(get_msg);
+  conn_->write(buffer, false);
+  // Wait for them to arrive upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(
+      *dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "POST");
+  EXPECT_EQ(upstream_request_->headers().getHostValue(), "localhost:" + port_str);
+}
+
+void HttpsInspectionIntegrationTest::sendBidirectionalData() {
+  Buffer::OwnedImpl buffer;
+  buffer.add(request_data_);
+  conn_->write(buffer, false);
+  // Wait for them to arrive upstream.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_data_));
+  // Also test upstream to downstream data.
+  payload_reader_->set_data_to_wait_for(response_data_, false);
+  upstream_request_->encodeData(response_data_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+void HttpsInspectionIntegrationTest::startTlsNegotiation() {
+  conn_->setTransportSocket(tls_context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
+      nullptr));
+  connect_callbacks_.reset();
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+}
+
 // Client sends a clear text HTTP CONNECT message to Envoy.
 // After confirms recevied 200 from proxy, client then sends a
 // clear text HTTP GET message, which will hits the DFP filter in the
 // internal listener and trigger DNS resolving.
 
 TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
+  hcm_filter_ = true;
+  tcp_proxy_filter_ = false;
   setupTestConfig();
   skip_tag_extraction_rule_check_ = true;
   initialize();
@@ -501,23 +561,8 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
   buffer.add(connect_msg);
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  // Sends a HTTP GET message.
-  auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
-  std::string get_msg =
-    "POST / HTTP/1.1\r\n"
-    "Host: localhost:"+ port_str  + "\r\n"
-    "Content-Length: 5"
-    "\r\n\r\n";
-  buffer.add(get_msg);
-  conn_->write(buffer, false);
-  // Wait for them to arrive upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(
-      *dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(
-      *dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "POST");
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "localhost:" + port_str);
+  // Sends a HTTP POST message.
+  sendHttpPostMsg();
 
   // Sends a response back to client.
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
@@ -525,14 +570,31 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Make sure the bi-directional data can go through.
-  buffer.add("hello");
-  conn_->write(buffer, false);
-  // Wait for them to arrive upstream.
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello"));
-  // Also test upstream to downstream data.
-  payload_reader_->set_data_to_wait_for("world", false);
-  upstream_request_->encodeData("world", false);
+  sendBidirectionalData();
+
+  conn_->close(Network::ConnectionCloseType::FlushWrite);
+}
+
+TEST_P(HttpsInspectionIntegrationTest, HttpsTerminatedByloopbackWithExternalListenerTcpProxy) {
+  clear_http_test_ = false;
+  setupTestConfig();
+  skip_tag_extraction_rule_check_ = true;
+  initialize();
+
+  // Open clear-text connection.
+  conn_->connect();
+  // Without closing the connection, switch to tls.
+  startTlsNegotiation();
+  // Sends a HTTP POST message.
+  sendHttpPostMsg();
+
+  // Sends a response back to client.
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Make sure the bi-directional data can go through the TLS tunnel.
+  sendBidirectionalData();
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
@@ -548,14 +610,18 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
 
 
 TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
+  hcm_filter_ = true;
+  tcp_proxy_filter_ = false;
   clear_http_test_ = false;
   setupTestConfig();
   skip_tag_extraction_rule_check_ = true;
   initialize();
   // Open clear-text connection.
   conn_->connect();
+
   Buffer::OwnedImpl buffer;
-  std::string request_msg =
+  std::string request_msg;
+  request_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
     "Host: www.cnn.com:80\r\n"
     "\r\n\r\n";
@@ -566,18 +632,9 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Without closing the connection, switch to tls.
-  conn_->setTransportSocket(tls_context_->createTransportSocket(
-      std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
-      nullptr));
-  connect_callbacks_.reset();
-  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
+  startTlsNegotiation();
 
-  // Send few messages over encrypted connection.
   auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
-  request_msg.clear();
   request_msg =
     "GET / HTTP/1.1\r\n"
     "Host: localhost:"+ port_str  + "\r\n"
