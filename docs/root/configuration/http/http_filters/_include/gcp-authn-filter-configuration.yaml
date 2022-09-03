@@ -36,7 +36,6 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: cluster_0
-    connect_timeout: 5s
     # Cluster for fake destination service which has typed metadata that contains the audience information.
     load_assignment:
       cluster_name: cluster_0
@@ -60,7 +59,6 @@ static_resources:
           url: http://test.com
   # Cluster for fake metadata server.
   - name: gcp_authn
-    connect_timeout: 5s
     load_assignment:
       cluster_name: gcp_authn
       endpoints:
