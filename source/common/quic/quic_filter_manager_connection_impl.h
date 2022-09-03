@@ -169,6 +169,8 @@ protected:
   virtual const quic::QuicConnection* quicConnection() const PURE;
   virtual quic::QuicConnection* quicConnection() PURE;
 
+  void maybeHandleCloseDuringInitialize();
+
   QuicNetworkConnection* network_connection_{nullptr};
 
   OptRef<Http::Http3::CodecStats> codec_stats_;

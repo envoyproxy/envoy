@@ -15,6 +15,12 @@ behavior_changes:
 - area: gcp_authn
   change: |
     Add GCP Authentication filter which can be used to fetch authentication tokens from Google Compute Engine(GCE) metadata server.
+- area: http
+  change: |
+    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
+    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
+    streaming calls. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -24,6 +30,15 @@ minor_behavior_changes:
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
+- area: quic
+  change: |
+    changed the timing of QUIC connection writing data in response to incoming packets in non-Windowns platforms. This change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to false.
+- area: original_dst
+  change: |
+    transparent listener can use original_dst filter without nf_conntrack enabled.
+- area: cache_filter
+  change: |
+    added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -76,12 +91,18 @@ new_features:
 - area: gzip
   change: |
     added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: listener
   change: |
     added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: load balancer
+  change: |
+    added a new field to subset load balancer config: :ref:`metadata_fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
@@ -119,5 +140,20 @@ new_features:
 - area: lua
   change: |
     added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: subset load balancer
+  change: |
+    added multiple keys or multiple selectors support for :ref:`single host per subset mode <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+- area: lua
+  change: |
+    added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
+    by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
+    ``{["return_duplicate_headers"] = true}`` as the ``options``.
 
 deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
+    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.

@@ -4,6 +4,7 @@
 
 #include "test/common/http/common.h"
 #include "test/mocks/router/router_filter_interface.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -72,6 +73,8 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
 
 // Test sending headers from the router to upstream.
 TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_upstream_filters", "true"}});
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());
 
@@ -115,7 +118,7 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_CALL(*filter, decodeHeaders(_, false));
   upstream_request_->acceptHeadersFromRouter(false);
 
-  EXPECT_CALL(router_filter_interface_.callbacks_, resetStream());
+  EXPECT_CALL(router_filter_interface_.callbacks_, resetStream(_, _));
   filter->callbacks_->resetStream();
 }
 
