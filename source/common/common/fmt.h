@@ -6,7 +6,6 @@
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 #include "fmt/ostream.h"
-#include "google/protobuf/stubs/stringpiece.h"
 
 // NOLINT(namespace-envoy)
 
@@ -26,9 +25,5 @@ template <> struct formatter<absl::string_view> : formatter<string_view> {
 
 // Provide formatter for absl::Status
 template <> struct formatter<absl::Status> : ostream_formatter {};
-
-// Provide formatter for google::protobuf::StringPiece
-template <>
-struct formatter<google::protobuf::stringpiece_internal::StringPiece> : ostream_formatter {};
 
 } // namespace fmt

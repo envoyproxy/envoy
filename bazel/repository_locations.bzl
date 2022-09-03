@@ -251,7 +251,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-01-06",
+        release_date = "2022-08-27",
         cpe = "cpe:2.3:a:fmt:fmt:*",
     ),
     com_github_gabime_spdlog = dict(
