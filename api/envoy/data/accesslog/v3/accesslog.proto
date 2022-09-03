@@ -192,6 +192,8 @@ message AccessLogCommon {
 
   // For HTTP: Total duration in milliseconds of the request from the start time to the last byte out.
   // For TCP: Total duration in milliseconds of the downstream connection.
+  // This is the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+  // and may be longer than ``time_to_last_downstream_tx_byte``.
   google.protobuf.Duration duration = 23;
 
   // For HTTP: Number of times the request is attempted upstream. Note that the field is omitted when the request was never attempted upstream.
