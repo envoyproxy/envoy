@@ -12,6 +12,9 @@ behavior_changes:
 - area: tls
   change: |
     Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+- area: gcp_authn
+  change: |
+    Add GCP Authentication filter which can be used to fetch authentication tokens from Google Compute Engine(GCE) metadata server.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
