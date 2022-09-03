@@ -260,7 +260,7 @@ routes:
         action:
           name: envoy.matching.action.meta_protocol.route
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.RouteAction
+            "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.action.v3.RouteAction
             cluster: "cluster_0"
             metadata:
               filter_metadata:

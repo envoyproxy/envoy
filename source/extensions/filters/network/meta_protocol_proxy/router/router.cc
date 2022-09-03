@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/meta_protocol_proxy/filters/router/router.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/router/router.h"
 
 #include "envoy/common/conn_pool.h"
 #include "envoy/network/connection.h"
@@ -74,7 +74,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
 
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                                   Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(debug, "dubbo upstream request: tcp connection has ready");
+  ENVOY_LOG(debug, "upstream request: tcp connection has ready");
   onUpstreamHostSelected(host);
 
   conn_data_ = std::move(conn);
@@ -130,7 +130,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 }
 
 void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(debug, "dubbo upstream request: selected upstream {}", host->address()->asString());
+  ENVOY_LOG(debug, "upstream request: selected upstream {}", host->address()->asString());
   upstream_host_ = host;
 }
 

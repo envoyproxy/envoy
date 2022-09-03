@@ -30,8 +30,6 @@ FakeStreamCodecFactoryConfig::createFactory(const Protobuf::Message&,
   return std::make_unique<FakeStreamCodecFactory>();
 }
 
-REGISTER_FACTORY(FakeStreamCodecFactoryConfig, CodecFactoryConfig);
-
 } // namespace MetaProtocolProxy
 } // namespace NetworkFilters
 } // namespace Extensions

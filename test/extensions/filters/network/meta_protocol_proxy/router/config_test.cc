@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/meta_protocol_proxy/filters/router/config.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/router/config.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
 #include "test/mocks/server/factory_context.h"

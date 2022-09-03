@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/interface/codec.h"
-#include <cstdint>
 
 namespace Envoy {
 namespace Extensions {
@@ -86,7 +87,7 @@ public:
       request->host_ = std::string(result[1]);
       request->path_ = std::string(result[2]);
       request->method_ = std::string(result[3]);
-      for (absl::string_view pair_str : absl::StrSplit(result[4], ';')) {
+      for (absl::string_view pair_str : absl::StrSplit(result[4], ';', absl::SkipEmpty())) {
         auto pair = absl::StrSplit(pair_str, absl::MaxSplits(':', 1));
         request->data_.emplace(pair);
       }
@@ -146,7 +147,7 @@ public:
       auto response = std::make_unique<FakeResponse>();
       response->status_ = Status(StatusCode(status_code), result[1]);
       response->protocol_ = std::string(result[0]);
-      for (absl::string_view pair_str : absl::StrSplit(result[2], ';')) {
+      for (absl::string_view pair_str : absl::StrSplit(result[2], ';', absl::SkipEmpty())) {
         auto pair = absl::StrSplit(pair_str, absl::MaxSplits(':', 1));
         response->data_.emplace(pair);
       }

@@ -5,8 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3/action.pb.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3/action.pb.validate.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/action/v3/action.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/action/v3/action.pb.validate.h"
 #include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.validate.h"
 #include "envoy/server/factory_context.h"
@@ -24,7 +24,7 @@ namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
 using ProtoRouteAction =
-    envoy::extensions::filters::network::meta_protocol_proxy::matcher::action::v3::RouteAction;
+    envoy::extensions::filters::network::meta_protocol_proxy::action::v3::RouteAction;
 using ProtoRouteConfiguration =
     envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteConfiguration;
 

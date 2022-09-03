@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/meta_protocol_proxy/filters/router/router.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/router/router.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"

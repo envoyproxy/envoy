@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3;
+package envoy.extensions.filters.network.meta_protocol_proxy.action.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -12,10 +12,10 @@ import "xds/annotations/v3/status.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.action.v3";
 option java_outer_classname = "ActionProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3;actionv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/meta_protocol_proxy/action/v3;actionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 

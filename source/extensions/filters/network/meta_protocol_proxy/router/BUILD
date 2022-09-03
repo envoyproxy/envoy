@@ -24,7 +24,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/meta_protocol_proxy/interface:codec_interface",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:config_interface",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:filter_interface",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,6 +39,6 @@ envoy_cc_library(
         ":router_lib",
         "//envoy/registry",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:config_interface",
-        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/router/v3:pkg_cc_proto",
     ],
 )

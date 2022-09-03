@@ -72,6 +72,18 @@ public:
   };
   using TestRequestEncoderCallbackSharedPtr = std::shared_ptr<TestRequestEncoderCallback>;
 
+  struct TestResponseEncoderCallback : public ResponseEncoderCallback {
+    void onEncodingSuccess(Buffer::Instance& buffer, bool) override {
+      buffer_.move(buffer);
+      complete_ = true;
+      response_bytes_ = buffer_.length();
+    }
+    bool complete_{};
+    size_t response_bytes_{};
+    Buffer::OwnedImpl buffer_;
+  };
+  using TestResponseEncoderCallbackSharedPtr = std::shared_ptr<TestResponseEncoderCallback>;
+
   struct TestResponseDecoderCallback : public ResponseDecoderCallback {
     TestResponseDecoderCallback(IntegrationTest& parent) : parent_(parent) {}
 
@@ -97,8 +109,10 @@ public:
     codec_factory_ = std::move(codec_factory);
     request_encoder_ = codec_factory_->requestEncoder();
     response_decoder_ = codec_factory_->responseDecoder();
+    response_encoder_ = codec_factory_->responseEncoder();
     request_encoder_callback_ = std::make_shared<TestRequestEncoderCallback>();
     response_decoder_callback_ = std::make_shared<TestResponseDecoderCallback>(*this);
+    response_encoder_callback_ = std::make_shared<TestResponseEncoderCallback>();
     response_decoder_->setDecoderCallback(*response_decoder_callback_);
   }
 
@@ -113,7 +127,7 @@ public:
           filters:
           - name: envoy.filters.meta.router
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.filters.router.v3.Router
+              "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.router.v3.Router
           codec_config:
             name: fake
             typed_config:
@@ -147,7 +161,7 @@ public:
                               action:
                                 name: route
                                 typed_config:
-                                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.RouteAction
+                                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.action.v3.RouteAction
                                   cluster: cluster_0
 )EOF");
   }
@@ -170,6 +184,7 @@ public:
     request_encoder_->encode(request, *request_encoder_callback_);
     RELEASE_ASSERT(request_encoder_callback_->complete_, "Encoding should complete Immediately");
     client_connection_->write(request_encoder_callback_->buffer_, false);
+    client_connection_->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
   }
 
   // Waiting upstream connection to be created.
@@ -184,8 +199,12 @@ public:
   }
 
   // Send upstream response.
-  void sendResponseForTest(const std::string& fake_response) {
-    auto result = upstream_connection_->write(fake_response, false);
+  void sendResponseForTest(const Response& response) {
+    response_encoder_->encode(response, *response_encoder_callback_);
+    RELEASE_ASSERT(response_encoder_callback_->complete_, "Encoding should complete Immediately");
+
+    auto result =
+        upstream_connection_->write(response_encoder_callback_->buffer_.toString(), false);
     RELEASE_ASSERT(result, result.failure_message());
   }
 
@@ -214,8 +233,10 @@ public:
   CodecFactoryPtr codec_factory_;
   RequestEncoderPtr request_encoder_;
   ResponseDecoderPtr response_decoder_;
+  ResponseEncoderPtr response_encoder_;
   TestRequestEncoderCallbackSharedPtr request_encoder_callback_;
   TestResponseDecoderCallbackSharedPtr response_decoder_callback_;
+  TestResponseEncoderCallbackSharedPtr response_encoder_callback_;
 
   // Integration test server.
   std::unique_ptr<BaseIntegrationTest> integration_;
@@ -234,10 +255,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, InitializeInstance) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
   initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
 }
 
 TEST_P(IntegrationTest, RequestRouteNotFound) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
   initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
   EXPECT_TRUE(makeClientConnectionForTest());
 
@@ -255,6 +282,41 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
 
   EXPECT_NE(response_decoder_callback_->response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->response_->status().message(), "route_not_found");
+}
+
+TEST_P(IntegrationTest, RequestAndResponse) {
+  FakeStreamCodecFactoryConfig codec_factory_config;
+  Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
+  initialize(defaultConfig(), std::make_unique<FakeStreamCodecFactory>());
+
+  EXPECT_TRUE(makeClientConnectionForTest());
+
+  FakeStreamCodecFactory::FakeRequest request;
+  request.host_ = "service_name_0";
+  request.method_ = "hello";
+  request.path_ = "/path_or_anything";
+  request.protocol_ = "fake_fake_fake";
+  request.data_ = {{"version", "v1"}};
+
+  sendRequestForTest(request);
+
+  waitForUpstreamConnectionForTest();
+  waitForUpstreamRequestForTest(request_encoder_callback_->request_bytes_, nullptr);
+
+  FakeStreamCodecFactory::FakeResponse response;
+  response.protocol_ = "fake_fake_fake";
+  response.status_ = Status();
+  response.data_["zzzz"] = "xxxx";
+
+  sendResponseForTest(response);
+
+  RELEASE_ASSERT(waitDownstreamResponseForTest(std::chrono::milliseconds(200)),
+                 "unexpected timeout");
+
+  EXPECT_NE(response_decoder_callback_->response_, nullptr);
+  EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
+  EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
 }
 
 } // namespace

@@ -203,7 +203,7 @@ proto_library(
         "//envoy/extensions/filters/network/ext_authz/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
         "//envoy/extensions/filters/network/local_ratelimit/v3:pkg",
-        "//envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3:pkg",
+        "//envoy/extensions/filters/network/meta_protocol_proxy/action/v3:pkg",
         "//envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3:pkg",
         "//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg",
         "//envoy/extensions/filters/network/mongo_proxy/v3:pkg",

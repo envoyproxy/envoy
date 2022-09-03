@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.meta_protocol_proxy"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/network/meta_protocol_proxy/filters/router:router_lib",
+        "//source/extensions/filters/network/meta_protocol_proxy/router:router_lib",
         "//test/extensions/filters/network/meta_protocol_proxy:fake_codec_lib",
         "//test/extensions/filters/network/meta_protocol_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/meta_protocol_proxy/mocks:filter_mocks",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.meta_protocol_proxy"],
     deps = [
-        "//source/extensions/filters/network/meta_protocol_proxy/filters/router:config",
+        "//source/extensions/filters/network/meta_protocol_proxy/router:config",
         "//test/extensions/filters/network/meta_protocol_proxy/mocks:filter_mocks",
         "//test/mocks/server:factory_context_mocks",
     ],

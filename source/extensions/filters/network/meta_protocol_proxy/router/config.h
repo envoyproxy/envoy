@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3/router.pb.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/filters/router/v3/router.pb.validate.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/router/v3/router.pb.validate.h"
 
-#include "source/extensions/filters/network/meta_protocol_proxy/filters/router/router.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/interface/config.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +20,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::filters::network::meta_protocol_proxy::filters::router::v3::Router>();
+        envoy::extensions::filters::network::meta_protocol_proxy::router::v3::Router>();
   }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { return nullptr; }
   RouteSpecificFilterConfigConstSharedPtr

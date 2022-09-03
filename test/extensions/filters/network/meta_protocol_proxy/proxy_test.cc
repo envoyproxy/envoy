@@ -34,7 +34,7 @@ TEST(BasicFilterConfigTest, CreatingCodecFactory) {
       name: envoy.meta_protocol_proxy.codec.fake
       typed_config:
         "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: envoy.meta_protocol_proxy.codec.unknow
+        type_url: envoy.meta_protocol_proxy.codec.fake.type
         value: {}
       )EOF";
     NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -47,6 +47,9 @@ TEST(BasicFilterConfigTest, CreatingCodecFactory) {
   }
 
   {
+    FakeStreamCodecFactoryConfig codec_factory_config;
+    Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
+
     const std::string yaml_config = R"EOF(
       name: envoy.meta_protocol_proxy.codec.fake
       typed_config:
@@ -86,7 +89,7 @@ TEST(BasicFilterConfigTest, CreatingRouteMatcher) {
             action:
               name: envoy.matching.action.meta_protocol.route
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.RouteAction
+                "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.action.v3.RouteAction
                 cluster: "cluster_0"
                 metadata:
                   filter_metadata:
