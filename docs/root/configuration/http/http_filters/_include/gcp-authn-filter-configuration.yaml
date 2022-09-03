@@ -34,19 +34,10 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-          access_log:
-          - name: envoy.access_loggers.stdout
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
   clusters:
   - name: cluster_0
+    connect_timeout: 5s
     # Cluster for fake destination service which has typed metadata that contains the audience information.
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options:
-            {}
     load_assignment:
       cluster_name: cluster_0
       endpoints:
@@ -56,21 +47,22 @@ static_resources:
               socket_address:
                 address: ::1
                 port_value: 36075
-    metadata:
-      typed_filter_metadata:
-        envoy.filters.http.gcp_authn:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
-          url: http:#test.com
-    connect_timeout: 5s
-  # Cluster for fake metadata server.
-  - name: gcp_authn
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options:
             {}
+    metadata:
+      typed_filter_metadata:
+        envoy.filters.http.gcp_authn:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
+          url: http://test.com
+  # Cluster for fake metadata server.
+  - name: gcp_authn
+    connect_timeout: 5s
     load_assignment:
+      cluster_name: gcp_authn
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -78,5 +70,9 @@ static_resources:
               socket_address:
                 address: ::1
                 port_value: 41713
-      cluster_name: gcp_authn
-    connect_timeout: 5s
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options:
+            {}
