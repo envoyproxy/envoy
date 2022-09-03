@@ -12,10 +12,28 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "client",
+    srcs = ["client.cc"],
+    hdrs = ["client.h"],
+    deps = [
+        "//source/common/network:filter_lib",
+        "//source/common/upstream:health_checker_base_lib",
+        "//source/extensions/filters/network/thrift_proxy:config",
+        "//source/extensions/filters/network/thrift_proxy:passthrough_decoder_event_handler_lib",
+        "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/health_checkers/thrift/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "thrift",
     srcs = ["thrift.cc"],
     hdrs = ["thrift.h"],
     deps = [
+        ":client",
         "//source/common/network:filter_lib",
         "//source/common/upstream:health_checker_base_lib",
         "//source/extensions/filters/network/thrift_proxy:config",

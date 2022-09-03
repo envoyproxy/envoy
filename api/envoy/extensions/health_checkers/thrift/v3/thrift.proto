@@ -29,7 +29,8 @@ message Thrift {
 
   // Supplies the type of transport that the Thrift health checker should use. Note that
   // :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`
-  // is not supported.
+  // is not supported, and we don't honor :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
+  // since it's possible to set to :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
   // [#extension-category: envoy.filters.network]
   filters.network.thrift_proxy.v3.TransportType transport = 3
       [(validate.rules).enum = {defined_only: true}];
@@ -37,7 +38,9 @@ message Thrift {
   // Supplies the type of protocol that the Thrift health checker should use. Note that
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
   // and :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`
-  // are not supported.
+  // are not supported, and we don't honor :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
+  // since it's possible to set to :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`
+  // or :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>`.
   filters.network.thrift_proxy.v3.ProtocolType protocol = 4
       [(validate.rules).enum = {defined_only: true}];
 }
