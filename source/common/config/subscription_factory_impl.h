@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -20,7 +21,8 @@ public:
   SubscriptionFactoryImpl(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                           Upstream::ClusterManager& cm,
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                          const Server::Instance& server);
+                          const Server::Instance& server,
+                          XdsResourcesDelegateOptRef xds_resources_delegate);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -48,6 +50,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
   const Server::Instance& server_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
 };
 
 } // namespace Config

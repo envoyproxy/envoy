@@ -27,8 +27,8 @@ The OAuth filter's flow involves:
   flow. These cookies are calculated using the
   :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.hmac_secret>`
   to assist in encoding.
-* The filter calls continueDecoding() to unblock the filter chain.
-* The filter sets `IdToken` and `RefreshToken` cookies if they are provided by Identity provider along with `AccessToken`.
+* The filter calls ``continueDecoding()`` to unblock the filter chain.
+* The filter sets ``IdToken`` and ``RefreshToken`` cookies if they are provided by Identity provider along with ``AccessToken``.
 
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if

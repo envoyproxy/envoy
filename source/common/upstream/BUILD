@@ -98,6 +98,7 @@ envoy_cc_library(
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
+        "//source/extensions/filters/network/http_connection_manager:config",
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
@@ -106,6 +107,7 @@ envoy_cc_library(
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//envoy/api:api_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
@@ -660,6 +662,7 @@ envoy_cc_library(
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

@@ -67,6 +67,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
+        "//source/common/runtime:runtime_features_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:codec_lib",
     ]),
@@ -239,6 +240,7 @@ envoy_cc_library(
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
         "//envoy/http:request_id_extension_interface",
         "//envoy/router:rds_interface",
@@ -308,6 +310,7 @@ envoy_cc_library(
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",

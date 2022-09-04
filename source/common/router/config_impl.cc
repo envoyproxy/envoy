@@ -58,11 +58,15 @@ namespace {
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
 void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
-  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
-                                src.headers_to_append.end());
-  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
-                                   src.headers_to_overwrite.begin(),
-                                   src.headers_to_overwrite.end());
+  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
+                                       src.headers_to_append_or_add.begin(),
+                                       src.headers_to_append_or_add.end());
+  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
+                                          src.headers_to_overwrite_or_add.begin(),
+                                          src.headers_to_overwrite_or_add.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
 }
@@ -100,7 +104,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
-  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathTemplate: {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
     route = std::make_shared<PathTemplateRouteEntryImpl>(vhost, route_config, optional_http_filters,
                                                          factory_context, validator);
     break;
@@ -383,6 +387,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
+  }
+  if (config.has_allow_private_network_access()) {
+    allow_private_network_access_ =
+        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
   }
 }
 
@@ -1381,27 +1389,26 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      path_template_(route.match().path_template()),
-      path_matcher_(Matchers::PathMatcher::createPattern(path_template_, !case_sensitive_)) {}
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {
+  // TODO(silverstar194) Implement path template matcher
+  throw absl::UnimplementedError("Path template matcher not implemented");
+}
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, path_template_, insert_envoy_original_path);
+  finalizePathHeader(headers, "", insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_template_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                         const StreamInfo::StreamInfo& stream_info,
                                                         uint64_t random_value) const {
-  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(headers.getPathValue())) {
-    return clusterEntry(headers, random_value);
-  }
+  throw absl::UnimplementedError("Path template matcher not implemented");
+  RouteEntryImplBase::matchRoute(headers, stream_info, random_value);
   return nullptr;
 }
 

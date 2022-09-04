@@ -59,6 +59,19 @@ namespace Network {
 #define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
 #endif
 
+#ifdef SO_ORIGINAL_DST
+#define ENVOY_SOCKET_SO_ORIGINAL_DST ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IP, SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
+#ifdef IP6T_SO_ORIGINAL_DST
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST                                                          \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IPV6, IP6T_SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
 #ifdef UDP_GRO
 #define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_UDP, UDP_GRO)
 #else

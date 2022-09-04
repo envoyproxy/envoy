@@ -397,6 +397,18 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%DOWNSTREAM_HANDSHAKE_DURATION%
+  HTTP
+    Not implemented ("-").
+
+  TCP
+    Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 .. _config_access_log_format_response_flags:
 
 %RESPONSE_FLAGS%
@@ -578,8 +590,10 @@ The following command operators are supported:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
-%GRPC_STATUS%
-  gRPC status code which is easy to interpret with text message corresponding with number.
+%GRPC_STATUS(X)%
+  `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
+  For example, if the grpc status is ``INVALID_ARGUMENT`` (represented by number 3), the formatter will return ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.
+  If ``X`` isn't provided, ``CAMEL_STRING`` will be used.
 
 %GRPC_STATUS_NUMBER%
   gRPC status code.

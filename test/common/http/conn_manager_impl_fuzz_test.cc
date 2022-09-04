@@ -215,6 +215,11 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  Http::HeaderValidatorPtr makeHeaderValidator(Protocol, StreamInfo::StreamInfo&) override {
+    // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
+    // be changed too
+    return nullptr;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;

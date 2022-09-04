@@ -25,8 +25,26 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+struct ValidationResults {
+  enum class ValidationStatus {
+    Pending,
+    Successful,
+    Failed,
+  };
+  // If the value is Pending, the validation is asynchronous.
+  // If the value is Failed, refer to tls_alert and error_details for detailed error messages.
+  ValidationStatus status;
+  // The TLS alert used to interpret validation error if the validation failed.
+  absl::optional<uint8_t> tls_alert;
+  // The detailed error messages populated during validation.
+  absl::optional<std::string> error_details;
+};
+
 class CertValidator {
 public:
+  // Wraps cert validation parameters added from time to time.
+  struct ExtraValidationContext {};
+
   virtual ~CertValidator() = default;
 
   /**
@@ -48,6 +66,31 @@ public:
   virtual int doSynchronousVerifyCertChain(
       X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
       const Network::TransportSocketOptions* transport_socket_options) PURE;
+
+  /**
+   * Called by customVerifyCallback to do the actual cert chain verification which could be
+   * asynchronous. If the verification is asynchronous, Pending will be returned. After the
+   * asynchronous verification is finished, the result should be passed back via a
+   * VerifyResultCallback object.
+   * @param cert_chain the cert chain with the leaf cert on top.
+   * @param callback called after the asynchronous validation finishes to handle the result. Must
+   * outlive this call if it returns Pending. Not used if doing synchronous verification. If not
+   * provided and the validation is asynchronous, ssl_extended_info will create one.
+   * @param ssl_extended_info the info for creating async validation result callback if needed,
+   * tracking the validation and storing the result.
+   * @param transport_socket_options config options to validate cert, might short live the
+   * validation if it is asynchronous.
+   * @param ssl_ctx the config context this validation should use.
+   * @param validation_context a placeholder for additional validation parameters.
+   * @param is_server whether the validation is on server side.
+   * @return ValidationResult the validation status and error messages if there is any.
+   */
+  virtual ValidationResults
+  doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
+                    Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+                    SSL_CTX& ssl_ctx, const ExtraValidationContext& validation_context,
+                    bool is_server, absl::string_view host_name) PURE;
 
   /**
    * Called to initialize all ssl contexts
