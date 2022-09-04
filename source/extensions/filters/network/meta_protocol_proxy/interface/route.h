@@ -1,7 +1,5 @@
 #pragma once
 
-#include <bits/stdint-uintn.h>
-
 #include <chrono>
 
 #include "envoy/config/core/v3/base.pb.h"
