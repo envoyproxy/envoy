@@ -609,6 +609,8 @@ envoy.filters.network.meta_protocol_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.meta_protocol_proxy.v3.MetaProtocolProxy
 envoy.filters.thrift.header_to_metadata:
   categories:
   - envoy.thrift_proxy.filters
