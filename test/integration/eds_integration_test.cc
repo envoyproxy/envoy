@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
@@ -185,9 +187,13 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
-  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
-  // being health checked.
-  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the
+  host
+      // being health checked.
+      cluster_.mutable_circuit_breakers()
+          ->add_thresholds()
+          ->mutable_max_connections()
+          ->set_value(100);
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
@@ -246,9 +252,10 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
-// Verifies that cluster warming proceeds even if a host is deleted before health checks complete.
-// This is a regression test for https://github.com/envoyproxy/envoy/issues/17836.
-TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
+// Verifies that cluster warming proceeds even if a host is deleted before health checks
+complete.
+    // This is a regression test for https://github.com/envoyproxy/envoy/issues/17836.
+    TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
     cluster.set_ignore_health_on_host_removal(true);
@@ -258,15 +265,20 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
-  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
-  // being health checked.
-  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the
+  host
+      // being health checked.
+      cluster_.mutable_circuit_breakers()
+          ->add_thresholds()
+          ->mutable_max_connections()
+          ->set_value(100);
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
-  // Clear out the host before the health check finishes (regardless of success/error/timeout) and
-  // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
-  setEndpoints(0, 0, 0, true, absl::nullopt, false);
+  // Clear out the host before the health check finishes (regardless of success/error/timeout)
+  and
+      // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
+      setEndpoints(0, 0, 0, true, absl::nullopt, false);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
@@ -282,9 +294,10 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
-  // The other endpoint should still be excluded.
-  waitForNextUpstreamRequest(0);
+  // Wait for the first HC and verify the host is healthy and that it is no longer being
+  excluded.
+      // The other endpoint should still be excluded.
+      waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -304,9 +317,10 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
-  // The other endpoint should still be excluded.
-  waitForNextUpstreamRequest(0);
+  // Wait for the first HC and verify the host is healthy and that it is no longer being
+  excluded.
+      // The other endpoint should still be excluded.
+      waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -437,7 +451,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   cleanupUpstreamAndDownstream();
 }
 
-class EdsOverGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class EdsOverGrpcIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                    public HttpIntegrationTest {
 protected:
   struct FakeUpstreamInfo {
@@ -532,11 +546,13 @@ protected:
     }
   }
 
-  void initializeTest(bool http_active_hc, uint32_t num_clusters_to_add) {
+  void initializeTest(bool http_active_hc, uint32_t num_clusters_to_add,
+                      bool ignore_new_hosts_until_first_hc) {
     setUpstreamCount(4);
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
-    config_helper_.addConfigModifier([this, http_active_hc, num_clusters_to_add](
+    config_helper_.addConfigModifier([this, http_active_hc, num_clusters_to_add,
+                                      ignore_new_hosts_until_first_hc](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add a static EDS cluster.
       auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -550,38 +566,17 @@ protected:
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->mutable_clusters()->erase(
           bootstrap.mutable_static_resources()->mutable_clusters()->begin());
-      std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add;
-      for (uint32_t i = 0; i < num_clusters_to_add + 1; ++i) {
-        envoy::config::cluster::v3::Cluster cluster;
-        cluster_.set_name("cluster_" + std::to_string(i));
-        cluster_.set_type(envoy::config::cluster::v3::Cluster::EDS);
-        cluster_.mutable_connect_timeout()->CopyFrom(
-            Protobuf::util::TimeUtil::SecondsToDuration(5));
-        auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
-        eds_cluster_config->mutable_eds_config()->set_resource_api_version(
-            envoy::config::core::v3::ApiVersion::V3);
-        auto* api_config_source =
-            eds_cluster_config->mutable_eds_config()->mutable_api_config_source();
-        api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-        api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-        auto* grpc_service = api_config_source->add_grpc_services();
-        setGrpcService(*grpc_service, "eds_cluster", fake_upstreams_[0]->localAddress());
-        if (http_active_hc) {
-          auto* health_check = cluster_.add_health_checks();
-          health_check->mutable_timeout()->set_seconds(30);
-          // TODO(mattklein123): Consider using simulated time here.
-          health_check->mutable_interval()->CopyFrom(
-              Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-          health_check->mutable_no_traffic_interval()->CopyFrom(
-              Protobuf::util::TimeUtil::MillisecondsToDuration(100));
-          health_check->mutable_unhealthy_threshold()->set_value(1);
-          health_check->mutable_healthy_threshold()->set_value(1);
-          health_check->mutable_http_health_check()->set_path("/healthcheck");
-          health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
-        }
-        clusters_to_add_.push_back(cluster);
+      for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
+        auto cluster_name = "cluster_" + std::to_string(i);
+        auto cluster_to_add =
+            buildCluster(cluster_name, http_active_hc, ignore_new_hosts_until_first_hc);
+        envoy::config::endpoint::v3::ClusterLoadAssignment cla_to_add;
+        cla_to_add.set_cluster_name(cluster_name);
+        clas_to_add_.push_back(cla_to_add);
+        clusters_to_add_.push_back(cluster_to_add);
+        resource_names_.push_back(cluster_name);
       }
-      cds_helper_.setCds({cluster_});
+      cds_helper_.setCds(clusters_to_add_);
     });
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
@@ -592,19 +587,57 @@ protected:
     // Add the assignment and localities.
     cluster_load_assignment_.set_cluster_name("cluster_0");
     acceptXdsConnection();
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                        {"cluster_0"}, {}, {}, true));
+    for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
+      EXPECT_TRUE(compareDiscoveryRequest(
+          Config::TypeUrl::get().ClusterLoadAssignment, "",
+          {resource_names_.begin(), resource_names_.begin() + i + 1}, {}, {}, true));
+    }
+
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment_},
-        {cluster_load_assignment_}, {}, std::to_string(eds_version_++));
+        Config::TypeUrl::get().ClusterLoadAssignment, clas_to_add_, clas_to_add_, {},
+        std::to_string(eds_version_));
     // Receive EDS ack.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                        std::to_string(eds_version_ - 1), {}, {}, {}, true));
+                                        std::to_string(eds_version_), {}, {}, {}, true));
+    eds_version_++;
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
     test_server_->waitUntilListenersReady();
     registerTestServerPorts({"http"});
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  }
+
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, bool http_active_hc,
+                                                   bool ignore_new_hosts_until_first_hc) {
+    envoy::config::cluster::v3::Cluster cluster;
+    if (ignore_new_hosts_until_first_hc) {
+      cluster.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+    }
+    cluster.set_name(name);
+    cluster.set_type(envoy::config::cluster::v3::Cluster::EDS);
+    cluster.mutable_connect_timeout()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(5));
+    auto* eds_cluster_config = cluster.mutable_eds_cluster_config();
+    eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = eds_cluster_config->mutable_eds_config()->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "eds_cluster", fake_upstreams_[0]->localAddress());
+    if (http_active_hc) {
+      auto* health_check = cluster.add_health_checks();
+      health_check->mutable_timeout()->set_seconds(30);
+      // TODO(mattklein123): Consider using simulated time here.
+      health_check->mutable_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      health_check->mutable_no_traffic_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+      health_check->mutable_unhealthy_threshold()->set_value(1);
+      health_check->mutable_healthy_threshold()->set_value(1);
+      health_check->mutable_http_health_check()->set_path("/healthcheck");
+      health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
+    }
+    return cluster;
   }
 
   void acceptXdsConnection() {
@@ -672,20 +705,20 @@ protected:
     }
   }
 
-  void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, 0); }
+  void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, 1, false); }
 
   envoy::type::v3::CodecClientType codec_client_type_{};
   CdsHelper cds_helper_;
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
-  envoy::config::cluster::v3::Cluster cluster_;
   std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add_;
+  std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> clas_to_add_;
+  std::vector<std::string> resource_names_;
   std::vector<FakeUpstreamInfo> hosts_upstreams_info_;
   uint32_t eds_version_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EdsOverGrpcIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeSotwOrDelta, EdsOverGrpcIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validates that endpoints can be added and then moved to other priorities without causing crashes.
 // Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
@@ -723,9 +756,8 @@ TEST_P(EdsOverGrpcIntegrationTest, RemoveAfterHcFail) {
 
 // Verifies that endpoints are ignored until health checked when configured to.
 TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingSuccessfulHc) {
-  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
   // Endpoints are initially excluded.
-  initializeTest(true);
+  initializeTest(true, 1, true);
   setEndpoints(1, 0, 0, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
@@ -742,9 +774,8 @@ TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingSuccessfulHc) {
 // Verifies that endpoints are ignored until health checked when configured to when the first
 // health check fails.
 TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingFailedHc) {
-  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
   // Endpoints are initially excluded.
-  initializeTest(true);
+  initializeTest(true, 1, true);
   setEndpoints(1, 0, 0, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
@@ -857,11 +888,34 @@ TEST_P(EdsOverGrpcIntegrationTest, StatsReadyFilter) {
   cleanupUpstreamAndDownstream();
 }
 
-// TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxForMultipleClusters) {
-//   envoy::config::cluster::v3::Cluster cluster_1;
-//   envoy::config::cluster::v3::Cluster cluster_2;
-//   std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add = {cluster_1, cluster_2};
-// }
+TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
+  initializeTest(false, 3, false);
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
+  switch (clientType()) {
+  case Grpc::ClientType::EnvoyGrpc:
+    // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number of
+    // requests.
+    EXPECT_EQ(1UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
+    break;
+  case Grpc::ClientType::GoogleGrpc:
+    // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
+    // cluster (cluster_0). As a consequence, only one Google async grpc client and one
+    // corresponding set of client stats should be created.
+    EXPECT_EQ(1UL,
+              test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
+    EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                       "cluster.cluster_1.grpc.eds_cluster.streams_total"),
+              nullptr);
+    EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                       "cluster.cluster_2.grpc.eds_cluster.streams_total"),
+              nullptr);
+    break;
+  default:
+    PANIC("reached unexpected code");
+  }
+}
 
 } // namespace
 } // namespace Envoy

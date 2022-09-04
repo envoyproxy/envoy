@@ -372,8 +372,8 @@ public:
 
   /**
    * Obtain multiplexed subscription factory for the cluster manager.
-   * This factory shares mux per management server per xds method which reduces number of active
-   * grpc streams.
+   * This factory shares mux per management server per xds resource type which reduces number of
+   * concurrent active grpc streams.
    *
    * @return Config::SubscriptionFactory& multiplexed subscription factory.
    */

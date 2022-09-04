@@ -16,8 +16,9 @@
 /**
  * MultiplexedSubscriptionFactory is used for instantiation of XDS subscriptions so as to minimize
  * the number of open grpc connections used by these subscriptions. This is done by sharing a grpc
- * multiplexer between subscriptions handled per subscription server and xds method. Please see
- * https://github.com/envoyproxy/envoy/issues/2943 for additional information and related issues.
+ * multiplexer between subscriptions handled per subscription server and xds resource type. Please
+ * see https://github.com/envoyproxy/envoy/issues/2943 for additional information and related
+ * issues.
  *
  */
 
