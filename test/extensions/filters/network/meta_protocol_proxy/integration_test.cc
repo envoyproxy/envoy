@@ -229,6 +229,19 @@ public:
     return AssertionSuccess();
   }
 
+  void cleanup() {
+    if (upstream_connection_ != nullptr) {
+      AssertionResult result = upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      upstream_connection_.reset();
+    }
+    if (client_connection_ != nullptr) {
+      client_connection_->close(Envoy::Network::ConnectionCloseType::NoFlush);
+    }
+  }
+
   // Codec.
   CodecFactoryPtr codec_factory_;
   RequestEncoderPtr request_encoder_;
@@ -282,6 +295,8 @@ TEST_P(IntegrationTest, RequestRouteNotFound) {
 
   EXPECT_NE(response_decoder_callback_->response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->response_->status().message(), "route_not_found");
+
+  cleanup();
 }
 
 TEST_P(IntegrationTest, RequestAndResponse) {
@@ -317,6 +332,8 @@ TEST_P(IntegrationTest, RequestAndResponse) {
   EXPECT_NE(response_decoder_callback_->response_, nullptr);
   EXPECT_EQ(response_decoder_callback_->response_->status().code(), StatusCode::kOk);
   EXPECT_EQ(response_decoder_callback_->response_->getByKey("zzzz"), "xxxx");
+
+  cleanup();
 }
 
 } // namespace
