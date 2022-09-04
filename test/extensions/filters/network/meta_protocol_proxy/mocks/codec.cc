@@ -2,11 +2,9 @@
 
 #include <memory>
 
-using testing::_;
 using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {

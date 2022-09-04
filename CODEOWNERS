@@ -265,7 +265,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
-# Mata protocol filter
+# Meta protocol filter
 /*/extensions/filters/network/meta_protocol_proxy @wbpcode @zhaohuabing @rojkov @htuch
 
 # Intentionally exempt (treated as core code)
