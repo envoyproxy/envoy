@@ -53,133 +53,101 @@ protected:
 };
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
-  char valid[] = "%7eX";
+  std::string valid = "x%7ex";
 
   auto normalizer = create(empty_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 1);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Decoded);
   EXPECT_EQ(decoded.octet(), '~');
-  EXPECT_STREQ(valid, "%7EX");
+  EXPECT_EQ(valid, "x%7Ex");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetNormalized) {
-  char valid[] = "%ffX";
+  std::string valid = "%ffX";
 
   auto normalizer = create(empty_config);
 
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(valid).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(valid, 0).result(),
             PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(valid, "%FFX");
+  EXPECT_EQ(valid, "%FFX");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetInvalid) {
-  char invalid_length[] = "%";
-  char invalid_length_2[] = "%a";
-  char invalid_hex[] = "%ax";
+  std::string invalid_length = "%";
+  std::string invalid_length_2 = "%a";
+  std::string invalid_hex = "%ax";
 
   auto normalizer = create(empty_config);
 
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length, 0).result(),
             PathNormalizer::PercentDecodeResult::Invalid);
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length_2).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length_2, 0).result(),
             PathNormalizer::PercentDecodeResult::Invalid);
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_hex).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_hex, 0).result(),
             PathNormalizer::PercentDecodeResult::Invalid);
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(empty_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(valid, "%2Fx");
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(win_valid, "%5Cx");
+  EXPECT_EQ(valid, "%2Fx");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(impl_specific_slash_handling_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(valid, "%2Fx");
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(win_valid, "%5Cx");
+  EXPECT_EQ(valid, "%2Fx");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(keep_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(valid, "%2Fx");
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
-  EXPECT_STREQ(win_valid, "%5Cx");
+  EXPECT_EQ(valid, "%2Fx");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(reject_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Reject);
-  EXPECT_STREQ(valid, "%2Fx");
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::Reject);
-  EXPECT_STREQ(win_valid, "%5Cx");
+  EXPECT_EQ(valid, "%2Fx");
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(redirect_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::DecodedRedirect);
-  EXPECT_STREQ(valid, "%2Fx");
+  EXPECT_EQ(valid, "%2Fx");
   EXPECT_EQ(decoded.octet(), '/');
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::DecodedRedirect);
-  EXPECT_STREQ(win_valid, "%5Cx");
-  EXPECT_EQ(win_decoded.octet(), '\\');
 }
 
 TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecodedEncodedSlash) {
-  char valid[] = "%2fx";
-  char win_valid[] = "%5cx";
+  std::string valid = "%2fx";
 
   auto normalizer = create(decode_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Decoded);
-  EXPECT_STREQ(valid, "%2Fx");
+  EXPECT_EQ(valid, "%2Fx");
   EXPECT_EQ(decoded.octet(), '/');
-
-  auto win_decoded = normalizer->normalizeAndDecodeOctet(win_valid);
-  EXPECT_EQ(win_decoded.result(), PathNormalizer::PercentDecodeResult::Decoded);
-  EXPECT_STREQ(win_valid, "%5Cx");
-  EXPECT_EQ(win_decoded.octet(), '\\');
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriRoot) {

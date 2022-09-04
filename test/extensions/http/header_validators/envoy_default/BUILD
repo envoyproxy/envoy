@@ -33,6 +33,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "path_normalizer_test",
+    srcs = [
+        "path_normalizer_test.cc",
+    ],
+    extension_names = ["envoy.http.header_validators.envoy_default"],
+    deps = [
+        # "//source/common/network:utility_lib",
+        "//source/extensions/http/header_validators/envoy_default:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.header_validators.envoy_default"],

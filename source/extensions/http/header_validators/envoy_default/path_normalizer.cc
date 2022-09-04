@@ -22,8 +22,8 @@ using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCo
 
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
 
-PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(char* octet) const {
-  //
+PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(std::string& str,
+                                                                     std::size_t pos) const {
   // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.1
   //
   // SPELLCHECKER(off)
@@ -45,16 +45,17 @@ PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(char* octet
   // delimiters. The only exception is for percent-encoded octets corresponding
   // to characters in the unreserved set, which can be decoded at any time.
   // SPELLCHECKER(on)
-  //
-  char ch;
-
-  if (!isxdigit(octet[1]) || !isxdigit(octet[2])) {
+  auto octet = absl::string_view(str).substr(pos, 3);
+  if (octet.size() < 3 || octet.at(0) != '%' || !isxdigit(octet.at(1)) || !isxdigit(octet.at(2))) {
+    // invalid percent encoded octet
     return {PercentDecodeResult::Invalid};
   }
 
+  char ch;
+
   // normalize to UPPERCASE
-  octet[1] = octet[1] >= 'a' && octet[1] <= 'z' ? octet[1] ^ 0x20 : octet[1];
-  octet[2] = octet[2] >= 'a' && octet[2] <= 'z' ? octet[2] ^ 0x20 : octet[2];
+  str[pos + 1] = octet[1] >= 'a' && octet[1] <= 'z' ? octet[1] ^ 0x20 : octet[1];
+  str[pos + 2] = octet[2] >= 'a' && octet[2] <= 'z' ? octet[2] ^ 0x20 : octet[2];
 
   // decode to character
   ch = octet[1] >= 'A' ? (octet[1] - 'A' + 10) : (octet[1] - '0');
@@ -99,26 +100,45 @@ PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(char* octet
   return {PercentDecodeResult::Normalized};
 }
 
+/*
+ * Find the start index of the previous segment within the path. The previous segment starts at the
+ * first non-slash character after the preceeding slash. For example:
+ *
+ *   path = "/hello/world/..";
+ *                  ^    ^-- pos
+ *                  |-- start of previous segment
+ */
+size_t findStartOfPreviousSegment(absl::string_view path, size_t pos) {
+  bool seen_segment_char = false;
+  for (ssize_t i = pos; i >= 0; --i) {
+    if (path.at(i) == '/' && seen_segment_char) {
+      return i + 1;
+    }
+
+    if (path.at(i) != '/' && !seen_segment_char) {
+      seen_segment_char = true;
+    }
+  }
+
+  return absl::string_view::npos;
+}
+
 HeaderValidator::RequestHeaderMapValidationResult
 PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // Make a copy of the original path so we can edit it in place.
   absl::string_view original_path = header_map.path();
-  size_t length = original_path.size();
-  auto path_ptr = std::make_unique<char[]>(length + 1); // auto free on return
-  char* path = path_ptr.get();
-
-  original_path.copy(path, length);
-
-  // We rely on the string being null terminated so that we can safely look forward 1 character.
-  path[length] = '\0';
+  // make a copy of the original path and then create a readonly string_view to it. The path
+  // is modified in place.
+  std::string path{original_path.data(), original_path.length()};
+  absl::string_view path_view{path};
 
   // Start normalizing the path.
-  char* read = path;
-  char* write = path;
-  char* end = path + length;
+  size_t read = 0;
+  size_t write = 0;
+  size_t end = original_path.size();
   bool redirect = false;
 
-  if (*read != '/') {
+  if (path_view.at(0) != '/') {
     // Reject relative paths
     return {HeaderValidator::RejectOrRedirectAction::Reject,
             UhvResponseCodeDetail::get().InvalidUrl};
@@ -127,7 +147,6 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   ++read;
   ++write;
 
-  //
   // Path normalization is based on RFC 3986:
   // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
   //
@@ -150,15 +169,13 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   //
   // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
   // SPELLCHECKER(on)
-  //
   while (read < end) {
-    char ch = *read;
-    char prev = *(write - 1);
+    char ch = path_view.at(read);
+    char prev = path_view.at(write - 1);
 
     switch (ch) {
     case '%': {
-      // Potential percent-encoded octet
-      auto decode_result = normalizeAndDecodeOctet(read);
+      auto decode_result = normalizeAndDecodeOctet(path, read);
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
         ABSL_FALLTHROUGH_INTENDED;
@@ -170,9 +187,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
       case PercentDecodeResult::Normalized:
         // Valid encoding but outside the UNRESERVED character set. The encoding was normalized to
         // UPPERCASE and the octet must not be decoded. Copy the normalized encoding.
-        *write++ = *read++;
-        *write++ = *read++;
-        *write++ = *read++;
+        path[write++] = path_view.at(read++);
+        path[write++] = path_view.at(read++);
+        path[write++] = path_view.at(read++);
         break;
 
       case PercentDecodeResult::DecodedRedirect:
@@ -184,43 +201,38 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         // The encoding was decoded. Store the decoded octet in the last character of the percent
         // encoding (read[2]) so it will be processed in the next iteration.
         read += 2;
-        *read = decode_result.octet();
+        path[read] = decode_result.octet();
       }
       break;
     }
 
     case '.': {
-      // Potential "/./" or "/../" sequence
-      if (*(read + 1) == '/' || (read + 1) == end) {
-        // this is a "./" token.
-        if (prev == '/') {
-          // ignore "/./", jump to next segment (read + 2)
+      if (prev == '/') {
+        // attempt to read ahead 2 characters to see if we are in a "./" or "../" segment.
+        auto dot_segment = path_view.substr(read, 3);
+        if (absl::StartsWith(dot_segment, "./") || dot_segment == ".") {
+          // This is a "/./" segment or the path is terminated by "/.", ignore it
           read += 2;
-        } else if (prev == '.' && *(write - 2) == '/') {
-          // This is a "../" segment, remove the previous segment by back write up to the previous
-          // slash (write - 2).
-          write -= 2;
-          if (write <= path) {
-            // the full input is: "/.."", this is invalid
+        } else if (dot_segment == "../" || dot_segment == "..") {
+          // This is a "/../" segment or the path is terminated by "/..", navigate one segment up
+          auto new_write = findStartOfPreviousSegment(path, write - 1);
+          if (new_write == absl::string_view::npos) {
+            // This is an invalid ".." segment, most likely the full path is "/..", which attempts
+            // to go above the root.
             return {HeaderValidator::RejectOrRedirectAction::Reject,
                     UhvResponseCodeDetail::get().InvalidUrl};
           }
 
-          // reset write to overwrite the previous segment
-          while (write > path && *(write - 1) != '/') {
-            --write;
-          }
-
-          // skip the "../" token since it's been handled
-          read += 2;
+          // Set the write position to overwrite the previous segment
+          write = new_write;
+          read += 3;
         } else {
-          // just a dot within a normal path segment, copy it
-          *write++ = *read++;
+          path[write++] = path_view.at(read++);
         }
       } else {
-        // just a dot within a normal path segment, copy it
-        *write++ = *read++;
+        path[write++] = path_view.at(read++);
       }
+
       break;
     }
 
@@ -229,7 +241,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         // Duplicate slash, merge it
         ++read;
       } else {
-        *write++ = *read++;
+        path[write++] = path_view.at(read++);
       }
       break;
     }
@@ -237,7 +249,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     default: {
       if (testChar(kPathHeaderCharTable, ch)) {
         // valid path character, copy it
-        *write++ = *read++;
+        path[write++] = path_view.at(read++);
       } else {
         // invalid path character
         return {HeaderValidator::RejectOrRedirectAction::Reject,
@@ -247,12 +259,10 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     }
   }
 
-  *write = '\0';
-
-  auto normalized_length = static_cast<size_t>(write - path);
-  absl::string_view normalized_path{path, normalized_length};
+  absl::string_view normalized_path = path_view.substr(0, write);
   header_map.setPath(normalized_path);
 
+  // redirect |= normalized_path != original_path;
   if (redirect) {
     return {HeaderValidator::RejectOrRedirectAction::Redirect,
             PathNormalizerResponseCodeDetail::get().RedirectNormalized};
