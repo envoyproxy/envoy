@@ -22,4 +22,4 @@ responds_with \
 run_log "View the traces in OpenTelemetry UI"
 responds_with \
     "<!doctype html>" \
-    "http://localhost:${PORT_UI}/debug/tracez"
+    "http://localhost:${PORT_COLLECTOR_ZPAGE}/debug/tracez"
