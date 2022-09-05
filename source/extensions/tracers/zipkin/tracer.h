@@ -61,10 +61,11 @@ public:
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Random::RandomGenerator& random_generator, const bool trace_id_128bit,
-         const bool shared_span_context, TimeSource& time_source)
+         const bool shared_span_context, TimeSource& time_source, bool separate_proxy_for_tracing)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
-        shared_span_context_(shared_span_context), time_source_(time_source) {}
+        shared_span_context_(shared_span_context), time_source_(time_source),
+        separate_proxy_for_tracing_(separate_proxy_for_tracing) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -72,9 +73,11 @@ public:
    * @param config The tracing configuration
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
+   * @param downstream_span Whether the returned span is created for downstream request.
    * @return SpanPtr The root span.
    */
-  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
+  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
+                    bool downstream_span);
 
   /**
    * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
@@ -83,10 +86,11 @@ public:
    * @param span_name Name of the new span.
    * @param start_time The time indicating the beginning of the span.
    * @param previous_context The context of the span preceding the one to be created.
+   * @param downstream_span Whether the returned span is created for downstream request.
    * @return SpanPtr The child span.
    */
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
-                    const SpanContext& previous_context);
+                    const SpanContext& previous_context, bool downstream_span);
 
   /**
    * TracerInterface::reportSpan.
@@ -110,6 +114,7 @@ private:
   const bool trace_id_128bit_;
   const bool shared_span_context_;
   TimeSource& time_source_;
+  const bool separate_proxy_for_tracing_{};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

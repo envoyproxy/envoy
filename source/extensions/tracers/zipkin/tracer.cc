@@ -13,19 +13,26 @@ namespace Tracers {
 namespace Zipkin {
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp) {
+                          SystemTime timestamp, bool downstream_span) {
   // Build the endpoint
   Endpoint ep(service_name_, address_);
 
   // Build the CS annotation
   Annotation cs;
   cs.setEndpoint(std::move(ep));
-  if (config.operationName() == Tracing::OperationName::Egress) {
-    cs.setValue(CLIENT_SEND);
+  if (separate_proxy_for_tracing_) {
+    if (downstream_span) {
+      cs.setValue(SERVER_RECV);
+    } else {
+      cs.setValue(CLIENT_SEND);
+    }
   } else {
-    cs.setValue(SERVER_RECV);
+    if (config.operationName() == Tracing::OperationName::Egress) {
+      cs.setValue(CLIENT_SEND);
+    } else {
+      cs.setValue(SERVER_RECV);
+    }
   }
-
   // Create an all-new span, with no parent id
   SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   span_ptr->setName(span_name);
@@ -55,7 +62,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, const SpanContext& previous_context) {
+                          SystemTime timestamp, const SpanContext& previous_context,
+                          bool downstream_span) {
   SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   Annotation annotation;
   uint64_t timestamp_micro;
@@ -66,14 +74,22 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   span_ptr->setName(span_name);
 
   // Set the span's kind (client or server)
-  if (config.operationName() == Tracing::OperationName::Egress) {
-    annotation.setValue(CLIENT_SEND);
+  if (separate_proxy_for_tracing_) {
+    if (downstream_span) {
+      annotation.setValue(SERVER_RECV);
+    } else {
+      annotation.setValue(CLIENT_SEND);
+    }
   } else {
-    annotation.setValue(SERVER_RECV);
+    if (config.operationName() == Tracing::OperationName::Egress) {
+      annotation.setValue(CLIENT_SEND);
+    } else {
+      annotation.setValue(SERVER_RECV);
+    }
   }
 
   // Set the span's id and parent id
-  if (config.operationName() == Tracing::OperationName::Egress || !shared_span_context_) {
+  if (annotation.value() == CLIENT_SEND || !shared_span_context_) {
     // We need to create a new span that is a child of the previous span; no shared context
 
     // Create a new span id
@@ -85,7 +101,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
     // Set the timestamp globally for the span
     span_ptr->setTimestamp(timestamp_micro);
-  } else if (config.operationName() == Tracing::OperationName::Ingress) {
+  } else if (annotation.value() == SERVER_RECV) {
     // We need to create a new span that will share context with the previous span
 
     // Initialize the shared context for the new span

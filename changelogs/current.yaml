@@ -148,6 +148,10 @@ new_features:
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
     by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
+- area: zipkin
+  change: |
+    added :ref:`separate_proxy_for_tracing <envoy_v3_api_field_config.trace.v3.ZipkinConfig.separate_proxy_for_tracing>` to make Envoy worked
+    as independent hop for zipkin tracing.
 
 deprecated:
 - area: http
