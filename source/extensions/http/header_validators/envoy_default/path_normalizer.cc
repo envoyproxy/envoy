@@ -113,10 +113,10 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
 
 /*
  * Find the start index of the previous segment within the path. The previous segment starts at the
- * first non-slash character after the preceeding slash. For example:
+ * first non-slash character after the preceding slash. For example:
  *
  *   path = "/hello/world/..";
- *                  ^    ^-- iter
+ *                  ^    ^-- iterator
  *                  |-- start of previous segment
  *
  * The ``begin`` iterator is returned on error.
