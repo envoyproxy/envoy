@@ -110,7 +110,7 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 // addition to declaring it in MainCommon. There is no harm in double-declaring.
 TEST_P(MainCommonTest, ValidateUsingMainCommonBaseOutsideTestThread) {
   EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
-  const char* argv[] = {"envoy-static", "--mode", "validate", "--config-path",
+  const char* argv[] = {"envoy-static",       "--mode", "validate", "--config-path",
                         config_file_.c_str(), nullptr};
   Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommon::hotRestartVersion,
                              spdlog::level::info);
