@@ -604,13 +604,13 @@ envoy.filters.network.zookeeper_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy
-envoy.filters.network.meta_protocol_proxy:
+envoy.filters.network.generic_proxy:
   categories:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.network.meta_protocol_proxy.v3.MetaProtocolProxy
+  - envoy.extensions.filters.network.generic_proxy.v3.GenericProxy
 envoy.filters.thrift.header_to_metadata:
   categories:
   - envoy.thrift_proxy.filters
