@@ -163,7 +163,7 @@ message LocalService {
   string parameter = 2;
 }
 
-// Upstream transaction support by the use of X-Envoy-Origin-Ingress header custom header
+// Upstream transaction support by the use of X-Envoy-Origin-Ingress custom header
 message UpstreamTransactions {
   // Whether upstream transactions are allowed
   // False: upstream transactions disabled
