@@ -25,11 +25,6 @@
 namespace Envoy {
 namespace Upstream {
 
-// TODO(nezdolik):
-// 1. Do we need support for Delta Grpc APi type?
-// 2. Do we need support for unified mux?
-// 3. Implement collectionSubscriptionFromUrl
-// 4. Hide behind feature flag in api?
 class MultiplexedSubscriptionFactory : public Config::SubscriptionFactoryImpl {
 public:
   virtual ~MultiplexedSubscriptionFactory() = default;
@@ -37,7 +32,8 @@ public:
   MultiplexedSubscriptionFactory(const LocalInfo::LocalInfo& local_info,
                                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Api::Api& api, const Server::Instance& server);
+                                 Api::Api& api, const Server::Instance& server,
+                                 Config::XdsResourcesDelegateOptRef xds_resources_delegate);
 
 protected:
   // Config::SubscriptionFactoryImpl

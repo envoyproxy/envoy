@@ -325,7 +325,7 @@ public:
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
   Config::SubscriptionFactory& multiplexedSubscriptionFactory() override {
-    return multiplexed_subscription_factory_;
+    return *multiplexed_subscription_factory_;
   }
 
   void
@@ -765,8 +765,8 @@ private:
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
-  MultiplexedSubscriptionFactory multiplexed_subscription_factory_;
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
+  std::unique_ptr<MultiplexedSubscriptionFactory> multiplexed_subscription_factory_;
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;

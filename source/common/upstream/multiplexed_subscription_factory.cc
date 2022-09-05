@@ -12,9 +12,10 @@ namespace Upstream {
 MultiplexedSubscriptionFactory::MultiplexedSubscriptionFactory(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server)
-    : Config::SubscriptionFactoryImpl(local_info, dispatcher, cm, validation_visitor, api,
-                                      server){};
+    Api::Api& api, const Server::Instance& server,
+    Config::XdsResourcesDelegateOptRef xds_resources_delegate)
+    : Config::SubscriptionFactoryImpl(local_info, dispatcher, cm, validation_visitor, api, server,
+                                      xds_resources_delegate){};
 
 Config::GrpcMuxSharedPtr MultiplexedSubscriptionFactory::getOrCreateMux(
     const envoy::config::core::v3::ApiConfigSource& config_source, absl::string_view type_url,
