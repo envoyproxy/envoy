@@ -152,7 +152,7 @@ private:
 
   double width_;
   double offset_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   DeterministicApertureLoadBalancerStats stats_;
   RingHashLoadBalancerStats ring_stats_;
 };
