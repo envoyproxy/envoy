@@ -65,6 +65,7 @@ The following sandboxes are available:
     local_ratelimit
     lua
     mysql
+    opentelemetry_tracing
     postgres
     rbac
     redis
