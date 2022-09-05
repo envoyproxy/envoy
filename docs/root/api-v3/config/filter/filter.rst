@@ -11,4 +11,4 @@ Filters
   http/http
   dubbo/dubbo
   thrift/thrift
-  meta_protocol/meta_protocol
+  generic/generic
