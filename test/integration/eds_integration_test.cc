@@ -187,13 +187,9 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
-  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the
-  host
-      // being health checked.
-      cluster_.mutable_circuit_breakers()
-          ->add_thresholds()
-          ->mutable_max_connections()
-          ->set_value(100);
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
+  // being health checked.
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster_manager.warming_clusters")->value());
@@ -252,10 +248,9 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
-// Verifies that cluster warming proceeds even if a host is deleted before health checks
-complete.
-    // This is a regression test for https://github.com/envoyproxy/envoy/issues/17836.
-    TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
+// Verifies that cluster warming proceeds even if a host is deleted before health checks complete.
+// This is a regression test for https://github.com/envoyproxy/envoy/issues/17836.
+TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
     cluster.set_ignore_health_on_host_removal(true);
@@ -265,20 +260,15 @@ complete.
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
-  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the
-  host
-      // being health checked.
-      cluster_.mutable_circuit_breakers()
-          ->add_thresholds()
-          ->mutable_max_connections()
-          ->set_value(100);
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
+  // being health checked.
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
-  // Clear out the host before the health check finishes (regardless of success/error/timeout)
-  and
-      // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
-      setEndpoints(0, 0, 0, true, absl::nullopt, false);
+  // Clear out the host before the health check finishes (regardless of success/error/timeout) and
+  // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
+  setEndpoints(0, 0, 0, true, absl::nullopt, false);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
@@ -294,10 +284,9 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being
-  excluded.
-      // The other endpoint should still be excluded.
-      waitForNextUpstreamRequest(0);
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
@@ -317,10 +306,9 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being
-  excluded.
-      // The other endpoint should still be excluded.
-      waitForNextUpstreamRequest(0);
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());

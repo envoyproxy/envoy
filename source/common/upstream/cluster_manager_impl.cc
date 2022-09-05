@@ -340,12 +340,13 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
-  // Cluster loading happens in two phases: first all the primary clusters are loaded, and then
-  // all the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS
-  // which load endpoint definition from file are primary and (REST,GRPC,DELTA_GRPC) EDS clusters
-  // are secondary. This two phase loading is done because in v2 configuration each EDS cluster
-  // individually sets up a subscription. When this subscription is an API source the cluster will
-  // depend on a non-EDS cluster, so the non-EDS clusters must be loaded first.
+  // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
+  // the secondary clusters are loaded. As it currently stands all non-EDS clusters and EDS which
+  // load endpoint definition from file are primary and
+  // (REST,GRPC,DELTA_GRPC) EDS clusters are secondary. This two phase
+  // loading is done because in v2 configuration each EDS cluster individually sets up a
+  // subscription. When this subscription is an API source the cluster will depend on a non-EDS
+  // cluster, so the non-EDS clusters must be loaded first.
   auto is_primary_cluster = [](const envoy::config::cluster::v3::Cluster& cluster) -> bool {
     return cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
            (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
@@ -367,9 +368,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now setup ADS if needed, this might rely on a primary cluster.
-  // This is the only point where distinction between delta ADS and state-of-the-world ADS is
-  // made. After here, we just have a GrpcMux interface held in ads_mux_, which hides whether the
-  // backing implementation is delta or SotW.
+  // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
+  // After here, we just have a GrpcMux interface held in ads_mux_, which hides
+  // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
     Config::CustomConfigValidatorsPtr custom_config_validators =
         std::make_unique<Config::CustomConfigValidatorsImpl>(
@@ -427,8 +428,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                 ->createUncachedRawAsyncClient(),
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                "envoy.service.discovery.v3.AggregatedDiscoveryService."
-                "StreamAggregatedResources"),
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
@@ -525,11 +525,10 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 
 void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   // This routine is called when a cluster has finished initializing. The cluster has not yet
-  // been setup for cross-thread updates to avoid needless updates during initialization. The
-  // order of operations here is important. We start by initializing the thread aware load
-  // balancer if needed. This must happen first so cluster updates are heard first by the load
-  // balancer. Also, it assures that all of clusters which this function is called should be
-  // always active.
+  // been setup for cross-thread updates to avoid needless updates during initialization. The order
+  // of operations here is important. We start by initializing the thread aware load balancer if
+  // needed. This must happen first so cluster updates are heard first by the load balancer.
+  // Also, it assures that all of clusters which this function is called should be always active.
   auto& cluster = cm_cluster.cluster();
   auto cluster_data = warming_clusters_.find(cluster.info()->name());
   // We have a situation that clusters will be immediately active, such as static and primary
@@ -577,8 +576,8 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
         // only those updates that signal a change in host healthcheck state, weight or metadata.
         //
         // We've discussed merging updates related to hosts being added/removed, but it's really
-        // tricky to merge those given that downstream consumers of these updates expect to see
-        // the full list of updates, not a condensed one. This is because they use the broadcasted
+        // tricky to merge those given that downstream consumers of these updates expect to see the
+        // full list of updates, not a condensed one. This is because they use the broadcasted
         // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire
         // list of removals, these maps will leak those HostSharedPtrs.
         //
@@ -714,8 +713,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
     // Always proceed if the cluster is different from the existing warming cluster.
   } else if (existing_active_cluster != active_clusters_.end() &&
              existing_active_cluster->second->blockUpdate(new_hash)) {
-    // If there's no warming cluster of the same name, and if the cluster is the same as the
-    // active cluster of the same name, block the update.
+    // If there's no warming cluster of the same name, and if the cluster is the same as the active
+    // cluster of the same name, block the update.
     return false;
   }
 
@@ -736,12 +735,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   //    primary/secondary init, static/CDS init, warming all clusters, etc.
   // 2) After initial server load, we handle warming independently for each cluster in the warming
   //    map.
-  // Note: It's likely possible that all warming logic could be centralized in the init manager,
-  // but
-  //       a decision was made to split the logic given how complex the init manager already is.
-  //       In the future we may decide to undergo a refactor to unify the logic but the
-  //       effort/risk to do that right now does not seem worth it given that the logic is
-  //       generally pretty clean and easy to understand.
+  // Note: It's likely possible that all warming logic could be centralized in the init manager, but
+  //       a decision was made to split the logic given how complex the init manager already is. In
+  //       the future we may decide to undergo a refactor to unify the logic but the effort/risk to
+  //       do that right now does not seem worth it given that the logic is generally pretty clean
+  //       and easy to understand.
   const bool all_clusters_initialized =
       init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
   // Preserve the previous cluster data to avoid early destroy. The same cluster should be added
@@ -916,9 +914,9 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
 void ClusterManagerImpl::updateClusterCounts() {
   // This if/else block implements a control flow mechanism that can be used by an ADS
   // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that
-  // depend on it. This can improve incidence of HTTP 503 responses from Envoy when a route is
-  // used before it's supporting cluster is ready.
+  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
+  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // it's supporting cluster is ready.
   //
   // We achieve that by leaving CDS in the paused state as long as there is at least
   // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
@@ -1197,8 +1195,8 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
-  // return an already existing one if the config or locator matches. Note that this may need a
-  // way to clean up the unused handles, so we can close the unnecessary connections.
+  // return an already existing one if the config or locator matches. Note that this may need a way
+  // to clean up the unused handles, so we can close the unnecessary connections.
   auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this, stats_,
                                     validation_visitor);
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
@@ -1212,28 +1210,28 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
 
   auto [handle, discovery_in_progress, invoker] =
       cluster_manager.cdm_.addCallback(name, std::move(callback));
-  // This check will catch requests for discoveries from this thread only. If other thread
-  // requested the same discovery, we will detect it in the main thread later.
+  // This check will catch requests for discoveries from this thread only. If other thread requested
+  // the same discovery, we will detect it in the main thread later.
   if (discovery_in_progress) {
     ENVOY_LOG(debug,
               "cm odcds: on-demand discovery for cluster {} is already in progress, something else "
               "in thread {} has already requested it",
               name, cluster_manager.thread_local_dispatcher_.name());
-    // This worker thread has already requested a discovery of a cluster with this name, so
-    // nothing more left to do here.
+    // This worker thread has already requested a discovery of a cluster with this name, so nothing
+    // more left to do here.
     //
     // We can't "just" return handle here, because handle is a part of the structured binding done
     // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
-    // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here
-    // - it needs to be moved.
+    // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here -
+    // it needs to be moved.
     return std::move(handle);
   }
   ENVOY_LOG(
       debug,
       "cm odcds: forwarding the on-demand discovery request for cluster {} to the main thread",
       name);
-  // This seems to be the first request for discovery of this cluster in this worker thread. Rest
-  // of the process may only happen in the main thread.
+  // This seems to be the first request for discovery of this cluster in this worker thread. Rest of
+  // the process may only happen in the main thread.
   dispatcher_.post([this, odcds = std::move(odcds), timeout, name = std::move(name),
                     invoker = std::move(invoker),
                     &thread_local_dispatcher = cluster_manager.thread_local_dispatcher_] {
@@ -1252,8 +1250,8 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
 
     if (auto it = pending_cluster_creations_.find(name); it != pending_cluster_creations_.end()) {
       ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} is already in progress", name);
-      // We already began the discovery process for this cluster, nothing to do. If we got here,
-      // it means that it was other worker thread that requested the discovery.
+      // We already began the discovery process for this cluster, nothing to do. If we got here, it
+      // means that it was other worker thread that requested the discovery.
       return;
     }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
@@ -1269,8 +1267,8 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
 
   // We can't "just" return handle here, because handle is a part of the structured binding done
   // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
-  // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here -
-  // it needs to be moved.
+  // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here - it
+  // needs to be moved.
   return std::move(handle);
 }
 
@@ -1485,8 +1483,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   // outlier/ health is due to `ECMP` flow hashing issues for example, a new set of connections
   // might do better.
   // TODO(mattklein123): This function is currently very specific, but in the future when we do
-  // more granular host set changes, we should be able to capture single host changes and make
-  // them more targeted.
+  // more granular host set changes, we should be able to capture single host changes and make them
+  // more targeted.
   drainAllConnPoolsWorker(host);
 
   if (host->cluster().features() &
@@ -1500,9 +1498,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
     //
-    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long
-    // time and halt other useful work. Consider breaking up this work. Note that this behavior is
-    // noted in the configuration documentation in cluster setting
+    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long time
+    // and halt other useful work. Consider breaking up this work. Note that this behavior is noted
+    // in the configuration documentation in cluster setting
     // "close_connections_on_host_health_failure". Update the docs if this if this changes.
     while (true) {
       const auto& it = host_tcp_conn_map_.find(host);
@@ -1658,8 +1656,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   // cluster.
   //
   // TODO(mattklein123): Optimally, we would just fire member changed callbacks and remove all of
-  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we
-  // are going with a more targeted approach for now.
+  // the hosts inside of the HostImpl destructor. That is a change with wide implications, so we are
+  // going with a more targeted approach for now.
   drainConnPools();
 }
 
