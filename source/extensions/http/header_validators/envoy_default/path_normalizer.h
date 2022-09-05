@@ -54,7 +54,7 @@ public:
    * Normalize a percent encoded octet (%XX) to uppercase and attempt to decode to a character. The
    * octet argument must start with the "%" character and is normalized in-place to UPPERCASE.
    */
-  DecodedOctet normalizeAndDecodeOctet(std::string& str, std::size_t pos) const;
+  DecodedOctet normalizeAndDecodeOctet(std::string::iterator iter, std::string::iterator end) const;
 
 private:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig

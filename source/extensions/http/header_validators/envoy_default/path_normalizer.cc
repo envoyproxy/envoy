@@ -22,8 +22,9 @@ using PathNormalizerResponseCodeDetail = ConstSingleton<PathNormalizerResponseCo
 
 PathNormalizer::PathNormalizer(const HeaderValidatorConfig& config) : config_(config) {}
 
-PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(std::string& str,
-                                                                     std::size_t pos) const {
+PathNormalizer::DecodedOctet
+PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
+                                        std::string::iterator end) const {
   // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.1
   //
   // SPELLCHECKER(off)
@@ -45,29 +46,39 @@ PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(std::string
   // delimiters. The only exception is for percent-encoded octets corresponding
   // to characters in the unreserved set, which can be decoded at any time.
   // SPELLCHECKER(on)
-  auto octet = absl::string_view(str).substr(pos, 3);
-  if (octet.size() < 3 || octet.at(0) != '%' || !isxdigit(octet.at(1)) || !isxdigit(octet.at(2))) {
-    // invalid percent encoded octet
+
+  if (iter == end || *iter != '%') {
     return {PercentDecodeResult::Invalid};
   }
 
-  char ch;
+  char ch = '\0';
+  // Normalize and decode the octet
+  for (int i = 0; i < 2; ++i) {
+    ++iter;
+    if (iter == end) {
+      return {PercentDecodeResult::Invalid};
+    }
 
-  // normalize to UPPERCASE
-  str[pos + 1] = octet[1] >= 'a' && octet[1] <= 'z' ? octet[1] ^ 0x20 : octet[1];
-  str[pos + 2] = octet[2] >= 'a' && octet[2] <= 'z' ? octet[2] ^ 0x20 : octet[2];
+    char nibble = *iter;
+    if (!isxdigit(*iter)) {
+      return {PercentDecodeResult::Invalid};
+    }
 
-  // decode to character
-  ch = octet[1] >= 'A' ? (octet[1] - 'A' + 10) : (octet[1] - '0');
-  ch *= 16;
-  ch += octet[2] >= 'A' ? (octet[2] - 'A' + 10) : (octet[2] - '0');
+    // normalize
+    nibble = nibble >= 'a' ? nibble ^ 0x20 : nibble;
+    *iter = nibble;
+
+    // decode
+    int factor = i == 0 ? 16 : 1;
+    ch += factor * (nibble >= 'A' ? (nibble - 'A' + 10) : (nibble - '0'));
+  }
 
   if (testChar(kUnreservedCharTable, ch)) {
     // Based on RFC, only decode characters in the UNRESERVED set.
     return {PercentDecodeResult::Decoded, ch};
   }
 
-  if (ch == '/' || ch == '\\') {
+  if (ch == '/') {
     // We decoded a slash character and how we handle it depends on the active configuration.
     switch (config_.uri_path_normalization_options().path_with_escaped_slashes_action()) {
     case HeaderValidatorConfig_UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT:
@@ -105,41 +116,49 @@ PathNormalizer::DecodedOctet PathNormalizer::normalizeAndDecodeOctet(std::string
  * first non-slash character after the preceeding slash. For example:
  *
  *   path = "/hello/world/..";
- *                  ^    ^-- pos
+ *                  ^    ^-- iter
  *                  |-- start of previous segment
+ *
+ * The ``begin`` iterator is returned on error.
  */
-size_t findStartOfPreviousSegment(absl::string_view path, size_t pos) {
+std::string::iterator findStartOfPreviousSegment(std::string::iterator iter,
+                                                 std::string::iterator begin) {
   bool seen_segment_char = false;
-  for (ssize_t i = pos; i >= 0; --i) {
-    if (path.at(i) == '/' && seen_segment_char) {
-      return i + 1;
+  for (; iter != begin; --iter) {
+    if (*iter == '/' && seen_segment_char) {
+      ++iter;
+      return iter;
     }
 
-    if (path.at(i) != '/' && !seen_segment_char) {
+    if (*iter != '/' && !seen_segment_char) {
       seen_segment_char = true;
     }
   }
 
-  return absl::string_view::npos;
+  if (seen_segment_char) {
+    ++begin;
+  }
+
+  return begin;
 }
 
 HeaderValidator::RequestHeaderMapValidationResult
 PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
-  // Make a copy of the original path so we can edit it in place.
+  // Make a copy of the original path and then create a readonly string_view to it. The string_view
+  // is used for optimized sub-strings and the path is modified in place.
   absl::string_view original_path = header_map.path();
-  // make a copy of the original path and then create a readonly string_view to it. The path
-  // is modified in place.
   std::string path{original_path.data(), original_path.length()};
   absl::string_view path_view{path};
 
   // Start normalizing the path.
-  size_t read = 0;
-  size_t write = 0;
-  size_t end = original_path.size();
+  const auto begin = path.begin();
+  auto read = path.begin();
+  auto write = path.begin();
+  auto end = path.end();
   bool redirect = false;
 
-  if (path_view.at(0) != '/') {
-    // Reject relative paths
+  if (read == end || *read != '/') {
+    // Reject empty or relative paths
     return {HeaderValidator::RejectOrRedirectAction::Reject,
             UhvResponseCodeDetail::get().InvalidUrl};
   }
@@ -169,13 +188,13 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   //
   // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
   // SPELLCHECKER(on)
-  while (read < end) {
-    char ch = path_view.at(read);
-    char prev = path_view.at(write - 1);
+  while (read != end) {
+    char ch = *read;
+    char prev = *std::prev(write);
 
     switch (ch) {
     case '%': {
-      auto decode_result = normalizeAndDecodeOctet(path, read);
+      auto decode_result = normalizeAndDecodeOctet(read, end);
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
         ABSL_FALLTHROUGH_INTENDED;
@@ -187,9 +206,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
       case PercentDecodeResult::Normalized:
         // Valid encoding but outside the UNRESERVED character set. The encoding was normalized to
         // UPPERCASE and the octet must not be decoded. Copy the normalized encoding.
-        path[write++] = path_view.at(read++);
-        path[write++] = path_view.at(read++);
-        path[write++] = path_view.at(read++);
+        *write++ = *read++;
+        *write++ = *read++;
+        *write++ = *read++;
         break;
 
       case PercentDecodeResult::DecodedRedirect:
@@ -199,9 +218,10 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         ABSL_FALLTHROUGH_INTENDED;
       case PercentDecodeResult::Decoded:
         // The encoding was decoded. Store the decoded octet in the last character of the percent
-        // encoding (read[2]) so it will be processed in the next iteration.
-        read += 2;
-        path[read] = decode_result.octet();
+        // encoding (read[2]) so it will be processed in the next iteration. We can safely advance
+        // 2 positions since we know that the value was correctly decoded.
+        std::advance(read, 2);
+        *read = decode_result.octet();
       }
       break;
     }
@@ -209,14 +229,17 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     case '.': {
       if (prev == '/') {
         // attempt to read ahead 2 characters to see if we are in a "./" or "../" segment.
-        auto dot_segment = path_view.substr(read, 3);
+        const auto dot_segment = path_view.substr(std::distance(begin, read), 3);
         if (absl::StartsWith(dot_segment, "./") || dot_segment == ".") {
           // This is a "/./" segment or the path is terminated by "/.", ignore it
-          read += 2;
+          size_t distance = std::min<size_t>(dot_segment.size(), 2);
+          // Advance the read iterator by 1 if the path ends with "." or 2 if the segment is "./"
+          std::advance(read, distance);
         } else if (dot_segment == "../" || dot_segment == "..") {
-          // This is a "/../" segment or the path is terminated by "/..", navigate one segment up
-          auto new_write = findStartOfPreviousSegment(path, write - 1);
-          if (new_write == absl::string_view::npos) {
+          // This is a "/../" segment or the path is terminated by "/..", navigate one segment up.
+          // Back up write 1 position to the previous slash to find the previous segment start.
+          auto new_write = findStartOfPreviousSegment(std::prev(write), begin);
+          if (new_write == begin) {
             // This is an invalid ".." segment, most likely the full path is "/..", which attempts
             // to go above the root.
             return {HeaderValidator::RejectOrRedirectAction::Reject,
@@ -225,12 +248,14 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
           // Set the write position to overwrite the previous segment
           write = new_write;
-          read += 3;
+          // Advance the read iterator by 2 if the path ends with ".." or 3 if the segment is "../"
+          size_t distance = std::min<size_t>(dot_segment.size(), 3);
+          std::advance(read, distance);
         } else {
-          path[write++] = path_view.at(read++);
+          *write++ = *read++;
         }
       } else {
-        path[write++] = path_view.at(read++);
+        *write++ = *read++;
       }
 
       break;
@@ -241,7 +266,8 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         // Duplicate slash, merge it
         ++read;
       } else {
-        path[write++] = path_view.at(read++);
+        // Not a duplicate slash or we aren't configured to merge slashes, copy it
+        *write++ = *read++;
       }
       break;
     }
@@ -249,7 +275,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     default: {
       if (testChar(kPathHeaderCharTable, ch)) {
         // valid path character, copy it
-        path[write++] = path_view.at(read++);
+        *write++ = *read++;
       } else {
         // invalid path character
         return {HeaderValidator::RejectOrRedirectAction::Reject,
@@ -259,7 +285,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     }
   }
 
-  absl::string_view normalized_path = path_view.substr(0, write);
+  absl::string_view normalized_path = path_view.substr(0, std::distance(begin, write));
   header_map.setPath(normalized_path);
 
   // redirect |= normalized_path != original_path;

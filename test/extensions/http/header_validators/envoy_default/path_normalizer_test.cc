@@ -56,7 +56,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecoded) {
   std::string valid = "x%7ex";
 
   auto normalizer = create(empty_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 1);
+  auto decoded = normalizer->normalizeAndDecodeOctet(std::next(valid.begin()), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Decoded);
   EXPECT_EQ(decoded.octet(), '~');
@@ -68,7 +68,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetNormalized) {
 
   auto normalizer = create(empty_config);
 
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(valid, 0).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end()).result(),
             PathNormalizer::PercentDecodeResult::Normalized);
   EXPECT_EQ(valid, "%FFX");
 }
@@ -80,11 +80,13 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetInvalid) {
 
   auto normalizer = create(empty_config);
 
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length, 0).result(),
+  EXPECT_EQ(
+      normalizer->normalizeAndDecodeOctet(invalid_length.begin(), invalid_length.end()).result(),
+      PathNormalizer::PercentDecodeResult::Invalid);
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length_2.begin(), invalid_length_2.end())
+                .result(),
             PathNormalizer::PercentDecodeResult::Invalid);
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_length_2, 0).result(),
-            PathNormalizer::PercentDecodeResult::Invalid);
-  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_hex, 0).result(),
+  EXPECT_EQ(normalizer->normalizeAndDecodeOctet(invalid_hex.begin(), invalid_hex.end()).result(),
             PathNormalizer::PercentDecodeResult::Invalid);
 }
 
@@ -92,7 +94,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepNotSet) {
   std::string valid = "%2fx";
 
   auto normalizer = create(empty_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
   EXPECT_EQ(valid, "%2Fx");
@@ -102,7 +104,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepImplDefault) {
   std::string valid = "%2fx";
 
   auto normalizer = create(impl_specific_slash_handling_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
   EXPECT_EQ(valid, "%2Fx");
@@ -112,7 +114,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetKeepPathSepUnchanged) {
   std::string valid = "%2fx";
 
   auto normalizer = create(keep_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Normalized);
   EXPECT_EQ(valid, "%2Fx");
@@ -122,7 +124,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRejectEncodedSlash) {
   std::string valid = "%2fx";
 
   auto normalizer = create(reject_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Reject);
   EXPECT_EQ(valid, "%2Fx");
@@ -132,7 +134,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetRedirectEncodedSlash) {
   std::string valid = "%2fx";
 
   auto normalizer = create(redirect_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::DecodedRedirect);
   EXPECT_EQ(valid, "%2Fx");
@@ -143,7 +145,7 @@ TEST_F(PathNormalizerTest, NormalizeAndDecodeOctetDecodedEncodedSlash) {
   std::string valid = "%2fx";
 
   auto normalizer = create(decode_encoded_slash_config);
-  auto decoded = normalizer->normalizeAndDecodeOctet(valid, 0);
+  auto decoded = normalizer->normalizeAndDecodeOctet(valid.begin(), valid.end());
 
   EXPECT_EQ(decoded.result(), PathNormalizer::PercentDecodeResult::Decoded);
   EXPECT_EQ(valid, "%2Fx");
