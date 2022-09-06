@@ -150,7 +150,7 @@ new_features:
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
 - area: zipkin
   change: |
-    added :ref:`separate_proxy_for_tracing <envoy_v3_api_field_config.trace.v3.ZipkinConfig.separate_proxy_for_tracing>` to make Envoy worked
+    added :ref:`independent_proxy <envoy_v3_api_field_config.trace.v3.ZipkinConfig.independent_proxy>` to make Envoy worked
     as independent hop for zipkin tracing.
 
 deprecated:

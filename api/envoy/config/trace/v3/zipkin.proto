@@ -69,10 +69,10 @@ message ZipkinConfig {
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
   string collector_hostname = 6;
 
-  // If this is set to true, then Envoy will be treated as separated service. Server span will be created
+  // If this is set to true, then Envoy will be treated as independent service. Server span will be created
   // for downstream request and client span will be created for upstream request.
   // If this is set to true, then the
   // :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
   // SHOULD be set to true also.
-  bool separate_proxy_for_tracing = 7;
+  bool independent_proxy = 7;
 }

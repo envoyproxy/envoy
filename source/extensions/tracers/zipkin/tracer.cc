@@ -13,25 +13,20 @@ namespace Tracers {
 namespace Zipkin {
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, bool downstream_span) {
+                          SystemTime timestamp) {
   // Build the endpoint
   Endpoint ep(service_name_, address_);
 
   // Build the CS annotation
   Annotation cs;
   cs.setEndpoint(std::move(ep));
-  if (separate_proxy_for_tracing_) {
-    if (downstream_span) {
-      cs.setValue(SERVER_RECV);
-    } else {
-      cs.setValue(CLIENT_SEND);
-    }
+  if (independent_proxy_) {
+    // No previous context then this must be span created for downstream request. Server span will
+    // created for downstream request when the independent_proxy is set to true
+    cs.setValue(SERVER_RECV);
   } else {
-    if (config.operationName() == Tracing::OperationName::Egress) {
-      cs.setValue(CLIENT_SEND);
-    } else {
-      cs.setValue(SERVER_RECV);
-    }
+    cs.setValue(config.operationName() == Tracing::OperationName::Egress ? CLIENT_SEND
+                                                                         : SERVER_RECV);
   }
   // Create an all-new span, with no parent id
   SpanPtr span_ptr = std::make_unique<Span>(time_source_);
@@ -62,8 +57,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
-                          SystemTime timestamp, const SpanContext& previous_context,
-                          bool downstream_span) {
+                          SystemTime timestamp, const SpanContext& previous_context) {
   SpanPtr span_ptr = std::make_unique<Span>(time_source_);
   Annotation annotation;
   uint64_t timestamp_micro;
@@ -74,11 +68,14 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   span_ptr->setName(span_name);
 
   // Set the span's kind (client or server)
-  if (separate_proxy_for_tracing_) {
-    if (downstream_span) {
-      annotation.setValue(SERVER_RECV);
-    } else {
+  if (independent_proxy_) {
+    // If previous context is inner context then this span must be span created for upstream
+    // request. Client span will created for upstream request when the independent_proxy is
+    // set to true.
+    if (previous_context.innerContext()) {
       annotation.setValue(CLIENT_SEND);
+    } else {
+      annotation.setValue(SERVER_RECV);
     }
   } else {
     if (config.operationName() == Tracing::OperationName::Egress) {

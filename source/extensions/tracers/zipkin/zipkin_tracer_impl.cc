@@ -63,7 +63,7 @@ Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std
                                         SystemTime start_time) {
   SpanContext previous_context(span_);
   return std::make_unique<ZipkinSpan>(
-      *tracer_.startSpan(config, name, start_time, previous_context, false), tracer_);
+      *tracer_.startSpan(config, name, start_time, previous_context), tracer_);
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
@@ -96,18 +96,18 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
-  const bool separate_proxy_for_tracing = zipkin_config.separate_proxy_for_tracing();
+  const bool independent_proxy = zipkin_config.independent_proxy();
 
-  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context,
-             separate_proxy_for_tracing](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer = std::make_unique<Tracer>(
-        local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
-        shared_span_context, time_source_, separate_proxy_for_tracing);
-    tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
-    return std::make_shared<TlsTracer>(std::move(tracer), *this);
-  });
+  tls_->set(
+      [this, collector, &random_generator, trace_id_128bit, shared_span_context, independent_proxy](
+          Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        TracerPtr tracer = std::make_unique<Tracer>(
+            local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
+            shared_span_context, time_source_, independent_proxy);
+        tracer->setReporter(
+            ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
+        return std::make_shared<TlsTracer>(std::move(tracer), *this);
+      });
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
@@ -123,11 +123,11 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
-          tracer.startSpan(config, std::string(trace_context.authority()), start_time, true);
+          tracer.startSpan(config, std::string(trace_context.authority()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
       new_zipkin_span = tracer.startSpan(config, std::string(trace_context.authority()), start_time,
-                                         ret_span_context.first, true);
+                                         ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {

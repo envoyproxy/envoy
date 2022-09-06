@@ -56,7 +56,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
   time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-  SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp, true);
+  SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
   EXPECT_NE(0LL, root_span->startTime());
@@ -95,7 +95,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   SpanContext root_span_context(*root_span);
   SpanPtr server_side_shared_context_span =
-      tracer.startSpan(config, "my_span", timestamp, root_span_context, false);
+      tracer.startSpan(config, "my_span", timestamp, root_span_context);
 
   EXPECT_NE(0LL, server_side_shared_context_span->startTime());
 
@@ -138,8 +138,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
   SpanContext server_side_context(*server_side_shared_context_span);
-  SpanPtr child_span =
-      tracer.startSpan(config, "my_child_span", timestamp, server_side_context, false);
+  SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, server_side_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
   EXPECT_NE(0LL, child_span->startTime());
@@ -187,9 +186,9 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   const uint64_t generated_parent_id = generator.random();
   SpanContext modified_root_span_context(root_span_context.traceIdHigh(),
                                          root_span_context.traceId(), root_span_context.id(),
-                                         generated_parent_id, root_span_context.sampled());
-  SpanPtr new_shared_context_span = tracer.startSpan(config, "new_shared_context_span", timestamp,
-                                                     modified_root_span_context, false);
+                                         generated_parent_id, root_span_context.sampled(), true);
+  SpanPtr new_shared_context_span =
+      tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
   EXPECT_NE(0LL, new_shared_context_span->startTime());
 
   EXPECT_EQ("new_shared_context_span", new_shared_context_span->name());
@@ -226,7 +225,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   EXPECT_FALSE(new_shared_context_span->isSetDuration());
 }
 
-TEST_F(ZipkinTracerTest, SpanCreationWithseparateProxyForTracing) {
+TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Random::MockRandomGenerator> random_generator;
@@ -236,12 +235,12 @@ TEST_F(ZipkinTracerTest, SpanCreationWithseparateProxyForTracing) {
   NiceMock<Tracing::MockConfig> config;
 
   // ==============
-  // Test the creation of a root span. If the separate proxy for tracing is set to true, the
+  // Test the creation of a root span. If the independent proxy is set to true, the
   // downstream span will be server span.
   // ==============
   ON_CALL(random_generator, random()).WillByDefault(Return(1000));
   time_system_.advanceTimeWait(std::chrono::milliseconds(1));
-  SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp, true);
+  SpanPtr root_span = tracer.startSpan(config, "my_span", timestamp);
 
   EXPECT_EQ("my_span", root_span->name());
   EXPECT_NE(0LL, root_span->startTime());
@@ -273,14 +272,13 @@ TEST_F(ZipkinTracerTest, SpanCreationWithseparateProxyForTracing) {
   EXPECT_FALSE(root_span->isSetDuration());
 
   // ==============
-  // Test the creation of a upstream span. If the separate proxy for tracing is set to true,
+  // Test the creation of a upstream span. If the independent proxy is set to true,
   // the upstream span will be client span.
   // ==============
 
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
   SpanContext root_span_context(*root_span);
-  SpanPtr child_span =
-      tracer.startSpan(config, "my_child_span", timestamp, root_span_context, false);
+  SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, root_span_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
   EXPECT_NE(0LL, child_span->startTime());
@@ -320,12 +318,12 @@ TEST_F(ZipkinTracerTest, SpanCreationWithseparateProxyForTracing) {
   EXPECT_FALSE(child_span->isSetDuration());
 
   // ==============
-  // Test the downstream span with parent context and the shared context is enabled. If the separate
-  // proxy for tracing is set to true, the downstream span will be server span.
+  // Test the downstream span with parent context and the shared context is enabled. If the
+  // independent proxy is set to true, the downstream span will be server span.
   // ==============
-  SpanContext child_span_context(*child_span);
+  SpanContext child_span_context(*child_span, false);
   SpanPtr server_side_shared_context_span =
-      tracer.startSpan(config, "my_span", timestamp, child_span_context, true);
+      tracer.startSpan(config, "my_span", timestamp, child_span_context);
 
   EXPECT_NE(0LL, server_side_shared_context_span->startTime());
 
@@ -377,7 +375,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Creates a root-span with a CS annotation
-  SpanPtr span = tracer.startSpan(config, "my_span", timestamp, true);
+  SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(true);
 
   // Finishing a root span with a CS annotation must add a CR annotation
@@ -411,7 +409,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
 
   SpanContext context(*span);
-  SpanPtr server_side = tracer.startSpan(config, "my_span", timestamp, context, false);
+  SpanPtr server_side = tracer.startSpan(config, "my_span", timestamp, context);
 
   // Associate a reporter with the tracer
   TestReporterImpl* reporter_object = new TestReporterImpl(135);
@@ -465,7 +463,7 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   tracer.setReporter(std::move(reporter_ptr));
 
   // Creates a root-span with a CS annotation
-  SpanPtr span = tracer.startSpan(config, "my_span", timestamp, true);
+  SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
   span->finish();
 
@@ -484,18 +482,18 @@ TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create parent span
-  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp, true);
+  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   parent_span->setSampled(true);
 
   SpanContext parent_context1(*parent_span);
-  SpanPtr child_span1 = tracer.startSpan(config, "child_span 1", timestamp, parent_context1, false);
+  SpanPtr child_span1 = tracer.startSpan(config, "child_span 1", timestamp, parent_context1);
 
   // Test that child span sampled flag is true
   EXPECT_TRUE(child_span1->sampled());
 
   parent_span->setSampled(false);
   SpanContext parent_context2(*parent_span);
-  SpanPtr child_span2 = tracer.startSpan(config, "child_span 2", timestamp, parent_context2, false);
+  SpanPtr child_span2 = tracer.startSpan(config, "child_span 2", timestamp, parent_context2);
 
   // Test that sampled flag is false
   EXPECT_FALSE(child_span2->sampled());
@@ -512,7 +510,7 @@ TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create root span
-  SpanPtr root_span = tracer.startSpan(config, "root_span", timestamp, true);
+  SpanPtr root_span = tracer.startSpan(config, "root_span", timestamp);
 
   // Test that high 64 bit trace id is set
   EXPECT_TRUE(root_span->isSetTraceIdHigh());
@@ -534,7 +532,7 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create parent span
-  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp, true);
+  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   SpanContext parent_context(*parent_span);
 
   // An CS annotation must have been added
@@ -544,7 +542,7 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
 
-  SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context, false);
+  SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context);
 
   EXPECT_EQ(parent_span->id(), child_span->id());
 
@@ -570,7 +568,7 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   // Create parent span
-  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp, true);
+  SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   SpanContext parent_context(*parent_span);
 
   // An CS annotation must have been added
@@ -580,7 +578,7 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
 
-  SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context, false);
+  SpanPtr child_span = tracer.startSpan(config, "child_span", timestamp, parent_context);
 
   EXPECT_EQ(parent_span->id(), child_span->parentId());
 
