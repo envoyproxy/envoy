@@ -362,8 +362,39 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   const auto& path = value.getStringView();
   bool is_valid = !path.empty();
 
-  for (auto iter = path.begin(); iter != path.end() && is_valid; ++iter) {
-    is_valid &= testChar(kPathHeaderCharTable, *iter);
+  auto iter = path.begin();
+  auto end = path.end();
+  // Validate the path component of the URI
+  for (; iter != end && is_valid; ++iter) {
+    const char ch = *iter;
+    if (ch == '?' || ch == '#') {
+      // This is the start of the query or fragment portion of the path which uses a different
+      // character table.
+      break;
+    }
+
+    is_valid &= testChar(kPathHeaderCharTable, ch);
+  }
+
+  if (is_valid && iter != end && *iter == '?') {
+    // Validate the query component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      const char ch = *iter;
+      if (ch == '#') {
+        break;
+      }
+
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, ch);
+    }
+  }
+
+  if (is_valid && iter != end && *iter == '#') {
+    // Validate the fragment component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, *iter);
+    }
   }
 
   if (!is_valid) {

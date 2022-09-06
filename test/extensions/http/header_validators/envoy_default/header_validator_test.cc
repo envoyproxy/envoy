@@ -287,10 +287,33 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6PortDelim) {
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharacters) {
-  HeaderString valid{"/"};
+  HeaderString valid{"/parent/child"};
+  HeaderString invalid{"/parent child"};
   auto uhv = createBase(empty_config);
 
   EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersQuery) {
+  HeaderString valid{"/root?x=1"};
+  HeaderString invalid{"/root?x=1|2"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
+  HeaderString valid{"/root?x=1#fragment"};
+  HeaderString invalid{"/root#frag|ment"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_TRUE(uhv->validatePathHeaderCharacters(valid).ok());
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 } // namespace EnvoyDefault
