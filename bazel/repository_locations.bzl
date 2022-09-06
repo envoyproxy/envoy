@@ -735,7 +735,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "9733972d9bee45170be9a9194b3387d6a5a9524975cd80a11e69e654ca934663",
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
-        release_date = "2020-09-10",
+        release_date = "2021-03-15",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:google:google_test:*",
     ),
