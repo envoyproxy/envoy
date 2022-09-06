@@ -549,7 +549,7 @@ public:
   }
 
   void initializeConfig(bool legacy_allowed_headers = true) {
-    config_helper_.addConfigModifier([this, &legacy_allowed_headers](
+    config_helper_.addConfigModifier([this, legacy_allowed_headers](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
