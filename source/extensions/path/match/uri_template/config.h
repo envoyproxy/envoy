@@ -22,7 +22,7 @@ public:
         config, ProtobufMessage::getStrictValidationVisitor());
 
     if (!UriTemplate::isValidMatchPattern(path_match_config.path_template()).ok()) {
-      return absl::InvalidArgumentError(fmt::format("path_match_policy.uri_template {} is invalid",
+      return absl::InvalidArgumentError(fmt::format("path_match_policy.path_template {} is invalid",
                                                     path_match_config.path_template()));
     }
 

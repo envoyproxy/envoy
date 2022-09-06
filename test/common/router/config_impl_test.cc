@@ -8850,14 +8850,14 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/bar/{country}/{lang}"
         route:
           cluster: some-cluster
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/bar/{lang}/{country}"
 
   )EOF";
@@ -8868,11 +8868,11 @@ virtual_hosts:
 
   const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
   EXPECT_TRUE(pattern_match_policy.enabled());
-  EXPECT_EQ(pattern_match_policy.pathMatcher()->pattern(), "/bar/{country}/{lang}");
+  EXPECT_EQ(pattern_match_policy.pathMatcher()->uri_template(), "/bar/{country}/{lang}");
 
   const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewritePolicy();
   EXPECT_TRUE(pattern_rewrite_policy.enabled());
-  EXPECT_EQ(pattern_rewrite_policy.pathRewriter()->pattern(), "/bar/{lang}/{country}");
+  EXPECT_EQ(pattern_rewrite_policy.pathRewriter()->uri_template(), "/bar/{lang}/{country}");
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {
@@ -8886,7 +8886,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster}
@@ -8918,7 +8918,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-one}
@@ -8926,7 +8926,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/boo/{go}/{fly}/{bat}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-two}
@@ -8934,7 +8934,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
           case_sensitive: false
         route: { cluster: path-pattern-cluster-three}
@@ -8985,7 +8985,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
           case_sensitive: false
         route:
@@ -8993,7 +8993,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{two}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9019,7 +9019,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{two}"
           case_sensitive: false
         route:
@@ -9027,7 +9027,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9053,7 +9053,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
           case_sensitive: true
         route:
@@ -9061,13 +9061,13 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
       - match:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/REST/{one}/{two}"
           case_sensitive: true
         route:
@@ -9075,7 +9075,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/TEST/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9108,7 +9108,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one/{two}"
           case_sensitive: false
         route:
@@ -9116,7 +9116,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
   )EOF";
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
@@ -9136,7 +9136,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
           case_sensitive: false
         route:
@@ -9144,7 +9144,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9167,7 +9167,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{on==e}/{two}"
           case_sensitive: false
         route:
@@ -9175,7 +9175,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9196,7 +9196,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/*/{two}"
           case_sensitive: false
         route:
@@ -9204,7 +9204,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9230,7 +9230,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/**"
           case_sensitive: false
         route:
@@ -9238,7 +9238,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9265,7 +9265,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{last=**}"
           case_sensitive: false
         route:
@@ -9273,7 +9273,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{last}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9300,7 +9300,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{middle=videos/*}/end"
           case_sensitive: false
         route:
@@ -9308,7 +9308,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{middle}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9335,7 +9335,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{One}/end"
           case_sensitive: false
         route:
@@ -9343,7 +9343,7 @@ virtual_hosts:
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{One}/{one}"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -9370,7 +9370,7 @@ virtual_hosts:
           path_match_policy:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"
           case_sensitive: false
         route:
