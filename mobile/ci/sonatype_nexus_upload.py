@@ -187,7 +187,7 @@ def _close_staging_repository(profile_id, staging_id):
 
         request.add_header("Authorization", "Basic {}".format(BASE64_ENCODED_CREDENTIALS))
         request.add_header("Content-Type", "application/json")
-        request.add_data(json.dumps(data))
+        request.data = json.dumps(data).encode("utf8")
         request.get_method = lambda: "POST"
         _urlopen_retried(request)
     except Exception as e:
@@ -208,7 +208,7 @@ def _drop_staging_repository(staging_id, message):
 
         request.add_header("Authorization", "Basic {}".format(BASE64_ENCODED_CREDENTIALS))
         request.add_header("Content-Type", "application/json")
-        request.add_data(json.dumps(data))
+        request.data = json.dumps(data).encode("utf8")
         request.get_method = lambda: "POST"
         _urlopen_retried(request)
     except Exception as e:
@@ -229,7 +229,7 @@ def _release_staging_repository(staging_id):
 
         request.add_header("Authorization", "Basic {}".format(BASE64_ENCODED_CREDENTIALS))
         request.add_header("Content-Type", "application/json")
-        request.add_data(json.dumps(data))
+        request.data = json.dumps(data).encode("utf8")
         request.get_method = lambda: "POST"
         _urlopen_retried(request)
     except Exception as e:
