@@ -1506,8 +1506,8 @@ void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& he
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers,
-                                                   path_match_policy_.pathMatcher()->uri_template());
+  return currentUrlPathAfterRewriteWithMatchedPath(
+      headers, path_match_policy_.pathMatcher()->uri_template());
 }
 
 RouteConstSharedPtr

@@ -24,9 +24,8 @@ namespace Rewrite {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-absl::Status
-UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
-                                                 bool active_matcher) const {
+absl::Status UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
+                                                          bool active_matcher) const {
   if (!active_matcher || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
                                                   Extensions::UriTemplate::Rewrite::NAME,
@@ -44,9 +43,8 @@ UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_m
   return absl::OkStatus();
 }
 
-absl::StatusOr<std::string>
-UriTemplateRewriter::rewritePath(absl::string_view pattern,
-                                     absl::string_view matched_path) const {
+absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view pattern,
+                                                             absl::string_view matched_path) const {
   absl::StatusOr<std::string> regex_pattern = convertPathPatternSyntaxToRegex(matched_path);
   if (!regex_pattern.ok()) {
     return absl::InvalidArgumentError("Unable to parse matched_path");

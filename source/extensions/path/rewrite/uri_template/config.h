@@ -15,10 +15,9 @@ class UriTemplateRewriterFactory : public Router::PathRewriterFactory {
 public:
   absl::StatusOr<Router::PathRewriterSharedPtr>
   createPathRewriter(const Protobuf::Message& rewrite_config) override {
-    auto path_rewrite_config =
-        MessageUtil::downcastAndValidate<const envoy::extensions::path::rewrite::uri_template::
-                                             v3::UriTemplateRewriteConfig&>(
-            rewrite_config, ProtobufMessage::getStrictValidationVisitor());
+    auto path_rewrite_config = MessageUtil::downcastAndValidate<
+        const envoy::extensions::path::rewrite::uri_template::v3::UriTemplateRewriteConfig&>(
+        rewrite_config, ProtobufMessage::getStrictValidationVisitor());
 
     if (!UriTemplate::isValidRewritePattern(path_rewrite_config.path_template_rewrite()).ok()) {
       return absl::InvalidArgumentError(

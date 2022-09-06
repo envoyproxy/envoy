@@ -127,10 +127,9 @@ TEST(RewriteTest, MatchPatternInactive) {
 
   absl::Status error = rewrite_predicate->isCompatibleMatchPolicy(match_predicate, false);
   EXPECT_FALSE(error.ok());
-  EXPECT_EQ(error.message(),
-            "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
-            "extension without envoy.path.match.uri_template.uri_template_matcher "
-            "extension");
+  EXPECT_EQ(error.message(), "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
+                             "extension without envoy.path.match.uri_template.uri_template_matcher "
+                             "extension");
 }
 
 TEST(RewriteTest, MatchPatternMismatchedVars) {

@@ -35,9 +35,7 @@ public:
         envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig>();
   }
 
-  std::string name() const override {
-    return "envoy.path.match.uri_template.uri_template_matcher";
-  }
+  std::string name() const override { return "envoy.path.match.uri_template.uri_template_matcher"; }
 };
 
 } // namespace Match

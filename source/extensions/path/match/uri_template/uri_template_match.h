@@ -28,8 +28,7 @@ const absl::string_view NAME = "envoy.path.match.uri_template.uri_template_match
 class UriTemplateMatcher : public Router::PathMatcher {
 public:
   explicit UriTemplateMatcher(
-      const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig&
-          config)
+      const envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig& config)
       : path_template_(config.path_template()) {}
 
   // Router::PathMatcher
