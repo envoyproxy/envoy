@@ -31,7 +31,7 @@ DeterministicApertureLoadBalancer::generateStats(Stats::Scope& scope) {
 
 /*
  * TODO(jojy): The concept of HashingLoadBalancer::chooseHost might not directly apply here since we
- * dont actually use the hash of the nodes placed in the ring. We use `random` algorithm in the
+ * don't actually use the hash of the nodes placed in the ring. We use `random` algorithm in the
  * Deterministic aperture load balancer. Hence we ignore the `h` and `attempt` here.
  */
 HostConstSharedPtr DeterministicApertureLoadBalancer::Ring::chooseHost(uint64_t, uint32_t) const {
