@@ -3,7 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
-#include "quic_ssl_connection_info.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -74,7 +75,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     return;
   }
   if (!initialized_) {
-    // Delay close till the first OnCanWrite() call.
+    // Delay close till the first ProcessUdpPacket() call.
     close_type_during_initialize_ = type;
     return;
   }
@@ -147,6 +148,8 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
     if (close_type_during_initialize_.has_value()) {
+      ASSERT(!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
       close(close_type_during_initialize_.value());
       close_type_during_initialize_ = absl::nullopt;
     }
@@ -256,6 +259,13 @@ absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInByte
   }
 
   return cwnd;
+}
+
+void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
+  if (close_type_during_initialize_.has_value()) {
+    close(close_type_during_initialize_.value());
+    close_type_during_initialize_ = absl::nullopt;
+  }
 }
 
 } // namespace Quic

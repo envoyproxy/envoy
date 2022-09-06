@@ -443,6 +443,7 @@ envoy_cc_test(
         "//source/common/router:router_lib",
         "//test/common/http:common_lib",
         "//test/mocks/router:router_filter_interface",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

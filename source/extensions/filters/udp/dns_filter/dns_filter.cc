@@ -260,9 +260,10 @@ Network::FilterStatus DnsFilter::onData(Network::UdpRecvData& client_request) {
   config_->stats().downstream_rx_queries_.inc();
 
   // Setup counters for the parser
-  DnsParserCounters parser_counters(config_->stats().query_buffer_underflow_,
-                                    config_->stats().record_name_overflow_,
-                                    config_->stats().query_parsing_failure_);
+  DnsParserCounters parser_counters(
+      config_->stats().query_buffer_underflow_, config_->stats().record_name_overflow_,
+      config_->stats().query_parsing_failure_, config_->stats().queries_with_additional_rrs_,
+      config_->stats().queries_with_ans_or_authority_rrs_);
 
   // Parse the query, if it fails return an response to the client
   DnsQueryContextPtr query_context =

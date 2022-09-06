@@ -306,10 +306,7 @@ message Cluster {
       // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
       // choosing a host, but updating hosts is faster, especially for large numbers of hosts.
       //
-      // If a match is found to a host, that host will be used regardless of priority levels, unless the host is unhealthy.
-      //
-      // Currently, this mode is only supported if ``subset_selectors`` has only one entry, and ``keys`` contains
-      // only one entry.
+      // If a match is found to a host, that host will be used regardless of priority levels.
       //
       // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in ``keys``
       // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
