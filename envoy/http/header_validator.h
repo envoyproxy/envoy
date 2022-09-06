@@ -35,8 +35,7 @@ public:
                 "Error details must not be empty in case of an error");
     }
 
-    template<typename OtherActionType>
-    operator Result<OtherActionType>() const {
+    template <typename OtherActionType> operator Result<OtherActionType>() const {
       // Cast to another result, treating any non-success action as "ActionType::Reject"
       if (std::get<0>(result_) != ActionType::Accept) {
         return Result<OtherActionType>(OtherActionType::Reject, std::get<1>(result_));
