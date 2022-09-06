@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/pat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Uri Template Rewrite Config]
-// [#extension: envoy.path.rewrite.pattern_template.uri_template_rewriter]
+// [#extension: envoy.path.rewrite.uri_template.uri_template_rewriter]
 
 // Indicates that during forwarding, portions of the path that match the
 // pattern should be rewritten, even allowing the substitution of variables
