@@ -12,10 +12,21 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "client",
-    srcs = ["client.cc"],
+    name = "client_interface",
     hdrs = ["client.h"],
     deps = [
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+    ],
+)
+
+# TODO(kuochunghsu) decouple the independent libs.
+envoy_cc_library(
+    name = "client_lib",
+    srcs = ["client_impl.cc"],
+    hdrs = ["client_impl.h"],
+    deps = [
+        ":client_interface",
         "//source/common/network:filter_lib",
         "//source/common/upstream:health_checker_base_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
@@ -33,7 +44,7 @@ envoy_cc_library(
     srcs = ["thrift.cc"],
     hdrs = ["thrift.h"],
     deps = [
-        ":client",
+        ":client_lib",
         "//source/common/network:filter_lib",
         "//source/common/upstream:health_checker_base_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
@@ -51,6 +62,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":client_lib",
         ":thrift",
         ":utility",
         "//envoy/registry",

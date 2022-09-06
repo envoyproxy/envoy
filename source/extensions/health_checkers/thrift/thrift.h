@@ -35,7 +35,8 @@ public:
                       const envoy::config::core::v3::HealthCheck& config,
                       const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
                       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                      Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api);
+                      Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
+                      ClientFactory& client_factory);
 
 protected:
   envoy::data::core::v3::HealthCheckerType healthCheckerType() const override {
@@ -86,6 +87,7 @@ private:
   const std::string method_name_;
   const TransportType transport_;
   const ProtocolType protocol_;
+  ClientFactory& client_factory_;
 };
 
 } // namespace ThriftHealthChecker

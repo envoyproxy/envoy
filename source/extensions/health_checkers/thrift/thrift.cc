@@ -31,12 +31,14 @@ ThriftHealthChecker::ThriftHealthChecker(
     const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     const envoy::extensions::health_checkers::thrift::v3::Thrift& thrift_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-    Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api)
+    Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
+    ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       method_name_(thrift_config.method_name()),
       transport_(TransportNames::get().getTypeFromProto(thrift_config.transport())),
-      protocol_(ProtocolNames::get().getTypeFromProto(thrift_config.protocol())) {
+      protocol_(ProtocolNames::get().getTypeFromProto(thrift_config.protocol())),
+      client_factory_(client_factory) {
   if (transport_ == TransportType::Auto || protocol_ == ProtocolType::Auto ||
       protocol_ == ProtocolType::Twitter) {
     throw EnvoyException(
@@ -71,7 +73,8 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
     Upstream::Host::CreateConnectionData conn_data =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
-    client_ = std::make_unique<Client>(*this, parent_.transport_, parent_.protocol_,
+    client_ =
+        parent_.client_factory_.create(*this, parent_.transport_, parent_.protocol_,
                                        parent_.method_name_, conn_data, parent_.random_.random());
     client_->start();
     expect_close_ = false;

@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/extensions/health_checkers/thrift/client_impl.h"
 #include "source/extensions/health_checkers/thrift/utility.h"
 
 namespace Envoy {
@@ -19,7 +20,8 @@ Upstream::HealthCheckerSharedPtr ThriftHealthCheckerFactory::createCustomHealthC
   return std::make_shared<ThriftHealthChecker>(
       context.cluster(), config,
       getThriftHealthCheckConfig(config, context.messageValidationVisitor()),
-      context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api());
+      context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
+      ClientFactoryImpl::instance_);
 };
 
 /**

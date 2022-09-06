@@ -1,4 +1,4 @@
-#include "source/extensions/health_checkers/thrift/client.h"
+#include "source/extensions/health_checkers/thrift/client_impl.h"
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -69,14 +69,14 @@ void ThriftSessionCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, bool) {
-  // Response data flow to Client and then SimpleResponseDecoder.
+  // Response data flow to ClientImpl and then SimpleResponseDecoder.
   parent_.onData(data);
   return Network::FilterStatus::StopIteration;
 }
 
-// Client
-void Client::start() {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker Client start", *connection_);
+// ClientImpl
+void ClientImpl::start() {
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
   session_callbacks_ = std::make_unique<ThriftSessionCallbacks>(*this);
   connection_->addConnectionCallbacks(*session_callbacks_);
   connection_->addReadFilter(session_callbacks_);
@@ -85,10 +85,11 @@ void Client::start() {
   connection_->noDelay(true);
 }
 
-bool Client::makeRequest() {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker Client makeRequest", *connection_);
+bool ClientImpl::makeRequest() {
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl makeRequest", *connection_);
   if (connection_->state() == Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "ThriftHealthChecker Client makeRequest fail due to closed connection",
+    ENVOY_CONN_LOG(debug,
+                   "ThriftHealthChecker ClientImpl makeRequest fail due to closed connection",
                    *connection_);
     return false;
   }
@@ -117,19 +118,19 @@ bool Client::makeRequest() {
   transport->encodeFrame(transport_buffer, *metadata, request_buffer);
 
   connection_->write(transport_buffer, false);
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker Client makeRequest success id={}", *connection_,
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl makeRequest success id={}", *connection_,
                  metadata->sequenceId());
   return true;
 }
 
-void Client::close() {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker Client close", *connection_);
+void ClientImpl::close() {
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl close", *connection_);
   connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-void Client::onData(Buffer::Instance& data) {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker Client onData. total pending buffer={}", *connection_,
-                 data.length());
+void ClientImpl::onData(Buffer::Instance& data) {
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl onData. total pending buffer={}",
+                 *connection_, data.length());
   if (!response_decoder_) {
     response_decoder_ =
         std::make_unique<SimpleResponseDecoder>(createTransport(), createProtocol());
@@ -139,6 +140,16 @@ void Client::onData(Buffer::Instance& data) {
                    response_decoder_->responseSuccess());
     parent_.onResponseResult(response_decoder_->responseSuccess());
   }
+}
+
+ClientFactoryImpl ClientFactoryImpl::instance_;
+
+ClientPtr ClientFactoryImpl::create(ClientCallback& callbacks, TransportType transport,
+                                    ProtocolType protocol, const std::string& method_name,
+                                    Upstream::Host::CreateConnectionData& data, int32_t seq_id) {
+  auto client =
+      std::make_unique<ClientImpl>(callbacks, transport, protocol, method_name, data, seq_id);
+  return client;
 }
 
 } // namespace ThriftHealthChecker
