@@ -730,10 +730,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Google Test",
         project_desc = "Google's C++ test framework",
         project_url = "https://github.com/google/googletest",
-        # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
-        # see https://github.com/google/googletest/issues/2490
-        version = "a4ab0abb93620ce26efad9de9296b73b16e88588",
-        sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
+        # Pick up "Use @platforms instead of @bazel_tools for windows constraint"
+        version = "5c08f92c881b666998a4f7852c3cf9e393bf33a7",
+        sha256 = "9733972d9bee45170be9a9194b3387d6a5a9524975cd80a11e69e654ca934663",
         strip_prefix = "googletest-{version}",
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
         release_date = "2020-09-10",
