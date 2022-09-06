@@ -56,6 +56,7 @@ class MainActivity : Activity() {
       .addPlatformFilter(::BufferDemoFilter)
       .addPlatformFilter(::AsyncDemoFilter)
       .h2ExtendKeepaliveTimeout(true)
+      .enableAdminInterface()
       .enableInterfaceBinding(true)
       .enableDNSUseSystemResolver(false)
       .enableSocketTagging(true)

@@ -143,7 +143,7 @@ R"(- &enable_drain_post_dns_refresh false
 !ignore admin_interface_defs: &admin_interface
     address:
       socket_address:
-        address: 127.0.0.1
+        address: ::1
         port_value: 9901
 
 !ignore tls_root_ca_defs: &tls_root_certs |

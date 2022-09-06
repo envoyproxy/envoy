@@ -23,6 +23,7 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
       .h2ExtendKeepaliveTimeout(true)
+      .enableAdminInterface()
       .enableInterfaceBinding(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
