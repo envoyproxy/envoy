@@ -48,6 +48,8 @@ public:
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
+  static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
+
 protected:
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
@@ -86,8 +88,6 @@ protected:
     return std::make_shared<BoundedLoadHashingLoadBalancer>(
         ring_hash_lb, std::move(normalized_host_weights), hash_balance_factor_);
   }
-
-  static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;
   RingHashLoadBalancerStats stats_;
