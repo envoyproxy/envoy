@@ -54,7 +54,7 @@ TEST(RewriteTest, BasicSetup) {
 )EOF";
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(predicate->uri_template(), "/bar/{lang}/{country}");
+  EXPECT_EQ(predicate->uriTemplate(), "/bar/{lang}/{country}");
   EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 

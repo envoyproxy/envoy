@@ -37,7 +37,7 @@ TEST(MatchTest, BasicUsage) {
 )EOF";
 
   Router::PathMatcherSharedPtr predicate = createMatcherFromYaml(yaml_string);
-  EXPECT_EQ(predicate->uri_template(), "/bar/{lang}/{country}");
+  EXPECT_EQ(predicate->uriTemplate(), "/bar/{lang}/{country}");
   EXPECT_EQ(predicate->name(), "envoy.path.match.uri_template.uri_template_matcher");
 
   EXPECT_TRUE(predicate->match("/bar/en/us"));
