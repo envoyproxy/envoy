@@ -16,8 +16,8 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
-using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult (
-    Http2HeaderValidator::*)(const HeaderString&);
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
 struct Http2ResponseCodeDetailValues {
   const std::string InvalidTE = "uhv.http2.invalid_te";
@@ -302,7 +302,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   return ResponseHeaderMapValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value) {
   // Only allow a TE value of "trailers" for HTTP/2, based on
   // RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.2.2:
@@ -310,13 +310,13 @@ Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value)
   // The only exception to this is the TE header field, which MAY be present in an HTTP/2 request;
   // when it is, it MUST NOT contain any value other than "trailers".
   if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
-    return {HeaderEntryValidationResult::Action::Reject, Http2ResponseCodeDetail::get().InvalidTE};
+    return {HeaderValueValidationResult::Action::Reject, Http2ResponseCodeDetail::get().InvalidTE};
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString& value) {
   // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2:
   //

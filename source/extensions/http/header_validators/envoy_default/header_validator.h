@@ -22,17 +22,18 @@ public:
           config,
       ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
 
+  using HeaderValueValidationResult = RejectResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :status response pseudo header based on the range of valid response statuses.
    * TODO: add RFC reference
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validateStatusHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
@@ -44,46 +45,82 @@ public:
   /*
    * Validate any request or response header value.
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Content-Length request and response header as a whole number integer.
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :scheme pseudo header.
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Host header or :authority pseudo header. This method does not allow the
    * userinfo component (user:pass@host).
    */
-  virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
+  virtual HeaderValueValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :path pseudo header. This method only validates that the :path header only
    * contains valid characters and does not validate the syntax or form of the path URI.
    */
-  virtual HeaderEntryValidationResult
+  virtual HeaderValueValidationResult
   validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
 protected:
   /*
+   * An internal class that stores the result of validating syntax-specific URI hosts.
+   */
+  class HostHeaderValidationResult {
+  public:
+    HostHeaderValidationResult(RejectAction action, absl::string_view details,
+                               absl::string_view address, absl::string_view port)
+        : result_(action, details, address, port) {
+      ENVOY_BUG(action == RejectAction::Accept || !details.empty(),
+                "Error details must not be empty in case of an error");
+    }
+
+    static HostHeaderValidationResult reject(absl::string_view details) {
+      return HostHeaderValidationResult(RejectAction::Reject, details, "", "");
+    }
+
+    static HostHeaderValidationResult success(absl::string_view address, absl::string_view port) {
+      return HostHeaderValidationResult(RejectAction::Accept, "", address, port);
+    }
+
+    bool ok() const { return action() == RejectAction::Accept; }
+
+    RejectAction action() const { return std::get<0>(result_); }
+
+    absl::string_view details() const { return std::get<1>(result_); }
+
+    // The address component of the URI path.
+    absl::string_view address() const { return std::get<2>(result_); }
+
+    // The port component of the URI path, including the leading ":" delimiter.
+    absl::string_view port() const { return std::get<3>(result_); }
+
+  private:
+    std::tuple<RejectAction, std::string, absl::string_view, absl::string_view> result_;
+  };
+
+  /*
    * Validate an IPv6 host header value. The port specifier, if included in the host string, is
    * stored in the return details on success.
    */
-  HeaderEntryValidationResult validateHostHeaderIPv6(absl::string_view host);
+  HostHeaderValidationResult validateHostHeaderIPv6(absl::string_view host);
 
   /*
    * Validate a reg-name host header value. The port specifier, if included in the host string, is
    * stored in the return details on success.
    */
-  HeaderEntryValidationResult validateHostHeaderRegName(absl::string_view host);
+  HostHeaderValidationResult validateHostHeaderRegName(absl::string_view host);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

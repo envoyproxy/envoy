@@ -32,7 +32,7 @@ public:
   /*
    * Validate the Transfer-Encoding header.
    */
-  HeaderEntryValidationResult
+  HeaderValueValidationResult
   validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value);
 };
 

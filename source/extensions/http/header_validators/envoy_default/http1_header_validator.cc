@@ -16,8 +16,8 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
-using HeaderValidatorFunction = ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult (
-    Http1HeaderValidator::*)(const HeaderString&);
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderValueValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
 struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
@@ -56,7 +56,8 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   auto validator_it = kHeaderValidatorMap.find(key_string_view);
@@ -75,7 +76,8 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
     // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
     // and we don't have a validator registered in the map, then the header name is an unknown
     // pseudo header.
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   return validateGenericHeaderValue(value);
@@ -87,7 +89,8 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   if (key_string_view == ":status") {
@@ -108,7 +111,8 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   } else {
     // The only valid pseudo header for responses is :status. If the header name starts with ":"
     // and it's not ":status", then the header name is an unknown pseudo header.
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidPseudoHeader};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidPseudoHeader};
   }
 
   // Validate the header value
@@ -383,7 +387,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   return ResponseHeaderMapValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) {
   // HTTP/1.1 states that requests with an unrecognized transfer encoding should
   // be rejected, from RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-6.1:
@@ -401,12 +405,12 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
     }
 
     if (!is_valid) {
-      return {HeaderEntryValidationResult::Action::Reject,
+      return {HeaderValueValidationResult::Action::Reject,
               Http1ResponseCodeDetail::get().InvalidTransferEncoding};
     }
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
 } // namespace EnvoyDefault
