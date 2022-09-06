@@ -21,9 +21,9 @@ std::string kvStoreDelegateConfig() {
   ::unlink(filename.c_str());
 
   return fmt::format(R"EOF(
-    name: envoy.config.xds.KeyValueStoreXdsDelegate
+    name: envoy.config.config.KeyValueStoreXdsDelegate
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.xds.v3alpha.KeyValueStoreXdsDelegateConfig
+      "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig
       key_value_store_config:
         config:
           name: envoy.key_value.file_based

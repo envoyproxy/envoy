@@ -12,7 +12,7 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/xds/source/kv_store_xds_delegate.h"
+#include "contrib/config/source/kv_store_xds_delegate.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -27,9 +27,9 @@ envoy::config::core::v3::TypedExtensionConfig kvStoreDelegateConfig() {
   ::unlink(filename.c_str());
 
   const std::string config_str = fmt::format(R"EOF(
-    name: envoy.config.xds.KeyValueStoreXdsDelegate
+    name: envoy.config.config.KeyValueStoreXdsDelegate
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.xds.v3alpha.KeyValueStoreXdsDelegateConfig
+      "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig
       key_value_store_config:
         config:
           name: envoy.key_value.file_based
