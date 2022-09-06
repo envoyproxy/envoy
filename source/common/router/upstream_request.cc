@@ -53,7 +53,7 @@ void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
 
 void UpstreamCodecFilter::onUpstreamConnectionEstablished() {
   if (latched_end_stream_.has_value()) {
-    bool end_stream = *latched_end_stream_;
+    const bool end_stream = *latched_end_stream_;
     latched_end_stream_.reset();
     Http::FilterHeadersStatus status = decodeHeaders(*latched_headers_, end_stream);
     if (status == Http::FilterHeadersStatus::Continue) {
