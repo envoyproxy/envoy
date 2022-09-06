@@ -104,7 +104,7 @@ TEST(RewriteTest, MatchPatternValidation) {
   Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
   Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
 
-  EXPECT_TRUE(rewrite_predicate->isCompatibleMatchPolicy(match_predicate, true).ok());
+  EXPECT_TRUE(rewrite_predicate->isCompatiblePathMatcher(match_predicate, true).ok());
 }
 
 TEST(RewriteTest, MatchPatternInactive) {
