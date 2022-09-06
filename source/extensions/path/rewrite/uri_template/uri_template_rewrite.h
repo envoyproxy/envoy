@@ -41,7 +41,7 @@ public:
       : rewrite_pattern_(rewrite_config.path_template_rewrite()) {}
 
   // Router::PathRewriter
-  absl::string_view uri_template() const override { return rewrite_pattern_; }
+  absl::string_view uriTemplate() const override { return rewrite_pattern_; }
 
   /**
    * Concatenates literals and extracts variable values to form the final rewritten path.

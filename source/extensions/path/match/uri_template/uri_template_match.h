@@ -34,7 +34,7 @@ public:
   // Router::PathMatcher
   bool match(absl::string_view path) const override;
 
-  absl::string_view uri_template() const override;
+  absl::string_view uriTemplate() const override;
 
   absl::string_view name() const override { return NAME; }
 

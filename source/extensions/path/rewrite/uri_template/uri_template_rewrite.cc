@@ -34,10 +34,10 @@ absl::Status UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSha
 
   // This is needed to match up variable values.
   // Validation between extensions as they share rewrite pattern variables.
-  if (!isValidSharedVariableSet(rewrite_pattern_, path_matcher->uri_template()).ok()) {
+  if (!isValidSharedVariableSet(rewrite_pattern_, path_matcher->uriTemplate()).ok()) {
     return absl::InvalidArgumentError(
         fmt::format("mismatch between variables in path_match_policy {} and path_rewrite_policy {}",
-                    path_matcher->uri_template(), rewrite_pattern_));
+                    path_matcher->uriTemplate(), rewrite_pattern_));
   }
 
   return absl::OkStatus();

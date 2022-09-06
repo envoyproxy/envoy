@@ -14,9 +14,9 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_names = ["envoy.path.rewrite.uri_template.pattern_template_rewriter"],
+    extension_names = ["envoy.path.match.uri_template.uri_template_matcher"],
     deps = [
-        "//source/extensions/path/rewrite/uri_template:config",
+        "//source/extensions/path/match/uri_template:config",
         "//test/mocks/server:factory_context_mocks",
     ],
 )
@@ -24,12 +24,10 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
-    extension_names = ["envoy.path.rewrite.uri_template.pattern_template_rewriter"],
+    extension_names = ["envoy.path.match.uri_template.uri_template_matcher"],
     deps = [
         "//source/extensions/path/match/uri_template:config",
-        "//source/extensions/path/match/uri_template:pattern_template_match_lib",
-        "//source/extensions/path/rewrite/uri_template:config",
-        "//source/extensions/path/rewrite/uri_template:pattern_template_rewrite_lib",
+        "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "//test/mocks/server:factory_context_mocks",
     ],
 )

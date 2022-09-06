@@ -1496,18 +1496,18 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      uri_template_(path_match_policy_.pathMatcher()->uri_template()){};
+      uri_template_(path_match_policy_.pathMatcher()->uriTemplate()){};
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, path_match_policy_.pathMatcher()->uri_template(),
+  finalizePathHeader(headers, path_match_policy_.pathMatcher()->uriTemplate(),
                      insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(
-      headers, path_match_policy_.pathMatcher()->uri_template());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers,
+                                                   path_match_policy_.pathMatcher()->uriTemplate());
 }
 
 RouteConstSharedPtr

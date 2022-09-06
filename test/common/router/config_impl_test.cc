@@ -8868,11 +8868,11 @@ virtual_hosts:
 
   const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
   EXPECT_TRUE(pattern_match_policy.enabled());
-  EXPECT_EQ(pattern_match_policy.pathMatcher()->uri_template(), "/bar/{country}/{lang}");
+  EXPECT_EQ(pattern_match_policy.pathMatcher()->uriTemplate(), "/bar/{country}/{lang}");
 
   const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewritePolicy();
   EXPECT_TRUE(pattern_rewrite_policy.enabled());
-  EXPECT_EQ(pattern_rewrite_policy.pathRewriter()->uri_template(), "/bar/{lang}/{country}");
+  EXPECT_EQ(pattern_rewrite_policy.pathRewriter()->uriTemplate(), "/bar/{lang}/{country}");
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {

@@ -23,7 +23,7 @@ bool UriTemplateMatcher::match(absl::string_view path) const {
                         matching_pattern_regex);
 }
 
-absl::string_view UriTemplateMatcher::uri_template() const { return path_template_; }
+absl::string_view UriTemplateMatcher::uriTemplate() const { return path_template_; }
 
 } // namespace Match
 } // namespace UriTemplate

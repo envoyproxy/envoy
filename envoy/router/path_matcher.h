@@ -30,7 +30,7 @@ public:
   /**
    * @return the match uri_template.
    */
-  virtual absl::string_view uri_template() const PURE;
+  virtual absl::string_view uriTemplate() const PURE;
 
   /**
    * @return the name of the path matcher.

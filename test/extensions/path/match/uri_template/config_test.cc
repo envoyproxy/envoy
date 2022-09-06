@@ -1,5 +1,5 @@
 #include "source/common/config/utility.h"
-#include "source/extensions/path/match/pattern_template/config.h"
+#include "source/extensions/path/match/uri_template/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
