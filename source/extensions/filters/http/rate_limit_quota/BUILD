@@ -57,9 +57,9 @@ envoy_cc_library(
     hdrs = ["client_impl.h"],
     deps = [
         ":client_interface",
-        "//source/common/common:statusor_lib",
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:status",
+        "//source/common/common:statusor_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

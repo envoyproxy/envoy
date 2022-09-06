@@ -1,3 +1,5 @@
+#include <initializer_list>
+
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 
@@ -27,43 +29,49 @@ using ::testing::Invoke;
 using ::testing::NiceMock;
 using Upstream::MockThreadLocalCluster;
 
-// TODO(tyxia) matcher_list example
-// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/test/common/matcher/matcher_test.cc;rcl=442062708;l=162
 constexpr char MatcherConfig[] = R"EOF(
-    matcher_list:
-      matchers:
-        # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
-        predicate:
-          single_predicate:
-            input:
-              typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: environment
-            value_match:
-              exact: staging
-        on_match:
-          action:
-            name: rate_limit_quota
+  matcher_list:
+    matchers:
+      # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+      predicate:
+        single_predicate:
+          input:
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
               bucket_id_builder:
-                bucket_id_builder:
-                  "name":
-                      string_value: "prod"
-                  "env":
-                      custom_value:
-                        name: "test_1"
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                          header_name: environment
-                  "group":
-                      custom_value:
-                        name: "test_2"
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                          header_name: group
+                "name":
+                    string_value: "prod"
+                "environment":
+                    custom_value:
+                      name: "test_1"
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                        header_name: environment
+                "group":
+                    custom_value:
+                      name: "test_2"
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                        header_name: group
+            reporting_interval: 60s
   )EOF";
 
+const std::string GrpcConfig = R"EOF(
+  rlqs_server:
+    envoy_grpc:
+      cluster_name: "rate_limit_quota_server"
+  )EOF";
+
+// TODO(tyxia) CEL matcher config
 // constexpr char CelMatcherConfig[] = R"EOF(
 //     matcher_list:
 //       matchers:
@@ -96,7 +104,10 @@ constexpr char MatcherConfig[] = R"EOF(
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
-    // Construct the filter config with matcher configuration.
+    // Add the grpc service config.
+    TestUtility::loadFromYaml(GrpcConfig, config_);
+
+    // Add the matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
     TestUtility::loadFromYaml(MatcherConfig, matcher);
     config_.mutable_bucket_matchers()->MergeFrom(matcher);
@@ -114,16 +125,70 @@ public:
   FilterConfig config_;
 };
 
-TEST_F(FilterTest, BucketSettings) {
-  // Add {"environment", "staging"} in the request header for exact value_match in the predicate.
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},         {":path", "/"},
-                                         {":scheme", "http"},        {":authority", "host"},
-                                         {"environment", "staging"}, {"group", "envoy"}};
+MATCHER_P(SerializedProtoEquals, message, "") {
+  std::string expected_serialized, actual_serialized;
+  message.SerializeToString(&expected_serialized);
+  arg.SerializeToString(&actual_serialized);
+  return expected_serialized == actual_serialized;
+}
 
-  auto ids = filter_->requestMatching(headers);
-  for (auto it : ids.bucket()) {
+TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
+  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
+  // in the config.
+  std::unordered_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                     {"group", "envoy"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // Add custom_value_pairs to the request header for exact value_match in the predicate.
+  for (auto pair : custom_value_pairs) {
+    headers.addCopy(pair.first, pair.second);
+  }
+
+  // The expected bucket ids has one additional pair that is built statically via `string_value`
+  // from the config.
+  std::unordered_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({"name", "prod"});
+
+  // Get the generated bucket ids.
+  auto bucket_ids = filter_->requestMatching(headers).bucket();
+  // Serialize the proto map to std map for comparison. We can avoid this conversion by using
+  // `EqualsProto()` directly once it is available in the Envoy code base.
+  auto serialize_bucket_ids =
+      std::unordered_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+  EXPECT_THAT(expected_bucket_ids,
+              testing::UnorderedPointwise(testing::Eq(), serialize_bucket_ids));
+
+  for (auto it : bucket_ids) {
     std::cout << it.first << "___" << it.second << std::endl;
   }
+}
+
+TEST_F(FilterTest, BuildBucketSettingsFailed) {
+  // Define the wrong input that doesn't match the values in the config: it has `{"env", "staging"}`
+  // rather than `{"environment", "staging"}`.
+  std::unordered_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
+                                                                     {"group", "envoy"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  for (auto pair : custom_value_pairs) {
+    headers.addCopy(pair.first, pair.second);
+  }
+
+  // The expected bucket ids has one additional pair that is built via `string_value` static method
+  // from the config.
+  std::unordered_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({"name", "prod"});
+
+  // Get the generated bucket ids.
+  auto bucket_ids = filter_->requestMatching(headers).bucket();
+  // Serialize the proto map to std map for easier matching comparison. We can avoid this conversion
+  // by using `EqualsProto()` directly once that is added to the Envoy code base.
+  auto serialize_bucket_ids =
+      std::unordered_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+  EXPECT_THAT(expected_bucket_ids,
+              testing::Not(testing::UnorderedPointwise(testing::Eq(), serialize_bucket_ids)));
 }
 
 } // namespace

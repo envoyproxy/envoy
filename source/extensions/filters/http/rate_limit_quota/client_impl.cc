@@ -7,8 +7,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&&) {}
-
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
   stream_closed = true;
@@ -34,8 +32,6 @@ void RateLimitClientImpl::rateLimit() {
   // 2 and 3 are in parallel.
 
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-  // TODO(tyxia) This could be wrapped into a utility function.
-  // stream_.sendMessage(std::move(reports), true);
   send(std::move(reports), true);
 }
 
@@ -44,14 +40,15 @@ void RateLimitClientImpl::send(
   stream_.sendMessage(std::move(reports), end_stream);
 }
 
-absl::Status RateLimitClientImpl::startStream() {
+absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
-    Http::AsyncClient::StreamOptions options;
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this, options);
+        *this,
+        Http::AsyncClient::RequestOptions().setParentContext(
+            Http::AsyncClient::ParentContext{&stream_info}));
 
     if (stream_ == nullptr) {
       std::string error_string = "Unable to establish the new stream";

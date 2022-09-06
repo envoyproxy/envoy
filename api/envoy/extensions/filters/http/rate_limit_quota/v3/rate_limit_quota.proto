@@ -36,8 +36,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 7]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
-  // onfig.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
-  config.core.v3.GrpcService rlqs_server = 1;
+  config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
 
   // The application domain to use when calling the service. This enables sharing the quota
   // server between different applications without fear of overlap.
@@ -392,7 +391,7 @@ message RateLimitQuotaBucketSettings {
   // the internal specified in this field.
   // [#comment: 100000000 nanoseconds = 0.1 seconds]
   google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
-    required: false
+    required: true
     gt {nanos: 100000000}
   }];
 
