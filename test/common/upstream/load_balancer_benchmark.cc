@@ -546,7 +546,7 @@ public:
     lb_ = std::make_unique<SubsetLoadBalancer>(
         LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
         runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
-        absl::nullopt, common_config_, simTime());
+        absl::nullopt, absl::nullopt, common_config_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);
