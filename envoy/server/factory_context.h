@@ -134,7 +134,7 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return the init manager of the particular context. This can be used for extensions that need
+   * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
    *         will be called on  each registered target after cluster manager init but before the
