@@ -125,7 +125,7 @@ TEST(RewriteTest, MatchPatternInactive) {
   Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
   Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
 
-  absl::Status error = rewrite_predicate->isCompatibleMatchPolicy(match_predicate, false);
+  absl::Status error = rewrite_predicate->isCompatiblePathMatcher(match_predicate, false);
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(), "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
                              "extension without envoy.path.match.uri_template.uri_template_matcher "
@@ -150,7 +150,7 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
   Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
   Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
 
-  absl::Status error = rewrite_predicate->isCompatibleMatchPolicy(match_predicate, true);
+  absl::Status error = rewrite_predicate->isCompatiblePathMatcher(match_predicate, true);
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(), "mismatch between variables in path_match_policy "
                              "/bar/{lang}/{country} and path_rewrite_policy /foo/{lang}/{missing}");
