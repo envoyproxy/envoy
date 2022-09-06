@@ -753,7 +753,7 @@ envoy.path.match.uri_template.uri_template_matcher:
     status: stable
     undocumented: true
     type_urls:
-    - envoy.extensions.path.match.uri_template.v3.PatternTemplateMatchConfig
+    - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
 envoy.path.rewrite.uri_template.uri_template_rewriter:
       categories:
       - envoy.path.rewrite
@@ -761,7 +761,7 @@ envoy.path.rewrite.uri_template.uri_template_rewriter:
       status: stable
       undocumented: true
       type_urls:
-      - envoy.extensions.path.rewrite.uri_template.v3.PatternTemplateRewriteConfig
+      - envoy.extensions.path.rewrite.uri_template.v3.UriemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
