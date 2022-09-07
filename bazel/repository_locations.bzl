@@ -448,7 +448,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "9.1.0",
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-12-11",
+        release_date = "2022-06-09",
         cpe = "cpe:2.3:a:apache:skywalking:*",
     ),
     com_github_skyapm_cpp2sky = dict(
