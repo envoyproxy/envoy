@@ -71,6 +71,8 @@ public:
 
   bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
 #ifdef ENVOY_ENABLE_UHV
+    // H2 codec using oghttp2 does not call into UHV yet so tests that expect a UHV validation
+    // error will fail. Disable these tests for now.
     return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
            (stream == SkipOnStream::AnyStream ||
             (stream == SkipOnStream::Downstream &&

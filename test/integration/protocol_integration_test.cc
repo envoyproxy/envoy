@@ -2788,6 +2788,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
+#ifdef ENVOY_ENABLE_UHV
+  // Extended CONNECT requests are not implemented in UHV.
+  return;
+#endif
+
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
