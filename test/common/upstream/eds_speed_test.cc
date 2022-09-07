@@ -169,8 +169,9 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{validation_visitor_, "cluster_name"};
+  Config::OpaqueResourceDecoderSharedPtr resource_decoder_{std::make_shared<
+      Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>>(
+      validation_visitor_, "cluster_name")};
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
