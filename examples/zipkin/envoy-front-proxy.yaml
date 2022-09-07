@@ -1,9 +1,18 @@
+# This proxy listens on port 10000, and routes the following paths:
+#
+#   /trace/1 -> routes to `envoy-1` on port 10000
+#   /trace/2 -> routes to `envoy-1` on port 10001 (for onward routing to `envoy-2`)
+
+node:
+  # The cluster name is used by Zipkin to identify the proxy.
+  cluster: envoy-proxy-front
+
 static_resources:
   listeners:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 8000
+        port_value: 10000
     traffic_direction: OUTBOUND
     filter_chains:
     - filters:
@@ -21,19 +30,29 @@ static_resources:
                 collector_endpoint_version: HTTP_JSON
           codec_type: AUTO
           stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
-            name: local_route
+            name: proxy_routes
             virtual_hosts:
-            - name: backend
+            - name: proxy
               domains:
               - "*"
               routes:
               - match:
-                  prefix: "/"
+                  prefix: "/trace/1"
                 route:
-                  cluster: service1
+                  cluster: envoy_cluster1
                 decorator:
-                  operation: checkAvailability
+                  operation: routeToEnvoy1
+              - match:
+                  prefix: "/trace/2"
+                route:
+                  cluster: envoy_cluster2
+                decorator:
+                  operation: routeToEnvoy2ViaEnvoy1
               response_headers_to_add:
               - header:
                   key: "x-b3-traceid"
@@ -41,23 +60,32 @@ static_resources:
               - header:
                   key: "x-request-id"
                   value: "%REQ(x-request-id)%"
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
   clusters:
-  - name: service1
+  - name: envoy_cluster1
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: service1
+      cluster_name: envoy_cluster1
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: service1
-                port_value: 8000
+                address: envoy-1
+                port_value: 10000
+  - name: envoy_cluster2
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: envoy_cluster2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: envoy-1
+                port_value: 10001
   - name: zipkin
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN

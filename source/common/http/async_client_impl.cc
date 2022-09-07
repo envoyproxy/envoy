@@ -283,8 +283,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() {
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
-                                                   response_->trailers(), streamInfo(),
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
                                                    Tracing::EgressConfig::get());
 
   callbacks_.onSuccess(*this, std::move(response_));
@@ -316,9 +315,8 @@ void AsyncRequestImpl::onReset() {
                                           remoteClosed() ? &response_->headers() : nullptr);
 
   // Finalize the span based on whether we received a response or not.
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
-      remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
+                                                   Tracing::EgressConfig::get());
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.

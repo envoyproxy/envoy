@@ -47,7 +47,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'
@@ -143,7 +143,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'
@@ -188,7 +188,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'
@@ -242,7 +242,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'

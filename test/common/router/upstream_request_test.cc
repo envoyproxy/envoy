@@ -4,14 +4,18 @@
 
 #include "test/common/http/common.h"
 #include "test/mocks/router/router_filter_interface.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::HasSubstr;
-using testing::NiceMock;
-using testing::Return;
+using ::testing::_;
+using ::testing::AnyNumber;
+using ::testing::Eq;
+using ::testing::HasSubstr;
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::ReturnRef;
 
 namespace Envoy {
 namespace Router {
@@ -19,10 +23,19 @@ namespace {
 
 class UpstreamRequestTest : public testing::Test {
 public:
-  UpstreamRequestTest() {
+  UpstreamRequestTest() : pool_(*symbol_table_) {
     HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
     ON_CALL(router_filter_interface_, downstreamHeaders())
         .WillByDefault(Return(&downstream_request_header_map_));
+
+    ON_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
+        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
+          Http::FilterFactoryCb factory_cb =
+              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
   }
 
   void initialize() {
@@ -39,7 +52,12 @@ public:
 
   Router::MockGenericConnPool* conn_pool_{}; // Owned by the upstream request
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
+  Stats::TestUtil::TestSymbolTable symbol_table_;
+  Stats::StatNamePool pool_;
+  NiceMock<MockTimeSystem> time_system;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
+  std::unique_ptr<Router::FilterConfig> router_config_; // must outlive `UpstreamRequest`
   std::unique_ptr<UpstreamRequest> upstream_request_;
 };
 
@@ -70,8 +88,36 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
   upstream_request_->decodeHeaders(std::move(response_headers), false);
 }
 
+// UpstreamRequest is responsible for adding proper gRPC annotations to spans.
+TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
+  // Enable tracing in config.
+  envoy::extensions::filters::http::router::v3::Router router_proto;
+  router_proto.set_start_child_span(true);
+  router_config_ = std::make_unique<Router::FilterConfig>(
+      pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
+  EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
+
+  // Set expectations on span.
+  auto* child_span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(router_filter_interface_.callbacks_.active_span_, spawnChild_)
+      .WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span, setTag).Times(AnyNumber());
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.status_code"), Eq("1")));
+  EXPECT_CALL(*child_span, setTag(Eq("grpc.message"), Eq("failure")));
+
+  // System under test.
+  initialize();
+  auto upgrade_headers =
+      std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl(
+          {{":status", "200"}, {"grpc-status", "1"}, {"grpc-message", "failure"}}));
+  EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, _));
+  upstream_request_->decodeHeaders(std::move(upgrade_headers), false);
+}
+
 // Test sending headers from the router to upstream.
 TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.allow_upstream_filters", "true"}});
   std::shared_ptr<Http::MockStreamDecoderFilter> filter(
       new NiceMock<Http::MockStreamDecoderFilter>());
 
@@ -79,6 +125,11 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       .WillOnce(Invoke([&](Http::FilterChainManager& manager) -> void {
         auto factory = createDecoderFilterFactoryCb(filter);
         manager.applyFilterFactoryCb({}, factory);
+        Http::FilterFactoryCb factory_cb =
+            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        };
+        manager.applyFilterFactoryCb({}, factory_cb);
       }));
 
   initialize();

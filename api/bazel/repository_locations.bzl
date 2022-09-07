@@ -9,6 +9,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-10",
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/bazel-skylib/blob/{version}/LICENSE",
     ),
     com_envoyproxy_protoc_gen_validate = dict(
         project_name = "protoc-gen-validate (PGV)",
@@ -27,6 +29,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_google_genproto",
             "org_golang_x_text",
         ],
+        license = "Apache-2.0",
+        license_url = "https://github.com/envoyproxy/protoc-gen-validate/blob/v{version}/LICENSE",
     ),
     com_github_cncf_udpa = dict(
         project_name = "xDS API",
@@ -39,6 +43,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/cncf/xds/blob/{version}/LICENSE",
     ),
     com_github_openzipkin_zipkinapi = dict(
         project_name = "Zipkin API",
@@ -50,6 +56,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "zipkin-api-{version}",
         urls = ["https://github.com/openzipkin/zipkin-api/archive/{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/openzipkin/zipkin-api/blob/{version}/LICENSE",
     ),
     com_google_googleapis = dict(
         # TODO(dio): Consider writing a Starlark macro for importing Google API proto.
@@ -62,6 +70,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "googleapis-{version}",
         urls = ["https://github.com/googleapis/googleapis/archive/{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/googleapis/googleapis/blob/{version}/LICENSE",
     ),
     opencensus_proto = dict(
         project_name = "OpenCensus Proto",
@@ -73,6 +83,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "opencensus-proto-{version}/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/v{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/census-instrumentation/opencensus-proto/blob/v{version}/LICENSE",
     ),
     prometheus_metrics_model = dict(
         project_name = "Prometheus client model",
@@ -84,6 +96,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "client_model-{version}",
         urls = ["https://github.com/prometheus/client_model/archive/{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/prometheus/client_model/blob/{version}/LICENSE",
     ),
     rules_proto = dict(
         project_name = "Protobuf Rules for Bazel",
@@ -95,6 +109,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "rules_proto-{version}",
         urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_proto/blob/{version}/LICENSE",
     ),
     opentelemetry_proto = dict(
         project_name = "OpenTelemetry Proto",
@@ -106,6 +122,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "opentelemetry-proto-{version}",
         urls = ["https://github.com/open-telemetry/opentelemetry-proto/archive/v{version}.tar.gz"],
         use_category = ["api"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/open-telemetry/opentelemetry-proto/blob/v{version}/LICENSE",
     ),
     com_github_bufbuild_buf = dict(
         project_name = "buf",
@@ -118,5 +136,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-07-27",
         use_category = ["api"],
         tags = ["manual"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bufbuild/buf/blob/v{version}/LICENSE",
     ),
 )
