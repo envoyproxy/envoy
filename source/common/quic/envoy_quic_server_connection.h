@@ -22,14 +22,19 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::ConnectionSocketPtr connection_socket);
 
-  // QuicNetworkConnection
+  // quic::QuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
-
-  // quic::QuicConnection
   // Overridden to provide a CID manager which issues CIDs compatible with the existing BPF routing.
   std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
   MakeSelfIssuedConnectionIdManager() override;
+
+  bool deferSend() const { return defer_send_; }
+
+  bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
+
+private:
+  const bool defer_send_;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.

@@ -73,7 +73,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     }
   }
 
-  return tracer.startSpan(trace_context.path(), tracing_context);
+  return tracer.startSpan(trace_context.path(), trace_context.protocol(), tracing_context);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,

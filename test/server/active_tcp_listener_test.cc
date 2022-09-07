@@ -482,7 +482,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   generic_active_listener_->sockets().front()->onTimeout();
 
   EXPECT_EQ(server_name,
-            tcp_socket->stream_info_->downstreamAddressProvider().requestedServerName());
+            tcp_socket->streamInfo()->downstreamAddressProvider().requestedServerName());
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.

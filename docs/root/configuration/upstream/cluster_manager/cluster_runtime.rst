@@ -145,11 +145,11 @@ upstream.healthy_panic_threshold
   Defaults to 50%.
 
 upstream.use_http2
-  Whether the cluster uses ``HTTP/2`` if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Whether the cluster uses ``HTTP/2`` if configured in :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
   Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
 
 upstream.use_http3
-  Whether the cluster uses ``HTTP/3`` if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Whether the cluster uses ``HTTP/3`` if configured in :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
   Set to 0 to disable HTTP/3 even if the feature is configured. Defaults to enabled.
 
 

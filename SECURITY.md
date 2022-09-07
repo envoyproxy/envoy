@@ -156,9 +156,14 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 * Three weeks notice will be provided to private distributors from patch
   availability until the embargo deadline.
 
-* Public zero days will be fixed ASAP, but there is no SLO for this, since this
-  will depend on the severity and impact to the organizations backing the Envoy
-  security team.
+* Public zero days which affect the optimized binary will be fixed ASAP, but there is
+  no SLO for this, since this will depend on the severity and impact to the
+  organizations backing the Envoy security team. After a zero day bug fix is in, the
+  PST will kick off point releases unless the bug is deemed unlikely to be encountered
+  in production (e.g. only triggered by trace logs) at which point there will instead be an email
+  to envoy-announce and users can request point releases if they believe they will be affected.
+  Publicly announced bugs which only affect debug binaries will neither trigger point
+  releases nor announce emails.
 
 ### Fix Disclosure Process
 

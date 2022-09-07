@@ -99,7 +99,7 @@ class RdsRouteConfigSubscription : public Rds::RdsRouteConfigSubscription {
 public:
   RdsRouteConfigSubscription(
       RouteConfigUpdatePtr&& config_update,
-      std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
+      Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,

@@ -1265,6 +1265,28 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutIgnoreError) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// While waiting for a response from the external processor, trigger a
+// downstream disconnect followed by a response message timeout.
+TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutDownstreamDisconnect) {
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false,
+                                [this](const HttpHeaders&, HeadersResponse&) {
+                                  // Downstream disconnect
+                                  codec_client_->close();
+                                  // Travel forward 400 ms
+                                  timeSystem().advanceTimeWaitImpl(400ms);
+                                  return false;
+                                });
+
+  ASSERT_TRUE(response->waitForReset());
+}
+
 // Test how the filter responds when asked to buffer a request body for a POST
 // request with an empty body. We should get an empty body message because
 // the Envoy filter stream received the body after all the headers.

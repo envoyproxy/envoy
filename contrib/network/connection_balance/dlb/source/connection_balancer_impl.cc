@@ -1,12 +1,13 @@
 #include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 
-#include <bits/types/FILE.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
+
+#include "source/common/api/os_sys_calls_impl.h"
 
 #ifndef DLB_DISABLED
 #include "dlb.h"
@@ -18,13 +19,42 @@ namespace Dlb {
 
 Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
-    const Protobuf::Message&, Server::Configuration::FactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
+  const auto dlb_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb&>(
+      config, context.messageValidationVisitor());
 #ifdef DLB_DISABLED
-  context.localInfo();
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
+  int device_id = 0;
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat buffer;
+
+  if (dlb_config.id()) {
+    device_id = dlb_config.id();
+    const std::string& device_name = fmt::format("/dev/dlb{}", device_id);
+    if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ != 0) {
+      ExceptionUtil::throwEnvoyException(fmt::format("dlb hardware {} not found", device_name));
+    }
+  } else {
+    std::string device_name;
+    int i = 0;
+    // auto detect available dlb devices, now the max number of dlb device id is 63.
+    const int max_id = 64;
+    for (; i < max_id; i++) {
+      device_name = fmt::format("/dev/dlb{}", i);
+      if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ == 0) {
+        device_id = i;
+        break;
+      }
+    }
+    if (i == 64) {
+      ExceptionUtil::throwEnvoyException("no available dlb hardware");
+    }
+  }
+
   dlb_resources_t rsrcs;
-  if (dlb_open(1, &dlb) == -1) {
+  if (dlb_open(device_id, &dlb) == -1) {
     ExceptionUtil::throwEnvoyException(fmt::format("dlb_open {}", errorDetails(errno)));
   }
   if (dlb_get_dev_capabilities(dlb, &cap)) {

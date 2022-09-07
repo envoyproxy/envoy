@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
@@ -179,6 +180,55 @@ enum class LocalErrorStatus {
   ContinueAndResetStream,
 };
 
+// These are events that upstream filters can register for, via the addUpstreamCallbacks function.
+class UpstreamCallbacks {
+public:
+  virtual ~UpstreamCallbacks() = default;
+
+  // Called when the upstream connection is established and
+  // UpstreamStreamFilterCallbacks::upstream should be available.
+  //
+  // This indicates that data may begin flowing upstream.
+  virtual void onUpstreamConnectionEstablished() PURE;
+};
+
+// These are filter callbacks specific to upstream filters, accessible via
+// StreamFilterCallbacks::upstreamCallbacks()
+class UpstreamStreamFilterCallbacks {
+public:
+  virtual ~UpstreamStreamFilterCallbacks() = default;
+
+  // Returns a handle to the upstream stream's stream info.
+  virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
+
+  // Returns a handle to the generic upstream.
+  virtual OptRef<Router::GenericUpstream> upstream() PURE;
+
+  // Dumps state for the upstream request.
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a CONNECT upgrade. These should only be used by the upstream codec filter.
+  // TODO(alyssawilk) after deprecating the classic path, move this logic to the
+  // upstream codec filter and remove these APIs
+  virtual bool pausedForConnect() const PURE;
+  virtual void setPausedForConnect(bool value) PURE;
+
+  // Return the upstreamStreamOptions for this stream.
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
+
+  // Adds the supplied UpstreamCallbacks to the list of callbacks to be called
+  // as various upstream events occur. Callbacks should persist for the lifetime
+  // of the upstream stream.
+  virtual void addUpstreamCallbacks(UpstreamCallbacks& callbacks) PURE;
+
+  // This should only be called by the UpstreamCodecFilter, and is used to let the
+  // UpstreamCodecFilter supply the interface used by the GenericUpstream to receive
+  // response data from the upstream stream once it is established.
+  virtual void
+  setUpstreamToDownstream(Router::UpstreamToDownstream& upstream_to_downstream_interface) PURE;
+};
+
 /**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
@@ -188,9 +238,10 @@ public:
   virtual ~StreamFilterCallbacks() = default;
 
   /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
+   * @return OptRef<const Network::Connection> the downstream connection, or nullptr if there is
+   * none.
    */
-  virtual const Network::Connection* connection() PURE;
+  virtual OptRef<const Network::Connection> connection() PURE;
 
   /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
@@ -200,7 +251,9 @@ public:
   /**
    * Reset the underlying stream.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the route for the current request. The assumption is that the implementation can do
@@ -317,6 +370,19 @@ public:
    */
   virtual void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Return a handle to the upstream callbacks. This is valid for upstream filters, and nullopt for
+   * downstream filters.
+   */
+  // TODO(alyssawilk) move things like clearRouteCache to downstreamCallbacks.
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 };
 
 /**
@@ -685,6 +751,8 @@ public:
   struct LocalReplyData {
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
+    // The gRPC status set in local reply.
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
     // True if a reset will occur rather than the local reply (some prior filter
@@ -921,12 +989,6 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t encoderBufferLimit() PURE;
-
-  /**
-   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
-   */
-  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
@@ -1067,79 +1129,5 @@ public:
    */
   virtual Event::Dispatcher& dispatcher() PURE;
 };
-
-/**
- * This function is used to wrap the creation of an HTTP filter chain for new streams as they
- * come in. Filter factories create the function at configuration initialization time, and then
- * they are used at runtime.
- * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
- * function will install a single filter, but it's technically possibly to install more than one
- * if desired.
- */
-using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
-
-/**
- * Simple struct of additional contextual information of HTTP filter, e.g. filter config name
- * from configuration, canonical filter name, etc.
- */
-struct FilterContext {
-  // The name of the filter configuration that used to create related filter factory function.
-  // This could be any legitimate non-empty string.
-  std::string config_name;
-  // Filter extension qualified name. This is used as a fallback of `config_name`. E.g.,
-  // "envoy.filters.http.buffer" for the HTTP buffer filter.
-  std::string filter_name;
-};
-
-/**
- * The filter chain manager is provided by the connection manager to the filter chain factory.
- * The filter chain factory will post the filter factory context and filter factory to the
- * filter chain manager to create filter and construct HTTP stream filter chain.
- */
-class FilterChainManager {
-public:
-  virtual ~FilterChainManager() = default;
-
-  /**
-   * Post filter factory context and filter factory to the filter chain manager. The filter
-   * chain manager will create filter instance based on the context and factory internally.
-   * @param context supplies additional contextual information of filter factory.
-   * @param factory factory function used to create filter instances.
-   */
-  virtual void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) PURE;
-};
-
-/**
- * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
- * new stream is created on the connection (either locally or remotely). Typically it would be
- * implemented by a configuration engine that would install a set of filters that are able to
- * process an application scenario on top of a stream.
- */
-class FilterChainFactory {
-public:
-  virtual ~FilterChainFactory() = default;
-
-  /**
-   * Called when a new HTTP stream is created on the connection.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
-   */
-  virtual void createFilterChain(FilterChainManager& manager) PURE;
-
-  /**
-   * Called when a new upgrade stream is created on the connection.
-   * @param upgrade supplies the upgrade header from downstream
-   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
-   *                FilterChainManager.
-   * @return true if upgrades of this type are allowed and the filter chain has been created.
-   *    returns false if this upgrade type is not configured, and no filter chain is created.
-   */
-  using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
-                                        const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainManager& manager) PURE;
-};
-
 } // namespace Http
 } // namespace Envoy
