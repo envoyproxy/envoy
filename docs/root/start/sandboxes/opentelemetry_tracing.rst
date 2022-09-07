@@ -58,14 +58,14 @@ To build this sandbox example, and start the example services run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                      Name                                 Command                State                                  Ports
--------------------------------------------------------------------------------------------------------------------------------------------------------
-opentelemetry-tracing_envoy-1_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
-opentelemetry-tracing_envoy-2_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
-opentelemetry-tracing_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp
-opentelemetry-tracing_opentelemetry_1       /otelcol --config=/etc/ote ... Up             0.0.0.0:4317->4317/tcp, 55678/tcp, 0.0.0.0:55679->55679/tcp
-opentelemetry-tracing_service-1_1           python3 /code/service.py       Up (healthy)
-opentelemetry-tracing_service-2_1           python3 /code/service.py       Up (healthy)
+                        Name                                 Command                State                                  Ports
+    -------------------------------------------------------------------------------------------------------------------------------------------------------
+    opentelemetry-tracing_envoy-1_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
+    opentelemetry-tracing_envoy-2_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
+    opentelemetry-tracing_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp
+    opentelemetry-tracing_opentelemetry_1       /otelcol --config=/etc/ote ... Up             0.0.0.0:4317->4317/tcp, 55678/tcp, 0.0.0.0:55679->55679/tcp
+    opentelemetry-tracing_service-1_1           python3 /code/service.py       Up (healthy)
+    opentelemetry-tracing_service-2_1           python3 /code/service.py       Up (healthy)
 
 Step 2: Make a request to ``service-1``
 ***************************************
@@ -112,11 +112,7 @@ and other contextual information.
 
 Note that OpenTelemetry identifies the Envoy proxies by the name provided in the bootstrap ``node/cluster`` configuration.
 
-.. image:: /start/sandboxes/_static/opentelemetry_tracing-ui.png
-
 You can also explore the OpenTelemetry dependency UI to view relationships between nodes and the path of traces.
-
-.. image:: /start/sandboxes/_static/opentelemetry_tracing-ui-dependency.png
 
 .. seealso::
 
