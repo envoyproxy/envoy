@@ -99,6 +99,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // TODO(cpakulski): Find a better way to access requestHeaders after runtime guard
   // envoy_reloadable_features_unified_header_formatter runtime guard is deprecated.
   // Maybe put it to parent_context?
+  // Since request headers may be empty, consider using optref.
   parent_.metadata_parser_->evaluateHeaders(
       headers_message_->headers(),
       ((options_.parent_context.stream_info != nullptr) &&
