@@ -58,14 +58,14 @@ To build this sandbox example, and start the example services run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                Name                          Command             State            Ports
-    -----------------------------------------------------------------------------------------------------------
-    opentelemetry_tracing_envoy-1_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
-    opentelemetry_tracing_envoy-2_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
-    opentelemetry_tracing_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp
-    opentelemetry_tracing_service-1_1           python3 /code/service.py       Up (healthy)
-    opentelemetry_tracing_service-2_1           python3 /code/service.py       Up (healthy)
-    opentelemetry_tracing_opentelemetry_tracing_1              start-opentelemetry_tracing                   Up (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp
+                      Name                                 Command                State                                  Ports
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+opentelemetry-tracing_envoy-1_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
+opentelemetry-tracing_envoy-2_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
+opentelemetry-tracing_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp
+opentelemetry-tracing_opentelemetry_1       /otelcol --config=/etc/ote ... Up             0.0.0.0:4317->4317/tcp, 55678/tcp, 0.0.0.0:55679->55679/tcp
+opentelemetry-tracing_service-1_1           python3 /code/service.py       Up (healthy)
+opentelemetry-tracing_service-2_1           python3 /code/service.py       Up (healthy)
 
 Step 2: Make a request to ``service-1``
 ***************************************
