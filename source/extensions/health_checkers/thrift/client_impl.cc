@@ -77,6 +77,10 @@ Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, boo
 // ClientImpl
 void ClientImpl::start() {
   ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
+
+  Upstream::Host::CreateConnectionData conn_data = parent_.createConnection();
+  connection_ = std::move(conn_data.connection_);
+  host_description_ = std::move(conn_data.host_description_);
   session_callbacks_ = std::make_unique<ThriftSessionCallbacks>(*this);
   connection_->addConnectionCallbacks(*session_callbacks_);
   connection_->addReadFilter(session_callbacks_);
@@ -146,9 +150,9 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(ClientCallback& callbacks, TransportType transport,
                                     ProtocolType protocol, const std::string& method_name,
-                                    Upstream::Host::CreateConnectionData& data, int32_t seq_id) {
-  auto client =
-      std::make_unique<ClientImpl>(callbacks, transport, protocol, method_name, data, seq_id);
+                                    Upstream::HostSharedPtr host, int32_t seq_id) {
+  auto client = std::make_unique<ClientImpl>(callbacks, transport, protocol, method_name,
+                                             std::move(host), seq_id);
   return client;
 }
 

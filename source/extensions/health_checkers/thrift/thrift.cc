@@ -70,12 +70,8 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
   ENVOY_LOG(trace, "ThriftActiveHealthCheckSession onInterval");
   if (!client_) {
     ENVOY_LOG(trace, "ThriftActiveHealthCheckSession construct client");
-    Upstream::Host::CreateConnectionData conn_data =
-        host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
-                                           parent_.transportSocketMatchMetadata().get());
-    client_ =
-        parent_.client_factory_.create(*this, parent_.transport_, parent_.protocol_,
-                                       parent_.method_name_, conn_data, parent_.random_.random());
+    client_ = parent_.client_factory_.create(*this, parent_.transport_, parent_.protocol_,
+                                             parent_.method_name_, host_, parent_.random_.random());
     client_->start();
     expect_close_ = false;
   }
@@ -88,6 +84,20 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onTimeout() {
   client_->close();
 }
 
+void ThriftHealthChecker::ThriftActiveHealthCheckSession::onResponseResult(bool is_success) {
+  if (is_success) {
+    handleSuccess();
+  } else {
+    // TODO(kuochunghsu): We might want to define retriable response.
+    handleFailure(envoy::data::core::v3::ACTIVE, /* retriable */ false);
+  }
+}
+
+Upstream::Host::CreateConnectionData
+ThriftHealthChecker::ThriftActiveHealthCheckSession::createConnection() {
+  return host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
+                                            parent_.transportSocketMatchMetadata().get());
+}
 // Network::ConnectionCallbacks
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||

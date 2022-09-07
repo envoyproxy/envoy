@@ -94,11 +94,9 @@ class ClientImpl : public Client,
                    protected Logger::Loggable<Logger::Id::hc> {
 public:
   ClientImpl(ClientCallback& callback, TransportType transport, ProtocolType protocol,
-             const std::string& method_name, Upstream::Host::CreateConnectionData& data,
-             int32_t seq_id)
+             const std::string& method_name, Upstream::HostSharedPtr host, int32_t seq_id)
       : parent_(callback), transport_(transport), protocol_(protocol), method_name_(method_name),
-        connection_(std::move(data.connection_)), host_description_(data.host_description_),
-        seq_id_(seq_id) {}
+        host_(host), seq_id_(seq_id) {}
 
   void start() override;
   bool makeRequest() override;
@@ -132,6 +130,7 @@ private:
   const TransportType transport_;
   const ProtocolType protocol_;
   const std::string& method_name_;
+  Upstream::HostSharedPtr host_;
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
 
@@ -145,7 +144,7 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // ClientFactory
   ClientPtr create(ClientCallback& callbacks, TransportType transport, ProtocolType protocol,
-                   const std::string& method_name, Upstream::Host::CreateConnectionData& data,
+                   const std::string& method_name, Upstream::HostSharedPtr host,
                    int32_t seq_id) override;
 
   static ClientFactoryImpl instance_;

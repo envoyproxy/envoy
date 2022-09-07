@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_mock",
     "envoy_package",
 )
 load(
@@ -11,18 +12,28 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_mock(
+    name = "thrift_mocks",
+    srcs = ["mocks.cc"],
+    hdrs = ["mocks.h"],
+    deps = [
+        "//source/extensions/health_checkers/thrift:client_interface",
+        "//test/mocks/network:connection_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "thrift_test",
     srcs = ["thrift_test.cc"],
     extension_names = ["envoy.health_checkers.thrift"],
     deps = [
+        ":thrift_mocks",
         "//source/common/api:api_lib",
         "//source/extensions/health_checkers/thrift",
         "//source/extensions/health_checkers/thrift:utility",
         "//test/common/upstream:utility_lib",
-        "//test/extensions/filters/network/common/thrift:thrift_mocks",
-        "//test/extensions/filters/network/common/thrift:test_utils_lib",
-        "//test/extensions/filters/network/thrift_proxy:thrift_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",

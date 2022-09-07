@@ -2,6 +2,7 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
@@ -16,10 +17,14 @@ namespace ThriftHealthChecker {
 class ClientCallback : public Network::ConnectionCallbacks {
 public:
   /**
+   * Called when the client needs a connection
+   */
+  virtual Upstream::Host::CreateConnectionData createConnection() PURE;
+
+  /**
    * Called when a response is received.
    * @param is_success indicate if the response is a success response
    */
-
   virtual void onResponseResult(bool is_success) PURE;
 };
 
@@ -66,8 +71,8 @@ public:
   virtual ClientPtr create(ClientCallback& callbacks,
                            NetworkFilters::ThriftProxy::TransportType transport,
                            NetworkFilters::ThriftProxy::ProtocolType protocol,
-                           const std::string& method_name,
-                           Upstream::Host::CreateConnectionData& data, int32_t seq_id) PURE;
+                           const std::string& method_name, Upstream::HostSharedPtr host,
+                           int32_t seq_id) PURE;
 };
 
 } // namespace ThriftHealthChecker

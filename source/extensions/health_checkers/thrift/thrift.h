@@ -44,22 +44,14 @@ protected:
   }
 
 private:
-  friend class ThriftHealthCheckerTest;
-
   struct ThriftActiveHealthCheckSession : public ActiveHealthCheckSession, public ClientCallback {
     ThriftActiveHealthCheckSession(ThriftHealthChecker& parent,
                                    const Upstream::HostSharedPtr& host);
     ~ThriftActiveHealthCheckSession() override;
 
     // ClientCallback
-    void onResponseResult(bool is_success) override {
-      if (is_success) {
-        handleSuccess();
-      } else {
-        // TODO(kuochunghsu): We might want to define retriable response.
-        handleFailure(envoy::data::core::v3::ACTIVE, /* retriable */ false);
-      }
-    }
+    void onResponseResult(bool is_success) override;
+    Upstream::Host::CreateConnectionData createConnection() override;
 
     // ActiveHealthCheckSession
     void onInterval() override;
