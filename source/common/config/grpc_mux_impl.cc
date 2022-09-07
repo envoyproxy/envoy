@@ -4,6 +4,7 @@
 
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_source_id.h"
 #include "source/common/memory/utils.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -37,12 +38,15 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          const Protobuf::MethodDescriptor& service_method,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
-                         CustomConfigValidatorsPtr&& config_validators)
+                         CustomConfigValidatorsPtr&& config_validators,
+                         XdsResourcesDelegateOptRef xds_resources_delegate,
+                         const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)), first_stream_request_(true),
-      dispatcher_(dispatcher),
+      config_validators_(std::move(config_validators)),
+      xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
+      first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -106,7 +110,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder,
+                                      OpaqueResourceDecoderSharedPtr resource_decoder,
                                       const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
@@ -216,7 +220,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourcePtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
-    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
     const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 
@@ -272,6 +276,14 @@ void GrpcMuxImpl::onDiscoveryResponse(
         watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
       }
     }
+
+    // All config updates have been applied without throwing an exception, so we'll call the xDS
+    // resources delegate, if any.
+    if (xds_resources_delegate_.has_value()) {
+      xds_resources_delegate_->onConfigUpdated(XdsConfigSourceId{target_xds_authority_, type_url},
+                                               all_resource_refs);
+    }
+
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
     api_state.request_.set_version_info(message->version_info());

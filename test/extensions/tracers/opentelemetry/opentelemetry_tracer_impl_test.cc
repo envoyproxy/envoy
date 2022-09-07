@@ -82,10 +82,8 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   setupValidDriver();
 
   // Add the OTLP headers to the request headers
-  //
   Http::TestRequestHeaderMapImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-
   // traceparent header is "version-trace_id-parent_id-trace_flags"
   // See https://w3c.github.io/trace-context/#traceparent-header
   const std::string version = "00";
@@ -98,8 +96,9 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
-
   request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT, parent_trace_header);
+  // Also add tracestate.
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_STATE, "test=foo");
 
   // Mock the random call for generating span ID so we can check it later.
   const uint64_t new_span_id = 3;
@@ -115,14 +114,53 @@ TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTest) {
 
   // Remove headers, then inject context into header from the span.
   request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE);
   span->injectContext(request_headers, nullptr);
 
   auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
-
   EXPECT_EQ(sampled_entry.size(), 1);
   EXPECT_EQ(
       sampled_entry[0]->value().getStringView(),
       absl::StrJoin({version, trace_id_hex, Hex::uint64ToHex(new_span_id), trace_flags}, "-"));
+
+  auto sampled_tracestate_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_STATE);
+  EXPECT_EQ(sampled_tracestate_entry.size(), 1);
+  EXPECT_EQ(sampled_tracestate_entry[0]->value().getStringView(), "test=foo");
+  const std::string request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+  scope_spans:
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      trace_state: "test=foo"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  SystemTime timestamp = time_system_.systemTime();
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(absl::HexStringToBytes(trace_id_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(new_span_id))));
+  expected_span->set_parent_span_id(
+      absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(parent_span_id))));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_stream_ptr_,
+              sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
 TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {

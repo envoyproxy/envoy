@@ -44,6 +44,8 @@ public:
   MOCK_METHOD(bool, isEnabled, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
               fallbackPolicy, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
+              metadataFallbackPolicy, (), (const));
   MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
   MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
   MOCK_METHOD(bool, localityWeightAware, (), (const));

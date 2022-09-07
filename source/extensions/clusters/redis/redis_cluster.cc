@@ -276,6 +276,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   parent_.info_->stats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {
+    ENVOY_LOG(debug, "redis cluster slot request is already in progress for '{}'",
+              parent_.info_->name());
     return;
   }
 
@@ -344,7 +346,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
            hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
                                              std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
-            ENVOY_LOG(debug, "async DNS resolution complete for {}", slot.primary_hostname_);
+            ENVOY_LOG(
+                debug,
+                "async DNS resolution complete for primary slot address {} at index location {}",
+                slot.primary_hostname_, slot_idx);
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
             // the timer.
@@ -398,7 +403,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
                                            std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
-          ENVOY_LOG(debug, "async DNS resolution complete for {}", replica.first);
+          ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
           // We log a warn message.

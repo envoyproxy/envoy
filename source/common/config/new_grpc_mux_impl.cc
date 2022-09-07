@@ -154,7 +154,7 @@ void NewGrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& resources,
                                          SubscriptionCallbacks& callbacks,
-                                         OpaqueResourceDecoder& resource_decoder,
+                                         OpaqueResourceDecoderSharedPtr resource_decoder,
                                          const SubscriptionOptions& options) {
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
@@ -163,7 +163,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
-  Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
+  Watch* watch = entry->second->watch_map_.addWatch(callbacks, *resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources, options);
   return std::make_unique<WatchImpl>(type_url, watch, *this, options);

@@ -246,6 +246,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
   // Close the HTTP/3 connection before sending back response. This would cause an upstream reset.
   ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 2);
   fake_upstream_connection_.reset();
   upstream_request_.reset();
 

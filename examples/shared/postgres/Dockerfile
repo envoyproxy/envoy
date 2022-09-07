@@ -1,1 +1,1 @@
-FROM postgres:latest@sha256:f8816ada742348e1adfcec5c2a180b675bf6e4a294e0feb68bd70179451e1242
+FROM postgres:latest@sha256:befb4cdc1d944bd89784b9caa287cf025f0720f9a02436038124163accd177dc
