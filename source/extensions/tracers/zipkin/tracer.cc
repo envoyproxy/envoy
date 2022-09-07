@@ -70,7 +70,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Set the span's kind (client or server)
   if (independent_proxy_) {
     // If previous context is inner context then this span must be span created for upstream
-    // request. Client span will created for upstream request when the independent_proxy is
+    // request. Client span will be created for upstream request when independent_proxy is
     // set to true.
     if (previous_context.innerContext()) {
       annotation.setValue(CLIENT_SEND);
