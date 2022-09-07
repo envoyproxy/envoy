@@ -10,8 +10,7 @@ functionality analysis. Make sure
     hedge attempt, and local-reply failures won't trigger retries)
 
 Once you've done this, you're ready to convert. An example converted filter is the Envoy
-[Buffer]
-(https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/buffer/config.cc)
+[Buffer](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/buffer/config.cc)
 [Filter](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/buffer/config.h)
 
 Assuming your filter inherits from FactoryBase:
