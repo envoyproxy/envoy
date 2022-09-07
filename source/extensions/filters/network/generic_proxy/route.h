@@ -81,7 +81,7 @@ public:
   Matcher::ActionFactoryCb
   createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
-  std::string name() const override { return "envoy.matching.action.meta_protocol.route"; }
+  std::string name() const override { return "envoy.matching.action.generic_proxy.route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoRouteAction>();
   }

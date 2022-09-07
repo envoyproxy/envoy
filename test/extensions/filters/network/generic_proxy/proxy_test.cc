@@ -80,14 +80,14 @@ TEST(BasicFilterConfigTest, CreatingRouteMatcher) {
               predicate:
               - single_predicate:
                   input:
-                    name: envoy.matching.meta_protocol.input.service
+                    name: envoy.matching.generic_proxy.input.service
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
                   value_match:
                     exact: "service_0"
           on_match:
             action:
-              name: envoy.matching.action.meta_protocol.route
+              name: envoy.matching.action.generic_proxy.route
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
                 cluster: "cluster_0"
@@ -113,18 +113,18 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
 
   const std::string yaml_config_0 = R"EOF(
-    name: mock_meta_protocol_filter_name_0
+    name: mock_generic_proxy_filter_name_0
     typed_config:
       "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      type_url: mock_meta_protocol_filter_name_0
+      type_url: mock_generic_proxy_filter_name_0
       value: {}
   )EOF";
 
   const std::string yaml_config_1 = R"EOF(
-    name: mock_meta_protocol_filter_name_1
+    name: mock_generic_proxy_filter_name_1
     typed_config:
       "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      type_url: mock_meta_protocol_filter_name_1
+      type_url: mock_generic_proxy_filter_name_1
       value: {}
   )EOF";
 
@@ -134,12 +134,12 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
   NiceMock<MockStreamFilterConfig> mock_filter_config_0;
   NiceMock<MockStreamFilterConfig> mock_filter_config_1;
 
-  ON_CALL(mock_filter_config_0, name()).WillByDefault(Return("mock_meta_protocol_filter_name_0"));
-  ON_CALL(mock_filter_config_1, name()).WillByDefault(Return("mock_meta_protocol_filter_name_1"));
+  ON_CALL(mock_filter_config_0, name()).WillByDefault(Return("mock_generic_proxy_filter_name_0"));
+  ON_CALL(mock_filter_config_1, name()).WillByDefault(Return("mock_generic_proxy_filter_name_1"));
   ON_CALL(mock_filter_config_0, configTypes())
-      .WillByDefault(Return(std::set<std::string>{"mock_meta_protocol_filter_name_0"}));
+      .WillByDefault(Return(std::set<std::string>{"mock_generic_proxy_filter_name_0"}));
   ON_CALL(mock_filter_config_1, configTypes())
-      .WillByDefault(Return(std::set<std::string>{"mock_meta_protocol_filter_name_1"}));
+      .WillByDefault(Return(std::set<std::string>{"mock_generic_proxy_filter_name_1"}));
 
   Registry::InjectFactory<NamedFilterConfigFactory> registration_0(mock_filter_config_0);
   Registry::InjectFactory<NamedFilterConfigFactory> registration_1(mock_filter_config_1);
@@ -158,7 +158,7 @@ TEST(BasicFilterConfigTest, CreatingFilterFactories) {
     EXPECT_THROW_WITH_MESSAGE(
         FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
         EnvoyException,
-        "Terminal filter: mock_meta_protocol_filter_name_0 must be the last generic L7 "
+        "Terminal filter: mock_generic_proxy_filter_name_0 must be the last generic L7 "
         "filter");
   }
 

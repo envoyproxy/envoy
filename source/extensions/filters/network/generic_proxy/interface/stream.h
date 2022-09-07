@@ -76,29 +76,28 @@ public:
   /**
    * Get request host.
    *
-   * @return The host of generic request. It generally consists of the host and an
-   * optional user information and an optional port. For different application protocols, the
-   * meaning of the return value may be different.
+   * @return The host of generic request. The meaning of the return value may be different For
+   * different application protocols. It typially should be domain, VIP, or service name that used
+   * to represents target service instances.
    */
   virtual absl::string_view host() const PURE;
 
   /**
    * Get request path.
    *
-   * @return The path of generic request. The content and meaning of path are determined by
-   * specific protocol itself.
+   * @return The path of generic request. The meaning of the return value may be different For
+   * different application protocols. It typially should be RPC service name that used to represents
+   * set of method or functionality provided by target service.
    */
   virtual absl::string_view path() const PURE;
 
   /**
    * Get request method.
    *
-   * @return The method of generic request. The content and meaning of method are determined
-   * by specific protocol itself.
+   * @return The method of generic request. The meaning of the return value may be different For
+   * different application protocols.
    */
   virtual absl::string_view method() const PURE;
-
-  static constexpr absl::string_view name() { return "meta_protocol"; }
 };
 using RequestPtr = std::unique_ptr<Request>;
 using RequestSharedPtr = std::shared_ptr<Request>;

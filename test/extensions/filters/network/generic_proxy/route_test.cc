@@ -178,7 +178,7 @@ TEST(RouteMatchActionFactoryTest, SimpleRouteMatchActionFactoryTest) {
   RouteMatchActionFactory factory;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  EXPECT_EQ("envoy.matching.action.meta_protocol.route", factory.name());
+  EXPECT_EQ("envoy.matching.action.generic_proxy.route", factory.name());
 
   EXPECT_EQ(factory.createEmptyConfigProto()->GetTypeName(), ProtoRouteAction().GetTypeName());
 
@@ -226,14 +226,14 @@ routes:
           predicate:
           - single_predicate:
               input:
-                name: envoy.matching.meta_protocol.input.service
+                name: envoy.matching.generic_proxy.input.service
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.ServiceMatchInput
               value_match:
                 exact: "service_0"
           - single_predicate:
               input:
-                name: envoy.matching.meta_protocol.input.method
+                name: envoy.matching.generic_proxy.input.method
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.MethodMatchInput
               value_match:
@@ -242,7 +242,7 @@ routes:
               predicate:
               - single_predicate:
                   input:
-                    name: envoy.matching.meta_protocol.input.property
+                    name: envoy.matching.generic_proxy.input.property
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
                       property_name: "key_0"
@@ -250,7 +250,7 @@ routes:
                     exact: "value_0"
               - single_predicate:
                   input:
-                    name: envoy.matching.meta_protocol.input.property
+                    name: envoy.matching.generic_proxy.input.property
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.matcher.v3.PropertyMatchInput
                       property_name: "key_1"
@@ -258,7 +258,7 @@ routes:
                     exact: "value_1"
       on_match:
         action:
-          name: envoy.matching.action.meta_protocol.route
+          name: envoy.matching.action.generic_proxy.route
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction
             cluster: "cluster_0"
@@ -346,14 +346,14 @@ routes:
           predicate:
           - single_predicate:
               input:
-                name: envoy.matching.meta_protocol.input.unknown_input
+                name: envoy.matching.generic_proxy.input.unknown_input
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.UnknownInput
               value_match:
                 exact: "service_0"
       on_match:
         action:
-          name: envoy.matching.action.meta_protocol.route
+          name: envoy.matching.action.generic_proxy.route
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.network.generic_proxy.v3.RouteAction
             cluster: "cluster_0"

@@ -44,7 +44,7 @@ public:
     return []() { return std::make_unique<ServiceMatchDataInput>(); };
   }
 
-  std::string name() const override { return "envoy.matching.meta_protocol.input.service"; }
+  std::string name() const override { return "envoy.matching.generic_proxy.input.service"; }
 };
 
 class MethodMatchDataInput : public Matcher::DataInput<Request> {
@@ -70,7 +70,7 @@ public:
     return []() { return std::make_unique<MethodMatchDataInput>(); };
   }
 
-  std::string name() const override { return "envoy.matching.meta_protocol.input.method"; }
+  std::string name() const override { return "envoy.matching.generic_proxy.input.method"; }
 };
 
 class PropertyMatchDataInput : public Matcher::DataInput<Request> {
@@ -111,7 +111,7 @@ public:
     return [name]() { return std::make_unique<PropertyMatchDataInput>(name); };
   }
 
-  std::string name() const override { return "envoy.matching.meta_protocol.input.property"; }
+  std::string name() const override { return "envoy.matching.generic_proxy.input.property"; }
 };
 
 } // namespace GenericProxy
