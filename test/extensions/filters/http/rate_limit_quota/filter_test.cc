@@ -125,13 +125,6 @@ public:
   FilterConfig config_;
 };
 
-MATCHER_P(SerializedProtoEquals, message, "") {
-  std::string expected_serialized, actual_serialized;
-  message.SerializeToString(&expected_serialized);
-  arg.SerializeToString(&actual_serialized);
-  return expected_serialized == actual_serialized;
-}
-
 TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
@@ -154,14 +147,10 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   auto bucket_ids = filter_->requestMatching(headers).bucket();
   // Serialize the proto map to std map for comparison. We can avoid this conversion by using
   // `EqualsProto()` directly once it is available in the Envoy code base.
-  auto serialize_bucket_ids =
+  auto serialized_bucket_ids =
       std::unordered_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
   EXPECT_THAT(expected_bucket_ids,
-              testing::UnorderedPointwise(testing::Eq(), serialize_bucket_ids));
-
-  for (auto it : bucket_ids) {
-    std::cout << it.first << "___" << it.second << std::endl;
-  }
+              testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
 TEST_F(FilterTest, BuildBucketSettingsFailed) {

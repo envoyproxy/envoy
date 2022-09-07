@@ -20,16 +20,13 @@ using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBuck
    filter while it waits for the initial assignment is determined by the no_assignment_behavior
    value.
 */
-
 void RateLimitQuotaFilter::setDecoderFilterCallbacks(
     Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  // TODO(tyxia) Perform the CEL matching on
-  // And can move it to initial_call
-  // buildBuckets(headers, *config_);
+  // Start the stream on the first request.
   if (rate_limit_client_->startStream(callbacks_->streamInfo()).ok()) {
     rate_limit_client_->rateLimit();
     return Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -41,7 +38,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 void RateLimitQuotaFilter::onDestroy() { rate_limit_client_->closeStream(); }
 
 void RateLimitQuotaFilter::createMatcher() {
-  std::cout << "Create matcher!!!" << std::endl;
   RateLimitOnMactchActionContext context;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMactchActionContext> factory(
       context, factory_context_.getServerFactoryContext(), visitor_);
@@ -50,8 +46,6 @@ void RateLimitQuotaFilter::createMatcher() {
 
 // Perform the request matching.
 BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
-  BucketId id;
-  std::cout << "Perform request matching!!!" << std::endl;
   // Initialize the data pointer on first use and reuse it for subsequent requests.
   if (data_ptr_ == nullptr) {
     if (callbacks_ != nullptr) {
@@ -67,8 +61,7 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
   // Http::Matching::HttpMatchingDataImpl
   // data(callbacks_->streamInfo().downstreamAddressProvider()); data.onRequestHeaders(headers);
   // auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
-  ASSERT(data_ptr_ != nullptr);
-  ASSERT(matcher_ != nullptr);
+  BucketId id;
   if (data_ptr_ == nullptr || matcher_ == nullptr) {
     if (data_ptr_ == nullptr) {
       ENVOY_LOG(error, "Matching data object has not been initialized yet.");

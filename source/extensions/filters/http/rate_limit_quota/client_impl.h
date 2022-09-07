@@ -24,7 +24,6 @@ using RateLimitQuotaResponsePtr =
     std::unique_ptr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 
 // Grpc bi-directional stream client.
-// TODO(tyxia) By current design, this class handles all the grpc operations.
 class RateLimitClientImpl : public RateLimitClient,
                             public Grpc::AsyncStreamCallbacks<
                                 envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
@@ -35,9 +34,8 @@ public:
                       Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)) {
-    // TODO(tyxia) Think about how to efficiently open grpc stream
-    // How about starting the stream on the first request.
-    // The difference is when to create the stream object.
+    // TODO(tyxia) Think about how to efficiently open grpc stream: whether it is opened on the
+    // first request or creation of client.
     // startStream();
   }
 
@@ -60,7 +58,7 @@ public:
   // TODO(tyxia) Do we need this to be abstract class in RateLimit?
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
   void closeStream();
-  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports& reports);
+  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&) {}
   void send(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports,
             bool end_stream);
 
@@ -73,13 +71,10 @@ private:
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
+
 /**
- * Create the rate limit client.
+ * Create the rate limit client. It is uniquely owned by each worker thread.
  */
-// TODO(tyxia)
-// https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/ratelimit/ratelimit_impl.cc;rcl=399691660;l=125
-// TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
-// requests.
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service) {

@@ -25,6 +25,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Rate Limit Quota]
 // Rate Limit Quota :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
 // [#comment:TODO(sergiitk): extension envoy.filters.http.rate_limit_quota]

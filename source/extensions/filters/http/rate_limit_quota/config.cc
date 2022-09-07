@@ -14,7 +14,7 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
         filter_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  // TODO(tyxia) The filter config is shared pointer but the client is unique pointer.
+  // Filter config const object is created on the main thread and shared between worker threads.
   FilterConfigConstSharedPtr config = std::make_shared<
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);

@@ -17,9 +17,6 @@ void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   }
 }
 
-void RateLimitClientImpl::createReports(
-    envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&) {}
-
 // TODO(tyxia) Key of performing the rate limiting
 void RateLimitClientImpl::rateLimit() {
   // TODO(tyxia) Do we need this assert at all?
