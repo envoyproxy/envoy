@@ -434,8 +434,8 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   const tsi_handshaker_vtable* vtable = raw_handshaker->vtable;
   tsi_handshaker_vtable mock_vtable = *vtable;
   mock_vtable.next = [](tsi_handshaker*, const unsigned char*, size_t, const unsigned char**,
-                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb,
-                        void*) { return TSI_INTERNAL_ERROR; };
+                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb, void*,
+                        std::string*) { return TSI_INTERNAL_ERROR; };
   raw_handshaker->vtable = &mock_vtable;
 
   client_.handshaker_factory_ = [&](Event::Dispatcher& dispatcher,

@@ -243,7 +243,7 @@ void AsyncStreamImpl::cleanup() {
   }
 }
 
-void AsyncStreamImpl::resetStream() {
+void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
   stream_callbacks_.onReset();
   cleanup();
 }

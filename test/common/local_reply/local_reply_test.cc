@@ -359,15 +359,15 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
         - header:
             key: foo-1
             value: bar1
-          append: true
+          append_action: APPEND_IF_EXISTS_OR_ADD
         - header:
             key: foo-2
             value: override-bar2
-          append: false
+          append_action: OVERWRITE_IF_EXISTS_OR_ADD
         - header:
             key: foo-3
             value: append-bar3
-          append: true
+          append_action: APPEND_IF_EXISTS_OR_ADD
         - header:
             key: local-reply-req-id
             value: '%REQ(req-id)%'

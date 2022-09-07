@@ -42,6 +42,7 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
+RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
 RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
@@ -50,6 +51,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
 RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
+RUNTIME_GUARD(envoy_reloadable_features_http_response_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgrade);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
@@ -58,10 +60,12 @@ RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
+RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
 RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_update_grpc_response_error_tag);
@@ -92,6 +96,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
 // Android.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
+// TODO(yanavlasov): disable upstream filters by default
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

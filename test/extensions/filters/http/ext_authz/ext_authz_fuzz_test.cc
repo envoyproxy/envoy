@@ -58,7 +58,8 @@ class FuzzerMocks {
 public:
   FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
 
-    ON_CALL(decoder_callbacks_, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }

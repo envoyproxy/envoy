@@ -208,6 +208,7 @@ private:
     explicit FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
     explicit FormatBuilder() : commands_(absl::nullopt) {}
     std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+    std::vector<FormatterProviderPtr> toFormatNumberValue(double value) const;
     StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
     StructFormatListWrapper
     toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
@@ -278,6 +279,25 @@ public:
 
 private:
   ProtobufWkt::Value str_;
+};
+
+/**
+ * FormatterProvider for numbers.
+ */
+class PlainNumberFormatter : public FormatterProvider {
+public:
+  PlainNumberFormatter(double num);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+
+private:
+  ProtobufWkt::Value num_;
 };
 
 /**
@@ -394,13 +414,16 @@ public:
                                  absl::string_view) const override;
 };
 
-/**
- * FormatterProvider for grpc-status
- */
 class GrpcStatusFormatter : public FormatterProvider, HeaderFormatter {
 public:
+  enum Format {
+    CamelString,
+    SnakeString,
+    Number,
+  };
+
   GrpcStatusFormatter(const std::string& main_header, const std::string& alternative_header,
-                      absl::optional<size_t> max_length, bool format_as_number = false);
+                      absl::optional<size_t> max_length, Format format);
 
   // FormatterProvider
   absl::optional<std::string> format(const Http::RequestHeaderMap&,
@@ -412,8 +435,10 @@ public:
                                  const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
                                  absl::string_view) const override;
 
+  static Format parseFormat(absl::string_view format);
+
 private:
-  const bool format_as_number_;
+  const Format format_;
 };
 
 /**

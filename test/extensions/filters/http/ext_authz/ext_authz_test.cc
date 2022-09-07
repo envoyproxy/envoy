@@ -67,7 +67,8 @@ public:
   }
 
   void prepareCheck() {
-    ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_filter_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
@@ -281,7 +282,8 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   failure_mode_allow: false
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _, _))
@@ -322,7 +324,8 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
     code: 503
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _, _))
@@ -364,7 +367,8 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   failure_mode_allow: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _, _))
@@ -400,7 +404,8 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   failure_mode_allow: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
@@ -460,7 +465,8 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
     max_request_bytes: 10
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
 
@@ -490,7 +496,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -532,7 +539,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -589,7 +597,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -1708,7 +1717,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   };
 
   test_disable(false);
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   // When filter is not disabled, setDecoderBufferLimit is called.
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
@@ -2434,7 +2444,8 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   };
 
   test_disable_request_body_buffering(false);
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   // When request body buffering is not skipped, setDecoderBufferLimit is called.
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);

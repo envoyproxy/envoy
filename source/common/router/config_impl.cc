@@ -58,11 +58,15 @@ namespace {
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
 void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
-  dest.headers_to_append.insert(dest.headers_to_append.end(), src.headers_to_append.begin(),
-                                src.headers_to_append.end());
-  dest.headers_to_overwrite.insert(dest.headers_to_overwrite.end(),
-                                   src.headers_to_overwrite.begin(),
-                                   src.headers_to_overwrite.end());
+  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
+                                       src.headers_to_append_or_add.begin(),
+                                       src.headers_to_append_or_add.end());
+  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
+                                          src.headers_to_overwrite_or_add.begin(),
+                                          src.headers_to_overwrite_or_add.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
 }
@@ -383,6 +387,10 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
   }
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
+  }
+  if (config.has_allow_private_network_access()) {
+    allow_private_network_access_ =
+        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
   }
 }
 
@@ -1390,12 +1398,12 @@ PathTemplateRouteEntryImpl::PathTemplateRouteEntryImpl(
 
 void PathTemplateRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                    bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, nullptr, insert_envoy_original_path);
+  finalizePathHeader(headers, "", insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, nullptr);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
 }
 
 RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,

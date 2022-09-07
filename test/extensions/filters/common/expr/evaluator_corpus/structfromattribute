@@ -1,0 +1,33 @@
+expression {
+  struct_expr {
+    message_name: "envoy.config.core.v3.BuildVersion"
+    entries {
+      field_key: "metadata"
+      value {
+        struct_expr {
+          entries {
+            map_key {
+              const_expr {
+                string_value: "validate.BytesRules"
+              }
+            }
+            value {
+              list_expr {
+                elements {
+                  select_expr {
+                    operand {
+                      ident_expr {
+                        name: "request"
+                      }
+                    }
+                    field: "url_path"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -76,8 +76,7 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   )EOF";
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config{};
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
-                          "route_key: Cannot find field");
+  EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException);
 }
 
 } // namespace

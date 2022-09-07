@@ -35,7 +35,7 @@ class Tracer : Logger::Loggable<Logger::Id::tracing> {
 public:
   Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-         OpenTelemetryTracerStats tracing_stats);
+         OpenTelemetryTracerStats tracing_stats, const std::string& service_name);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -62,6 +62,7 @@ private:
   Runtime::Loader& runtime_;
   Event::TimerPtr flush_timer_;
   OpenTelemetryTracerStats tracing_stats_;
+  std::string service_name_;
 };
 
 /**
@@ -122,6 +123,15 @@ public:
    */
   void setParentId(const absl::string_view& parent_span_id_hex) {
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
+  }
+
+  std::string tracestate() { return span_.trace_state(); }
+
+  /**
+   * Sets the span's tracestate.
+   */
+  void setTracestate(const absl::string_view& tracestate) {
+    span_.set_trace_state(std::string{tracestate});
   }
 
 private:

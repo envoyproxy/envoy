@@ -31,7 +31,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'
@@ -39,7 +39,7 @@ response_headers_to_add:
       key: test-resp-req-id
       value: '%REQ(test-req-id)%'
 request_headers_to_add_when_not_enforced:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-local-ratelimited
       value: 'true'
@@ -281,7 +281,7 @@ filter_enforced:
     numerator: 100
     denominator: HUNDRED
 response_headers_to_add:
-  - append: false
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
     header:
       key: x-test-rate-limit
       value: 'true'

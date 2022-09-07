@@ -299,7 +299,6 @@ public:
     return addresses_;
   }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
@@ -314,7 +313,8 @@ public:
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
-                                    const envoy::config::listener::v3::Listener& config);
+                                    const envoy::config::listener::v3::Listener& config,
+                                    Network::Socket::Type socket_type);
 
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
@@ -324,7 +324,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }

@@ -1,6 +1,7 @@
 #include "source/common/config/subscription_factory_impl.h"
 
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/filesystem_subscription_impl.h"
@@ -22,9 +23,11 @@ namespace Config {
 SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Api::Api& api, const Server::Instance& server)
+    Api::Api& api, const Server::Instance& server,
+    XdsResourcesDelegateOptRef xds_resources_delegate)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
-      validation_visitor_(validation_visitor), api_(api), server_(server) {}
+      validation_visitor_(validation_visitor), api_(api), server_(server),
+      xds_resources_delegate_(xds_resources_delegate) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -92,8 +95,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+            xds_resources_delegate_, Utility::getGrpcControlPlane(api_config_source).value_or(""));
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,

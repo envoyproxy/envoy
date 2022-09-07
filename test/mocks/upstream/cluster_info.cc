@@ -93,12 +93,13 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, timeoutBudgetStats())
       .WillByDefault(
           Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
-  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
+  ON_CALL(*this, sourceAddressFn())
+      .WillByDefault(Return([addr = source_address_](
+                                const Network::Address::InstanceConstSharedPtr&) { return addr; }));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
-  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRoundRobinConfig()).WillByDefault(ReturnRef(lb_round_robin_config_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));

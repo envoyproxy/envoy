@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
@@ -125,6 +126,62 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
   // When action is disabled through runtime the behavior is to keep escaped slashes unchanged.
   return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       KEEP_UNCHANGED;
+}
+
+Http::HeaderValidatorFactoryPtr
+createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
+                                 http_connection_manager::v3::HttpConnectionManager& config,
+                             [[maybe_unused]] Server::Configuration::FactoryContext& context) {
+
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
+  ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
+  if (!config.has_typed_header_validation_config()) {
+    // If header validator is not configured ensure that the defaults match Envoy's original
+    // behavior.
+    ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        uhv_config;
+    // By default legacy config had path normalization and merge slashes disabled.
+    uhv_config.mutable_uri_path_normalization_options()->set_skip_path_normalization(
+        !config.has_normalize_path() || !config.normalize_path().value());
+    uhv_config.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
+        !config.merge_slashes());
+    uhv_config.mutable_uri_path_normalization_options()->set_path_with_escaped_slashes_action(
+        static_cast<
+            ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+                UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
+            config.path_with_escaped_slashes_action()));
+    uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
+        config.http_protocol_options().allow_chunked_length());
+    legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
+    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+  }
+
+  const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
+      config.has_typed_header_validation_config() ? config.typed_header_validation_config()
+                                                  : legacy_header_validator_config;
+
+  auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
+      header_validator_config);
+  if (!factory) {
+    throw EnvoyException(
+        fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
+  }
+
+  header_validator_factory =
+      factory->createFromProto(header_validator_config.typed_config(), context);
+  if (!header_validator_factory) {
+    throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
+                                     header_validator_config.name()));
+  }
+#else
+  if (config.has_typed_header_validation_config()) {
+    throw EnvoyException(
+        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+                    config.typed_header_validation_config().name()));
+  }
+#endif
+  return header_validator_factory;
 }
 
 } // namespace
@@ -323,7 +380,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       proxy_status_config_(config.has_proxy_status_config()
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
-                               : nullptr) {
+                               : nullptr),
+      header_validator_factory_(createHeaderValidatorFactory(config, context)) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -629,14 +687,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) {
+void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks) {
+    Http::FilterChainManager& callbacks) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -656,7 +714,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     // or neither is configured for this upgrade.
     return false;
   }
-  FilterFactoriesList* filters_to_use = &filter_factories_;
+  const FilterFactoriesList* filters_to_use = &filter_factories_;
   if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
     filters_to_use = it->second.filter_factories.get();
   }

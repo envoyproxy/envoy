@@ -125,7 +125,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // that an insert has failed. If an insert fails partway, it's better not to send additional
     // chunks to the cache if we're already in a failure state and should abort, but we can only do
     // that if we can communicate failures back to the filter, so we should fix this.
-    insert_->insertHeaders(headers, metadata, end_stream);
+    insert_->insertHeaders(
+        headers, metadata, [](bool) {}, end_stream);
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
@@ -175,7 +176,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   response_has_trailers_ = !trailers.empty();
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers);
+    insert_->insertTrailers(trailers, [](bool) {});
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 
@@ -212,11 +213,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we
-        // should convert this to an ENVOY_BUG.
-        ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                      "response required validation, but filter state is ",
-                                      filter_state));
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state));
       }
       return LookupStatus::Unknown;
     }
@@ -227,12 +226,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we should
-    // convert this to an ENVOY_BUG.
-    ENVOY_LOG(error,
-              absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                  std::to_string(static_cast<int>(filter_state))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the

@@ -44,5 +44,8 @@ constexpr char CallDecodeDataOnceFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<CallDecodeDataOnceFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<CallDecodeDataOnceFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy
