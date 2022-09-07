@@ -28,14 +28,6 @@ MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
 }
 
-MockPathMatchPolicy::MockPathMatchPolicy() {
-  ON_CALL(*this, enabled()).WillByDefault(Return(false));
-}
-
-MockPathRewritePolicy::MockPathRewritePolicy() {
-  ON_CALL(*this, enabled()).WillByDefault(Return(false));
-}
-
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
@@ -108,7 +100,6 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
   ON_CALL(*this, internalRedirectPolicy()).WillByDefault(ReturnRef(internal_redirect_policy_));
-  ON_CALL(*this, pathMatchPolicy()).WillByDefault(ReturnRef(path_match_policy_));
   ON_CALL(*this, retryShadowBufferLimit())
       .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));

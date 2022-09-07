@@ -458,52 +458,6 @@ private:
 };
 
 /**
- * Implementation of PathMatchPolicy that reads from the proto
- * PathMatchPolicy of the RouteAction.
- */
-class PathMatchPolicyImpl : public PathMatchPolicy {
-public:
-  PathMatchPolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                      ProtobufMessage::ValidationVisitor& validator);
-
-  // Constructs a disabled PathMatchPolicyImpl
-  PathMatchPolicyImpl();
-
-  // Router::PathMatchPolicy
-  bool enabled() const override { return enabled_; }
-
-  PathMatcherSharedPtr pathMatcher() const override;
-
-private:
-  const bool enabled_;
-  ProtobufTypes::MessagePtr config_;
-  PathMatcherSharedPtr path_matcher_;
-};
-
-/**
- * Implementation of PathRewritePolicyImpl that reads from the proto
- * PathRewritePolicyImpl of the RouteAction.
- */
-class PathRewritePolicyImpl : public PathRewritePolicy {
-public:
-  PathRewritePolicyImpl(const envoy::config::core::v3::TypedExtensionConfig typed_config,
-                        ProtobufMessage::ValidationVisitor& validator);
-
-  // Constructs a disabled PathRewritePolicyImpl
-  PathRewritePolicyImpl();
-
-  // Router::PathRewritePolicy
-  bool enabled() const override { return enabled_; }
-
-  PathRewriterSharedPtr pathRewriter() const override;
-
-private:
-  const bool enabled_;
-  ProtobufTypes::MessagePtr config_;
-  PathRewriterSharedPtr rewriter_;
-};
-
-/**
  * Implementation of InternalRedirectPolicy that reads from the proto
  * InternalRedirectPolicy of the RouteAction.
  */
@@ -615,8 +569,8 @@ public:
     return internal_redirect_policy_;
   }
 
-  const PathMatchPolicyImpl& pathMatchPolicy() const override { return path_match_policy_; }
-  const PathRewritePolicyImpl& pathRewritePolicy() const override { return path_rewrite_policy_; }
+  const PathMatcherSharedPtr& pathMatcher() const override { return extension_path_matcher_; }
+  const PathRewriterSharedPtr& pathRewriter() const override { return extension_path_rewriter_; }
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -731,11 +685,11 @@ public:
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
     }
-    const PathMatchPolicyImpl& pathMatchPolicy() const override {
-      return parent_->pathMatchPolicy();
+    const PathMatcherSharedPtr& pathMatcher() const override {
+      return parent_->pathMatcher();
     }
-    const PathRewritePolicyImpl& pathRewritePolicy() const override {
-      return parent_->pathRewritePolicy();
+    const PathRewriterSharedPtr& pathRewriter() const override {
+      return parent_->pathRewriter();
     }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
@@ -902,8 +856,8 @@ protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  const PathMatchPolicyImpl path_match_policy_;
-  const PathRewritePolicyImpl path_rewrite_policy_;
+  const PathMatcherSharedPtr extension_path_matcher_;
+  const PathRewriterSharedPtr extension_path_rewriter_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -985,10 +939,10 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
-  PathMatchPolicyImpl buildPathMatchPolicy(envoy::config::route::v3::Route route,
+  PathMatcherSharedPtr buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathRewritePolicyImpl buildPathRewritePolicy(envoy::config::route::v3::Route route,
+  PathRewriterSharedPtr buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                                ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
@@ -1081,7 +1035,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return uri_template_; }
-  PathMatchType matchType() const override { return PathMatchType::Policy; }
+  PathMatchType matchType() const override { return PathMatchType::Template; }
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,

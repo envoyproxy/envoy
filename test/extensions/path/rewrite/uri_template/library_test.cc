@@ -101,10 +101,10 @@ TEST(RewriteTest, MatchPatternValidation) {
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
-  Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
+  Router::PathMatcherSharedPtr matcher = createMatcherPredicateFromYaml(match_yaml_string);
 
-  EXPECT_TRUE(rewrite_predicate->isCompatiblePathMatcher(match_predicate, true).ok());
+  EXPECT_TRUE(rewriter->isCompatiblePathMatcher(matcher).ok());
 }
 
 TEST(RewriteTest, MatchPatternInactive) {
@@ -115,17 +115,9 @@ TEST(RewriteTest, MatchPatternInactive) {
         path_template_rewrite: "/foo/{lang}/{country}"
 )EOF";
 
-  const std::string match_yaml_string = R"EOF(
-      name: envoy.path.match.uri_template.uri_template_matcher
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-        path_template: "/bar/{lang}/{country}"
-)EOF";
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
 
-  Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
-  Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
-
-  absl::Status error = rewrite_predicate->isCompatiblePathMatcher(match_predicate, false);
+  absl::Status error = rewriter->isCompatiblePathMatcher(nullptr);
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(), "unable to use envoy.path.rewrite.uri_template.uri_template_rewriter "
                              "extension without envoy.path.match.uri_template.uri_template_matcher "
@@ -147,10 +139,10 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathRewriterSharedPtr rewrite_predicate = createRewriterFromYaml(rewrite_yaml_string);
-  Router::PathMatcherSharedPtr match_predicate = createMatcherPredicateFromYaml(match_yaml_string);
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
+  Router::PathMatcherSharedPtr matcher = createMatcherPredicateFromYaml(match_yaml_string);
 
-  absl::Status error = rewrite_predicate->isCompatiblePathMatcher(match_predicate, true);
+  absl::Status error = rewriter->isCompatiblePathMatcher(matcher);
   EXPECT_FALSE(error.ok());
   EXPECT_EQ(error.message(), "mismatch between variables in path_match_policy "
                              "/bar/{lang}/{country} and path_rewrite_policy /foo/{lang}/{missing}");

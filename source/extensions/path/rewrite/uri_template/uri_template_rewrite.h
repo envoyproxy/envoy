@@ -21,7 +21,7 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Rewrite {
 
-const absl::string_view NAME = "envoy.path.rewrite.uri_template.pattern_template_rewriter";
+const absl::string_view NAME = "envoy.path.rewrite.uri_template.uri_template_rewriter";
 
 /**
  * UriTemplateRewriter allows rewriting paths based on match pattern variables provided
@@ -53,10 +53,7 @@ public:
    */
   absl::StatusOr<std::string> rewritePath(absl::string_view pattern,
                                           absl::string_view matched_path) const override;
-
-  absl::Status isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
-                                       bool active_matcher) const override;
-
+  absl::Status isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher) const override;
   absl::string_view name() const override { return NAME; }
 
 private:

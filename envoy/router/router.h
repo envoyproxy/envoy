@@ -808,7 +808,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Policy,
+  Template,
 };
 
 /**
@@ -963,12 +963,12 @@ public:
   /**
    * @return const PathMatcherPolicy& the path match policy for the route.
    */
-  virtual const PathMatchPolicy& pathMatchPolicy() const PURE;
+  virtual const PathMatcherSharedPtr& pathMatcher() const PURE;
 
   /**
    * @return const PathRewriterPolicy& the path match rewrite for the route.
    */
-  virtual const PathRewritePolicy& pathRewritePolicy() const PURE;
+  virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

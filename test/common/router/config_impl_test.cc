@@ -8836,8 +8836,8 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const auto& pattern_template_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
-  EXPECT_FALSE(pattern_template_policy.enabled());
+  const auto& pattern_template_policy = config.route(headers, 0)->routeEntry()->pathMatcher();
+  EXPECT_TRUE(pattern_template_policy == nullptr);
 }
 
 TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
@@ -8866,13 +8866,13 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
   Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/bar/one/two", "GET");
 
-  const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatchPolicy();
-  EXPECT_TRUE(pattern_match_policy.enabled());
-  EXPECT_EQ(pattern_match_policy.pathMatcher()->uriTemplate(), "/bar/{country}/{lang}");
+  const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatcher();
+  EXPECT_TRUE(pattern_match_policy != nullptr);
+  EXPECT_EQ(pattern_match_policy->uriTemplate(), "/bar/{country}/{lang}");
 
-  const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewritePolicy();
-  EXPECT_TRUE(pattern_rewrite_policy.enabled());
-  EXPECT_EQ(pattern_rewrite_policy.pathRewriter()->uriTemplate(), "/bar/{lang}/{country}");
+  const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewriter();
+  EXPECT_TRUE(pattern_rewrite_policy != nullptr);
+  EXPECT_EQ(pattern_rewrite_policy->uriTemplate(), "/bar/{lang}/{country}");
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {

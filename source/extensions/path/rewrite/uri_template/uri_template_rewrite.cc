@@ -24,9 +24,8 @@ namespace Rewrite {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-absl::Status UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher,
-                                                          bool active_matcher) const {
-  if (!active_matcher || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
+absl::Status UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher) const {
+  if (path_matcher == nullptr || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
     return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
                                                   Extensions::UriTemplate::Rewrite::NAME,
                                                   Extensions::UriTemplate::Match::NAME));

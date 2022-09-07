@@ -27,8 +27,7 @@ public:
    * @param active_policy true if user provided policy
    * @return true if current path match policy is acceptable
    */
-  virtual absl::Status isCompatiblePathMatcher(PathMatcherSharedPtr path_matcher,
-                                               bool active_matcher) const PURE;
+  virtual absl::Status isCompatiblePathMatcher(PathMatcherSharedPtr path_matcher) const PURE;
 
   /**
    * Rewrites the current path to the specified output. Return a failure in case rewrite

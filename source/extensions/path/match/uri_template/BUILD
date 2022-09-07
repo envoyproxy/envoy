@@ -22,7 +22,7 @@ envoy_cc_library(
         "//test/extensions/path/rewrite/uri_template:__subpackages__",
     ],
     deps = [
-        "//envoy/router:router_path_match_policy_interface",
+        "//envoy/router:path_matcher_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/path/uri_template_lib",
@@ -38,7 +38,7 @@ envoy_cc_extension(
     deps = [
         ":uri_template_match_lib",
         "//envoy/registry",
-        "//envoy/router:router_path_match_policy_interface",
+        "//envoy/router:path_matcher_interface",
         "//source/extensions/path/uri_template_lib",
         "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
     ],
