@@ -69,6 +69,9 @@ public:
    * @param val The metadata value of string view type.
    */
   virtual void setByReference(absl::string_view key, absl::string_view val) PURE;
+
+  // Used for matcher.
+  static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
 class Request : public StreamBase {
