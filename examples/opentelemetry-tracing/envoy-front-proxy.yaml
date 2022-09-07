@@ -103,5 +103,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: opentelemetry_collector
+                address: opentelemetry
                 port_value: 4317
