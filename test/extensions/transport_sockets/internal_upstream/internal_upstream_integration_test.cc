@@ -232,6 +232,8 @@ public:
                            dns_cache_config);
   void setupBootstrapExtension();
   void setupTransportSocket(envoy::config::listener::v3::FilterChain& filter_chain);
+  void setupTcpProxyFilter(envoy::config::listener::v3::Filter& filter, const std::string& filter_name,
+                           const std::string& cluster_name, const std::string& stats_prefix);
   void setupExternalListenerConfig();
   void setupInternalUpstreamConfig();
   void setupInternalListenerCofnig();
@@ -251,9 +253,11 @@ public:
 
   std::unique_ptr<ClientTestConnection> conn_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
-  bool clear_http_test_{true};
-  bool tcp_proxy_filter_{true};
-  bool hcm_filter_{false};
+  bool clear_http_test_{false};
+  bool external_tcp_proxy_filter_{false};
+  bool external_hcm_filter_{false};
+  bool internal_tcp_proxy_filter_{false};
+  bool internal_hcm_filter_{false};
   std::string request_data_{"foo"};
   std::string response_data_{"bar"};
 };
@@ -342,18 +346,25 @@ void HttpsInspectionIntegrationTest::setupTransportSocket(envoy::config::listene
     transport_socket->set_name("envoy.transport_sockets.tls");
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
-    /*
     auto* tls_params = common_tls_context->mutable_tls_params();
     tls_params->set_tls_minimum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
     tls_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-    */
     auto* tls_certificate = common_tls_context->add_tls_certificates();
     tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     transport_socket->mutable_typed_config()->PackFrom(tls_context);
   }
+}
+
+void HttpsInspectionIntegrationTest::setupTcpProxyFilter(envoy::config::listener::v3::Filter& filter,
+     const std::string& filter_name, const std::string& cluster_name, const std::string& stats_prefix) {
+  filter.set_name(filter_name);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+  tcp_proxy.set_cluster(cluster_name);
+  tcp_proxy.set_stat_prefix(stats_prefix);
+  filter.mutable_typed_config()->PackFrom(tcp_proxy);
 }
 
 // Setup the external listener which listens to the client messages.
@@ -366,15 +377,20 @@ void HttpsInspectionIntegrationTest::setupExternalListenerConfig() {
     // Clear existing http proxy filters.
     filter_chain->clear_filters();
     auto* filter = filter_chain->add_filters();
-    if (hcm_filter_) {
+    if (external_hcm_filter_) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
-      hcm.set_stat_prefix("ingress_http");
+      hcm.set_stat_prefix("stats_prefix");
       auto * route_config = hcm.mutable_route_config();
       route_config->set_name("local_route");
       auto * virtual_hosts = route_config->add_virtual_hosts();
       virtual_hosts->set_name("local_service");
       virtual_hosts->add_domains("*");
+      // 1st route for CONNECT message.
       auto * routes = virtual_hosts->add_routes();
+      ConfigHelper::setConnectConfig(hcm, true, false);
+      routes->mutable_route()->set_cluster("internal_upstream");
+      // 2nd route.
+      routes = virtual_hosts->add_routes();
       routes->mutable_match()->set_prefix("/");
       routes->mutable_route()->set_cluster("internal_upstream");
 
@@ -383,15 +399,10 @@ void HttpsInspectionIntegrationTest::setupExternalListenerConfig() {
       router_filter->set_name("envoy.filters.http.router");
       envoy::extensions::filters::http::router::v3::Router router;
       router_filter->mutable_typed_config()->PackFrom(router);
-      ConfigHelper::setConnectConfig(hcm, true, false);
       filter->set_name("envoy.filters.network.http_connection_manager");
       filter->mutable_typed_config()->PackFrom(hcm);
-    } else if (tcp_proxy_filter_) {
-      filter->set_name("tcp_proxy");
-      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-      tcp_proxy.set_cluster("internal_upstream");
-      tcp_proxy.set_stat_prefix("internal_address");
-      filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    } else if (external_tcp_proxy_filter_) {
+      setupTcpProxyFilter(*filter, "tcp_proxy", "internal_upstream", "stats_prefix");
     }
   });
 }
@@ -402,16 +413,6 @@ void HttpsInspectionIntegrationTest::setupInternalUpstreamConfig() {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters()->Add();
     cluster->set_name("internal_upstream");
-    // Insert internal upstream transport.
-    TestUtility::loadFromYaml(R"EOF(
-        name: envoy.transport_sockets.internal_upstream
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-          transport_socket:
-            name: envoy.transport_sockets.raw_buffer
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-        )EOF", *cluster->mutable_transport_socket());
     // Insert internal address endpoint.
     cluster->clear_load_assignment();
     auto* load_assignment = cluster->mutable_load_assignment();
@@ -436,54 +437,60 @@ void HttpsInspectionIntegrationTest::setupInternalListenerCofnig() {
     // Setup listener filter chain.
     auto* filter_chain = listener->add_filter_chains();
     setupTransportSocket(*filter_chain);
-
-    // Set up HCM.
-    envoy::extensions::filters::network::http_connection_manager::
-                    v3::HttpConnectionManager hcm;
-    hcm.set_stat_prefix("ingress_http");
-    auto * route_config = hcm.mutable_route_config();
-    route_config->set_name("local_route");
-    auto * virtual_hosts = route_config->add_virtual_hosts();
-    virtual_hosts->set_name("local_service");
-    virtual_hosts->add_domains("*");
-    auto * routes = virtual_hosts->add_routes();
-    routes->mutable_match()->set_prefix("/");
-    routes->mutable_route()->set_cluster("cluster_0");
-    // Setup DFP FilterConfig.
-    envoy::extensions::filters::http::dynamic_forward_proxy::
-                    v3::FilterConfig filter_config;
-    auto *dns_cache_config = filter_config.mutable_dns_cache_config();
-    setupDnsCacheConfig(*dns_cache_config);
-    // Setup DFP HTTP filter.
-    auto* dfp_filter = hcm.add_http_filters();
-    dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
-    dfp_filter->mutable_typed_config()->PackFrom(filter_config);
-    // Setup router HTTP filter.
-    auto* router_filter = hcm.add_http_filters();
-    router_filter->set_name("envoy.filters.http.router");
-    envoy::extensions::filters::http::router::v3::Router router;
-    router_filter->mutable_typed_config()->PackFrom(router);
     auto* filter = filter_chain->add_filters();
-    filter->set_name("envoy.filters.network.http_connection_manager");
-    filter->mutable_typed_config()->PackFrom(hcm);
+
+    if (internal_hcm_filter_) {
+      // Set up HCM.
+      envoy::extensions::filters::network::http_connection_manager::
+          v3::HttpConnectionManager hcm;
+      hcm.set_stat_prefix("stats_prefix");
+      auto * route_config = hcm.mutable_route_config();
+      route_config->set_name("local_route");
+      auto * virtual_hosts = route_config->add_virtual_hosts();
+      virtual_hosts->set_name("local_service");
+      virtual_hosts->add_domains("*");
+      auto * routes = virtual_hosts->add_routes();
+      routes->mutable_match()->set_prefix("/");
+      routes->mutable_route()->set_cluster("cluster_0");
+    // Setup DFP FilterConfig.
+      envoy::extensions::filters::http::dynamic_forward_proxy::
+          v3::FilterConfig filter_config;
+      auto *dns_cache_config = filter_config.mutable_dns_cache_config();
+      setupDnsCacheConfig(*dns_cache_config);
+      // Setup DFP HTTP filter.
+      auto* dfp_filter = hcm.add_http_filters();
+      dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
+      dfp_filter->mutable_typed_config()->PackFrom(filter_config);
+      // Setup router HTTP filter.
+      auto* router_filter = hcm.add_http_filters();
+      router_filter->set_name("envoy.filters.http.router");
+      envoy::extensions::filters::http::router::v3::Router router;
+      router_filter->mutable_typed_config()->PackFrom(router);
+      filter->set_name("envoy.filters.network.http_connection_manager");
+      filter->mutable_typed_config()->PackFrom(hcm);
+    } else if (internal_tcp_proxy_filter_) {
+      setupTcpProxyFilter(*filter, "tcp_proxy", "cluster_0", "stats_prefix");
+    }
   });
 }
 
 // Setup the external upstream which has the DFP cluster.
 void HttpsInspectionIntegrationTest::setupExternalUpstreamConfig() {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster_0 = static_resources->mutable_clusters(0);
-    cluster_0->mutable_cluster_type()->set_name("envoy.clusters.dynamic_forward_proxy");
-    cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy_CLUSTER_PROVIDED);
+  if (internal_hcm_filter_) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      auto* cluster_0 = static_resources->mutable_clusters(0);
+      cluster_0->mutable_cluster_type()->set_name("envoy.clusters.dynamic_forward_proxy");
+      cluster_0->set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy_CLUSTER_PROVIDED);
 
-    // Setup DFP ClusterConfig.
-    envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig dfp_cluster_config;
+      // Setup DFP ClusterConfig.
+      envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig dfp_cluster_config;
     auto *dns_cache_config = dfp_cluster_config.mutable_dns_cache_config();
     setupDnsCacheConfig(*dns_cache_config);
     cluster_0->mutable_cluster_type()->mutable_typed_config()->PackFrom(dfp_cluster_config);
     cluster_0->clear_load_assignment();
-  });
+    });
+  }
 }
 
 void HttpsInspectionIntegrationTest::setupTestConfig() {
@@ -537,14 +544,105 @@ void HttpsInspectionIntegrationTest::startTlsNegotiation() {
   }
 }
 
+#if 0
+// With TLS enabled in internal listerner, Client sends a clear text HTTP CONNECT message to Envoy.
+// After confirms recevied 200 from proxy, client then sends a
+// TCP data to Envoy, which is then TCP proxied to the upstream.
+
+TEST_P(HttpsInspectionIntegrationTest, TlsViaHttpConnect) {
+  clear_http_test_ = false;
+  external_hcm_filter_ = true;
+  external_tcp_proxy_filter_ = false;
+  internal_hcm_filter_ = false;
+  internal_tcp_proxy_filter_ = true;
+
+  setupTestConfig();
+  skip_tag_extraction_rule_check_ = true;
+  initialize();
+
+  // Open clear-text connection.
+  conn_->connect();
+  // Sends a HTTP CONNECT message.
+  Buffer::OwnedImpl buffer;
+  std::string connect_msg =
+    "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
+    "Host: www.cnn.com:80\r\n"
+    "\r\n\r\n";
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
+  buffer.add(connect_msg);
+  conn_->write(buffer, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Sends a HTTP POST message.
+  sendHttpPostMsg();
+
+  // Sends a response back to client.
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Make sure the bi-directional data can go through.
+  sendBidirectionalData();
+
+  conn_->close(Network::ConnectionCloseType::FlushWrite);
+}
+#endif
+
+
+// Client sends a clear text HTTP CONNECT message to Envoy.
+// After confirms recevied 200 from proxy, client then sends a
+// TCP data to Envoy, which is then TCP proxied to the upstream.
+
+TEST_P(HttpsInspectionIntegrationTest, TcpViaHttpConnect) {
+  clear_http_test_ = true;
+  external_hcm_filter_ = true;
+  external_tcp_proxy_filter_ = false;
+  internal_hcm_filter_ = false;
+  internal_tcp_proxy_filter_ = true;
+
+  setupTestConfig();
+  skip_tag_extraction_rule_check_ = true;
+  initialize();
+
+  // Open clear-text connection.
+  conn_->connect();
+  // Sends a HTTP CONNECT message.
+  Buffer::OwnedImpl buffer;
+  std::string connect_msg =
+    "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
+    "Host: www.cnn.com:80\r\n"
+    "\r\n\r\n";
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
+  buffer.add(connect_msg);
+  conn_->write(buffer, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Sends a HTTP POST message.
+  sendHttpPostMsg();
+
+  // Sends a response back to client.
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Make sure the bi-directional data can go through.
+  sendBidirectionalData();
+
+  conn_->close(Network::ConnectionCloseType::FlushWrite);
+}
+
+
 // Client sends a clear text HTTP CONNECT message to Envoy.
 // After confirms recevied 200 from proxy, client then sends a
 // clear text HTTP GET message, which will hits the DFP filter in the
 // internal listener and trigger DNS resolving.
 
-TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
-  hcm_filter_ = true;
-  tcp_proxy_filter_ = false;
+TEST_P(HttpsInspectionIntegrationTest, HttpViaHttpConnect) {
+  clear_http_test_ = true;
+  external_hcm_filter_ = true;
+  external_tcp_proxy_filter_ = false;
+  internal_hcm_filter_ = true;
+  internal_tcp_proxy_filter_ = false;
   setupTestConfig();
   skip_tag_extraction_rule_check_ = true;
   initialize();
@@ -562,6 +660,12 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   // Sends a HTTP POST message.
+
+  /*
+  EXPECT_LOG_CONTAINS("",
+                      "main thread resolve complete for host ",
+                      sendHttpPostMsg());
+  */
   sendHttpPostMsg();
 
   // Sends a response back to client.
@@ -575,8 +679,12 @@ TEST_P(HttpsInspectionIntegrationTest, HttpClearInHttpTunnelTest) {
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-TEST_P(HttpsInspectionIntegrationTest, HttpsTerminatedByloopbackWithExternalListenerTcpProxy) {
+TEST_P(HttpsInspectionIntegrationTest, HttpsViaTcpProxy) {
   clear_http_test_ = false;
+  external_hcm_filter_ = false;
+  external_tcp_proxy_filter_ = true;
+  internal_hcm_filter_ = true;
+  internal_tcp_proxy_filter_ = false;
   setupTestConfig();
   skip_tag_extraction_rule_check_ = true;
   initialize();
@@ -609,10 +717,13 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsTerminatedByloopbackWithExternalList
 // routines:OPENSSL_internal:WRONG_VERSION_NUMBER
 
 
-TEST_P(HttpsInspectionIntegrationTest, HttpsInHttpTunnelTest) {
-  hcm_filter_ = true;
-  tcp_proxy_filter_ = false;
+TEST_P(HttpsInspectionIntegrationTest, HttpsViaHttpConnect) {
   clear_http_test_ = false;
+  external_hcm_filter_ = true;
+  external_tcp_proxy_filter_ = false;
+  internal_hcm_filter_ = true;
+  internal_tcp_proxy_filter_ = false;
+
   setupTestConfig();
   skip_tag_extraction_rule_check_ = true;
   initialize();
