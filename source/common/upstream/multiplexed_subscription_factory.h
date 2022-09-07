@@ -27,7 +27,7 @@ namespace Upstream {
 
 class MultiplexedSubscriptionFactory : public Config::SubscriptionFactoryImpl {
 public:
-  virtual ~MultiplexedSubscriptionFactory() = default;
+  ~MultiplexedSubscriptionFactory() override = default;
 
   MultiplexedSubscriptionFactory(const LocalInfo::LocalInfo& local_info,
                                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,

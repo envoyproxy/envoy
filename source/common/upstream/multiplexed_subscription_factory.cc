@@ -1,9 +1,6 @@
 #include "source/common/upstream/multiplexed_subscription_factory.h"
 
-#include <assert.h>
-
 #include "source/common/common/hash.h"
-#include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
 
 namespace Envoy {
