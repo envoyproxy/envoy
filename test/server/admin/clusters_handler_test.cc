@@ -13,7 +13,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, ClustersJson) {
+TEST_P(AdminInstanceTest, ClustersJsonAndText) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
