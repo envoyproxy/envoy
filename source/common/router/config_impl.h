@@ -685,12 +685,8 @@ public:
     const InternalRedirectPolicy& internalRedirectPolicy() const override {
       return parent_->internalRedirectPolicy();
     }
-    const PathMatcherSharedPtr& pathMatcher() const override {
-      return parent_->pathMatcher();
-    }
-    const PathRewriterSharedPtr& pathRewriter() const override {
-      return parent_->pathRewriter();
-    }
+    const PathMatcherSharedPtr& pathMatcher() const override { return parent_->pathMatcher(); }
+    const PathRewriterSharedPtr& pathRewriter() const override { return parent_->pathRewriter(); }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
     const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
       return parent_->shadowPolicies();
@@ -940,7 +936,7 @@ private:
                               absl::string_view current_route_name) const;
 
   PathMatcherSharedPtr buildPathMatchPolicy(envoy::config::route::v3::Route route,
-                                           ProtobufMessage::ValidationVisitor& validator) const;
+                                            ProtobufMessage::ValidationVisitor& validator) const;
 
   PathRewriterSharedPtr buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                                ProtobufMessage::ValidationVisitor& validator) const;

@@ -231,7 +231,9 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
-    const Router::PathMatcherSharedPtr& pathMatcher() const override { return extension_path_matcher_; }
+    const Router::PathMatcherSharedPtr& pathMatcher() const override {
+      return extension_path_matcher_;
+    }
     const Router::PathRewriterSharedPtr& pathRewriter() const override {
       return extension_path_rewriter_;
     }

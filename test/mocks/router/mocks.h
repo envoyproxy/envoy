@@ -171,10 +171,10 @@ public:
 class MockPathRewriter : public PathRewriter {
 public:
   MOCK_METHOD(absl::string_view, name, (), (const));
-  MOCK_METHOD(absl::StatusOr<std::string>, rewritePath, (absl::string_view path, absl::string_view rewrite_pattern), (const));
+  MOCK_METHOD(absl::StatusOr<std::string>, rewritePath,
+              (absl::string_view path, absl::string_view rewrite_pattern), (const));
   MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
   MOCK_METHOD(absl::Status, isCompatiblePathMatcher, (PathMatcherSharedPtr path_matcher), (const));
-
 };
 
 class MockPathMatcher : public PathMatcher {
@@ -182,7 +182,6 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(bool, match, (absl::string_view path), (const));
   MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
-
 };
 
 class MockRetryState : public RetryState {

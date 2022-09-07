@@ -676,8 +676,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (extension_path_rewriter_ != nullptr) {
-    absl::Status compatible_status = extension_path_rewriter_->isCompatiblePathMatcher(
-        extension_path_matcher_);
+    absl::Status compatible_status =
+        extension_path_rewriter_->isCompatiblePathMatcher(extension_path_matcher_);
     if (!compatible_status.ok()) {
       throw EnvoyException(std::string(compatible_status.message()));
     }
@@ -1478,14 +1478,12 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
 
 void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                       bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, extension_path_matcher_->uriTemplate(),
-                     insert_envoy_original_path);
+  finalizePathHeader(headers, extension_path_matcher_->uriTemplate(), insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers,
-                                                   extension_path_matcher_->uriTemplate());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, extension_path_matcher_->uriTemplate());
 }
 
 RouteConstSharedPtr
