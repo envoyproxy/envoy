@@ -329,8 +329,7 @@ public:
   virtual Init::Manager& initManager() PURE;
 
   /*
-   * @return the stats scope of the particulra context. This will last as long
-   * as the cluster is valid
+   * @return the stats scope of the cluster. This will last as long as the cluster is valid
    * */
   virtual Stats::Scope& scope() PURE;
 };
