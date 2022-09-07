@@ -180,6 +180,55 @@ enum class LocalErrorStatus {
   ContinueAndResetStream,
 };
 
+// These are events that upstream filters can register for, via the addUpstreamCallbacks function.
+class UpstreamCallbacks {
+public:
+  virtual ~UpstreamCallbacks() = default;
+
+  // Called when the upstream connection is established and
+  // UpstreamStreamFilterCallbacks::upstream should be available.
+  //
+  // This indicates that data may begin flowing upstream.
+  virtual void onUpstreamConnectionEstablished() PURE;
+};
+
+// These are filter callbacks specific to upstream filters, accessible via
+// StreamFilterCallbacks::upstreamCallbacks()
+class UpstreamStreamFilterCallbacks {
+public:
+  virtual ~UpstreamStreamFilterCallbacks() = default;
+
+  // Returns a handle to the upstream stream's stream info.
+  virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
+
+  // Returns a handle to the generic upstream.
+  virtual OptRef<Router::GenericUpstream> upstream() PURE;
+
+  // Dumps state for the upstream request.
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a CONNECT upgrade. These should only be used by the upstream codec filter.
+  // TODO(alyssawilk) after deprecating the classic path, move this logic to the
+  // upstream codec filter and remove these APIs
+  virtual bool pausedForConnect() const PURE;
+  virtual void setPausedForConnect(bool value) PURE;
+
+  // Return the upstreamStreamOptions for this stream.
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
+
+  // Adds the supplied UpstreamCallbacks to the list of callbacks to be called
+  // as various upstream events occur. Callbacks should persist for the lifetime
+  // of the upstream stream.
+  virtual void addUpstreamCallbacks(UpstreamCallbacks& callbacks) PURE;
+
+  // This should only be called by the UpstreamCodecFilter, and is used to let the
+  // UpstreamCodecFilter supply the interface used by the GenericUpstream to receive
+  // response data from the upstream stream once it is established.
+  virtual void
+  setUpstreamToDownstream(Router::UpstreamToDownstream& upstream_to_downstream_interface) PURE;
+};
+
 /**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
@@ -327,6 +376,13 @@ public:
    * absl::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Return a handle to the upstream callbacks. This is valid for upstream filters, and nullopt for
+   * downstream filters.
+   */
+  // TODO(alyssawilk) move things like clearRouteCache to downstreamCallbacks.
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
 };
 
 /**
