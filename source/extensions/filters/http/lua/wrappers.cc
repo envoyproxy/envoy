@@ -14,9 +14,9 @@ namespace Lua {
 HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
   entries_.reserve(parent_.headers_.size());
   parent_.headers_.iterate(
-      [this](const ::Envoy::Http::HeaderEntry& header) -> ::Envoy::Http::HeaderMap::Iterate {
+      [this](const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
         entries_.push_back(&header);
-        return ::Envoy::Http::HeaderMap::Iterate::Continue;
+        return Envoy::Http::HeaderMap::Iterate::Continue;
       });
 }
 
@@ -39,15 +39,15 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 
   const char* key = luaL_checkstring(state, 2);
   const char* value = luaL_checkstring(state, 3);
-  headers_.addCopy(::Envoy::Http::LowerCaseString(key), value);
+  headers_.addCopy(Envoy::Http::LowerCaseString(key), value);
   return 0;
 }
 
 int HeaderMapWrapper::luaGet(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  const ::Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
-      ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(headers_,
-                                                           ::Envoy::Http::LowerCaseString(key));
+  const Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult value =
+      Envoy::Http::HeaderUtility::getAllOfHeaderAsString(headers_,
+                                                         Envoy::Http::LowerCaseString(key));
   if (value.result().has_value()) {
     lua_pushlstring(state, value.result().value().data(), value.result().value().size());
     return 1;
@@ -59,8 +59,8 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
 int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
   const int index = luaL_checknumber(state, 3);
-  const ::Envoy::Http::HeaderMap::GetResult header_value =
-      headers_.get(::Envoy::Http::LowerCaseString(key));
+  const Envoy::Http::HeaderMap::GetResult header_value =
+      headers_.get(Envoy::Http::LowerCaseString(key));
   if (index >= 0 && header_value.size() > static_cast<uint64_t>(index)) {
     absl::string_view value = header_value[index]->value().getStringView();
     lua_pushlstring(state, value.data(), value.size());
@@ -71,8 +71,8 @@ int HeaderMapWrapper::luaGetAtIndex(lua_State* state) {
 
 int HeaderMapWrapper::luaGetNumValues(lua_State* state) {
   absl::string_view key = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  const ::Envoy::Http::HeaderMap::GetResult header_value =
-      headers_.get(::Envoy::Http::LowerCaseString(key));
+  const Envoy::Http::HeaderMap::GetResult header_value =
+      headers_.get(Envoy::Http::LowerCaseString(key));
   lua_pushnumber(state, header_value.size());
   return 1;
 }
@@ -99,7 +99,7 @@ int HeaderMapWrapper::luaReplace(lua_State* state) {
 
   const char* key = luaL_checkstring(state, 2);
   const char* value = luaL_checkstring(state, 3);
-  const ::Envoy::Http::LowerCaseString lower_key(key);
+  const Envoy::Http::LowerCaseString lower_key(key);
 
   headers_.setCopy(lower_key, value);
 
@@ -110,7 +110,7 @@ int HeaderMapWrapper::luaRemove(lua_State* state) {
   checkModifiable(state);
 
   const char* key = luaL_checkstring(state, 2);
-  headers_.remove(::Envoy::Http::LowerCaseString(key));
+  headers_.remove(Envoy::Http::LowerCaseString(key));
   return 0;
 }
 
@@ -127,27 +127,27 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 int HeaderMapWrapper::luaSetHttp1ReasonPhrase(lua_State* state) {
   checkModifiable(state);
 
-  const char* phrase = luaL_checkstring(state, 2);
+  size_t input_size = 0;
+  const char* phrase = luaL_checklstring(state, 2, &input_size);
 
-  ::Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter(headers_.formatter());
+  Envoy::Http::StatefulHeaderKeyFormatterOptRef formatter(headers_.formatter());
 
   if (!formatter.has_value()) {
     using envoy::extensions::http::header_formatters::preserve_case::v3::
         PreserveCaseFormatterConfig;
-    using ::Envoy::Http::ResponseHeaderMapImpl;
-    using ::Envoy::Http::StatefulHeaderKeyFormatter;
+    using Envoy::Http::ResponseHeaderMapImpl;
+    using Envoy::Http::StatefulHeaderKeyFormatter;
     using Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter;
 
-    try {
-      ResponseHeaderMapImpl& map = dynamic_cast<ResponseHeaderMapImpl&>(headers_);
+    ResponseHeaderMapImpl* map = dynamic_cast<ResponseHeaderMapImpl*>(&headers_);
+    if (map) {
       std::unique_ptr<StatefulHeaderKeyFormatter> fmt =
           std::make_unique<PreserveCaseHeaderFormatter>(true, PreserveCaseFormatterConfig::DEFAULT);
       fmt->setReasonPhrase(absl::string_view(std::string(phrase)));
-      map.setFormatter(std::move(fmt));
-    } catch (const std::bad_cast&) {
+      map->setFormatter(std::move(fmt));
     }
   } else {
-    formatter->setReasonPhrase(absl::string_view(std::string(phrase)));
+    formatter->setReasonPhrase(absl::string_view(std::string(phrase, input_size)));
   }
 
   return 0;
@@ -155,7 +155,7 @@ int HeaderMapWrapper::luaSetHttp1ReasonPhrase(lua_State* state) {
 
 int StreamInfoWrapper::luaProtocol(lua_State* state) {
   const std::string& protocol =
-      ::Envoy::Http::Utility::getProtocolString(stream_info_.protocol().value());
+      Envoy::Http::Utility::getProtocolString(stream_info_.protocol().value());
   lua_pushlstring(state, protocol.data(), protocol.size());
   return 1;
 }
