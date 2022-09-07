@@ -232,11 +232,6 @@ message ClusterManager {
   // <envoy_api_field_core.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`.
   api.v2.core.ApiConfigSource load_stats_config = 4;
-
-  // If set, all discovery requests for EDS will utilize a single GRPC stream towards the same management server.
-  // Defaults to false. When unset, Envoy will allocate a GRPC stream per EDS cluster which can lead to the exhaustion of
-  // the limit for max concurrent streams in HTTP2.
-  bool multiplex_eds = 5;
 }
 
 // Envoy process watchdog configuration. When configured, this monitors for
