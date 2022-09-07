@@ -22,7 +22,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   cs.setEndpoint(std::move(ep));
   if (independent_proxy_) {
     // No previous context then this must be span created for downstream request. Server span will
-    // created for downstream request when the independent_proxy is set to true
+    // be created for downstream request when independent_proxy is set to true
     cs.setValue(SERVER_RECV);
   } else {
     cs.setValue(config.operationName() == Tracing::OperationName::Egress ? CLIENT_SEND
