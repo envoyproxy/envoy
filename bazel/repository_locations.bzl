@@ -451,7 +451,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     com_github_nghttp2_nghttp2 = dict(
         project_name = "Nghttp2",
-        project_desc = "Implementation of HTTP/2 and its header compression algorithm HPACK in Cimplementation of HTTP/2 and its header compression algorithm HPACK in C",
+        project_desc = "Implementation of HTTP/2 and its header compression algorithm HPACK in C",
         project_url = "https://nghttp2.org",
         version = "1.49.0",
         sha256 = "14dd5654e369227afebfba5198793a1788a0af9d30cddb19af3ec275d110a7a6",
