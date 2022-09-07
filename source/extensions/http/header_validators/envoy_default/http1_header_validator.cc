@@ -123,7 +123,8 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
-  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
+  // Step 1: verify that required pseudo headers are present. Pseudo headers in HTTP/1.1 are
+  // synthesized by the codec from the request line and HTTP/1.1 requests requires the
   // :method header based on RFC 9112
   // https://www.rfc-editor.org/rfc/rfc9112.html#section-3:
   //
@@ -164,7 +165,9 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // field-value for Host that is identical to that authority component,
   // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
   //
-  // TODO(meilya) - should this be implemented here in UHV or the H1 codec?
+  // TODO(meilya) - This needs to be implemented after we have path normalization so that we can
+  // parse the :path form and compare the authority component of the path against the :authority
+  // header.
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
 
@@ -212,10 +215,10 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
               Http1ResponseCodeDetail::get().TransferEncodingNotAllowed};
     }
 
-    if (header_map.ContentLength()) {
+    if (header_map.ContentLength() &&
+        hasChunkedTransferEncoding(header_map.TransferEncoding()->value())) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
-        // TODO(meilya) - is this correct? we allow any transfer-encoding
         return {RequestHeaderMapValidationResult::Action::Reject,
                 Http1ResponseCodeDetail::get().ChunkedContentLength};
       } else {
@@ -277,9 +280,12 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       return {RequestHeaderMapValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidHost};
     }
-  } else if (path.empty()) {
-    return {RequestHeaderMapValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidUrl};
+
+    if (!path.empty()) {
+      // CONNECT requests must not have a :path specified
+      return {RequestHeaderMapValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidUrl};
+    }
   } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
              path_is_absolute) {
     // Validate and normalize the path, which must be a valid URI

@@ -299,12 +299,25 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
                                                   {":method", "GET"},
                                                   {":path", "/"},
                                                   {":authority", "envoy.com"},
-                                                  {"transfer-encoding", "chunked"},
+                                                  {"transfer-encoding", "gzip, other, chunked"},
                                                   {"content-length", "10"}};
   auto uhv = createH1(allow_chunked_length_config);
 
   EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
   EXPECT_EQ(headers.ContentLength(), nullptr);
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContentLengthNotChunked) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"transfer-encoding", "gzip"},
+                                                  {"content-length", "10"}};
+  auto uhv = createH1(allow_chunked_length_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.getContentLengthValue(), "10");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthConnectReject) {

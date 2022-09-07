@@ -404,6 +404,17 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
   return HeaderValueValidationResult::success();
 }
 
+bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
+  const auto encoding = value.getStringView();
+  for (const auto token : StringUtil::splitToken(encoding, ",", true, true)) {
+    if (token == header_values_.TransferEncodingValues.Chunked) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
