@@ -16,22 +16,15 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& 
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
                                  const Stats::TagVector& cli_tags) {
-  // To check name conflict.
   reserveResources(config);
-  absl::node_hash_set<std::string> names = addDefaultExtractors(config);
+  addDefaultExtractors(config);
 
   for (const auto& cli_tag : cli_tags) {
-    if (!names.emplace(cli_tag.name_).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", cli_tag.name_));
-    }
     default_tags_.emplace_back(cli_tag);
   }
 
   for (const auto& tag_specifier : config.stats_tags()) {
     const std::string& name = tag_specifier.tag_name();
-    if (!names.emplace(name).second) {
-      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", name));
-    }
 
     // If no tag value is found, fallback to default regex to keep backward compatibility.
     if (tag_specifier.tag_value_case() ==
@@ -116,21 +109,16 @@ void TagProducerImpl::reserveResources(const envoy::config::metrics::v3::StatsCo
   default_tags_.reserve(config.stats_tags().size());
 }
 
-absl::node_hash_set<std::string>
-TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
-  absl::node_hash_set<std::string> names;
+void TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config) {
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
-      names.emplace(desc.name_);
       addExtractor(TagExtractorImplBase::createTagExtractor(desc.name_, desc.regex_, desc.substr_,
                                                             desc.negative_match_, desc.re_type_));
     }
     for (const auto& desc : Config::TagNames::get().tokenizedDescriptorVec()) {
-      names.emplace(desc.name_);
       addExtractor(std::make_unique<TagExtractorTokensImpl>(desc.name_, desc.pattern_));
     }
   }
-  return names;
 }
 
 } // namespace Stats

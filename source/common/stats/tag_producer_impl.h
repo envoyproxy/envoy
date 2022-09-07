@@ -69,15 +69,11 @@ private:
   void reserveResources(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
-   * Adds all default extractors from well_known_names.cc into the
-   * collection. Returns a set of names of all default extractors
-   * into a string-set for dup-detection against new stat names
-   * specified in the configuration.
+   * Adds all default extractors from well_known_names.cc into the collection.
+   *
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
-   * @return names absl::node_hash_set<std::string> the set of names to populate
    */
-  absl::node_hash_set<std::string>
-  addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
+  void addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling
