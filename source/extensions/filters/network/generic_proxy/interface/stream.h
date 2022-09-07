@@ -77,8 +77,8 @@ public:
    * Get request host.
    *
    * @return The host of generic request. The meaning of the return value may be different For
-   * different application protocols. It typially should be domain, VIP, or service name that used
-   * to represents target service instances.
+   * different application protocols. It typically should be domain, VIP, or service name that
+   * used to represents target service instances.
    */
   virtual absl::string_view host() const PURE;
 
@@ -86,8 +86,8 @@ public:
    * Get request path.
    *
    * @return The path of generic request. The meaning of the return value may be different For
-   * different application protocols. It typially should be RPC service name that used to represents
-   * set of method or functionality provided by target service.
+   * different application protocols. It typically should be RPC service name that used to
+   * represents set of method or functionality provided by target service.
    */
   virtual absl::string_view path() const PURE;
 
