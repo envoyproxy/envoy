@@ -39,6 +39,7 @@ def envoy_mobile_flatbuffers_library(name, srcs, namespace, types):
         outs = swift_outputs,
         srcs = swift_intermediate_outputs,
         cmd = """
-        sed -e 's/import FlatBuffers/@_implementationOnly import FlatBuffers/g' -e 's/public /internal /g' $(SRCS) > $(OUTS)
+        echo "@_implementationOnly import FlatBuffers" > $(OUTS)
+        sed -e 's/import FlatBuffers/@_implementationOnly import FlatBuffers/g' -e 's/public /internal /g' $(SRCS) >> $(OUTS)
         """,
     )

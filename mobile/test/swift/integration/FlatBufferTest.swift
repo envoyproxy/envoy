@@ -1,5 +1,5 @@
 import Envoy
-import FlatBuffers
+@_implementationOnly import FlatBuffers
 import XCTest
 
 final class FlatBufferTest: XCTestCase {
