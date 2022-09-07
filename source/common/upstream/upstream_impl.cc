@@ -323,15 +323,6 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSo
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    return createConnection(
-        dispatcher, cluster(), transport_socket_options->http11ProxyInfo()->proxy_address,
-        {transport_socket_options->http11ProxyInfo()->proxy_address}, transportSocketFactory(),
-        options, transport_socket_options, shared_from_this());
-  }
   return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
@@ -398,15 +389,26 @@ Host::CreateConnectionData HostImpl::createConnection(
 
   auto source_address_fn = cluster.sourceAddressFn();
 
-  Network::ClientConnectionPtr connection =
-      address_list.size() > 1
-          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
-                dispatcher, address_list, source_address_fn, socket_factory,
-                transport_socket_options, host, connection_options)
-          : dispatcher.createClientConnection(
-                address, source_address_fn ? source_address_fn(address) : nullptr,
-                socket_factory.createTransportSocket(transport_socket_options, host),
-                connection_options, transport_socket_options);
+  Network::ClientConnectionPtr connection;
+  // If the transport socket options indicate the connection should be
+  // redirected to a proxy, create the TCP connection to the proxy's address not
+  // the host's address.
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    connection = dispatcher.createClientConnection(
+        transport_socket_options->http11ProxyInfo()->proxy_address,
+        source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  } else if (address_list.size() > 1) {
+    connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
+        dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
+        connection_options);
+  } else {
+    connection = dispatcher.createClientConnection(
+        address, source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
