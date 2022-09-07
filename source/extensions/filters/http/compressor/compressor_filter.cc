@@ -323,7 +323,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   }
 
   // Find all compressors enabled for the filter chain.
-  std::map<std::string, std::pair<uint32_t,bool>> allowed_compressors;
+  std::map<std::string, std::pair<uint32_t, bool>> allowed_compressors;
   uint32_t registration_count{0};
 
   auto typed_state =
@@ -357,7 +357,8 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     // registered last.
     auto enc = allowed_compressors.find(filter_config->contentEncoding());
     if (enc == allowed_compressors.end()) {
-      allowed_compressors.insert({filter_config->contentEncoding(), {registration_count,filter_config->chooseFirst()}});
+      allowed_compressors.insert(
+          {filter_config->contentEncoding(), {registration_count, filter_config->chooseFirst()}});
       ++registration_count;
     }
   }
@@ -405,10 +406,11 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   EncPair choice{Http::CustomHeaders::get().AcceptEncodingValues.Identity, static_cast<float>(0)};
   for (const auto& pair : pairs) {
     if (allowed_compressors.count(std::string(pair.first)) ||
-         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
-         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
-      if((pair.second > choice.second)||(pair.second == choice.second && allowed_compressors[std::string(pair.first)].second)){
-      choice = pair;
+        pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
+        pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
+      if ((pair.second > choice.second) ||
+          (pair.second == choice.second && allowed_compressors[std::string(pair.first)].second)) {
+        choice = pair;
       }
     }
   }
@@ -429,10 +431,12 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
 
   // If wildcard is given then use which ever compressor is registered first.
   if (choice.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
-    auto first_registered = std::min_element(
-        allowed_compressors.begin(), allowed_compressors.end(),
-        [](const std::pair<std::string, std::pair<uint32_t,bool>>& a,
-           const std::pair<std::string, std::pair<uint32_t,bool>>& b) -> bool { return a.second.first < b.second.first; });
+    auto first_registered =
+        std::min_element(allowed_compressors.begin(), allowed_compressors.end(),
+                         [](const std::pair<std::string, std::pair<uint32_t, bool>>& a,
+                            const std::pair<std::string, std::pair<uint32_t, bool>>& b) -> bool {
+                           return a.second.first < b.second.first;
+                         });
     return std::make_unique<CompressorFilter::EncodingDecision>(
         first_registered->first, CompressorFilter::EncodingDecision::HeaderStat::Wildcard);
   }

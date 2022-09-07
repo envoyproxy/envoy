@@ -91,6 +91,9 @@ new_features:
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
+- area: compression
+  change: |
+    added support for :ref:`choose_first<envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`.
 - area: cors
   change: |
     added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.

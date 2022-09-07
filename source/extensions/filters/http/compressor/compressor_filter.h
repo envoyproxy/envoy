@@ -145,7 +145,7 @@ public:
   Envoy::Compression::Compressor::CompressorPtr makeCompressor();
 
   const std::string contentEncoding() const { return content_encoding_; };
-  bool chooseFirst() const {return choose_first_; };
+  bool chooseFirst() const { return choose_first_; };
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
 
