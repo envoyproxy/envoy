@@ -281,8 +281,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   if (span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
-                                                     upstream_trailers_.get(), stream_info_,
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
                                                      Tracing::EgressConfig::get());
   }
 
@@ -390,6 +389,9 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   }
 
   awaiting_headers_ = false;
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseHeaders(*span_, headers.get());
+  }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
@@ -421,6 +423,9 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 
   if (!allow_upstream_filters_) {
     maybeEndDecode(true);
+  }
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseTrailers(*span_, trailers.get());
   }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
