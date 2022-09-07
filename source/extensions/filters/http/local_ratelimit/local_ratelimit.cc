@@ -233,18 +233,17 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
 
   switch (vh_rate_limit_option) {
   case VhRateLimitOptions::Ignore:
-    break;
+    return;
   case VhRateLimitOptions::Include:
     populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
-    break;
+    return;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
       populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
     }
-    break;
-  default:
-    PANIC("not reached");
+    return;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
@@ -280,6 +279,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
     const auto* specific_per_route_config = getConfig();
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case envoy::extensions::common::ratelimit::v3::INCLUDE:
         vh_rate_limits_ = VhRateLimitOptions::Include;
         break;
@@ -287,8 +287,8 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
         vh_rate_limits_ = VhRateLimitOptions::Ignore;
         break;
       case envoy::extensions::common::ratelimit::v3::OVERRIDE:
-      default:
         vh_rate_limits_ = VhRateLimitOptions::Override;
+        break;
       }
     } else {
       vh_rate_limits_ = VhRateLimitOptions::Override;
