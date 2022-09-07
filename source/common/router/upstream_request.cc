@@ -281,8 +281,7 @@ void UpstreamRequest::cleanUp() {
   }
 
   if (span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
-                                                     upstream_trailers_.get(), stream_info_,
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
                                                      Tracing::EgressConfig::get());
   }
 
@@ -390,6 +389,9 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   }
 
   awaiting_headers_ = false;
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseHeaders(*span_, headers.get());
+  }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
@@ -421,6 +423,9 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 
   if (!allow_upstream_filters_) {
     maybeEndDecode(true);
+  }
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseTrailers(*span_, trailers.get());
   }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
@@ -479,21 +484,6 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
   }
 
   auto* headers = parent_.downstreamHeaders();
-
-  const auto* route_entry = parent_.route()->routeEntry();
-  if (route_entry->autoHostRewrite() && !upstream_host_->hostname().empty()) {
-    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), upstream_host_->hostname(),
-                                   route_entry->appendXfh());
-  }
-
-  if (span_ != nullptr) {
-    span_->injectContext(*parent_.downstreamHeaders(), upstream_host_);
-  } else {
-    // No independent child span for current upstream request then inject the parent span's tracing
-    // context into the request headers.
-    // The injectContext() of the parent span may be called repeatedly when the request is retried.
-    parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), upstream_host_);
-  }
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
   // the upstream has accepted the CONNECT request.
@@ -799,15 +789,6 @@ void UpstreamRequest::onPoolReady(
     max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
-  if (allow_upstream_filters_) {
-    // Make sure the local filter manager will do the same.
-    codec_filter_->callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
-    codec_filter_->shipHeadersIfPaused(*parent_.downstreamHeaders());
-    return;
-  }
-
-  calling_encode_headers_ = true;
-  auto* headers = parent_.downstreamHeaders();
   const auto* route_entry = parent_.route()->routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
@@ -822,6 +803,17 @@ void UpstreamRequest::onPoolReady(
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
+
+  if (allow_upstream_filters_) {
+    // Make sure the local filter manager will inform the downstream watermark manager if downstream
+    // buffers are overrun.
+    codec_filter_->callbacks_->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+    codec_filter_->shipHeadersIfPaused(*parent_.downstreamHeaders());
+    return;
+  }
+
+  calling_encode_headers_ = true;
+  auto* headers = parent_.downstreamHeaders();
 
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 

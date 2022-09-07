@@ -85,6 +85,11 @@ protected:
 private:
   void configureComponentLogLevels();
   void configureHotRestarter(Random::RandomGenerator& random_generator);
+
+  // Declaring main thread here allows custom integrations to instantiate
+  // MainCommonBase directly, with environment-specific dependency injection.
+  // Note that MainThread must also be declared in MainCommon.
+  Thread::MainThread main_thread_;
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to

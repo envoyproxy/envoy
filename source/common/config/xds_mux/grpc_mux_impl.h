@@ -81,7 +81,7 @@ public:
   Config::GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const absl::flat_hash_set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder& resource_decoder,
+                                   OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) override;
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
@@ -252,7 +252,7 @@ public:
   }
 
   Config::GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                                   SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                   SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {

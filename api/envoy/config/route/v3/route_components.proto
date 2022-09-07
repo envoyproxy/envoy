@@ -730,6 +730,10 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  //
+  // .. note::
+  //
+  //   Shadowing doesn't support Http CONNECT and upgrades.
   // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
