@@ -304,7 +304,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
                                              parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
   }
-
+  ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
@@ -431,6 +431,7 @@ void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' succeeded", parent_.info_->name());
   current_request_ = nullptr;
 
   const uint32_t SlotRangeStart = 0;
@@ -562,6 +563,7 @@ void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
 }
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' failed", parent_.info_->name());
   current_request_ = nullptr;
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);
