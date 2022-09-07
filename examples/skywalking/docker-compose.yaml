@@ -1,55 +1,64 @@
 version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    image: flask_service:python-3.10-slim-bullseye
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  tracing:
-    build:
-      context: ../shared/tracing
-    image: envoyproxy:tracing
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  # Front envoy.
-  front-envoy:
+  envoy-front-proxy:
     build:
       context: .
-      dockerfile: Dockerfile-frontenvoy
-    ports:
-    - "${PORT_PROXY:-8000}:8000"
-    - "${PORT_ADMIN:-8001}:8001"
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-front-proxy.yaml
     depends_on:
-    - skywalking-oap
+      skywalking-ui:
+        condition: service_healthy
+      envoy-1:
+        condition: service_started
+      envoy-2:
+        condition: service_started
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_ADMIN:-8001}:8001"
 
-  # First service.
-  service1:
+  envoy-1:
     build:
-      context: ../shared/tracing
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-1.yaml
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy
+      service-1:
+        condition: service_healthy
+      envoy-2:
+        condition: service_started
+
+  envoy-2:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-2.yaml
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy
+      service-2:
+        condition: service_healthy
+
+  service-1:
+    build:
+      context: ../shared/flask
     volumes:
-    - ./service1-envoy-skywalking.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=1
-    depends_on:
-    - skywalking-oap
 
-  # Second service.
-  service2:
+  service-2:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
     volumes:
-    - ./service2-envoy-skywalking.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=2
-    depends_on:
-    - skywalking-oap
 
   # Skywalking components.
   elasticsearch:
