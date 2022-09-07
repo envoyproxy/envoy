@@ -99,7 +99,7 @@ This will be routed via all 3 of the Envoy proxies:
     Hello from behind Envoy (service 2)!
 
 Step 4: View the traces in OpenTelemetry UI
-************************************
+*******************************************
 
 Point your browser to http://localhost:9411 .
 
