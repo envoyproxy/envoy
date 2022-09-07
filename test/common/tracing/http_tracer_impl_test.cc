@@ -806,7 +806,7 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
 }
 
-TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
+TEST_F(HttpTracerImplTest, ChildGrpcUpstreamSpanTest) {
   EXPECT_CALL(stream_info_, startTime());
   EXPECT_CALL(local_info_, nodeName());
   EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
@@ -854,8 +854,9 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
   EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
 
-  HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,
-                                          stream_info_, config_);
+  HttpTracerUtility::onUpstreamResponseHeaders(*child_span, &response_headers_);
+  HttpTracerUtility::onUpstreamResponseTrailers(*child_span, &response_trailers_);
+  HttpTracerUtility::finalizeUpstreamSpan(*child_span, stream_info_, config_);
 }
 
 TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {

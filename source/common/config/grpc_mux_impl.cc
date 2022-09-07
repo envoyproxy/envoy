@@ -110,7 +110,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder,
+                                      OpaqueResourceDecoderSharedPtr resource_decoder,
                                       const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
@@ -220,7 +220,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourcePtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
-    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
     const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 

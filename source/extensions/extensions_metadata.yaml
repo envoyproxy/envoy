@@ -185,6 +185,7 @@ envoy.filters.http.bandwidth_limit:
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: robust_to_untrusted_downstream
   status: stable
   type_urls:
@@ -204,6 +205,13 @@ envoy.filters.http.cdn_loop:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
+envoy.filters.http.upstream_codec:
+  categories:
+  - envoy.filters.http.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
 envoy.filters.http.composite:
   categories:
   - envoy.filters.http
