@@ -51,7 +51,7 @@ envoy_mobile_swift_test(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@swift_flatbuffers//:FlatBuffers",
+        "@swift_flatbuffers//swift",
     ],
 )
 

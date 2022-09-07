@@ -89,7 +89,7 @@ swift_library(
     module_name = "Envoy",
     private_deps = [
         "//library/objective-c:envoy_engine_objc_lib",
-        "@swift_flatbuffers//:FlatBuffers",
+        "@swift_flatbuffers//swift",
         "@envoy_mobile_extra_swift_sources//:extra_private_dep",
     ],
     visibility = ["//visibility:public"],
