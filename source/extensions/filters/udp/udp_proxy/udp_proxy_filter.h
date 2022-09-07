@@ -90,9 +90,14 @@ public:
           "is not running with the CAP_NET_ADMIN capability.");
     }
 
-    access_logs_.reserve(config.access_log_size());
-    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-      access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+    sess_access_logs_.reserve(config.sess_access_log_size());
+    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.sess_access_log()) {
+      sess_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+    }
+
+    proxy_access_logs_.reserve(config.proxy_access_log_size());
+    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.proxy_access_log()) {
+      proxy_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
     }
 
     if (!config.hash_policies().empty()) {
@@ -116,7 +121,8 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
     return upstream_socket_config_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const { return access_logs_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const { return sess_access_logs_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const { return proxy_access_logs_; }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -135,7 +141,8 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> sess_access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   Random::RandomGenerator& random_;
 };
 
@@ -375,6 +382,16 @@ private:
     return std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, host->address(),
                                                  nullptr, Network::SocketCreationOptions{});
   }
+
+  /**
+  * Struct definition for proxy access logging.
+  */
+  struct UdpProxyStats {
+    uint64_t downstream_proxy_no_route_;
+    uint64_t downstream_proxy_total_;
+    uint64_t downstream_proxy_idle_timeout_;
+    uint64_t downstream_sess_rx_errors_;
+  };
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;

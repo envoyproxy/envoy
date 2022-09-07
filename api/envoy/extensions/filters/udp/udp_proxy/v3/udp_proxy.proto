@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -106,5 +106,7 @@ message UdpProxyConfig {
   bool use_per_packet_load_balancing = 7;
 
   // Configuration for access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
-  repeated config.accesslog.v3.AccessLog access_log = 8;
+  repeated config.accesslog.v3.AccessLog sess_access_log = 8;
+
+  repeated config.accesslog.v3.AccessLog proxy_access_log = 9;
 }
