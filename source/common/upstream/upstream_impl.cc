@@ -395,6 +395,7 @@ Host::CreateConnectionData HostImpl::createConnection(
   // redirected to a proxy, create the TCP connection to the proxy's address not
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address,
         source_address_fn ? source_address_fn(address) : nullptr,

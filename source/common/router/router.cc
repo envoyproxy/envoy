@@ -685,9 +685,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const bool can_send_early_data =
       conn_pool_new_stream_with_early_data_and_http3_ &&
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
+  // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
+  // For retries etc, HTTP/3 usability may transition from true to false, but
+  // will never transition from false to true.
+  bool can_use_http3 =
+      !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, headers, std::move(generic_conn_pool), can_send_early_data,
-      /*can_use_http3=*/true);
+      *this, headers, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (end_stream) {
