@@ -419,7 +419,7 @@ private:
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
-  OptRef<DownstreamCallbacks> downstreamCallbacks() override { return {}; }
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}

@@ -161,7 +161,7 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks,
-                              public DownstreamCallbacks {
+                              public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
@@ -285,9 +285,9 @@ private:
     void onLocalReply(Code code) override;
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
-    OptRef<DownstreamCallbacks> downstreamCallbacks() override { return *this; }
+    OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
 
-    // DownstreamCallbacks
+    // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;

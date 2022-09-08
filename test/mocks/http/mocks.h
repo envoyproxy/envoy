@@ -105,7 +105,7 @@ public:
   MOCK_METHOD(void, onResponseDataTooLarge, ());
   MOCK_METHOD(void, onRequestDataTooLarge, ());
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(OptRef<DownstreamCallbacks>, downstreamCallbacks, ());
+  MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
@@ -218,9 +218,9 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
 };
 
-class MockDownstreamCallbacks : public DownstreamCallbacks {
+class MockDownstreamStreamFilterCallbacks : public DownstreamStreamFilterCallbacks {
 public:
-  ~MockDownstreamCallbacks() override = default;
+  ~MockDownstreamStreamFilterCallbacks() override = default;
 
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback&));
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
@@ -264,7 +264,7 @@ public:
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(OptRef<DownstreamCallbacks>, downstreamCallbacks, ());
+  MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
 
   // Http::StreamDecoderFilterCallbacks
@@ -317,7 +317,7 @@ public:
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
-  testing::NiceMock<MockDownstreamCallbacks> downstream_callbacks_;
+  testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopeTrackedObject> scope_;
@@ -355,7 +355,7 @@ public:
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(OptRef<DownstreamCallbacks>, downstreamCallbacks, ());
+  MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
 
   // Http::StreamEncoderFilterCallbacks
@@ -373,7 +373,7 @@ public:
                absl::string_view details));
 
   Buffer::InstancePtr buffer_;
-  testing::NiceMock<MockDownstreamCallbacks> downstream_callbacks_;
+  testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopeTrackedObject> scope_;

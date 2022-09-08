@@ -100,7 +100,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
-  OptRef<DownstreamCallbacks> downstreamCallbacks() override;
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
 
   // Functions to set or get iteration state.
@@ -514,7 +514,7 @@ public:
   /**
    * Returns a handle to the downstream callbacks, if available.
    */
-  virtual OptRef<DownstreamCallbacks> downstreamCallbacks() { return {}; }
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 };
 
 /**

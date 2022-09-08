@@ -245,9 +245,9 @@ public:
 using RouteConfigUpdatedCallback = std::function<void(bool)>;
 using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
 
-class DownstreamCallbacks {
+class DownstreamStreamFilterCallbacks {
 public:
-  virtual ~DownstreamCallbacks() = default;
+  virtual ~DownstreamStreamFilterCallbacks() = default;
 
   /**
    * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
@@ -413,7 +413,7 @@ public:
 ￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
     * for upstream filters.
     */
-  virtual OptRef<DownstreamCallbacks> downstreamCallbacks() PURE;
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
 };
 
 /**

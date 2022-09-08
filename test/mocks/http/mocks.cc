@@ -66,7 +66,8 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
   ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
   ON_CALL(callbacks, downstreamCallbacks())
-      .WillByDefault(Return(OptRef<DownstreamCallbacks>{callbacks.downstream_callbacks_}));
+      .WillByDefault(
+          Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));
 }
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {

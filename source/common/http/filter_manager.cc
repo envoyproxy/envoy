@@ -318,7 +318,7 @@ Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOption
   return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
 }
 
-OptRef<DownstreamCallbacks> ActiveStreamFilterBase::downstreamCallbacks() {
+OptRef<DownstreamStreamFilterCallbacks> ActiveStreamFilterBase::downstreamCallbacks() {
   return parent_.filter_manager_callbacks_.downstreamCallbacks();
 }
 
