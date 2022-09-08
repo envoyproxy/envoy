@@ -1184,9 +1184,9 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RouteConstSharedPtr
-RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
-                                                const Http::HeaderMap& headers) const {
+RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
+    const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
+    const RouteEntryAndRoute* route_selector_override) const {
   const auto entry = headers.get(cluster_header_name);
   std::string final_cluster_name;
   if (!entry.empty()) {
@@ -1198,7 +1198,10 @@ RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& clu
   // NOTE: Though we return a shared_ptr here, the current ownership model
   // assumes that the route table sticks around. See snapped_route_config_ in
   // ConnectionManagerImpl::ActiveStream.
-  return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+  return std::make_shared<DynamicRouteEntry>(route_selector_override
+                                                 ? route_selector_override
+                                                 : static_cast<const RouteEntryAndRoute*>(this),
+                                             final_cluster_name);
 }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
@@ -1267,7 +1270,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     if (selected_value >= begin && selected_value < end) {
       if (!cluster->clusterHeaderName().get().empty() &&
           !headers.get(cluster->clusterHeaderName()).empty()) {
-        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers);
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers, cluster.get());
       }
       return cluster;
     }
