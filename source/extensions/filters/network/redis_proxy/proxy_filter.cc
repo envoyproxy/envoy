@@ -96,6 +96,7 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       }
       pending_requests_.pop_front();
     }
+    transaction_.close();
   }
 }
 
