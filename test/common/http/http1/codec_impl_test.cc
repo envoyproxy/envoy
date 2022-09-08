@@ -928,6 +928,11 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
+  if (parser_impl_ == ParserImpl::BalsaParser) {
+    // BalsaParser only validates trailers if `enable_trailers_` is set.
+    codec_settings_.enable_trailers_ = true;
+  }
+
   initialize();
 
   MockRequestDecoder decoder;
@@ -2945,11 +2950,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
@@ -2957,11 +2957,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
