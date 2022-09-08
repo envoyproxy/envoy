@@ -309,7 +309,7 @@ Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value)
   //
   // The only exception to this is the TE header field, which MAY be present in an HTTP/2 request;
   // when it is, it MUST NOT contain any value other than "trailers".
-  if (value.getStringView() != header_values_.TEValues.Trailers) {
+  if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
     return {HeaderValueValidationResult::Action::Reject, Http2ResponseCodeDetail::get().InvalidTE};
   }
 

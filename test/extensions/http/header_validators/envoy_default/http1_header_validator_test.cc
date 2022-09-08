@@ -360,6 +360,15 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLength0ConnectAc
   EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapConnectWithPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "CONNECT"}, {":authority", "envoy.com:80"}, {":path", "/"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudo) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "CONNECT"},
