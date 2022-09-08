@@ -170,6 +170,7 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         ":utility_lib",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:protobuf_link_hacks",

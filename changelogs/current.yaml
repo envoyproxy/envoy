@@ -12,6 +12,12 @@ behavior_changes:
 - area: tls
   change: |
     Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+- area: http
+  change: |
+    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
+    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
+    streaming calls. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -21,9 +27,15 @@ minor_behavior_changes:
 - area: prometheus_stats
   change: |
     removed blank line for being compatible with OpenMetrics.
+- area: quic
+  change: |
+    changed the timing of QUIC connection writing data in response to incoming packets in non-Windowns platforms. This change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to false.
 - area: original_dst
   change: |
     transparent listener can use original_dst filter without nf_conntrack enabled.
+- area: cache_filter
+  change: |
+    added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -131,6 +143,11 @@ new_features:
 - area: listener
   change: |
     allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+- area: lua
+  change: |
+    added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
+    by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
+    ``{["return_duplicate_headers"] = true}`` as the ``options``.
 
 deprecated:
 - area: http

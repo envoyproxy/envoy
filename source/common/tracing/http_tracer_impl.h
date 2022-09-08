@@ -50,15 +50,25 @@ public:
    * Adds information obtained from the upstream request headers as tags to the active span.
    * Then finishes the span.
    */
-  static void finalizeUpstreamSpan(Span& span, const Http::ResponseHeaderMap* response_headers,
-                                   const Http::ResponseTrailerMap* response_trailers,
-                                   const StreamInfo::StreamInfo& stream_info,
+  static void finalizeUpstreamSpan(Span& span, const StreamInfo::StreamInfo& stream_info,
                                    const Config& tracing_config);
 
+  /**
+   * Adds tags to the current "unfinished" span when processing upstream response headers.
+   * NOOP if headers are nullptr.
+   */
+  static void onUpstreamResponseHeaders(Span& span,
+                                        const Http::ResponseHeaderMap* response_headers);
+
+  /**
+   * Adds tags to the current "unfinished" span when processing upstream response trailers.
+   * NOOP if trailers are nullptr.
+   */
+  static void onUpstreamResponseTrailers(Span& span,
+                                         const Http::ResponseTrailerMap* response_trailers);
+
 private:
-  static void setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
-                            const Http::ResponseTrailerMap* response_trailers,
-                            const StreamInfo::StreamInfo& stream_info,
+  static void setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
                             const Config& tracing_config);
 
   static const std::string IngressOperation;

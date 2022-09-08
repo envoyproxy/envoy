@@ -3997,6 +3997,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":quic_platform_base",
+        "@com_googlesource_googleurl//url",
     ],
 )
 
