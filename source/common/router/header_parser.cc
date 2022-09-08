@@ -59,7 +59,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
 
   // Let the substitution formatter parse the final_header_value.
   return std::make_unique<HttpHeaderFormatterImpl>(
-      std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true), true);
+      std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true));
 }
 
 // Implements a state machine to parse custom headers. Each character of the custom header format

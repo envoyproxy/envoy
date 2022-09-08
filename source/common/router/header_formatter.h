@@ -98,12 +98,6 @@ public:
   virtual const std::string format(const Http::RequestHeaderMap& request_headers,
                                    const Http::ResponseHeaderMap& response_headers,
                                    const Envoy::StreamInfo::StreamInfo& stream_info) const PURE;
-
-  /**
-   * @return bool indicating whether the formatted header should be appended to the existing
-   *              headers or replace any existing values for the header
-   */
-  virtual bool append() const PURE;
 };
 
 using HttpHeaderFormatterPtr = std::unique_ptr<HttpHeaderFormatter>;
@@ -114,8 +108,7 @@ using HttpHeaderFormatterPtr = std::unique_ptr<HttpHeaderFormatter>;
  */
 class HttpHeaderFormatterImpl : public HttpHeaderFormatter {
 public:
-  HttpHeaderFormatterImpl(Formatter::FormatterPtr&& formatter, bool append)
-      : formatter_(std::move(formatter)), append_(append) {}
+  HttpHeaderFormatterImpl(Formatter::FormatterPtr&& formatter) : formatter_(std::move(formatter)) {}
 
   // HttpHeaderFormatter::format
   // Trailers are not available when HTTP headers are manipulated.
@@ -127,11 +120,9 @@ public:
                              *Http::StaticEmptyHeaders::get().response_trailers, stream_info, "");
     return buf;
   };
-  bool append() const override { return append_; }
 
 private:
   const Formatter::FormatterPtr formatter_;
-  const bool append_;
 };
 
 // TODO(cpakulski).
@@ -150,7 +141,6 @@ public:
                            const Envoy::StreamInfo::StreamInfo& stream_info) const override {
     return header_formatter_->format(stream_info);
   }
-  bool append() const override { return false; }
 
 private:
   const HeaderFormatterPtr header_formatter_;
