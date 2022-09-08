@@ -144,7 +144,7 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(status);
 
   // Responding with http can cause client to close, if so create a new one.
-  bool client_will_close =
+  const bool client_will_close =
       Http::HeaderUtility::shouldCloseConnection(health_checker_->protocol(), *response_headers);
 
   // Check if there is a response body.
