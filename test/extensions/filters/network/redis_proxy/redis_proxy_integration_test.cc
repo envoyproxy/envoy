@@ -1248,7 +1248,7 @@ TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"exec"}), "+(empty array)\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}), "*0\r\n", redis_client);
 
   redis_client->close();
 }
