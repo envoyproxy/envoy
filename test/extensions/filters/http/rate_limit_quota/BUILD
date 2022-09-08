@@ -4,12 +4,23 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_extension_cc_mock(
+    name = "mocks",
+    hdrs = ["mocks.h"],
+    extension_names = ["envoy.filters.http.rate_limit_quota"],
+    deps = [
+        "//source/extensions/filters/http/rate_limit_quota",
+        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "config_test",
@@ -48,7 +59,9 @@ envoy_extension_cc_test(
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
     deps = [
+        ":mocks",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/rate_limit_quota:client_interface",
         "//source/extensions/filters/http/rate_limit_quota:client_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:factory_context_mocks",

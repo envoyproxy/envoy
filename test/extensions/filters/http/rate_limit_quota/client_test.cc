@@ -2,8 +2,10 @@
 
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
+#include "test/extensions/filters/http/rate_limit_quota/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/status_utility.h"
@@ -60,6 +62,7 @@ public:
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
+  MockRateLimitQuotaCallbacks callbacks_;
 
   bool grpc_closed_ = false;
 };
@@ -73,36 +76,34 @@ TEST_F(RateLimitStreamTest, OpenAndCloseStream) {
 
 TEST_F(RateLimitStreamTest, SendRequest) {
   EXPECT_OK(client_->startStream(stream_info_));
+  bool end_stream = true;
   // Send empty report and ensure that we get it.
-  EXPECT_CALL(stream_, sendMessageRaw_(_, /*end_stream=*/false));
+  EXPECT_CALL(stream_, sendMessageRaw_(_, end_stream));
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports report;
-  client_->send(std::move(report), /*end_stream=*/false);
+  client_->send(std::move(report), end_stream);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   client_->closeStream();
 }
 
-TEST_F(RateLimitStreamTest, CloseOnRemote) {
+TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   EXPECT_OK(client_->startStream(stream_info_));
-  // Send empty report and ensure that we get it.
-  EXPECT_CALL(stream_, sendMessageRaw_(_, /*end_stream=*/true));
-  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports report;
-  client_->send(std::move(report), /*end_stream=*/true);
-  // EXPECT_CALL(stream_, closeStream()).Times(0);
-  // EXPECT_CALL(stream_, resetStream()).Times(0);
-  // client_->closeStream();
-}
+  ASSERT_NE(stream_callbacks_, nullptr);
 
-// TEST_F(RateLimitStreamTest, StreamClosed) {
-//   EXPECT_OK(client_->startStream());
-//   ASSERT_NE(stream_callbacks_, nullptr);
-//   EXPECT_FALSE(grpc_closed_);
-//   EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
-//   stream_callbacks_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
-//   EXPECT_TRUE(grpc_closed_);
-//   EXPECT_EQ(grpc_status_, Grpc::Status::WellKnownGrpcStatus::Ok);
-//   client_->closeStream();
-// }
+  // Send empty report and ensure that we get it.
+  EXPECT_CALL(stream_, sendMessageRaw_(_, true));
+  client_->rateLimit(callbacks_);
+
+  // `onReceive` callback is expected to be called.
+  EXPECT_CALL(callbacks_, onReceive);
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
+  auto response_buf = Grpc::Common::serializeMessage(resp);
+  EXPECT_TRUE(stream_callbacks_->onReceiveMessageRaw(std::move(response_buf)));
+
+  EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
+  client_->closeStream();
+}
 
 } // namespace
 } // namespace RateLimitQuota

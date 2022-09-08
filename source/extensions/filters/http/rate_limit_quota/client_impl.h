@@ -20,31 +20,22 @@ namespace RateLimitQuota {
 using GrpcAsyncClient =
     Grpc::AsyncClient<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports,
                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
-using RateLimitQuotaResponsePtr =
-    std::unique_ptr<envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>;
 
-// Grpc bi-directional stream client.
+// Grpc bidirectional streaming client which handles the communication with RLS server.
 class RateLimitClientImpl : public RateLimitClient,
                             public Grpc::AsyncStreamCallbacks<
                                 envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
-                            // TODO(tyxia) Should I create a new log ID rate_limit for logging
-                            public Logger::Loggable<Logger::Id::filter> {
+                            public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
                       Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)) {
-    // TODO(tyxia) Think about how to efficiently open grpc stream: whether it is opened on the
-    // first request or creation of client.
+    // TODO(tyxia) It is opened on the first request not at time when client is created here
     // startStream();
   }
 
-  // TODO(tyxia) callbacks might not be needed to be implemented implemented as callback
-  // code here
-  // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/common/ratelimit/ratelimit.h;rcl=466836161;l=89
-  // needs callback is to provide the
-  // AsyncStreamCallbacks
-  void onReceiveMessage(RateLimitQuotaResponsePtr&&) override {}
+  void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
   // RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -52,10 +43,9 @@ public:
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  // RateLimitQuota::RateLimitClient
-  void rateLimit() override;
+  // RateLimitClient
+  void rateLimit(RateLimitQuotaCallbacks& callbacks) override;
 
-  // TODO(tyxia) Do we need this to be abstract class in RateLimit?
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
   void closeStream();
   void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&) {}
@@ -65,7 +55,8 @@ public:
 private:
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
-  Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_;
+  Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_{};
+  RateLimitQuotaCallbacks* callbacks_{};
   // TODO(tyxia) Further look at this flag
   bool stream_closed = false;
 };

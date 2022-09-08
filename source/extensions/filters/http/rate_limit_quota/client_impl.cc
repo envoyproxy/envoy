@@ -17,24 +17,19 @@ void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   }
 }
 
-// TODO(tyxia) Key of performing the rate limiting
-void RateLimitClientImpl::rateLimit() {
-  // TODO(tyxia) Do we need this assert at all?
-  // How to coordinate with the `startStream` function which create the stream_
-  ASSERT(stream_ != nullptr);
-  // TODO(tyxia) workflow of rateLimit()
-  // 1. Build buckets based on request attributes
-  // 2. retrieve quota assignment
-  // 3. report usage
-  // 2 and 3 are in parallel.
+void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
 
+  ASSERT(callbacks_ == nullptr);
+  callbacks_ = &callbacks;
+  ASSERT(stream_ != nullptr);
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-  send(std::move(reports), true);
+  // TODO(tyxia) end_stream
+  send(std::move(reports), /*end_stream*/true);
 }
 
 void RateLimitClientImpl::send(
     envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream) {
-  stream_.sendMessage(std::move(reports), end_stream);
+  stream_->sendMessage(std::move(reports), end_stream);
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
@@ -58,9 +53,13 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
   return absl::OkStatus();
 }
 
+void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
+  ASSERT(callbacks_ != nullptr);
+  callbacks_->onReceive(response.get());
+}
+
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
-  // TODO(tyxia) onRemoteClose will set this flag to false; Avoid the double close??
   if (stream_ != nullptr && !stream_closed) {
     stream_->closeStream();
     stream_closed = true;

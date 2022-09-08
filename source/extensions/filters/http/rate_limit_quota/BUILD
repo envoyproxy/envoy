@@ -47,7 +47,7 @@ envoy_cc_library(
     hdrs = ["client.h"],
     deps = [
         "//envoy/grpc:status",
-        "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
 )
 

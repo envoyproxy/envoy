@@ -9,9 +9,9 @@
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
-// TODO(tyxia) Needed for bucket id, re-evaluate later.
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -28,14 +28,6 @@ using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota:
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 using BucketId = ::envoy::service::rate_limit_quota::v3::BucketId;
 
-/**
- * TODO(tyxia) Placeholder Implement as needed for the interaction with filter.
- */
-class RequestCallbacks {
-public:
-  virtual ~RequestCallbacks() = default;
-};
-
 class RateLimitQuotaValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
 public:
@@ -46,9 +38,8 @@ public:
   }
 };
 
-// TODO(tyxia) Starts with passThroughFilter consider streamFilter.
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
-                             public RequestCallbacks,
+                             public RateLimitQuotaCallbacks,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
@@ -64,6 +55,9 @@ public:
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
+  // RateLimitQuota::RateLimitQuotaCallbacks
+  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
+
   BucketId buildMatcherTree(const Http::RequestHeaderMap& headers);
   BucketId requestMatching(const Http::RequestHeaderMap& headers);
 
@@ -72,6 +66,7 @@ public:
 private:
   // Create the matcher factory and matcher.
   void createMatcher();
+
   FilterConfigConstSharedPtr config_;
   RateLimitClientPtr rate_limit_client_;
   Server::Configuration::FactoryContext& factory_context_;
@@ -81,28 +76,16 @@ private:
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 
-// TODO(tyxia) CEL expression.
-// C++ exception with description "Didn't find a registered implementation for 'test_action' with
-// type URL: 'envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings'"
-// thrown in the test body.
-// Looks like I need to implement the action factory and register it statically.
-// 1. use action to create the matcher tree
-// 2. use test action in the test to trigger the action???
 
 // Contextual information used to construct the onMatch actions for a match tree.
 // Currently it is empty struct.
 struct RateLimitOnMactchActionContext {
-  // RateLimitQuotaValidationVisitor visitor;
-  // Server::Configuration::FactoryContext& factory_context;
-  // Http::Matching::HttpMatchingDataImpl data;
-  // Network::ConnectionInfoProvider& provider;
 };
 
 // This class implements the on_match action behavior.
 class RateLimitOnMactchAction : public Matcher::ActionBase<BucketId>,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
-  // TODO(tyxia) Efficient coding pass by ref, capture etc.
   explicit RateLimitOnMactchAction(
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings settings)
       : setting_(std::move(settings)) {}

@@ -28,7 +28,7 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // Start the stream on the first request.
   if (rate_limit_client_->startStream(callbacks_->streamInfo()).ok()) {
-    rate_limit_client_->rateLimit();
+    rate_limit_client_->rateLimit(*this);
     return Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
 
@@ -79,7 +79,6 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
     if (match.result_) {
       std::cout << "Matcher succeed!!!" << std::endl;
       const auto result = match.result_();
-      // TODO(tyxia) Remove ASSERTS???? change to error or logging
       ASSERT(result->typeUrl() == RateLimitOnMactchAction::staticTypeUrl());
       ASSERT(dynamic_cast<RateLimitOnMactchAction*>(result.get()));
       const RateLimitOnMactchAction& match_action =
