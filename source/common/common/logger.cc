@@ -250,7 +250,7 @@ void Registry::setLogLevel(spdlog::level::level_enum log_level) {
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    LoggerUtil::setLogFormatForLogger(&logger.getLogger(), log_format);
+    Utility::setLogFormatForLogger(logger.getLogger(), log_format);
   }
 }
 
@@ -264,9 +264,9 @@ Logger* Registry::logger(const std::string& log_name) {
   }
   return logger_to_return;
 }
+namespace Utility {
 
-void LoggerUtil::setLogFormatForLogger(spdlog::logger* const logger,
-                                       const std::string& log_format) {
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format) {
   auto formatter = std::make_unique<spdlog::pattern_formatter>();
   formatter
       ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
@@ -278,8 +278,10 @@ void LoggerUtil::setLogFormatForLogger(spdlog::logger* const logger,
       ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
           CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
       .set_pattern(log_format);
-  logger->set_formatter(std::move(formatter));
+  logger.set_formatter(std::move(formatter));
 }
+
+} // namespace Utility
 
 namespace CustomFlagFormatter {
 

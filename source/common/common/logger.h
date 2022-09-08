@@ -363,17 +363,6 @@ private:
 };
 
 /**
- * Defines a set of functions shared by Envoy and Find-grain loggers.
- */
-class LoggerUtil {
-public:
-  /**
-   * Sets the log format for a specific logger.
-   */
-  static void setLogFormatForLogger(spdlog::logger* const logger, const std::string& log_format);
-};
-
-/**
  * Mixin class that allows any class to perform logging with a logger of a particular ID.
  */
 template <Id id> class Loggable {
@@ -388,6 +377,15 @@ protected:
     return instance;
   }
 };
+
+namespace Utility {
+
+/**
+ * Sets the log format for a specific logger.
+ */
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
+
+} // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
 // https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.
