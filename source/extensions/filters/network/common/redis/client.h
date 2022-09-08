@@ -225,6 +225,16 @@ public:
   }
 };
 
+// An empty array sent when a transaction is empty.
+struct EmptyArray : public Extensions::NetworkFilters::Common::Redis::RespValue {
+public:
+  EmptyArray() {
+    type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
+    std::vector<NetworkFilters::Common::Redis::RespValue> values;
+    asArray().swap(values);
+  }
+};
+
 // A class representing a Redis transaction.
 class Transaction {
 public:

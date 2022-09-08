@@ -487,7 +487,8 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     // Handle the case where the transaction is empty.
     if (transaction.key_.empty()) {
       if (to_lower_string == "exec") {
-        localResponse(callbacks, "(empty array)");
+        Common::Redis::RespValuePtr empty_array{new Common::Redis::Client::EmptyArray{}};
+        callbacks.onResponse(std::move(empty_array));
       } else {
         localResponse(callbacks, "OK");
       }
