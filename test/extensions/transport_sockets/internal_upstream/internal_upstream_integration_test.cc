@@ -192,10 +192,9 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
 }
 
 
-// ********************************************************************
-// Integration tests for HTTP or HTTPs traffic through HTTP CONNECT
-// tunnel using internal listener
-// ********************************************************************
+// ********************************************************************************
+// Integration tests for traffic through internal upstream and internal listener.
+// ********************************************************************************
 
 // ClientTestConnection is used for simulating a client
 // which initiates a connection to Envoy in clear-text and then switches to TLS
@@ -240,7 +239,7 @@ public:
   void setupExternalUpstreamConfig();
   void setupTestConfig();
   void sendHttpPostMsg();
-  void sendBidirectionalData();
+  void sendBidirectionalTcpData();
   void startTlsNegotiation();
 
   // Contexts needed by raw buffer and tls transport sockets.
@@ -519,17 +518,38 @@ void HttpsInspectionIntegrationTest::sendHttpPostMsg() {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "POST");
   EXPECT_EQ(upstream_request_->headers().getHostValue(), "localhost:" + port_str);
-}
 
-void HttpsInspectionIntegrationTest::sendBidirectionalData() {
-  Buffer::OwnedImpl buffer;
+  // Sends a response back to client.
+  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Send the payload data.
   buffer.add(request_data_);
   conn_->write(buffer, false);
   // Wait for them to arrive upstream.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_data_));
-  // Also test upstream to downstream data.
+  // Send some data from upstream to client.
   payload_reader_->set_data_to_wait_for(response_data_, false);
   upstream_request_->encodeData(response_data_, false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+void HttpsInspectionIntegrationTest::sendBidirectionalTcpData() {
+  FakeRawConnectionPtr fake_raw_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection));
+  Buffer::OwnedImpl buffer;
+  buffer.add(request_data_);
+  conn_->write(buffer, false);
+  uint64_t bytes_expected = client_write_buffer_->bytesDrained() + request_data_.size();
+  while (client_write_buffer_->bytesDrained() != bytes_expected) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  ASSERT_TRUE(fake_raw_upstream_connection->waitForData(3));
+      //    FakeRawConnection::waitForInexactMatch("foo")));
+  // Also test upstream to downstream data.
+  payload_reader_->set_data_to_wait_for(response_data_, false);
+  ASSERT_TRUE(fake_raw_upstream_connection->write("bar"));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -544,7 +564,6 @@ void HttpsInspectionIntegrationTest::startTlsNegotiation() {
   }
 }
 
-#if 0
 // With TLS enabled in internal listerner, Client sends a clear text HTTP CONNECT message to Envoy.
 // After confirms recevied 200 from proxy, client then sends a
 // TCP data to Envoy, which is then TCP proxied to the upstream.
@@ -566,27 +585,18 @@ TEST_P(HttpsInspectionIntegrationTest, TlsViaHttpConnect) {
   Buffer::OwnedImpl buffer;
   std::string connect_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
-    "Host: www.cnn.com:80\r\n"
-    "\r\n\r\n";
+    "Host: www.cnn.com:80\r\n\r\n";
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
   buffer.add(connect_msg);
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // Sends a HTTP POST message.
-  sendHttpPostMsg();
-
-  // Sends a response back to client.
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
+  // Without closing the connection, switch to tls.
+  startTlsNegotiation();
   // Make sure the bi-directional data can go through.
-  sendBidirectionalData();
+  sendBidirectionalTcpData();
 
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
-#endif
 
 
 // Client sends a clear text HTTP CONNECT message to Envoy.
@@ -610,24 +620,14 @@ TEST_P(HttpsInspectionIntegrationTest, TcpViaHttpConnect) {
   Buffer::OwnedImpl buffer;
   std::string connect_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
-    "Host: www.cnn.com:80\r\n"
-    "\r\n\r\n";
+    "Host: www.cnn.com:80\r\n\r\n";
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
   buffer.add(connect_msg);
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // Sends a HTTP POST message.
-  sendHttpPostMsg();
-
-  // Sends a response back to client.
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
   // Make sure the bi-directional data can go through.
-  sendBidirectionalData();
-
+  sendBidirectionalTcpData();
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -653,8 +653,7 @@ TEST_P(HttpsInspectionIntegrationTest, HttpViaHttpConnect) {
   Buffer::OwnedImpl buffer;
   std::string connect_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
-    "Host: www.cnn.com:80\r\n"
-    "\r\n\r\n";
+    "Host: www.cnn.com:80\r\n\r\n";
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
   buffer.add(connect_msg);
   conn_->write(buffer, false);
@@ -667,15 +666,6 @@ TEST_P(HttpsInspectionIntegrationTest, HttpViaHttpConnect) {
                       sendHttpPostMsg());
   */
   sendHttpPostMsg();
-
-  // Sends a response back to client.
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // Make sure the bi-directional data can go through.
-  sendBidirectionalData();
-
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -695,15 +685,6 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsViaTcpProxy) {
   startTlsNegotiation();
   // Sends a HTTP POST message.
   sendHttpPostMsg();
-
-  // Sends a response back to client.
-  payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n", false);
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-
-  // Make sure the bi-directional data can go through the TLS tunnel.
-  sendBidirectionalData();
-
   conn_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -734,9 +715,9 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsViaHttpConnect) {
   std::string request_msg;
   request_msg =
     "CONNECT www.cnn.com:80 HTTP/1.1\r\n"
-    "Host: www.cnn.com:80\r\n"
-    "\r\n\r\n";
+    "Host: www.cnn.com:80\r\n\r\n";
   payload_reader_->set_data_to_wait_for("HTTP/1.1 200 OK\r\n");
+  //payload_reader_->set_data_to_wait_for("\r\n");
   buffer.add(request_msg);
   conn_->write(buffer, false);
    // Wait for confirmation
@@ -748,8 +729,7 @@ TEST_P(HttpsInspectionIntegrationTest, HttpsViaHttpConnect) {
   auto port_str = std::to_string(fake_upstreams_[0]->localAddress()->ip()->port());
   request_msg =
     "GET / HTTP/1.1\r\n"
-    "Host: localhost:"+ port_str  + "\r\n"
-    "\r\n\r\n";
+    "Host: localhost:"+ port_str  + "\r\n\r\n";
   buffer.add(request_msg);
   conn_->write(buffer, false);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
