@@ -191,6 +191,7 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseResponseResult(false);
 
+  // TODO: test deferredDelete_
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -313,7 +314,7 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
 /*
 TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
-  setupDontReuseConnection();
+  setupDoNotReuseConnection();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};

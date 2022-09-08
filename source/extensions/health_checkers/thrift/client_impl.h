@@ -69,7 +69,7 @@ class ClientImpl;
 
 // Network::ClientConnection takes a shared pointer callback but we need a
 // unique DeferredDeletable pointer for connection management. Therefore we
-// need aditional wrapper class.
+// need additional wrapper class.
 class ThriftSessionCallbacks : public Network::ConnectionCallbacks,
                                public Network::ReadFilterBaseImpl {
 public:

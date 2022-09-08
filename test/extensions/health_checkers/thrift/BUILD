@@ -19,8 +19,27 @@ envoy_cc_mock(
     deps = [
         "//source/extensions/health_checkers/thrift:client_interface",
         "//test/mocks/network:connection_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "client_impl_test",
+    srcs = ["client_impl_test.cc"],
+    extension_names = ["envoy.health_checkers.thrift"],
+    deps = [
+        ":thrift_mocks",
+        "//source/extensions/health_checkers/thrift",
+        "//source/extensions/health_checkers/thrift:client_lib",
+        "//source/extensions/health_checkers/thrift:utility",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 

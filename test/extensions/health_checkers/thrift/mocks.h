@@ -2,8 +2,9 @@
 
 #include "gmock/gmock.h"
 
-#include "test/mocks/network/connection.h"
 #include "source/extensions/health_checkers/thrift/client.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/upstream/host.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,13 +40,24 @@ private:
   ClientCallback& callback_;
 };
 
-class MockClientCallback : public ClientCallback , public Network::MockConnectionCallbacks{
+class MockClientCallback : public ClientCallback {
 public:
   MockClientCallback();
   ~MockClientCallback() override;
 
+  // EXPECT_CALL can not return mock object which needs an implicit cast.
+  Upstream::Host::CreateConnectionData createConnection() override {
+    Upstream::MockHost::MockCreateConnectionData data = createConnection_();
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
+  }
+
   MOCK_METHOD(void, onResponseResult, (bool));
-  MOCK_METHOD(Upstream::Host::CreateConnectionData, createConnection, ());
+  MOCK_METHOD(Upstream::MockHost::MockCreateConnectionData, createConnection_, ());
+
+  // Network::ConnectionCallbacks
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
 } // namespace ThriftHealthChecker

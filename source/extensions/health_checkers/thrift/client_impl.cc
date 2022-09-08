@@ -76,8 +76,6 @@ Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, boo
 
 // ClientImpl
 void ClientImpl::start() {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
-
   Upstream::Host::CreateConnectionData conn_data = parent_.createConnection();
   connection_ = std::move(conn_data.connection_);
   host_description_ = std::move(conn_data.host_description_);
@@ -87,6 +85,8 @@ void ClientImpl::start() {
 
   connection_->connect();
   connection_->noDelay(true);
+
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
 }
 
 bool ClientImpl::makeRequest() {
