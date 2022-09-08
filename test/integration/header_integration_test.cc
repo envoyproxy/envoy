@@ -498,7 +498,7 @@ route_config:
                     - header:
                         key: "x-weighted-cluster-request"
                         value: "weighted-cluster-1"
-                      append: 
+                      append:
                         value: false
                   request_headers_to_remove: ["x-weighted-cluster-request-remove"]
                   response_headers_to_add:
