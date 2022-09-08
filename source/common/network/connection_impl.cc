@@ -1,7 +1,5 @@
 #include "source/common/network/connection_impl.h"
 
-#include <execinfo.h>
-
 #include <atomic>
 #include <cstdint>
 #include <memory>
