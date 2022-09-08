@@ -250,6 +250,32 @@ absl::string_view MessageMetadata::getDomainFromHeaderParameter(HeaderType type,
   return "";
 }
 
+bool MessageMetadata::validate(bool check_tra_context) {
+  // Check message type has been identified as request or response
+  if ((msgType() != MsgType::Request) && (msgType() != MsgType::Response)) {
+    error_message_ = "Message not identified as request or response";
+    return false;
+  }
+  // Check if it contains Via header (required for getting transaction ID)
+  if (!hasMsgHeader(HeaderType::Via)) {
+    error_message_ = "Missing Via header";
+    return false;
+  }
+  // Check if it contains Transaction ID 
+  if (!transactionId().has_value()) {
+    error_message_ = "Missing Transaction ID";
+    return false;
+  }
+  if (check_tra_context) {
+    // Check if it contains From header (required for TRA context management)
+    if (!hasMsgHeader(HeaderType::From)) {
+      error_message_ = "Missing From header";
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions

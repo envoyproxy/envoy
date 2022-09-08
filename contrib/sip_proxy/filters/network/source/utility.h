@@ -163,6 +163,10 @@ public:
         ->ip()
         ->addressAsString();
   }
+
+  static const std::string threadId(Server::Configuration::FactoryContext& context) {
+    return context.api().threadFactory().currentThreadId().debugString() + "@" + localAddress(context);
+  }
 };
 
 /**

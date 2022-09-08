@@ -182,13 +182,7 @@ Network::FilterStatus ConnectionManager::onNewConnection() {
 }
 
 void ConnectionManager::createNewDownstreamConnection() {
-  std::string thread_id = this->context_.api().threadFactory().currentThreadId().debugString() +
-                          "@" +
-                          read_callbacks_->connection()
-                              .connectionInfoProvider()
-                              .localAddress()
-                              ->ip()
-                              ->addressAsString();
+  std::string thread_id = Utility::threadId(context_);
   std::string downstream_conn_id =
       read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
       "@" + random_generator_.uuid();
@@ -251,9 +245,10 @@ void ConnectionManager::continueHandling(MessageMetadataSharedPtr metadata,
     decoder_->onData(request_buffer_, true);
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
-    sendLocalReply(*(decoder_->metadata()), ex, false);
-    setLocalResponseSent(decoder_->metadata()->transactionId().value());
-
+    if (decoder_->metadata()->msgType() == MsgType::Request) {
+      sendLocalReply(*(decoder_->metadata()), ex, false);
+      setLocalResponseSent(decoder_->metadata()->transactionId().value());
+    }
     decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
@@ -268,9 +263,10 @@ void ConnectionManager::dispatch() {
     decoder_->onData(request_buffer_);
   } catch (const AppException& ex) {
     ENVOY_LOG(debug, "sip application exception: {}", ex.what());
-    sendLocalReply(*(decoder_->metadata()), ex, false);
-    setLocalResponseSent(decoder_->metadata()->transactionId().value());
-
+    if (decoder_->metadata()->msgType() == MsgType::Request) {
+      sendLocalReply(*(decoder_->metadata()), ex, false);
+      setLocalResponseSent(decoder_->metadata()->transactionId().value());
+    }
     decoder_->complete();
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(debug, "sip error: {}", read_callbacks_->connection(), ex.what());
@@ -379,21 +375,25 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
+DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   std::string&& k = std::string(metadata->transactionId().value());
-
-  if ((settings()->UpstreamTransactionsEnabled()) &&
+  if ((!settings()->UpstreamTransactionsEnabled()) &&
+      (metadata->msgType() == MsgType::Response)) {
+    ENVOY_LOG(error, "Upstream transactions support disabled. Dropping response received from upstream transaction.");
+    return nullptr;
+  }
+  else if ((settings()->UpstreamTransactionsEnabled()) &&
       (metadata->msgType() == MsgType::Response) && 
       (upstream_transaction_infos_->hasTransaction(k))) {
     ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
-    return *(upstream_transaction_infos_->getTransaction(k));
+    return upstream_transaction_infos_->getTransaction(k).get();
   } else {
     stats_.request_active_.inc();
         stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
     // if (metadata->methodType() == MethodType::Ack) {
     if (transactions_.find(k) != transactions_.end()) {
       // ACK_4XX metadata will updated later.
-      return *transactions_.at(k);
+      return transactions_.at(k).get();
     }
     // }
 
@@ -401,7 +401,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
     new_trans->createFilterChain();
     transactions_.emplace(k, std::move(new_trans));
 
-    return *transactions_.at(k);
+    return transactions_.at(k).get();
   } 
 }
 
@@ -638,9 +638,10 @@ FilterStatus ConnectionManager::UpstreamActiveTrans::transportBegin(MessageMetad
 }
 
 void ConnectionManager::UpstreamActiveTrans::onError(const std::string& what) {
+  UNREFERENCED_PARAMETER(what);
   if (metadata_) {
-    sendLocalReply(AppException(AppExceptionType::ProtocolError, what), true);
-    return;
+    // Until deciding what local replies to send, none will be sent
+    //sendLocalReply(AppException(AppExceptionType::ProtocolError, what), false);
   }
   parent_.doDeferredUpstreamTransDestroy(*this);
 }
@@ -690,13 +691,12 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
   return_destination_ = return_destination.value();
   metadata_ = metadata;
                                   
-
   if (local_response_sent_) {
     ENVOY_LOG(error, "Message after local response sent closing the transaction, return directly");
     return SipFilters::ResponseStatus::Reset;
   }
 
-  try {
+  try {    
     if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
       throw EnvoyException("Downstream connection is closed");
     }
@@ -713,7 +713,8 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     return SipFilters::ResponseStatus::Complete;
   } catch (const AppException& ex) {
     ENVOY_LOG(error, "SIP response application error: {}", ex.what());
-    sendLocalReply(ex, false);
+    // Until deciding what local replies to send, none will be sent
+    //sendLocalReply(ex, false);
     return SipFilters::ResponseStatus::Reset;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "SIP response error: {}", parent_.read_callbacks_->connection(),

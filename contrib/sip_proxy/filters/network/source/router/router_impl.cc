@@ -385,7 +385,7 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                      host->address()->ip()->addressAsString());
   } else {
     upstream_connection_ = std::make_shared<UpstreamConnection>(
-        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info);
+        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info, context_);
     upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
     upstream_connection_->setMetadata(metadata);
     transaction_info->insertUpstreamConnection(host->address()->ip()->addressAsString(),
@@ -566,8 +566,9 @@ const Network::Connection* Router::downstreamConnection() const {
 void Router::cleanup() { upstream_connection_.reset(); }
 
 UpstreamConnection::UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool,
-                                 std::shared_ptr<TransactionInfo> transaction_info)
-    : conn_pool_(pool), transaction_info_(transaction_info) {}
+                                 std::shared_ptr<TransactionInfo> transaction_info,
+                                Server::Configuration::FactoryContext& context)
+    : conn_pool_(pool), transaction_info_(transaction_info), context_(context) {}
 
 UpstreamConnection::~UpstreamConnection() {
   if (conn_pool_handle_) {
@@ -657,6 +658,8 @@ void UpstreamConnection::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& co
   conn_pool_handle_ = nullptr;
 
   setConnectionState(ConnectionState::Connected);
+
+  thread_id_ = Utility::threadId(context_);
 
   if (continue_handling) {
     if (callbacks_) {
@@ -803,23 +806,56 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
   ENVOY_LOG(trace, "UpstreamMessageDecoder\n{}", metadata->rawMsg());
 
   // ONLY used in case of requests to upstream initiated transactions
-  if ((metadata->msgType() == MsgType::Request) && (settings()->UpstreamTransactionsEnabled())) {
+  if (metadata->msgType() == MsgType::Request) {
+    if (!metadata->validate(false)) {
+      ENVOY_LOG(
+          error,
+          "Dropping upstream request with no well formatted header. Error: {}", metadata->errorMessage());
+      parent_.onError(metadata, ErrorCode::BadRequest, metadata->errorMessage());
+      return FilterStatus::StopIteration;
+    }
+
+    if (!settings()->UpstreamTransactionsEnabled()) {
+      ENVOY_LOG(
+          error,
+          "Upstream transaction support disabled. Dropping the received upstream request.");
+      return FilterStatus::StopIteration;
+    }
+
     auto origin_ingress = metadata->originIngress();
     if (origin_ingress == nullptr) {
       ENVOY_LOG(
           error,
-          "Dropping upstream request with no well formatted X-Envoy-Origin-Ingress header.\n");
+          "Dropping upstream request with no X-Envoy-Origin-Ingress header.");
       parent_.onError(metadata, ErrorCode::BadRequest,
-                      "Missing or bad formatted X-Envoy-Origin-Ingress header");
+                      "Missing X-Envoy-Origin-Ingress header");
+      return FilterStatus::StopIteration;
+    } else if (!origin_ingress->isValid()) {
+      ENVOY_LOG(
+          error,
+          "Dropping upstream request with invalid format of X-Envoy-Origin-Ingress header.");
+      parent_.onError(metadata, ErrorCode::BadRequest,
+                      "Invalid format of X-Envoy-Origin-Ingress header");
+      return FilterStatus::StopIteration;
+    }
+
+    auto message_thread_id = origin_ingress->getThreadID();
+    auto local_thread_id = parent_.threadId();
+    if (message_thread_id != local_thread_id) {
+      ENVOY_LOG(error, "Thread ID {} received different from local thread ID {}. Dropping  message.", message_thread_id, local_thread_id);
+      // For the moment we discard the message, without sending local reply, until decide what error code to send
+      /*parent_.onError(metadata, ErrorCode::TransactionNotExist,
+                      "X-Envoy-Origin-Ingress header pointing to wrong thread");*/
       return FilterStatus::StopIteration;
     }
 
     auto downstream_conn_id = origin_ingress->getDownstreamConnectionID();
     auto downstream_conn = parent_.getDownstreamConnection(downstream_conn_id);
     if (downstream_conn == nullptr) {
-      ENVOY_LOG(debug, "No downstream connection found for: {}", downstream_conn_id);
-      parent_.onError(metadata, ErrorCode::TransactionNotExist,
-                      "No downstream connection found for provided ID");
+      ENVOY_LOG(error, "No downstream connection found for {}. Dropping  message.", downstream_conn_id);
+      // For the moment we discard the message, without sending local reply, until decide what error code to send
+      /*parent_.onError(metadata, ErrorCode::TransactionNotExist,
+                      "X-Envoy-Origin-Ingress header pointing to not existing downstream connection");*/
       return FilterStatus::StopIteration;
     }
 

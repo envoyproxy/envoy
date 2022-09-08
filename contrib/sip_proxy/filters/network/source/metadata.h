@@ -107,6 +107,8 @@ public:
 
   std::string getThreadID() { return thread_id_; }
 
+  bool isValid() { return (!((thread_id_.empty()) || (downstream_connection_id_.empty()))); }
+
 private:
   std::string thread_id_;
   std::string downstream_connection_id_;
@@ -160,6 +162,8 @@ public:
   std::string destination() { return destination_; }
   void setDestination(std::string destination) { destination_ = destination; }
   void resetDestination() { destination_.clear(); }
+
+  std::string errorMessage() { return error_message_; }
 
   bool stopLoadBalance() { return stop_load_balance_; };
   void setStopLoadBalance(bool stop_load_balance) { stop_load_balance_ = stop_load_balance; };
@@ -219,6 +223,8 @@ public:
     return tra_context_map_;
   }
 
+  bool validate(bool check_tra_context);
+
 private:
   MsgType msg_type_;
   MethodType method_type_;
@@ -234,6 +240,8 @@ private:
   absl::optional<absl::string_view> transaction_id_{};
   std::unique_ptr<OriginIngress> origin_ingress_;
   std::string destination_{};
+  
+  std::string error_message_{};
 
   std::vector<AffinityEntry> affinity_{};
   std::vector<AffinityEntry>::iterator affinity_iteration_{affinity_.begin()};

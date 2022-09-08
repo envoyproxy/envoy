@@ -10,7 +10,7 @@ namespace NetworkFilters {
 namespace SipProxy {
 
 const std::vector<std::string> errorCodeStr{
-    "400 Bad Request", "481 Call/Transaction Does Not Exist", "503 Service Unavailable"};
+    "400 Bad Request", "503 Service Unavailable"};
 
 DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
                                                   Buffer::Instance& buffer) const {

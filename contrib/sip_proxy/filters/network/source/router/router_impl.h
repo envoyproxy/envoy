@@ -340,7 +340,7 @@ public:
   FilterStatus transportEnd() override { return FilterStatus::Continue; }
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
+  DecoderEventHandler* newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
   std::shared_ptr<SipSettings> settings() const override;
 
 private:
@@ -356,7 +356,8 @@ class UpstreamConnection : public Tcp::ConnectionPool::Callbacks,
                         public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool_data,
-                  std::shared_ptr<TransactionInfo> transaction_info);
+                  std::shared_ptr<TransactionInfo> transaction_info,
+                  Server::Configuration::FactoryContext& context);
   ~UpstreamConnection() override;
   FilterStatus start();
   void resetStream();
@@ -408,6 +409,8 @@ public:
 
   SipFilterStats* stats() { return stats_; }
 
+  std::string threadId() { return thread_id_; }
+
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
@@ -424,6 +427,8 @@ private:
   SipFilters::DecoderFilterCallbacks* callbacks_{};
   MessageMetadataSharedPtr metadata_;
   Buffer::OwnedImpl upstream_buffer_;
+  Server::Configuration::FactoryContext& context_;
+  std::string thread_id_;
 };
 
 } // namespace Router

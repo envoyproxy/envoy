@@ -82,7 +82,7 @@ public:
   /**
    * @return DecoderEventHandler& a new DecoderEventHandler for a message.
    */
-  virtual DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
+  virtual DecoderEventHandler* newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
   virtual std::shared_ptr<SipSettings> settings() const PURE;
 };
 
@@ -116,7 +116,9 @@ public:
     state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
   }
 
-  void complete();
+  void complete() {
+    complete(true);
+  };
 
 private:
   friend class SipConnectionManagerTest;
@@ -137,6 +139,8 @@ private:
    *               than length when other data after data.
    */
   FilterStatus onDataReady(Buffer::Instance& data);
+
+  void complete(bool reset_request);
 
   int decode();
 

@@ -136,7 +136,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // DecoderCallbacks
-  DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
+  DecoderEventHandler* newDecoderEventHandler(MessageMetadataSharedPtr metadata) override;
 
   std::shared_ptr<SipSettings> settings() const override { return config_.settings(); }
 
@@ -159,6 +159,8 @@ public:
   void eraseActiveTransFromPendingList(std::string& transaction_id) override {
     return pending_list_.eraseActiveTransFromPendingList(transaction_id);
   }
+
+  absl::optional<OriginIngress> originIngress() { return local_origin_ingress_; }
 
 private:
   friend class SipConnectionManagerTest;
@@ -187,9 +189,9 @@ private:
     FilterStatus transportEnd() override;
 
     // DecoderCallbacks
-    DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
+    DecoderEventHandler* newDecoderEventHandler(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
-      return *this;
+      return this;
     }
 
     std::shared_ptr<SipSettings> settings() const override { return parent_.parent_.settings(); }
@@ -486,7 +488,7 @@ private:
 
     uint64_t streamId() const override { return 0; }
     std::string transactionId() const override { return ""; }
-    absl::optional<OriginIngress> originIngress() override { return OriginIngress{"", ""}; }
+    absl::optional<OriginIngress> originIngress() override { return parent_.originIngress(); }
 
     Router::RouteConstSharedPtr route() override { return nullptr; }
 

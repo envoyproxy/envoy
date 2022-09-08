@@ -75,8 +75,10 @@ State DecoderStateMachine::run() {
 
 Decoder::Decoder(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
-void Decoder::complete() {
-  request_.reset();
+void Decoder::complete(bool reset_request) {
+  if (reset_request) {
+    request_.reset();
+  }
   metadata_.reset();
   state_machine_ = nullptr;
 
@@ -171,14 +173,19 @@ FilterStatus Decoder::onDataReady(Buffer::Instance& data) {
 
   decode();
 
-  request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler(metadata_));
-  state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
-  State rv = state_machine_->run();
+  DecoderEventHandler* handler = callbacks_.newDecoderEventHandler(metadata_);
+  if (handler != nullptr) {
+    request_ = std::make_unique<ActiveRequest>(*(handler));
+    state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
+    State rv = state_machine_->run();
 
-  if (rv == State::Done) {
-    // complete();
+    if (rv == State::Done) {
+      // complete();
+    }
+    complete();
+  } else {
+    complete(false);
   }
-  complete();
 
   return FilterStatus::StopIteration;
 }
@@ -309,13 +316,17 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
 
   auto thread_start = header.find("thread=");
   if (thread_start == absl::string_view::npos) {
-    ENVOY_LOG(error, "Not found start of thread field for X-Envoy-origin-Ingress={}", header);
+    ENVOY_LOG(error, "Not found start of thread field for X-Envoy-origin-Ingress={}", header);    
+    auto origin_ingress = std::make_unique<OriginIngress>("", "");
+    metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
   }
   thread_start += 7;
   auto thread_end = header.find(";", thread_start);
   if ((thread_end == absl::string_view::npos) || (thread_end <= thread_start)) {
-    ENVOY_LOG(error, "Not found end of thread field for X-Envoy-origin-Ingress={}", header);
+    ENVOY_LOG(error, "Not found end of thread field for X-Envoy-origin-Ingress={}", header);  
+    auto origin_ingress = std::make_unique<OriginIngress>("", "");
+    metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
   }
 
@@ -323,14 +334,18 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   if (downstream_conn_start == absl::string_view::npos) {
     ENVOY_LOG(error,
               "Not found start of thread downstream-connection for X-Envoy-origin-Ingress={}",
-              header);
+              header);  
+    auto origin_ingress = std::make_unique<OriginIngress>("", "");
+    metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
   }
   downstream_conn_start += 22;
   auto downstream_conn_end = header.length();
   if (downstream_conn_end <= downstream_conn_start) {
     ENVOY_LOG(error, "Not found end of thread downstream-connection for X-Envoy-origin-Ingress={}",
-              header);
+              header);  
+    auto origin_ingress = std::make_unique<OriginIngress>("", "");
+    metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
   }
 

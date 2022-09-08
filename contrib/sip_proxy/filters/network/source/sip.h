@@ -71,7 +71,6 @@ enum class AppExceptionType {
 
 enum ErrorCode {
   BadRequest,
-  TransactionNotExist,
   ServiceUnavailable,
 };
 
