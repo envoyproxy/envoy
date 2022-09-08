@@ -502,15 +502,18 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   // When we receive the first command with a key we will set this key as our transaction
   // key, and then send a MULTI command to the node that handles that key.
-  const auto route = router.upstreamPool(transaction.key_);
+  RouteSharedPtr route;
   if (transaction.key_.empty()) {
     transaction.key_ = incoming_request->asArray()[1].asString();
+    route = router.upstreamPool(transaction.key_);
     Common::Redis::RespValueSharedPtr multi_request =
         std::make_shared<Common::Redis::Client::MultiRequest>();
     if (route) {
       makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, null_pool_callbacks,
                               callbacks.transaction());
     }
+  } else {
+    route = router.upstreamPool(transaction.key_);
   }
 
   std::unique_ptr<TransactionRequest> request_ptr{
