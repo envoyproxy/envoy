@@ -9,17 +9,6 @@ namespace RateLimitQuota {
 
 using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 
-// TODO(tyxia) buildBuckets might be the part of filter rather than the client.
-// * the data plane sends a usage report for requests matched into the bucket with ``BucketId``
-//   to the control plane
-// * the control plane sends an assignment for the bucket with ``BucketId`` to the data plane
-//   Bucket ID.
-
-/*Initially all Envoy's quota assignments are empty. The rate limit quota filter requests quota
-   assignment from RLQS when the request matches a bucket for the first time. The behavior of the
-   filter while it waits for the initial assignment is determined by the no_assignment_behavior
-   value.
-*/
 void RateLimitQuotaFilter::setDecoderFilterCallbacks(
     Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
