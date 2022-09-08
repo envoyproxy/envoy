@@ -19,7 +19,8 @@ namespace HealthCheckers {
 namespace ThriftHealthChecker {
 namespace {
 
-using CustomThriftHealthChecker = Extensions::HealthCheckers::ThriftHealthChecker::ThriftHealthChecker;
+using CustomThriftHealthChecker =
+    Extensions::HealthCheckers::ThriftHealthChecker::ThriftHealthChecker;
 
 TEST(HealthCheckerFactoryTest, CreateThrift) {
   const std::string yaml = R"EOF(
@@ -49,9 +50,8 @@ TEST(HealthCheckerFactoryTest, CreateThrift) {
 }
 
 TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
-  std::vector<std::string> yamls = {
-  // missing method name
-  R"EOF(
+  std::vector<std::string> yamls = {// missing method name
+                                    R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -65,8 +65,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         transport: HEADER
         protocol: BINARY
   )EOF",
-  // missing transport
-  R"EOF(
+                                    // missing transport
+                                    R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -80,8 +80,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         protocol: BINARY
   )EOF",
-  // missing protocol
-  R"EOF(
+                                    // missing protocol
+                                    R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -95,8 +95,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         transport: HEADER
   )EOF",
-  // AUTO protocol is not allowed.
-  R"EOF(
+                                    // AUTO protocol is not allowed.
+                                    R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -110,8 +110,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         protocol: AUTO
   )EOF",
-  // AUTO transport is not allowed.
-  R"EOF(
+                                    // AUTO transport is not allowed.
+                                    R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -124,16 +124,16 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         "@type": type.googleapis.com/envoy.extensions.health_checkers.thrift.v3.Thrift
         method_name: ping
         transport: AUTO
-  )EOF"
-  };
+  )EOF"};
 
   ThriftHealthCheckerFactory factory;
 
-  for (const std::string& yaml:yamls) {
+  for (const std::string& yaml : yamls) {
     NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
     EXPECT_THROW(
-        factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context), EnvoyException);
+        factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV3Yaml(yaml), context),
+        EnvoyException);
   }
 }
 

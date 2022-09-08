@@ -1,8 +1,6 @@
-
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/health_checkers/thrift/client_impl.h"
 
 #include "test/extensions/health_checkers/thrift/mocks.h"
@@ -29,8 +27,7 @@ namespace ThriftHealthChecker {
 
 using namespace NetworkFilters::ThriftProxy;
 
-class ThriftClientImplTest : public testing::Test,
-                             public Event::TestUsingSimulatedTime {
+class ThriftClientImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   ThriftClientImplTest() = default;
   ~ThriftClientImplTest() override = default;
@@ -40,13 +37,12 @@ public:
     conn_info_.connection_ = connection_;
 
     EXPECT_CALL(callback_, createConnection_).WillOnce(Return(conn_info_));
-    EXPECT_CALL(*connection_, addReadFilter(_))
-        .WillOnce(SaveArg<0>(&upstream_read_filter_));
+    EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, noDelay(true));
 
-    client_ = std::make_unique<ClientImpl>(callback_, transport_, protocol_, method_name_,
-                                             host_, initial_seq_id_);
+    client_ = std::make_unique<ClientImpl>(callback_, transport_, protocol_, method_name_, host_,
+                                           initial_seq_id_);
     client_->start();
 
     // No-OP currently.
@@ -54,9 +50,7 @@ public:
     connection_->runLowWatermarkCallbacks();
   }
 
-  void onConnected() {
-
-  }
+  void onConnected() {}
 
   void writeMessage(Buffer::Instance& buffer, NetworkFilters::ThriftProxy::MessageType msg_type) {
     Buffer::OwnedImpl msg;
@@ -76,15 +70,13 @@ public:
     proto->writeStructEnd(msg);
     proto->writeMessageEnd(msg);
 
-    TransportPtr transport =
-        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
   }
 
   void writeFramedBinaryIDLException(Buffer::Instance& buffer) {
     Buffer::OwnedImpl msg;
-    ProtocolPtr proto =
-        NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
     MessageMetadata metadata;
     metadata.setProtocol(protocol_);
     metadata.setMethodName(method_name_);
@@ -108,8 +100,7 @@ public:
     proto->writeStructEnd(msg);
     proto->writeMessageEnd(msg);
 
-    TransportPtr transport =
-        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
   }
 
@@ -119,8 +110,10 @@ public:
   ClientPtr client_;
   Upstream::MockHost::MockCreateConnectionData conn_info_;
   NiceMock<MockClientCallback> callback_;
-  const NetworkFilters::ThriftProxy::TransportType transport_{NetworkFilters::ThriftProxy::TransportType::Header};
-  const NetworkFilters::ThriftProxy::ProtocolType protocol_{NetworkFilters::ThriftProxy::ProtocolType::Binary};
+  const NetworkFilters::ThriftProxy::TransportType transport_{
+      NetworkFilters::ThriftProxy::TransportType::Header};
+  const NetworkFilters::ThriftProxy::ProtocolType protocol_{
+      NetworkFilters::ThriftProxy::ProtocolType::Binary};
   const std::string method_name_{"foo"};
   const int32_t initial_seq_id_{9527};
 };
@@ -139,7 +132,7 @@ TEST_F(ThriftClientImplTest, Success) {
   EXPECT_CALL(callback_, onResponseResult(true));
 
   Buffer::OwnedImpl success_response;
-  writeMessage(success_response,  NetworkFilters::ThriftProxy::MessageType::Reply);
+  writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
   upstream_read_filter_->onData(success_response, false);
 
   client_->close();
@@ -160,7 +153,7 @@ TEST_F(ThriftClientImplTest, Execption) {
   EXPECT_CALL(callback_, onResponseResult(false));
 
   Buffer::OwnedImpl exception_response;
-  writeMessage(exception_response,  NetworkFilters::ThriftProxy::MessageType::Exception);
+  writeMessage(exception_response, NetworkFilters::ThriftProxy::MessageType::Exception);
   upstream_read_filter_->onData(exception_response, false);
 
   EXPECT_CALL(*connection_, close(_));

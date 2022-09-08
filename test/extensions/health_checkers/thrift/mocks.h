@@ -1,10 +1,11 @@
 #pragma once
 
-#include "gmock/gmock.h"
-
 #include "source/extensions/health_checkers/thrift/client.h"
+
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/host.h"
+
+#include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,21 +17,13 @@ public:
   MockClient(ClientCallback& callback);
   ~MockClient() override;
 
-  void raiseEvent(Network::ConnectionEvent event) {
-    callback_.onEvent(event);
-  }
+  void raiseEvent(Network::ConnectionEvent event) { callback_.onEvent(event); }
 
-  void raiseResponseResult(bool is_success) {
-    callback_.onResponseResult(is_success);
-  }
+  void raiseResponseResult(bool is_success) { callback_.onResponseResult(is_success); }
 
-  void runHighWatermarkCallbacks() {
-    callback_.onAboveWriteBufferHighWatermark();
-  }
+  void runHighWatermarkCallbacks() { callback_.onAboveWriteBufferHighWatermark(); }
 
-  void runLowWatermarkCallbacks() {
-    callback_.onBelowWriteBufferLowWatermark();
-  }
+  void runLowWatermarkCallbacks() { callback_.onBelowWriteBufferLowWatermark(); }
 
   MOCK_METHOD(void, start, ());
   MOCK_METHOD(bool, makeRequest, ());

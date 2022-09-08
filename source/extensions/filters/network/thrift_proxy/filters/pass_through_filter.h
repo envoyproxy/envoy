@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,7 +15,7 @@ namespace ThriftFilters {
  * Pass through Thrift decoder/encoder/bidirectional filter. Continue at each state within the
  * series of transitions, and pass through the decoded/encoded data.
  */
-class PassThroughDecoderFilter : public DecoderFilter, public PassThroughDecoderEventHandler  {
+class PassThroughDecoderFilter : public DecoderFilter, public PassThroughDecoderEventHandler {
 public:
   // Thrift FilterBase
   void onDestroy() override {}

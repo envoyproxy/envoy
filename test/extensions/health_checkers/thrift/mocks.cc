@@ -27,7 +27,6 @@ MockClient::~MockClient() = default;
 MockClientCallback::MockClientCallback() = default;
 MockClientCallback::~MockClientCallback() = default;
 
-
 } // namespace ThriftHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

@@ -29,10 +29,9 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace ThriftHealthChecker {
 
-class ThriftHealthCheckerTest
-    : public Event::TestUsingSimulatedTime,
-      public testing::Test,
-      public ClientFactory {
+class ThriftHealthCheckerTest : public Event::TestUsingSimulatedTime,
+                                public testing::Test,
+                                public ClientFactory {
 public:
   ThriftHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
@@ -119,14 +118,11 @@ public:
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
-  ClientPtr
-  create(ClientCallback& callbacks,
-        NetworkFilters::ThriftProxy::TransportType transport,
-        NetworkFilters::ThriftProxy::ProtocolType protocol,
-        const std::string& method_name,
-        Upstream::HostSharedPtr , int32_t ) override {
-    EXPECT_EQ(transport,  NetworkFilters::ThriftProxy::TransportType::Header);
-    EXPECT_EQ(protocol,  NetworkFilters::ThriftProxy::ProtocolType::Binary);
+  ClientPtr create(ClientCallback& callbacks, NetworkFilters::ThriftProxy::TransportType transport,
+                   NetworkFilters::ThriftProxy::ProtocolType protocol,
+                   const std::string& method_name, Upstream::HostSharedPtr, int32_t) override {
+    EXPECT_EQ(transport, NetworkFilters::ThriftProxy::TransportType::Header);
+    EXPECT_EQ(protocol, NetworkFilters::ThriftProxy::ProtocolType::Binary);
     EXPECT_EQ(method_name, "ping");
     return ClientPtr{create_(callbacks)};
   }
@@ -307,7 +303,6 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 */
-
 
 // TODO Need massage
 // Tests that thrift client will behave appropriately when reuse_connection is false.
