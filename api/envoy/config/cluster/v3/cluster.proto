@@ -205,6 +205,11 @@ message Cluster {
     // have the same restrictions as cluster name, i.e. it may be arbitrary
     // length. This may be a xdstp:// URL.
     string service_name = 2;
+
+    // If set, all discovery requests for EDS will utilize a single GRPC stream towards the same management server.
+    // Defaults to false. When unset, Envoy will allocate a GRPC stream per EDS cluster which can lead to the exhaustion of
+    // the limit for max concurrent streams in HTTP2.
+    bool multiplex_eds = 3;
   }
 
   // Optionally divide the endpoints in this cluster into subsets defined by
