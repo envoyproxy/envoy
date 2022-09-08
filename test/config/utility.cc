@@ -930,9 +930,12 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    ASSERT(!old_options.has_auto_config());
+    bool auto_config = old_options.has_auto_config();
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
+    if (auto_config) {
+      protocol_options.mutable_auto_config();
+    }
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -1195,6 +1198,9 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
       old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    if (old_protocol_options.http_filters().empty()) {
+      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
     TestUtility::loadFromYaml(config, *filter_list_back);

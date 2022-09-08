@@ -231,6 +231,7 @@ LEV
 LF
 LHS
 hls
+integrations
 jkl
 lang
 libsxg

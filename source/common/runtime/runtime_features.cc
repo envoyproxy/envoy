@@ -33,6 +33,8 @@ RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
 RUNTIME_GUARD(envoy_reloadable_features_allow_adding_content_type_in_local_replies);
 RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
+// TODO(alyssawilk) REVERT BEFORE SUBMIT
+RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_inline_write);
 RUNTIME_GUARD(envoy_reloadable_features_append_or_truncate);
 RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
@@ -95,8 +97,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
 // Android.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
-// TODO(yanavlasov): disable upstream filters by default
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
