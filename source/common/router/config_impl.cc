@@ -107,7 +107,7 @@ RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
     break;
   }
   case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPathMatchPolicy: {
-    route = std::make_shared<PathMatchPolicyRouteEntryImpl>(
+    route = std::make_shared<UriTemplateMatcherRouteEntryImpl>(
         vhost, route_config, optional_http_filters, factory_context, validator);
     break;
   }
@@ -485,7 +485,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()),
       extension_path_matcher_(buildPathMatchPolicy(route, validator)),
-      extension_path_rewriter_(buildPathRewritePolicy(route, validator)),
+      path_rewriter_(buildPathRewritePolicy(route, validator)),
       host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       auto_host_rewrite_header_(!route.route().host_rewrite_header().empty()
@@ -652,7 +652,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   int num_rewrite_polices = 0;
-  if (extension_path_rewriter_ != nullptr) {
+  if (path_rewriter_ != nullptr) {
     ++num_rewrite_polices;
   }
 
@@ -675,9 +675,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  if (extension_path_rewriter_ != nullptr) {
+  if (path_rewriter_ != nullptr) {
     absl::Status compatible_status =
-        extension_path_rewriter_->isCompatiblePathMatcher(extension_path_matcher_);
+        path_rewriter_->isCompatiblePathMatcher(extension_path_matcher_);
     if (!compatible_status.ok()) {
       throw EnvoyException(std::string(compatible_status.message()));
     }
@@ -848,7 +848,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   // Handle path rewrite
   absl::optional<std::string> container;
   if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
-      extension_path_rewriter_ != nullptr) {
+      path_rewriter_ != nullptr) {
     rewritePathHeader(headers, insert_envoy_original_path);
   }
 }
@@ -966,29 +966,30 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
     const Http::RequestHeaderMap& headers, absl::string_view matched_path) const {
   absl::optional<std::string> container;
   const auto& rewrite = getPathRewrite(headers, container);
-  if (!rewrite.empty() || regex_rewrite_ != nullptr) {
-    // TODO(perf): can we avoid the string copy for the common case?
-    std::string path(headers.getPathValue());
-
-    if (!rewrite.empty()) {
-      ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                             : absl::StartsWithIgnoreCase(path, matched_path));
-      return path.replace(0, matched_path.size(), rewrite);
-    }
-
-    if (regex_rewrite_ != nullptr) {
-      // Replace the entire path, but preserve the query parameters
-      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
-      return path.replace(0, just_path.size(),
-                          regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
-    }
+  if (rewrite.empty() && regex_rewrite_ == nullptr && path_rewriter_ == nullptr) {
+    // There are no rewrites configured.
+    return {};
   }
 
-  if (extension_path_rewriter_ != nullptr) {
+  // TODO(perf): can we avoid the string copy for the common case?
+  std::string path(headers.getPathValue());
+  if (!rewrite.empty()) {
+    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
+                           : absl::StartsWithIgnoreCase(path, matched_path));
+    return path.replace(0, matched_path.size(), rewrite);
+  }
+
+  if (regex_rewrite_ != nullptr) {
+    // Replace the entire path, but preserve the query parameters
+    auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+    return path.replace(0, just_path.size(),
+                        regex_rewrite_->replaceAll(just_path, regex_rewrite_substitution_));
+  }
+
+  if (path_rewriter_ != nullptr) {
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
 
-    absl::StatusOr<std::string> new_path =
-        extension_path_rewriter_->rewritePath(just_path, matched_path);
+    absl::StatusOr<std::string> new_path = path_rewriter_->rewritePath(just_path, matched_path);
 
     // if rewrite fails return old path.
     if (!new_path.ok()) {
@@ -1191,44 +1192,44 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
 PathRewriterSharedPtr
 RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const {
-  if (route.route().has_path_rewrite_policy()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathRewriterFactory>(
-        route.route().path_rewrite_policy());
-
-    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        route.route().path_rewrite_policy().typed_config(), validator, factory);
-
-    absl::StatusOr<PathRewriterSharedPtr> rewriter = factory.createPathRewriter(*config);
-
-    if (!rewriter.ok()) {
-      throw EnvoyException(std::string(rewriter.status().message()));
-    }
-
-    return rewriter.value();
+  if (!route.route().has_path_rewrite_policy()) {
+    return nullptr;
   }
-  return nullptr;
+
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathRewriterFactory>(
+      route.route().path_rewrite_policy());
+
+  ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      route.route().path_rewrite_policy().typed_config(), validator, factory);
+
+  absl::StatusOr<PathRewriterSharedPtr> rewriter = factory.createPathRewriter(*config);
+
+  if (!rewriter.ok()) {
+    throw EnvoyException(std::string(rewriter.status().message()));
+  }
+
+  return rewriter.value();
 }
 
 PathMatcherSharedPtr
 RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
-  if (route.match().has_path_match_policy()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathMatcherFactory>(
-        route.match().path_match_policy());
+  if (!route.match().has_path_match_policy()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<PathMatcherFactory>(
+      route.match().path_match_policy());
 
-    ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        route.match().path_match_policy().typed_config(), validator, factory);
+  ProtobufTypes::MessagePtr config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      route.match().path_match_policy().typed_config(), validator, factory);
 
-    absl::StatusOr<PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
+  absl::StatusOr<PathMatcherSharedPtr> matcher = factory.createPathMatcher(*config);
 
-    if (!matcher.ok()) {
-      throw EnvoyException(std::string(matcher.status().message()));
-    }
-
-    return matcher.value();
+  if (!matcher.ok()) {
+    throw EnvoyException(std::string(matcher.status().message()));
   }
 
-  return nullptr;
+  return matcher.value();
 }
 
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::config::route::v3::Route& route) {
@@ -1468,7 +1469,7 @@ void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
   }
 }
 
-PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
+UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
@@ -1476,20 +1477,20 @@ PathMatchPolicyRouteEntryImpl::PathMatchPolicyRouteEntryImpl(
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       uri_template_(extension_path_matcher_->uriTemplate()){};
 
-void PathMatchPolicyRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
-                                                      bool insert_envoy_original_path) const {
+void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
+                                                         bool insert_envoy_original_path) const {
   finalizePathHeader(headers, extension_path_matcher_->uriTemplate(), insert_envoy_original_path);
 }
 
-absl::optional<std::string> PathMatchPolicyRouteEntryImpl::currentUrlPathAfterRewrite(
+absl::optional<std::string> UriTemplateMatcherRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
   return currentUrlPathAfterRewriteWithMatchedPath(headers, extension_path_matcher_->uriTemplate());
 }
 
 RouteConstSharedPtr
-PathMatchPolicyRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                                       const StreamInfo::StreamInfo& stream_info,
-                                       uint64_t random_value) const {
+UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                          const StreamInfo::StreamInfo& stream_info,
+                                          uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       extension_path_matcher_->match(headers.getPathValue())) {
     return clusterEntry(headers, random_value);

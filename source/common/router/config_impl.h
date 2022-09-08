@@ -570,7 +570,7 @@ public:
   }
 
   const PathMatcherSharedPtr& pathMatcher() const override { return extension_path_matcher_; }
-  const PathRewriterSharedPtr& pathRewriter() const override { return extension_path_rewriter_; }
+  const PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
@@ -853,7 +853,7 @@ protected:
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   const PathMatcherSharedPtr extension_path_matcher_;
-  const PathRewriterSharedPtr extension_path_rewriter_;
+  const PathRewriterSharedPtr path_rewriter_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
@@ -1019,15 +1019,15 @@ private:
 };
 
 /**
- * Route entry implementation for path match policy based routing.
+ * Route entry implementation for uri template match based routing.
  */
-class PathMatchPolicyRouteEntryImpl : public RouteEntryImplBase {
+class UriTemplateMatcherRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathMatchPolicyRouteEntryImpl(const VirtualHostImpl& vhost,
-                                const envoy::config::route::v3::Route& route,
-                                const OptionalHttpFilters& optional_http_filters,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                ProtobufMessage::ValidationVisitor& validator);
+  UriTemplateMatcherRouteEntryImpl(const VirtualHostImpl& vhost,
+                                   const envoy::config::route::v3::Route& route,
+                                   const OptionalHttpFilters& optional_http_filters,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return uri_template_; }

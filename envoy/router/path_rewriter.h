@@ -24,7 +24,6 @@ public:
    * Determines if the matcher policy is compatible.
    *
    * @param path_match_policy current path match policy for route
-   * @param active_policy true if user provided policy
    * @return true if current path match policy is acceptable
    */
   virtual absl::Status isCompatiblePathMatcher(PathMatcherSharedPtr path_matcher) const PURE;
@@ -54,7 +53,7 @@ public:
 using PathRewriterSharedPtr = std::shared_ptr<PathRewriter>;
 
 /**
- * Factory for PathRewrite.
+ * Factory for PathRewriter.
  */
 class PathRewriterFactory : public Envoy::Config::TypedFactory {
 public:

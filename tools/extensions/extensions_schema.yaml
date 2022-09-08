@@ -109,6 +109,9 @@ categories:
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.filters.http.upstream
+- envoy.path.match
+- envoy.path.rewrite
 
 status_values:
 - name: stable

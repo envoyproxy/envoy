@@ -305,44 +305,6 @@ public:
 enum class RetryStatus { No, NoOverflow, NoRetryLimitExceeded, Yes };
 
 /**
- * PathMatchPolicy from the route configuration.
- */
-class PathMatchPolicy {
-public:
-  virtual ~PathMatchPolicy() = default;
-
-  /**
-   * @return whether path match policy is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
-   * Returns the stored target route PathMatcher.
-   * @return a PathMatcher instance.
-   */
-  virtual PathMatcherSharedPtr pathMatcher() const PURE;
-};
-
-/**
- * PathRewriterPolicy from the route configuration.
- */
-class PathRewritePolicy {
-public:
-  virtual ~PathRewritePolicy() = default;
-
-  /**
-   * @return whether path rewrite policy is enabled on this route.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
-   * Returns the stored target route PathRewriter.
-   * @return a PathRewriter instance.
-   */
-  virtual PathRewriterSharedPtr pathRewriter() const PURE;
-};
-
-/**
  * InternalRedirectPolicy from the route configuration.
  */
 class InternalRedirectPolicy {
@@ -961,12 +923,12 @@ public:
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
 
   /**
-   * @return const PathMatcherPolicy& the path match policy for the route.
+   * @return const PathMatcherSharedPtr& the path match policy for the route.
    */
   virtual const PathMatcherSharedPtr& pathMatcher() const PURE;
 
   /**
-   * @return const PathRewriterPolicy& the path match rewrite for the route.
+   * @return const PathRewriterSharedPtr& the path match rewrite for the route.
    */
   virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 

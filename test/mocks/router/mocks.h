@@ -396,8 +396,8 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
-  MOCK_METHOD(const PathMatchPolicy&, pathMatchPolicy, (), (const));
-  MOCK_METHOD(const PathRewritePolicy&, pathRewritePolicy, (), (const));
+  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
+  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -424,8 +424,6 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
-  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
-  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
 
   const RouteStatsContextOptRef routeStatsContext() const override {
     return RouteStatsContextOptRef();
@@ -438,7 +436,7 @@ public:
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
   testing::NiceMock<MockPathMatcher> extension_path_matcher_;
-  testing::NiceMock<MockPathRewriter> extension_path_rewriter_;
+  testing::NiceMock<MockPathRewriter> path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
