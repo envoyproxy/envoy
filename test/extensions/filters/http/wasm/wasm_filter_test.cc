@@ -53,7 +53,7 @@ public:
   MOCK_CONTEXT_LOG_;
 };
 
-class WasmHttpFilterTest : public Common::Wasm::WasmHttpFilterTestBase<
+class WasmHttpFilterTest : public Envoy::Extensions::Common::Wasm::WasmHttpFilterTestBase<
                                testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmHttpFilterTest() = default;
