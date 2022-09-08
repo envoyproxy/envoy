@@ -143,11 +143,11 @@ int HeaderMapWrapper::luaSetHttp1ReasonPhrase(lua_State* state) {
     if (map) {
       std::unique_ptr<StatefulHeaderKeyFormatter> fmt =
           std::make_unique<PreserveCaseHeaderFormatter>(true, PreserveCaseFormatterConfig::DEFAULT);
-      fmt->setReasonPhrase(absl::string_view(std::string(phrase)));
+      fmt->setReasonPhrase(absl::string_view(phrase, input_size));
       map->setFormatter(std::move(fmt));
     }
   } else {
-    formatter->setReasonPhrase(absl::string_view(std::string(phrase, input_size)));
+    formatter->setReasonPhrase(absl::string_view(phrase, input_size));
   }
 
   return 0;
