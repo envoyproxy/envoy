@@ -220,7 +220,9 @@ message TagSpecifier {
   //
   // .. note::
   //
-  //   It is invalid to specify the same tag name twice in a config.
+  //   It is valid to specify the same tag name twice in a config. In that case, both
+  //   specifications will apply, and that may result in tag-names occurring multiple
+  //   times in the metric.
   string tag_name = 1;
 
   oneof tag_value {

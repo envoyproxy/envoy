@@ -12,7 +12,7 @@ namespace Stats {
 
 class TagProducerTest : public testing::Test {
 protected:
-  void addSpecifier(const char* name, const char* value) {
+  void addSpecifier(const std::string& name, const std::string& value) {
     auto& specifier = *stats_config_.mutable_stats_tags()->Add();
     specifier.set_tag_name(name);
     specifier.set_regex(value);
@@ -27,6 +27,7 @@ protected:
   }
 
   envoy::config::metrics::v3::StatsConfig stats_config_;
+  const Config::TagNameValues tag_name_values_;
 };
 
 TEST_F(TagProducerTest, CheckConstructor) {
@@ -73,8 +74,7 @@ TEST_F(TagProducerTest, CheckConstructor) {
 }
 
 TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
-  addSpecifier("envoy.response_code", "\\.(response_code=(\\d{3}));");
-  addSpecifier("envoy.response_code", "_rq(_(\\d{3}))$");
+  addSpecifier(tag_name_values_.RESPONSE_CODE, "\\.(response_code=(\\d{3}));");
   {
     TagProducerImpl producer{stats_config_};
     TagVector tags;
@@ -82,28 +82,27 @@ TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
               producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
     checkTags(
         TagVector{
-            {"envoy.response_code", "200"},
-            {"envoy.response_code", "300"},
-            {"envoy.response_code", "200"},
-            {"envoy.cluster_name", "xds-grpc"},
+            {tag_name_values_.RESPONSE_CODE, "200"},
+            {tag_name_values_.RESPONSE_CODE, "300"},
+            {tag_name_values_.CLUSTER_NAME, "xds-grpc"},
         },
         tags);
   }
 }
 
 TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
-  addSpecifier("response", "\\.(response_code=(\\d{3}));");
+  addSpecifier(tag_name_values_.RESPONSE_CODE, "\\.(response_code=(\\d{3}));");
   {
-    TagProducerImpl producer{stats_config_, {{"response", "fixed"}}};
+    TagProducerImpl producer{stats_config_, {{tag_name_values_.RESPONSE_CODE, "fixed"}}};
     TagVector tags;
     EXPECT_EQ("cluster.;upstream_rq",
               producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
     checkTags(
         TagVector{
-            {"response", "fixed"},
-            {"envoy.response_code", "200"},
-            {"response", "300"},
-            {"envoy.cluster_name", "xds-grpc"},
+            {tag_name_values_.RESPONSE_CODE, "fixed"},
+            {tag_name_values_.RESPONSE_CODE, "200"},
+            {tag_name_values_.RESPONSE_CODE, "300"},
+            {tag_name_values_.CLUSTER_NAME, "xds-grpc"},
         },
         tags);
   }
