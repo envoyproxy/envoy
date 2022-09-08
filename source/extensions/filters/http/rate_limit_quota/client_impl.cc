@@ -24,7 +24,7 @@ void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
   ASSERT(stream_ != nullptr);
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
   // TODO(tyxia) end_stream
-  send(std::move(reports), /*end_stream*/true);
+  send(std::move(reports), /*end_stream*/ true);
 }
 
 void RateLimitClientImpl::send(

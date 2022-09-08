@@ -129,7 +129,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
-                                                                     {"group", "envoy"}};
+                                                                      {"group", "envoy"}};
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
@@ -157,7 +157,7 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
   // Define the wrong input that doesn't match the values in the config: it has `{"env", "staging"}`
   // rather than `{"environment", "staging"}`.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
-                                                                     {"group", "envoy"}};
+                                                                      {"group", "envoy"}};
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 

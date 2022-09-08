@@ -3,6 +3,9 @@
 
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
+#include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/message_impl.h"
@@ -11,10 +14,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
-#include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
-#include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
-#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,11 +75,9 @@ private:
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 
-
 // Contextual information used to construct the onMatch actions for a match tree.
 // Currently it is empty struct.
-struct RateLimitOnMactchActionContext {
-};
+struct RateLimitOnMactchActionContext {};
 
 // This class implements the on_match action behavior.
 class RateLimitOnMactchAction : public Matcher::ActionBase<BucketId>,
