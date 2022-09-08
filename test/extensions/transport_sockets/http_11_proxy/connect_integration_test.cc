@@ -25,7 +25,7 @@ public:
   void initialize() override {
     config_helper_.addFilter("{ name: header-to-proxy-filter }");
     if (upstream_tls_) {
-      config_helper_.configureUpstreamTls(false, false);
+      config_helper_.configureUpstreamTls(use_alpn_, false);
     }
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
@@ -50,14 +50,14 @@ public:
     });
     BaseIntegrationTest::initialize();
     if (upstream_tls_) {
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1, false);
-      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), Http::CodecType::HTTP1, false);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), upstreamProtocol(), false);
+      addFakeUpstream(createUpstreamTlsContext(upstreamConfig()), upstreamProtocol(), false);
       // Read disable the fake upstreams, so we can rawRead rather than read data and decrypt.
       fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
       fake_upstreams_[2]->setDisableAllAndDoNotEnable(true);
     } else {
-      addFakeUpstream(Http::CodecType::HTTP1);
-      addFakeUpstream(Http::CodecType::HTTP1);
+      addFakeUpstream(upstreamProtocol());
+      addFakeUpstream(upstreamProtocol());
     }
   }
 
@@ -70,6 +70,7 @@ public:
     // Ship the CONNECT response.
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
   }
+  bool use_alpn_ = false;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -234,6 +235,8 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsAndEndpoints) {
 
 // Test sending requests to different proxies.
 TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
+  // Also make sure that alpn negotiation works.
+  use_alpn_ = true;
   initialize();
 
   // Point at the second fake upstream. Envoy doesn't actually know about this one.
@@ -282,6 +285,35 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   // No encapsulation.
   EXPECT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test Http2 for the inner application layer.
+TEST_P(Http11ConnectHttpIntegrationTest, TestHttp2) {
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  use_alpn_ = true;
+  initialize();
+
+  // Point at the second fake upstream. Envoy doesn't actually know about this one.
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 1, due to the connect-proxy header.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  stripConnectUpgradeAndRespond();
+
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

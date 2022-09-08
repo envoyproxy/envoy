@@ -101,6 +101,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
   OptRef<DownstreamCallbacks> downstreamCallbacks() override;
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -488,6 +489,11 @@ public:
    * Returns the Http1StreamEncoderOptions associated with the response encoder.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Returns the UpstreamStreamFilterCallbacks for upstream filters.
+   */
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() { return {}; }
 
   /**
    * Called when a local reply is made by the filter manager.

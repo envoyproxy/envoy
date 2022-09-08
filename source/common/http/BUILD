@@ -67,6 +67,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
+        "//source/common/runtime:runtime_features_lib",
     ] + envoy_select_enable_http3([
         "//source/common/quic:codec_lib",
     ]),
