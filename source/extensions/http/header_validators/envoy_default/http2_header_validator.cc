@@ -159,6 +159,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //  * The ":authority" pseudo-header field contains the host and port to connect to (equivalent
     //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
     //    [HTTP/1.1]).
+    //
+    // TODO - Add support for extended CONNECT requests: envoy.reloadable_features.use_rfc_connect
     absl::string_view details;
     if (!path.empty()) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
