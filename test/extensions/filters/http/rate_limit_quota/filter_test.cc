@@ -128,7 +128,7 @@ public:
 TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
-  std::unordered_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                      {"group", "envoy"}};
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -140,7 +140,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
 
   // The expected bucket ids has one additional pair that is built statically via `string_value`
   // from the config.
-  std::unordered_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
 
   // Get the generated bucket ids.
@@ -148,7 +148,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   // Serialize the proto map to std map for comparison. We can avoid this conversion by using
   // `EqualsProto()` directly once it is available in the Envoy code base.
   auto serialized_bucket_ids =
-      std::unordered_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
@@ -156,7 +156,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
 TEST_F(FilterTest, BuildBucketSettingsFailed) {
   // Define the wrong input that doesn't match the values in the config: it has `{"env", "staging"}`
   // rather than `{"environment", "staging"}`.
-  std::unordered_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
                                                                      {"group", "envoy"}};
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -167,7 +167,7 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
 
   // The expected bucket ids has one additional pair that is built via `string_value` static method
   // from the config.
-  std::unordered_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
 
   // Get the generated bucket ids.
@@ -175,7 +175,7 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
   // Serialize the proto map to std map for easier matching comparison. We can avoid this conversion
   // by using `EqualsProto()` directly once that is added to the Envoy code base.
   auto serialize_bucket_ids =
-      std::unordered_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
   EXPECT_THAT(expected_bucket_ids,
               testing::Not(testing::UnorderedPointwise(testing::Eq(), serialize_bucket_ids)));
 }
