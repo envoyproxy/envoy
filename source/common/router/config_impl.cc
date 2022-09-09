@@ -484,8 +484,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        ProtobufMessage::ValidationVisitor& validator)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()),
-      extension_path_matcher_(buildPathMatchPolicy(route, validator)),
-      path_rewriter_(buildPathRewritePolicy(route, validator)),
+      path_matcher_(buildPathMatcher(route, validator)),
+      path_rewriter_(buildPathRewriter(route, validator)),
       host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       auto_host_rewrite_header_(!route.route().host_rewrite_header().empty()
@@ -677,7 +677,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
   if (path_rewriter_ != nullptr) {
     absl::Status compatible_status =
-        path_rewriter_->isCompatiblePathMatcher(extension_path_matcher_);
+        path_rewriter_->isCompatiblePathMatcher(path_matcher_);
     if (!compatible_status.ok()) {
       throw EnvoyException(std::string(compatible_status.message()));
     }
@@ -1190,7 +1190,7 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   return InternalRedirectPolicyImpl{policy_config, validator, current_route_name};
 }
 PathRewriterSharedPtr
-RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
                                            ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.route().has_path_rewrite_policy()) {
     return nullptr;
@@ -1212,7 +1212,7 @@ RouteEntryImplBase::buildPathRewritePolicy(envoy::config::route::v3::Route route
 }
 
 PathMatcherSharedPtr
-RouteEntryImplBase::buildPathMatchPolicy(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
                                          ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.match().has_path_match_policy()) {
     return nullptr;
@@ -1475,16 +1475,16 @@ UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      uri_template_(extension_path_matcher_->uriTemplate()){};
+      uri_template_(path_matcher_->uriTemplate()){};
 
 void UriTemplateMatcherRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                          bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, extension_path_matcher_->uriTemplate(), insert_envoy_original_path);
+  finalizePathHeader(headers, path_matcher_->uriTemplate(), insert_envoy_original_path);
 }
 
 absl::optional<std::string> UriTemplateMatcherRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, extension_path_matcher_->uriTemplate());
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_matcher_->uriTemplate());
 }
 
 RouteConstSharedPtr
@@ -1492,7 +1492,7 @@ UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      extension_path_matcher_->match(headers.getPathValue())) {
+      path_matcher_->match(headers.getPathValue())) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;

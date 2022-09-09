@@ -569,7 +569,7 @@ public:
     return internal_redirect_policy_;
   }
 
-  const PathMatcherSharedPtr& pathMatcher() const override { return extension_path_matcher_; }
+  const PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
 
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
@@ -852,7 +852,7 @@ protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
-  const PathMatcherSharedPtr extension_path_matcher_;
+  const PathMatcherSharedPtr path_matcher_;
   const PathRewriterSharedPtr path_rewriter_;
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
@@ -935,10 +935,10 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
-  PathMatcherSharedPtr buildPathMatchPolicy(envoy::config::route::v3::Route route,
+  PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
                                             ProtobufMessage::ValidationVisitor& validator) const;
 
-  PathRewriterSharedPtr buildPathRewritePolicy(envoy::config::route::v3::Route route,
+  PathRewriterSharedPtr buildPathRewriter(envoy::config::route::v3::Route route,
                                                ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
