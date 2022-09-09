@@ -51,17 +51,12 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
   }
   std::string regex_pattern_str = *std::move(regex_pattern);
 
-  absl::StatusOr<RewriteSegments> rewrite_pattern =
-      parseRewritePattern(rewrite_pattern_, regex_pattern_str);
+  // validated on construction of UriTemplateRewriter
+  RewriteSegments rewrite_pattern_segments = parseRewritePattern(rewrite_pattern_, regex_pattern_str).value();
 
-  if (!rewrite_pattern.ok()) {
-    return absl::InvalidArgumentError("Unable to parse path rewrite pattern");
-  }
-
-  const RewriteSegments& rewrite_pattern_segments = *std::move(rewrite_pattern);
   RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {
-    return absl::InternalError(regex.error());
+    return absl::InternalError("Regex library failed");
   }
 
   // First capture is the whole matched regex pattern.
@@ -79,9 +74,6 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
     if (literal != nullptr) {
       absl::StrAppend(&new_path, *literal);
     } else if (capture_index != nullptr) {
-      if (*capture_index < 1 || *capture_index >= capture_num) {
-        return absl::InvalidArgumentError("Invalid variable index");
-      }
       absl::StrAppend(&new_path, absl::string_view(captures[*capture_index].as_string()));
     }
   }

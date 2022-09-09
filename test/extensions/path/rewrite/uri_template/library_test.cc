@@ -71,6 +71,20 @@ TEST(RewriteTest, BasicUsage) {
   EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
+TEST(RewriteTest, PatternNotMatched) {
+  const std::string yaml_string = R"EOF(
+      name: envoy.path.rewrite.uri_template.uri_template_rewriter
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+        path_template_rewrite: "/bar/{lang}/{country}/{test}"
+)EOF";
+
+  Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
+ absl::StatusOr<std::string> rewrite_or_error = predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}/{test}");
+  EXPECT_FALSE(rewrite_or_error.ok());
+   EXPECT_EQ(rewrite_or_error.status().message(), "Pattern not match");
+}
+
 TEST(RewriteTest, RewriteInvalidRegex) {
   const std::string yaml_string = R"EOF(
       name: envoy.path.rewrite.uri_template.uri_template_rewriter
