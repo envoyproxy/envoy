@@ -936,10 +936,10 @@ private:
                               absl::string_view current_route_name) const;
 
   PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
-                                            ProtobufMessage::ValidationVisitor& validator) const;
+                                        ProtobufMessage::ValidationVisitor& validator) const;
 
   PathRewriterSharedPtr buildPathRewriter(envoy::config::route::v3::Route route,
-                                               ProtobufMessage::ValidationVisitor& validator) const;
+                                          ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                                                   const Http::HeaderMap& headers) const;

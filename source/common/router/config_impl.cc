@@ -676,8 +676,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (path_rewriter_ != nullptr) {
-    absl::Status compatible_status =
-        path_rewriter_->isCompatiblePathMatcher(path_matcher_);
+    absl::Status compatible_status = path_rewriter_->isCompatiblePathMatcher(path_matcher_);
     if (!compatible_status.ok()) {
       throw EnvoyException(std::string(compatible_status.message()));
     }
@@ -1191,7 +1190,7 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
 }
 PathRewriterSharedPtr
 RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
-                                           ProtobufMessage::ValidationVisitor& validator) const {
+                                      ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.route().has_path_rewrite_policy()) {
     return nullptr;
   }
@@ -1213,7 +1212,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
 
 PathMatcherSharedPtr
 RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
-                                         ProtobufMessage::ValidationVisitor& validator) const {
+                                     ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.match().has_path_match_policy()) {
     return nullptr;
   }
