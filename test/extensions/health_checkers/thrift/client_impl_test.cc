@@ -39,7 +39,8 @@ public:
     EXPECT_CALL(*connection_, noDelay(true));
 
     client_ = std::make_unique<ClientImpl>(callback_, transport_, protocol_, method_name_, host_,
-                                           max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_);
+                                           max_seq_id ? std::numeric_limits<int32_t>::max()
+                                                      : initial_seq_id_);
     client_->start();
 
 
