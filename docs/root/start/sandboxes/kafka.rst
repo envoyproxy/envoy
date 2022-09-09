@@ -92,7 +92,8 @@ Step 6: Check admin ``kafka_broker`` stats
 
 When you proxy to the Kafka broker, Envoy records various stats.
 
-You can check the broker stats by querying the Envoy admin interface:
+You can check the broker stats by querying the Envoy admin interface
+(the numbers might differ a little as the kafka-client does not expose precise control over its network traffic):
 
 .. code-block:: console
 
