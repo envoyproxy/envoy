@@ -52,7 +52,8 @@ absl::StatusOr<std::string> UriTemplateRewriter::rewritePath(absl::string_view p
   std::string regex_pattern_str = *std::move(regex_pattern);
 
   // validated on construction of UriTemplateRewriter
-  RewriteSegments rewrite_pattern_segments = parseRewritePattern(rewrite_pattern_, regex_pattern_str).value();
+  RewriteSegments rewrite_pattern_segments =
+      parseRewritePattern(rewrite_pattern_, regex_pattern_str).value();
 
   RE2 regex = RE2(Internal::toStringPiece(regex_pattern_str));
   if (!regex.ok()) {

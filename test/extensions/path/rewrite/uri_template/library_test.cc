@@ -80,9 +80,10 @@ TEST(RewriteTest, PatternNotMatched) {
 )EOF";
 
   Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
- absl::StatusOr<std::string> rewrite_or_error = predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}/{test}");
+  absl::StatusOr<std::string> rewrite_or_error =
+      predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}/{test}");
   EXPECT_FALSE(rewrite_or_error.ok());
-   EXPECT_EQ(rewrite_or_error.status().message(), "Pattern not match");
+  EXPECT_EQ(rewrite_or_error.status().message(), "Pattern not match");
 }
 
 TEST(RewriteTest, RewriteInvalidRegex) {
