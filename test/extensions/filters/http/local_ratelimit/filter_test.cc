@@ -684,7 +684,7 @@ TEST_F(DescriptorFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
 }
 
 // Tests that the virtual host rate limit is used when includeVirtualHostRateLimits is used
-TEST_F(DescriptorFilterTest, includeVirtualHostRateLimitsSetTrue) {
+TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
   setUpTest(fmt::format(descriptor_vh_config_yaml, "1", "\"OFF\"", "1", "0", "IGNORE"));
 
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
