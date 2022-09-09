@@ -139,6 +139,7 @@ int HeaderMapWrapper::luaSetHttp1ReasonPhrase(lua_State* state) {
     using Envoy::Http::StatefulHeaderKeyFormatter;
     using Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter;
 
+    // Casting here to make sure the call is in the right (response) context
     ResponseHeaderMapImpl* map = dynamic_cast<ResponseHeaderMapImpl*>(&headers_);
     if (map) {
       std::unique_ptr<StatefulHeaderKeyFormatter> fmt =

@@ -629,8 +629,9 @@ setHttp1ReasonPhrase()
 
   headers:setHttp1ReasonPhrase(reasonPhrase)
 
-Sets a custom HTTP1 response reason phrase. This call is *only valid in the response flow*.
-*reasonPhrase* is a string that supplies the reason phrase value.
+Sets a custom HTTP/1 response reason phrase. This call is *only valid in the response flow*.
+*reasonPhrase* is a string that supplies the reason phrase value. Additionally this call only
+effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HTTP/3.
 
 .. _config_http_filters_lua_buffer_wrapper:
 
