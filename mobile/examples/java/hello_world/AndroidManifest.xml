@@ -12,10 +12,10 @@
             android:targetSdkVersion="27"/>
 
     <application
-            android:label="Hello Envoy">
+            android:label="Hello Envoy Java">
         <activity
                 android:name=".MainActivity"
-                android:label="Hello Envoy">
+                android:label="Hello Envoy Java">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

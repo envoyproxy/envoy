@@ -1,4 +1,4 @@
-package io.envoyproxy.envoymobile.helloenvoykotlin
+package io.envoyproxy.envoymobile.helloenvoybaselinetest
 
 import android.app.Activity
 import android.os.Bundle

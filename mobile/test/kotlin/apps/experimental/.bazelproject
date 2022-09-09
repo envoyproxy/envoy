@@ -7,13 +7,14 @@ directories:
   -bazel-testlogs
   -buck-out
   -build
-  examples/kotlin/hello_world
+  test/kotlin/apps/experimental
 
 import_run_configurations:
-  examples/kotlin/hello_world/tools/android-studio-run-configurations/run_configuration_example_debug_x86.xml
+  test/kotlin/apps/experimental/tools/android-studio-run-configurations/run_configuration_example_debug_x86.xml
+  test/kotlin/apps/experimental/tools/android-studio-run-configurations/run_configuration_example_debug_arm64.xml
 
 targets:
-  //examples/kotlin/hello_world:hello_envoy_kt
+  //test/kotlin/apps/experimental:hello_envoy_kt
 
 additional_languages:
   kotlin

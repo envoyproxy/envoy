@@ -51,7 +51,7 @@ Entering a debugging session
 
 With the project ready, you can now start debugging with Android Studio.
 
-1. From Android Studio select either `Example App (Debug) [x86]` or `Example App (Debug) [arm64]` configuration. Note: the `x86` configuration doesn't work on ARM machines (i.e., M1 Macbooks).
+1. From Android Studio select one of the available configurations e.g., `Example App (Debug) [x86]` or `Example App (Debug) [arm64]`. Note: `x86` configurations don't work on ARM machines (i.e., M1 Macbooks).
 2. Hit the debug icon. Note: if you don't see this option go to "Add configuration" and it'll be there on the Bazel category, just select it and hit Ok.
 3. Optionally you could create symbolic breakpoints before running by going to the Debugger tab.
 
