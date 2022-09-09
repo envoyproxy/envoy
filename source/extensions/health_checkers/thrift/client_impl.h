@@ -2,22 +2,10 @@
 
 #include <chrono>
 
-// TODO split the include files
-#include "envoy/api/api.h"
-#include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
-#include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
-#include "envoy/router/router.h"
-
 #include "source/common/network/filter_impl.h"
-#include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
-#include "source/extensions/filters/network/thrift_proxy/router/router.h"
-
 #include "source/extensions/health_checkers/thrift/client.h"
 
 namespace Envoy {
@@ -44,9 +32,9 @@ public:
   // Check if it is a success response or not.
   bool responseSuccess();
 
+  // PassThroughDecoderEventHandler
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus messageEnd() override;
-  FilterStatus transportEnd() override;
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
@@ -98,8 +86,9 @@ public:
       : parent_(callback), transport_(transport), protocol_(protocol), method_name_(method_name),
         host_(host), seq_id_(seq_id) {}
 
+  // Client
   void start() override;
-  bool makeRequest() override;
+  bool sendRequest() override;
   void close() override;
 
   // For ThriftSessionCallbacks

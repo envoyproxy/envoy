@@ -8,14 +8,9 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
-#include "envoy/router/router.h"
 
-#include "source/common/network/filter_impl.h"
 #include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
-#include "source/extensions/filters/network/thrift_proxy/decoder.h"
-#include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
-#include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/health_checkers/thrift/client.h"
 
 namespace Envoy {

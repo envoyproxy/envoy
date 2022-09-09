@@ -30,8 +30,8 @@ namespace ThriftProxy {
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions& config)
-    : transport_(TransportNames::get().getTypeFromProto(config.transport())),
-      protocol_(ProtocolNames::get().getTypeFromProto(config.protocol())) {}
+    : transport_(ProtoUtils::getTransportType(config.transport())),
+      protocol_(ProtoUtils::getProtocolType(config.protocol())) {}
 
 TransportType ProtocolOptionsConfigImpl::transport(TransportType downstream_transport) const {
   return (transport_ == TransportType::Auto) ? downstream_transport : transport_;
@@ -77,8 +77,8 @@ ConfigImpl::ConfigImpl(
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
-      transport_(TransportNames::get().getTypeFromProto(config.transport())),
-      proto_(ProtocolNames::get().getTypeFromProto(config.protocol())),
+      transport_(ProtoUtils::getTransportType(config.transport())),
+      proto_(ProtoUtils::getProtocolType(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
       max_requests_per_connection_(config.max_requests_per_connection().value()),
       header_keys_preserve_case_(config.header_keys_preserve_case()) {

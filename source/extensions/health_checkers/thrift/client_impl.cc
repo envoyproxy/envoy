@@ -1,11 +1,5 @@
 #include "source/extensions/health_checkers/thrift/client_impl.h"
 
-#include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
-#include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
-
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
@@ -52,11 +46,6 @@ FilterStatus SimpleResponseDecoder::messageEnd() {
   return FilterStatus::Continue;
 }
 
-FilterStatus SimpleResponseDecoder::transportEnd() {
-  ENVOY_LOG(trace, "SimpleResponseDecoder transportEnd");
-  return FilterStatus::Continue;
-}
-
 // ThriftSessionCallbacks
 void ThriftSessionCallbacks::onEvent(Network::ConnectionEvent event) { parent_.onEvent(event); }
 
@@ -74,7 +63,6 @@ Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, boo
   return Network::FilterStatus::StopIteration;
 }
 
-// ClientImpl
 void ClientImpl::start() {
   Upstream::Host::CreateConnectionData conn_data = parent_.createConnection();
   connection_ = std::move(conn_data.connection_);
@@ -89,14 +77,9 @@ void ClientImpl::start() {
   ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl start", *connection_);
 }
 
-bool ClientImpl::makeRequest() {
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl makeRequest", *connection_);
-  if (connection_->state() == Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug,
-                   "ThriftHealthChecker ClientImpl makeRequest fail due to closed connection",
-                   *connection_);
-    return false;
-  }
+bool ClientImpl::sendRequest() {
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl sendRequest", *connection_);
+  ASSERT(connection_->state() == Network::Connection::State::Open);
 
   Buffer::OwnedImpl request_buffer;
   ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
@@ -122,7 +105,7 @@ bool ClientImpl::makeRequest() {
   transport->encodeFrame(transport_buffer, *metadata, request_buffer);
 
   connection_->write(transport_buffer, false);
-  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl makeRequest success id={}", *connection_,
+  ENVOY_CONN_LOG(trace, "ThriftHealthChecker ClientImpl sendRequest success id={}", *connection_,
                  metadata->sequenceId());
   return true;
 }

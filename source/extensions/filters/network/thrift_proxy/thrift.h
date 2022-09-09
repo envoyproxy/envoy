@@ -24,7 +24,6 @@ enum class TransportType {
 
 /**
  * Names of available Transport implementations.
- * TODO(kuochunghsu): rename class name.
  */
 class TransportNameValues {
 public:
@@ -53,25 +52,6 @@ public:
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
-
-  TransportType getTypeFromProto(
-      envoy::extensions::filters::network::thrift_proxy::v3::TransportType transport) const {
-    const auto& transport_iter = transport_map_.find(transport);
-    ASSERT(transport_iter != transport_map_.end());
-
-    return transport_iter->second;
-  }
-
-private:
-  using TransportTypeMap =
-      std::map<envoy::extensions::filters::network::thrift_proxy::v3::TransportType, TransportType>;
-
-  TransportTypeMap transport_map_{
-      {envoy::extensions::filters::network::thrift_proxy::v3::AUTO_TRANSPORT, TransportType::Auto},
-      {envoy::extensions::filters::network::thrift_proxy::v3::FRAMED, TransportType::Framed},
-      {envoy::extensions::filters::network::thrift_proxy::v3::UNFRAMED, TransportType::Unframed},
-      {envoy::extensions::filters::network::thrift_proxy::v3::HEADER, TransportType::Header},
-  };
 };
 
 using TransportNames = ConstSingleton<TransportNameValues>;
@@ -122,28 +102,46 @@ public:
     }
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
-
-  ProtocolType getTypeFromProto(
-      envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType protocol) const {
-    const auto& protocol_iter = protocol_map_.find(protocol);
-    ASSERT(protocol_iter != protocol_map_.end());
-    return protocol_iter->second;
-  }
-
-private:
-  using ProtocolTypeMap =
-      std::map<envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType, ProtocolType>;
-
-  ProtocolTypeMap protocol_map_{
-      {envoy::extensions::filters::network::thrift_proxy::v3::AUTO_PROTOCOL, ProtocolType::Auto},
-      {envoy::extensions::filters::network::thrift_proxy::v3::BINARY, ProtocolType::Binary},
-      {envoy::extensions::filters::network::thrift_proxy::v3::LAX_BINARY, ProtocolType::LaxBinary},
-      {envoy::extensions::filters::network::thrift_proxy::v3::COMPACT, ProtocolType::Compact},
-      {envoy::extensions::filters::network::thrift_proxy::v3::TWITTER, ProtocolType::Twitter},
-  };
 };
 
 using ProtocolNames = ConstSingleton<ProtocolNameValues>;
+
+class ProtoUtils {
+public:
+  static TransportType
+  getTransportType(envoy::extensions::filters::network::thrift_proxy::v3::TransportType transport) {
+    switch (transport) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::filters::network::thrift_proxy::v3::AUTO_TRANSPORT:
+      return TransportType::Auto;
+    case envoy::extensions::filters::network::thrift_proxy::v3::FRAMED:
+      return TransportType::Framed;
+    case envoy::extensions::filters::network::thrift_proxy::v3::UNFRAMED:
+      return TransportType::Unframed;
+    case envoy::extensions::filters::network::thrift_proxy::v3::HEADER:
+      return TransportType::Header;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  static ProtocolType
+  getProtocolType(envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType protocol) {
+    switch (protocol) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::filters::network::thrift_proxy::v3::AUTO_PROTOCOL:
+      return ProtocolType::Auto;
+    case envoy::extensions::filters::network::thrift_proxy::v3::BINARY:
+      return ProtocolType::Binary;
+    case envoy::extensions::filters::network::thrift_proxy::v3::LAX_BINARY:
+      return ProtocolType::LaxBinary;
+    case envoy::extensions::filters::network::thrift_proxy::v3::COMPACT:
+      return ProtocolType::Compact;
+    case envoy::extensions::filters::network::thrift_proxy::v3::TWITTER:
+      return ProtocolType::Twitter;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
 
 /**
  * Thrift protocol message types.

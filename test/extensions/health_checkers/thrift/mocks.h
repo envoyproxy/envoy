@@ -26,7 +26,7 @@ public:
   void runLowWatermarkCallbacks() { callback_.onBelowWriteBufferLowWatermark(); }
 
   MOCK_METHOD(void, start, ());
-  MOCK_METHOD(bool, makeRequest, ());
+  MOCK_METHOD(bool, sendRequest, ());
   MOCK_METHOD(void, close, ());
 
 private:

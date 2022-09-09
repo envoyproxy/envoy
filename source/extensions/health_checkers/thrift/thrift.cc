@@ -1,11 +1,5 @@
 #include "source/extensions/health_checkers/thrift/thrift.h"
 
-#include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
-#include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
-
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
@@ -18,11 +12,8 @@ namespace {
 // Helper functions to get the correct hostname for an L7 health check.
 const std::string& getHostname(const Upstream::HostSharedPtr& host,
                                const Upstream::ClusterInfoConstSharedPtr& cluster) {
-  if (!host->hostnameForHealthChecks().empty()) {
-    return host->hostnameForHealthChecks();
-  }
-
-  return cluster->name();
+  return host->hostnameForHealthChecks().empty() ? cluster->name()
+                                                 : host->hostnameForHealthChecks();
 }
 
 } // namespace
@@ -36,8 +27,8 @@ ThriftHealthChecker::ThriftHealthChecker(
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       method_name_(thrift_config.method_name()),
-      transport_(TransportNames::get().getTypeFromProto(thrift_config.transport())),
-      protocol_(ProtocolNames::get().getTypeFromProto(thrift_config.protocol())),
+      transport_(ProtoUtils::getTransportType(thrift_config.transport())),
+      protocol_(ProtoUtils::getProtocolType(thrift_config.protocol())),
       client_factory_(client_factory) {
   if (transport_ == TransportType::Auto || protocol_ == ProtocolType::Auto ||
       protocol_ == ProtocolType::Twitter) {
@@ -76,7 +67,7 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
     expect_close_ = false;
   }
 
-  client_->makeRequest();
+  client_->sendRequest();
 }
 
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onTimeout() {
@@ -91,6 +82,11 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onResponseResult(bool 
     // TODO(kuochunghsu): We might want to define retriable response.
     handleFailure(envoy::data::core::v3::ACTIVE, /* retriable */ false);
   }
+
+  if (!parent_.reuse_connection_) {
+    expect_close_ = true;
+    client_->close();
+  }
 }
 
 Upstream::Host::CreateConnectionData
@@ -98,13 +94,13 @@ ThriftHealthChecker::ThriftActiveHealthCheckSession::createConnection() {
   return host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                             parent_.transportSocketMatchMetadata().get());
 }
+
 // Network::ConnectionCallbacks
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(trace, "on event close, is_local_close={} expect_close={}",
               event == Network::ConnectionEvent::LocalClose, expect_close_);
-    // TODO: check if response is partial or complete
     if (!expect_close_) {
       handleFailure(envoy::data::core::v3::NETWORK);
     }

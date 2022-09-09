@@ -41,7 +41,7 @@ public:
   /**
    * Make a simple thrift request.
    */
-  virtual bool makeRequest() PURE;
+  virtual bool sendRequest() PURE;
 
   /**
    * Closes the underlying network connection.

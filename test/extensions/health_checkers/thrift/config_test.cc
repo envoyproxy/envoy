@@ -50,8 +50,10 @@ TEST(HealthCheckerFactoryTest, CreateThrift) {
 }
 
 TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
-  std::vector<std::string> yamls = {// missing method name
-                                    R"EOF(
+  // clang-format off
+  std::vector<std::string> yamls = {
+  // missing method name
+  R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -65,8 +67,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         transport: HEADER
         protocol: BINARY
   )EOF",
-                                    // missing transport
-                                    R"EOF(
+  // missing transport
+  R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -80,8 +82,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         protocol: BINARY
   )EOF",
-                                    // missing protocol
-                                    R"EOF(
+  // missing protocol
+  R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -95,8 +97,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         transport: HEADER
   )EOF",
-                                    // AUTO protocol is not allowed.
-                                    R"EOF(
+  // AUTO protocol is not allowed.
+  R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -110,8 +112,8 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         protocol: AUTO
   )EOF",
-                                    // AUTO transport is not allowed.
-                                    R"EOF(
+  // AUTO transport is not allowed.
+  R"EOF(
     timeout: 1s
     interval: 1s
     no_traffic_interval: 5s
@@ -125,6 +127,7 @@ TEST(HealthCheckerFactoryTest, CreateThriftMissingField) {
         method_name: ping
         transport: AUTO
   )EOF"};
+  // clang-format on
 
   ThriftHealthCheckerFactory factory;
 

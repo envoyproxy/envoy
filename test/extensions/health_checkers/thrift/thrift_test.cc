@@ -91,7 +91,7 @@ public:
         Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
   }
 
-  void setupDontReuseConnection() {
+  void setupDoNotReuseConnection() {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -134,7 +134,7 @@ public:
     timeout_timer_ = new Event::MockTimer(&dispatcher_);
   }
 
-  void expectClientCreate() {
+  void expectClientAndPingRequestCreate() {
     EXPECT_CALL(*this, create_(_)).WillOnce(testing::Invoke([&](ClientCallback& callback) {
       client_ = new NiceMock<MockClient>(callback);
       expectPingRequestCreate();
@@ -143,7 +143,7 @@ public:
   }
 
   void expectPingRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest()).WillOnce(Return(true));
+    EXPECT_CALL(*client_, sendRequest()).WillOnce(Return(true));
     EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   }
 
@@ -167,7 +167,7 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -187,7 +187,6 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseResponseResult(false);
 
-  // TODO: test deferredDelete_
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -195,15 +194,65 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
-/*
-// TODO corner cases
+
 TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   InSequence s;
   setup();
-}
-*/
 
-TEST_F(ThriftHealthCheckerTest, FailuresLogging) {
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+  expectSessionCreate();
+  expectClientAndPingRequestCreate();
+  health_checker_->start();
+
+  client_->runHighWatermarkCallbacks();
+  client_->runLowWatermarkCallbacks();
+
+  // Success
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  client_->raiseResponseResult(true);
+
+  expectPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  // Failure
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  client_->raiseResponseResult(false);
+
+  expectPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  // Redis failure via disconnect
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  expectClientAndPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  // Timeout
+  EXPECT_CALL(*client_, close());
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  timeout_timer_->invokeCallback();
+
+  expectClientAndPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  // Shutdown with active request.
+  EXPECT_CALL(*client_, close());
+
+  EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
+TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   InSequence s;
   setupAlwaysLogHealthCheckFailures();
 
@@ -211,7 +260,7 @@ TEST_F(ThriftHealthCheckerTest, FailuresLogging) {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -252,8 +301,7 @@ TEST_F(ThriftHealthCheckerTest, FailuresLogging) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-// TODO Need massage
-/*
+// Host responses {EXCEPTION, SUCCESS}.
 TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   InSequence s;
   setup();
@@ -262,7 +310,49 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
+  health_checker_->start();
+
+  client_->runHighWatermarkCallbacks();
+  client_->runLowWatermarkCallbacks();
+
+  // Failure on exception response
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  expectClientAndPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  // Success
+  EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  client_->raiseResponseResult(true);
+
+  expectPingRequestCreate();
+  interval_timer_->invokeCallback();
+
+  EXPECT_CALL(*client_, close());
+
+  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
+// Host responses {SUCCESS, EXCEPTION, SUCCESS}.
+TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
+  InSequence s;
+  setup();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+  expectSessionCreate();
+  expectClientAndPingRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -278,16 +368,15 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
 
   // Failure on exception response
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  expectClientCreate();
-  expectPingRequestCreate();
+  expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
   // Success
+  EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseResponseResult(true);
@@ -297,16 +386,13 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
 
   EXPECT_CALL(*client_, close());
 
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
-  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(4UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
-*/
 
-// TODO Need massage
 // Tests that thrift client will behave appropriately when reuse_connection is false.
-/*
 TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
   setupDoNotReuseConnection();
@@ -315,7 +401,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
       Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   health_checker_->start();
 
   client_->runHighWatermarkCallbacks();
@@ -327,7 +413,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*client_, close());
   client_->raiseResponseResult(true);
 
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
   // The connection will close on failure.
@@ -337,7 +423,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*client_, close());
   client_->raiseResponseResult(false);
 
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
   // Redis failure via disconnect, the connection was closed by the other end.
@@ -345,7 +431,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
   // Timeout, the connection will be closed.
@@ -354,8 +440,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   timeout_timer_->invokeCallback();
 
-
-  expectClientCreate();
+  expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
   // Shutdown with active request.
@@ -367,7 +452,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
-*/
+
 } // namespace ThriftHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions
