@@ -96,11 +96,11 @@ protected:
     }
 
     static HostHeaderValidationResult reject(absl::string_view details) {
-      return HostHeaderValidationResult(RejectAction::Reject, details, "", "");
+      return {RejectAction::Reject, details, "", ""};
     }
 
     static HostHeaderValidationResult success(absl::string_view address, absl::string_view port) {
-      return HostHeaderValidationResult(RejectAction::Accept, "", address, port);
+      return {RejectAction::Accept, "", address, port};
     }
 
     bool ok() const { return action() == RejectAction::Accept; }

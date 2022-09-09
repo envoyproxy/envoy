@@ -235,8 +235,8 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderNameRejectConnectionHeader
                                        HeaderString("upgrade"), HeaderString("proxy-connection")};
   auto uhv = createH2(empty_config);
 
-  for (int i = 0; i < 5; ++i) {
-    EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(transfer_encodings[i]),
+  for (auto& encoding : transfer_encodings) {
+    EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(encoding),
                                "uhv.http2.connection_header_rejected");
   }
 }
