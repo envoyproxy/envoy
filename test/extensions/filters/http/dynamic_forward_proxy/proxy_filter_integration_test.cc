@@ -449,14 +449,23 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithAltHeaderSni) {
   upstream_tls_ = true;
   initializeWithArgs(1024, 1024, "x-host");
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-                   fake_upstreams_[0]->localAddress()->ip()->port())},
-      {"x-host", "localhost"}};
+
+  std::string authority;
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    authority =
+        fmt::format("[{}]:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+                    fake_upstreams_[0]->localAddress()->ip()->port());
+  } else {
+    authority =
+        fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+                    fake_upstreams_[0]->localAddress()->ip()->port());
+  }
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", authority},
+                                                       {"x-host", "localhost"}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

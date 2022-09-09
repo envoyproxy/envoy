@@ -313,6 +313,11 @@ INSTANTIATE_TEST_SUITE_P(
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO - add legacy extended CONNECT validation to UHV.
+  return;
+#endif
+
   config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
 
   initialize();
