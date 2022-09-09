@@ -16,6 +16,7 @@ using WasmVmPtr = std::unique_ptr<proxy_wasm::WasmVm>;
 class WasmRuntimeFactory : public Config::UntypedFactory {
 public:
   ~WasmRuntimeFactory() override = default;
+
   virtual WasmVmPtr createWasmVm() PURE;
 
   std::string category() const override { return "envoy.wasm.runtime"; }

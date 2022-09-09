@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
@@ -39,6 +40,25 @@ proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_
   test_null_vm_plugin_ = plugin.get();
   return plugin;
 });
+
+class NoneVmTest : public testing::Test {
+  void SetUp() override {
+    original_factories_ = Registry::FactoryRegistry<WasmRuntimeFactory>::factories();
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories().clear();
+  }
+  void TearDown() override {
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories() = original_factories_;
+  }
+
+private:
+  absl::flat_hash_map<std::string, WasmRuntimeFactory*> original_factories_;
+};
+
+TEST_F(NoneVmTest, NoAvailableEngine) {
+  // When there is no registered factory, `first_wasm_engine_name` should be empty
+  absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
+  EXPECT_TRUE(first_wasm_engine_name.empty());
+}
 
 class BaseVmTest : public testing::Test {
 public:

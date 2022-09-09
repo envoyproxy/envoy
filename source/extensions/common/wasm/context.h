@@ -272,6 +272,8 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
+
+  // No need to check the coverage if returning the empty vector.
   std::vector<const google::api::expr::runtime::CelFunction*>
   FindFunctionOverloads(absl::string_view) const override {
     return {};
