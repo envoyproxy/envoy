@@ -146,7 +146,7 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithHos
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
     const Network::Address::InstanceConstSharedPtr& peer_address) const {
   UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address);
-  Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context).host_;
+  Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
   return host;
 }
 

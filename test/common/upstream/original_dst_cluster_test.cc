@@ -227,6 +227,179 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   }
 }
 
+TEST_F(OriginalDstClusterTest, AddressCollision) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  // Host gets the local address of the downstream connection.
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
+  auto lb1 = OriginalDstCluster::LoadBalancer(cluster_);
+  auto lb2 = OriginalDstCluster::LoadBalancer(cluster_);
+
+  // Simulate concurrent request for the same address from two workers.
+  Event::PostCb post_cb1;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  HostConstSharedPtr host1 = lb1.chooseHost(&lb_context);
+  ASSERT_NE(host1, nullptr);
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host1->address());
+  Event::PostCb post_cb2;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb2));
+  HostConstSharedPtr host2 = lb2.chooseHost(&lb_context);
+  ASSERT_NE(host2, nullptr);
+  EXPECT_EQ(*connection.connectionInfoProvider().localAddress(), *host2->address());
+
+  // Process main callbacks sequentially.
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb1();
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb2();
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+
+  // First host is returned on the 3rd call
+  HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  EXPECT_EQ(host3, host1);
+
+  // Make host time out, no membership changes happen on the first timeout.
+  ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+
+  // Both hosts get removed on the 2nd timeout.
+  ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+
+  // New host gets created once again.
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  // Mock the cluster manager by recreating the load balancer with the new host map
+  HostConstSharedPtr host4 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  post_cb1();
+  EXPECT_NE(host4, nullptr);
+  EXPECT_NE(host4, host1);
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+TEST_F(OriginalDstClusterTest, HostInUse) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  // Host gets the local address of the downstream connection.
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
+  auto lb = OriginalDstCluster::LoadBalancer(cluster_);
+  Event::PostCb post_cb;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb();
+
+  // Borrow a host handle.
+  auto handle = host->acquireHandle();
+
+  // Run cleanup 3 times, and validate the host is not removed.
+  for (auto i = 0; i < 3; i++) {
+    EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+    cleanup_timer_->invokeCallback();
+  }
+  HostConstSharedPtr host2 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  EXPECT_EQ(host2, host);
+
+  // Reset a handle, and run cleanup twice again.
+  handle.reset();
+  ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+TEST_F(OriginalDstClusterTest, CollisionHostInUse) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  // Host gets the local address of the downstream connection.
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  // Mock the cluster manager by recreating the load balancer each time to get a fresh host map
+  auto lb = OriginalDstCluster::LoadBalancer(cluster_);
+  Event::PostCb post_cb1;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb1));
+  HostConstSharedPtr host1 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  Event::PostCb post_cb2;
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb2));
+  HostConstSharedPtr host2 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb1();
+  EXPECT_CALL(membership_updated_, ready());
+  post_cb2();
+
+  // Borrow a collision host2 handle.
+  auto handle = host2->acquireHandle();
+
+  // Run cleanup 3 times, and validate the host is not removed.
+  for (auto i = 0; i < 3; i++) {
+    EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+    cleanup_timer_->invokeCallback();
+  }
+  HostConstSharedPtr host3 = OriginalDstCluster::LoadBalancer(cluster_).chooseHost(&lb_context);
+  EXPECT_EQ(host3, host1);
+
+  // Reset a handle, and run cleanup twice again.
+  handle.reset();
+  ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
 TEST_F(OriginalDstClusterTest, Membership) {
   std::string yaml = R"EOF(
     name: name
@@ -283,7 +456,6 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // Make host time out, no membership changes happen on the first timeout.
   ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   cleanup_timer_->invokeCallback();
   EXPECT_EQ(
@@ -292,7 +464,6 @@ TEST_F(OriginalDstClusterTest, Membership) {
 
   // host gets removed on the 2nd timeout.
   ASSERT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   EXPECT_CALL(membership_updated_, ready());
@@ -384,8 +555,6 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   // Make hosts time out, no membership changes happen on the first timeout.
   ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
-  EXPECT_EQ(true, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->used());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   cleanup_timer_->invokeCallback();
   EXPECT_EQ(
@@ -394,8 +563,6 @@ TEST_F(OriginalDstClusterTest, Membership2) {
 
   // both hosts get removed on the 2nd timeout.
   ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->used());
-  EXPECT_EQ(false, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->used());
 
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
   EXPECT_CALL(membership_updated_, ready());

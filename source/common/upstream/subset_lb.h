@@ -44,9 +44,9 @@ public:
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
-  HostData chooseHost(LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
-  HostData peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -224,7 +224,7 @@ private:
 
     // Subset
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) const override {
-      return subset_.lb_->chooseHost(context).host_;
+      return subset_.lb_->chooseHost(context);
     }
     void pushHost(uint32_t priority, HostSharedPtr host) override {
       while (host_sets_.size() <= priority) {

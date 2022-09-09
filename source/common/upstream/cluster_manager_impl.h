@@ -435,12 +435,14 @@ private:
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject,
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
-      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
-                         const HostInUseConstSharedPtr& in_use)
-          : pools_{std::make_shared<ConnPools>(dispatcher, host)}, in_use_(in_use) {}
+      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
+          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
+                                                                                    host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
       bool draining_{false};
@@ -448,19 +450,17 @@ private:
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
       bool do_not_delete_{false};
-
-      const HostInUseConstSharedPtr in_use_;
     };
 
     struct TcpConnPoolsContainer {
-      TcpConnPoolsContainer(const HostInUseConstSharedPtr& in_use) : in_use_(in_use) {}
+      TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       ConnPools pools_;
       bool draining_{false};
-
-      const HostInUseConstSharedPtr in_use_;
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -488,11 +488,12 @@ private:
       Network::ClientConnection& connection_;
     };
     struct TcpConnectionsMap {
-      TcpConnectionsMap(const HostInUseConstSharedPtr& in_use) : in_use_(in_use) {}
+      TcpConnectionsMap(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
           connections_;
-      const HostInUseConstSharedPtr in_use_;
     };
 
     class ClusterEntry : public ThreadLocalCluster {
@@ -585,8 +586,7 @@ private:
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
-                                                  bool allocate = false,
-                                                  HostInUseConstSharedPtr in_use = nullptr);
+                                                  bool allocate = false);
 
     // Upstream::ClusterLifecycleCallbackHandler
     ClusterUpdateCallbacksHandlePtr addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) override;

@@ -1124,8 +1124,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostData host_data = lb_->chooseHost(context);
-  const HostConstSharedPtr& logical_host = host_data.host_;
+  HostConstSharedPtr logical_host = lb_->chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1135,9 +1134,9 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
         conn_info.connection_ != nullptr) {
       auto conn_map_iter = parent_.host_tcp_conn_map_.find(logical_host);
       if (conn_map_iter == parent_.host_tcp_conn_map_.end()) {
-        TcpConnectionsMap container{host_data.in_use_};
         conn_map_iter =
-            parent_.host_tcp_conn_map_.emplace(logical_host, std::move(container)).first;
+            parent_.host_tcp_conn_map_.try_emplace(logical_host, logical_host->acquireHandle())
+                .first;
       }
       auto& conn_map = conn_map_iter->second;
       conn_map.connections_.emplace(
@@ -1519,14 +1518,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ConnPoolsContainer*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
-    const HostConstSharedPtr& host, bool allocate, HostInUseConstSharedPtr in_use) {
+    const HostConstSharedPtr& host, bool allocate) {
   auto container_iter = host_http_conn_pool_map_.find(host);
   if (container_iter == host_http_conn_pool_map_.end()) {
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_, host, in_use};
-    container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
+    container_iter =
+        host_http_conn_pool_map_.try_emplace(host, thread_local_dispatcher_, host).first;
   }
 
   return &container_iter->second;
@@ -1669,8 +1668,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostData host_data = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
-  const HostConstSharedPtr& host = host_data.host_;
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1720,7 +1718,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
     context->downstreamConnection()->hashKey(hash_key);
   }
 
-  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true, host_data.in_use_);
+  ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
@@ -1777,8 +1775,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostData host_data = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
-  const HostConstSharedPtr& host = host_data.host_;
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1813,8 +1810,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
 
   auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
   if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
-    TcpConnPoolsContainer container{host_data.in_use_};
-    container_iter = parent_.host_tcp_conn_pool_map_.emplace(host, std::move(container)).first;
+    container_iter = parent_.host_tcp_conn_pool_map_.try_emplace(host, host->acquireHandle()).first;
   }
   TcpConnPoolsContainer& container = container_iter->second;
   auto pool_iter = container.pools_.find(hash_key);

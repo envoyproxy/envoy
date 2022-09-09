@@ -18,13 +18,19 @@
 namespace Envoy {
 namespace Upstream {
 
-// A list of hosts and in-use tokens for the same address. Hosts may be added
-// concurrently by multiple workers, but are eventually cleaned up if the
-// tokens are released.
-using SyntheticHosts = std::vector<std::pair<HostSharedPtr, std::weak_ptr<const HostInUse>>>;
-using SyntheticHostsSharedPtr = std::shared_ptr<SyntheticHosts>;
-using SyntheticHostsConstSharedPtr = std::shared_ptr<const SyntheticHosts>;
-using HostMultiMap = absl::flat_hash_map<std::string, SyntheticHostsConstSharedPtr>;
+struct HostsForAddress {
+  HostsForAddress(HostSharedPtr& host) : host_(host), used_(true) {}
+
+  // Primary host for the address.
+  const HostSharedPtr host_;
+  // Hosts that are added concurrently with host_ are stored in this list.
+  std::vector<HostSharedPtr> hosts_;
+  // Marks as recently used by load balancers.
+  std::atomic<bool> used_;
+};
+
+using HostsForAddressSharedPtr = std::shared_ptr<HostsForAddress>;
+using HostMultiMap = absl::flat_hash_map<std::string, HostsForAddressSharedPtr>;
 using HostMultiMapSharedPtr = std::shared_ptr<HostMultiMap>;
 using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
 
@@ -62,9 +68,9 @@ public:
           host_map_(parent->getCurrentHostMap()) {}
 
     // Upstream::LoadBalancer
-    HostData chooseHost(LoadBalancerContext* context) override;
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
-    HostData peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
+    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
     // Pool selection not implemented for OriginalDstCluster
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -122,7 +128,7 @@ private:
     host_map_ = new_host_map;
   }
 
-  void addHost(HostSharedPtr, std::weak_ptr<const HostInUse>);
+  void addHost(HostSharedPtr&);
   void cleanup();
 
   // ClusterImplBase

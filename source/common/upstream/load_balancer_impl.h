@@ -215,7 +215,7 @@ public:
  */
 class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 public:
-  HostData chooseHost(LoadBalancerContext* context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
@@ -433,7 +433,7 @@ public:
       TimeSource& time_source);
 
   // Upstream::ZoneAwareLoadBalancerBase
-  HostData peekAnotherHost(LoadBalancerContext* context) override;
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
@@ -679,7 +679,7 @@ public:
 
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
-  HostData peekAnotherHost(LoadBalancerContext* context) override;
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
 
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);

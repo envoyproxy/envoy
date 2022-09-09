@@ -150,7 +150,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
   }
 }
 
-Upstream::HostData
+Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const Upstream::HealthyAndDegradedLoad* priority_loads = nullptr;
   if (context != nullptr) {
@@ -174,20 +174,20 @@ AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalance
   return cluster->loadBalancer().chooseHost(&aggregate_context);
 }
 
-Upstream::HostData
+Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->chooseHost(context);
   }
-  return {nullptr};
+  return nullptr;
 }
 
-Upstream::HostData
+Upstream::HostConstSharedPtr
 AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->peekAnotherHost(context);
   }
-  return {nullptr};
+  return nullptr;
 }
 
 absl::optional<Upstream::SelectedPoolAndConnection>

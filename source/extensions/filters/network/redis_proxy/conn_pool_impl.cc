@@ -253,7 +253,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
                                                            is_redis_cluster_, getRequest(request),
                                                            config_->readPolicy());
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context).host_;
+  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;

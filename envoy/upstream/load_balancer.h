@@ -107,21 +107,6 @@ struct SelectedPoolAndConnection {
 };
 
 /**
- * A reference-counting token class for tracking a host usage by the connection pools.
- **/
-class HostInUse {
-public:
-  virtual ~HostInUse() = default;
-};
-
-using HostInUseConstSharedPtr = std::shared_ptr<const HostInUse>;
-
-struct HostData {
-  HostConstSharedPtr host_;
-  HostInUseConstSharedPtr in_use_{nullptr};
-};
-
-/**
  * Abstract load balancing interface.
  */
 class LoadBalancer {
@@ -134,7 +119,7 @@ public:
    *        context information. Load balancers should be written to assume that context information
    *        is missing and use sensible defaults.
    */
-  virtual HostData chooseHost(LoadBalancerContext* context) PURE;
+  virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
 
   /**
    * Returns a best effort prediction of the next host to be picked, or nullptr if not predictable.
@@ -142,7 +127,7 @@ public:
    * a subsequent call will return the second host to be picked.
    * @param context supplies the context which is used in host selection.
    */
-  virtual HostData peekAnotherHost(LoadBalancerContext* context) PURE;
+  virtual HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) PURE;
 
   /**
    * Returns connection lifetime callbacks that may be used to inform the load balancer of

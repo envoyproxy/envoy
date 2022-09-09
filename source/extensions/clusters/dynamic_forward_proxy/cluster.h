@@ -64,10 +64,10 @@ private:
     LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
-    Upstream::HostData chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not implemented.
-    Upstream::HostData peekAnotherHost(Upstream::LoadBalancerContext*) override {
-      return {nullptr};
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,

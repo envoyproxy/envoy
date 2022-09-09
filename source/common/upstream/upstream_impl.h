@@ -285,6 +285,8 @@ public:
 
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
+  bool used() const override { return handle_count_ > 0; }
+  HostHandlePtr acquireHandle() const override { return std::make_unique<HostHandleImpl>(*this); }
 
 protected:
   static CreateConnectionData
@@ -301,6 +303,13 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+
+  struct HostHandleImpl : HostHandle {
+    HostHandleImpl(const HostImpl& parent) : parent_(parent) { parent.handle_count_++; }
+    ~HostHandleImpl() override { parent_.handle_count_--; }
+    const HostImpl& parent_;
+  };
+  mutable std::atomic<uint32_t> handle_count_{};
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {

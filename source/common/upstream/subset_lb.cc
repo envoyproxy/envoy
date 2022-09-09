@@ -169,25 +169,25 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
   }
 }
 
-HostData SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
+HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr override_host = LoadBalancerContextBase::selectOverrideHost(
       cross_priority_host_map_.get(), override_host_status_, context);
   if (override_host != nullptr) {
-    return {override_host};
+    return override_host;
   }
   if (metadata_fallback_policy_ !=
       envoy::config::cluster::v3::
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
-    return {chooseHostIteration(context)};
+    return chooseHostIteration(context);
   }
   const ProtobufWkt::Value* metadata_fallbacks = getMetadataFallbackList(context);
   if (metadata_fallbacks == nullptr) {
-    return {chooseHostIteration(context)};
+    return chooseHostIteration(context);
   }
 
   LoadBalancerContextWrapper context_no_metadata_fallback = removeMetadataFallbackList(context);
-  return {chooseHostWithMetadataFallbacks(&context_no_metadata_fallback,
-                                          metadata_fallbacks->list_value().values())};
+  return chooseHostWithMetadataFallbacks(&context_no_metadata_fallback,
+                                         metadata_fallbacks->list_value().values());
 }
 
 HostConstSharedPtr
