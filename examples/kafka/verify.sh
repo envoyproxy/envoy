@@ -37,9 +37,9 @@ has_metric_with_at_least_1 () {
     stat="$1"
     shift
     response=$(_curl "http://localhost:${PORT_ADMIN}/stats?filter=${stat}")
-    value=$(echo ${response} | cut -f2 -d':' | tr -d ' ')
+    value=$(echo "${response}" | cut -f2 -d':' | tr -d ' ')
     re='^[0-9]+$'
-    [[ ${value} =~ ${re} && ${value} > 0 ]] || {
+    [[ ${value} =~ ${re} && ${value} -gt 0 ]] || {
         echo "ERROR: metric check for [${stat}]" >&2
         echo "EXPECTED: numeric value greater than 0" >&2
         echo "RECEIVED:" >&2
