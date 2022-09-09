@@ -23,6 +23,7 @@ builtin:
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
 - envoy.regex_engines.google_re2
+- envoy.filters.http.upstream_codec
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -108,6 +109,7 @@ categories:
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.filters.http.upstream
 
 status_values:
 - name: stable

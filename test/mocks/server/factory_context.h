@@ -88,6 +88,7 @@ public:
 
   MOCK_METHOD(ServerFactoryContext&, getServerFactoryContext, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(Stats::Scope&, scope, ());
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
 };

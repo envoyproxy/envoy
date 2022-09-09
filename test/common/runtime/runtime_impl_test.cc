@@ -875,7 +875,7 @@ public:
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
         .WillByDefault(testing::Invoke(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
                    const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());
