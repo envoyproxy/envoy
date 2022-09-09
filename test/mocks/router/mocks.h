@@ -435,7 +435,7 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
-  testing::NiceMock<MockPathMatcher> extension_path_matcher_;
+  testing::NiceMock<MockPathMatcher> path_matcher_;
   testing::NiceMock<MockPathRewriter> path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;

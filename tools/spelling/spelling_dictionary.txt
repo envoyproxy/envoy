@@ -230,11 +230,8 @@ LEDS
 LEV
 LF
 LHS
-hls
 integrations
-jkl
 js
-lang
 hls
 jkl
 lang
