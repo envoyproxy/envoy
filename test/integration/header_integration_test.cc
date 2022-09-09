@@ -498,15 +498,11 @@ route_config:
                     - header:
                         key: "x-weighted-cluster-request"
                         value: "weighted-cluster-1"
-                      append:
-                        value: false
                   request_headers_to_remove: ["x-weighted-cluster-request-remove"]
                   response_headers_to_add:
                     - header:
                         key: "x-weighted-cluster-response"
                         value: "weighted-cluster-1"
-                      append:
-                        value: false
                   response_headers_to_remove: ["x-weighted-cluster-response-remove"]
 )EOF",
                                   hcm);
