@@ -7,7 +7,6 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace ThriftHealthChecker {
 
-// SimpleResponseDecoder
 bool SimpleResponseDecoder::onData(Buffer::Instance& data) {
   buffer_.move(data);
 
