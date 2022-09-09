@@ -7,7 +7,7 @@ licenses(["notice"])  # Apache 2
 
 android_binary(
     name = "hello_envoy_kt",
-    custom_package = "io.envoyproxy.envoymobile.helloenvoykotlin",
+    custom_package = "io.envoyproxy.envoymobile.helloenvoyexperimentaltest",
     manifest = "AndroidManifest.xml",
     proguard_specs = ["//library:proguard_rules"],
     deps = [
@@ -23,7 +23,7 @@ kt_android_library(
         "DemoFilter.kt",
         "MainActivity.kt",
     ],
-    custom_package = "io.envoyproxy.envoymobile.helloenvoykotlin",
+    custom_package = "io.envoyproxy.envoymobile.helloenvoyexperimentaltest",
     manifest = "AndroidManifest.xml",
     resource_files = [
         "res/layout/activity_main.xml",

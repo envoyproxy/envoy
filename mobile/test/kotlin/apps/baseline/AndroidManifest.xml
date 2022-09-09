@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="io.envoyproxy.envoymobile.helloenvoykotlin"
+          package="io.envoyproxy.envoymobile.helloenvoybaselinetest"
           android:versionCode="1"
           android:versionName="0.1">
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -10,10 +10,10 @@
             android:targetSdkVersion="27"/>
 
     <application
-            android:label="Hello Envoy">
+            android:label="Hello Envoy Baseline Test">
         <activity
                 android:name=".MainActivity"
-                android:label="Hello Envoy Kotlin">
+                android:label="Hello Envoy Baseline Test">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

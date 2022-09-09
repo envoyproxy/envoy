@@ -1,4 +1,4 @@
-<configuration name="Example App x86 (Debug)"
+<configuration name="Baseline Test App (Debug) [x86]"
     type="BlazeCommandRunConfigurationType"
     factoryName="Bazel Command"
     nameIsGenerated="false">
@@ -14,8 +14,9 @@
         use-work-profile-if-present="false"
         show-logcat-automatically="false"
         AM_START_OPTIONS="">
+        <blaze-user-flag>--config=dbg-android</blaze-user-flag>
         <blaze-user-flag>--fat_apk_cpu=x86</blaze-user-flag>
-        <blaze-target>//examples/kotlin/hello_world:hello_envoy_kt</blaze-target>
+        <blaze-target>//test/kotlin/apps/baseline:hello_envoy_kt</blaze-target>
         <Profilers>
             <option name="ADVANCED_PROFILING_ENABLED"
                 value="false" />
