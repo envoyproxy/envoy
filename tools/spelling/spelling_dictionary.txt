@@ -230,9 +230,8 @@ LEDS
 LEV
 LF
 LHS
-integrations
-js
 hls
+integrations
 jkl
 lang
 libsxg
