@@ -235,6 +235,7 @@ private:
     bool v6only() const override;
     uint32_t port() const;
     InstanceConstSharedPtr v4CompatibleAddress() const override;
+    InstanceConstSharedPtr forceV4CompatibleAddress() const override;
 
     std::string makeFriendlyAddress() const;
 

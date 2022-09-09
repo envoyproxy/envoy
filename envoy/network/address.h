@@ -59,6 +59,8 @@ public:
    * if the Ipv6 address isn't Ipv4 mapped.
    */
   virtual InstanceConstSharedPtr v4CompatibleAddress() const PURE;
+
+  virtual InstanceConstSharedPtr forceV4CompatibleAddress() const PURE;
 };
 
 enum class IpVersion { v4, v6 }; // NOLINT(readability-identifier-naming)

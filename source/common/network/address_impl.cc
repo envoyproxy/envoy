@@ -248,6 +248,16 @@ InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
   return nullptr;
 }
 
+InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::forceV4CompatibleAddress() const {
+  if (IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
+    struct sockaddr_in sin;
+    ipv6ToIpv4CompatibleAddress(&address_, &sin);
+    auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
+    return addr.ok() ? addr.value() : nullptr;
+  }
+  return nullptr;
+}
+
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {

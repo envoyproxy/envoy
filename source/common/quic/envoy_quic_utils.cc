@@ -42,25 +42,22 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_port = htons(port);
     ipv4_addr->sin_addr.s_addr = envoy_ip->ipv4()->address();
+  } else if (envoy_ip->ipv6()->forceV4CompatibleAddress() != nullptr) {
+    // Convert ipv4 mapped ipv6 address for QUIC.
+    auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+    memset(ipv4_addr, 0, sizeof(sockaddr_in));
+    ipv4_addr->sin_family = AF_INET;
+    ipv4_addr->sin_port = htons(port);
+    ipv4_addr->sin_addr.s_addr =
+        envoy_ip->ipv6()->forceV4CompatibleAddress()->ip()->ipv4()->address();
   } else {
-    absl::uint128 ipv4_prefix_in_network_order{0xFFFF};
-    ipv4_prefix_in_network_order <<= 112;
-    if ((envoy_ip->ipv6()->address() << 32) == ipv4_prefix_in_network_order) {
-      // Convert a ipv4 mapped ipv6 address back to ipv4.
-      auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
-      memset(ipv4_addr, 0, sizeof(sockaddr_in));
-      ipv4_addr->sin_family = AF_INET;
-      ipv4_addr->sin_port = htons(port);
-      ipv4_addr->sin_addr.s_addr = static_cast<uint32_t>(envoy_ip->ipv6()->address() >> 96);
-    } else {
-      // Create and return quic ipv6 address
-      auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
-      memset(ipv6_addr, 0, sizeof(sockaddr_in6));
-      ipv6_addr->sin6_family = AF_INET6;
-      ipv6_addr->sin6_port = htons(port);
-      ASSERT(sizeof(ipv6_addr->sin6_addr.s6_addr) == 16u);
-      *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) = envoy_ip->ipv6()->address();
-    }
+    // Create and return quic ipv6 address
+    auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+    memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+    ipv6_addr->sin6_family = AF_INET6;
+    ipv6_addr->sin6_port = htons(port);
+    ASSERT(sizeof(ipv6_addr->sin6_addr.s6_addr) == 16u);
+    *reinterpret_cast<absl::uint128*>(ipv6_addr->sin6_addr.s6_addr) = envoy_ip->ipv6()->address();
   }
   return quic::QuicSocketAddress(ss);
 }
