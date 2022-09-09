@@ -130,7 +130,7 @@ private:
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
-  absl::optional<uint32_t> port_override_{};
+  absl::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
 };
 
