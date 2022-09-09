@@ -39,8 +39,8 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         dst_host = connection->connectionInfoProvider().localAddress();
       }
     }
-    if (dst_host && use_port_override_) {
-      dst_host = Network::Utility::getAddressWithPort(*dst_host.get(), port_override_);
+    if (dst_host && port_override_.has_value()) {
+      dst_host = Network::Utility::getAddressWithPort(*dst_host.get(), port_override_.value());
     }
 
     if (dst_host) {
@@ -157,7 +157,6 @@ OriginalDstCluster::OriginalDstCluster(
     }
     if (config_opt->has_upstream_port_override()) {
       port_override_ = config_opt->upstream_port_override().value();
-      use_port_override_ = true;
     }
   }
   if (config.has_load_assignment()) {
