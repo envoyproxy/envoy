@@ -124,6 +124,7 @@ message Compressor {
   //    ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``.
   ResponseDirectionConfig response_direction_config = 8;
 
-  // If true, chooses this compressor first to do compression when the q-values are same.
+  // If true, chooses this compressor first to do compression when the q-values in `Accept-Encoding` are same.
+  // The last compressor which enables choose_first will be chosen if multiple compressor filters in the chain have choose_first as true.
   bool choose_first = 9;
 }
