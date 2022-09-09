@@ -663,11 +663,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        callbacks_->dispatcher(), config_.timeSource(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
-  // runtime keys.
-  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
-    const auto& policy_ref = *shadow_policy;
-    if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref(policy_ref));
+  // runtime keys. Also the method CONNECT doesn't support shadowing.
+  auto method = headers.getMethodValue();
+  if (method != Http::Headers::get().MethodValues.Connect) {
+    for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+      const auto& policy_ref = *shadow_policy;
+      if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
+        active_shadow_policies_.push_back(std::cref(policy_ref));
+      }
     }
   }
 
@@ -681,9 +684,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const bool can_send_early_data =
       conn_pool_new_stream_with_early_data_and_http3_ &&
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
-                                        /*can_use_http3=*/true);
+  // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
+  // For retries etc, HTTP/3 usability may transition from true to false, but
+  // will never transition from false to true.
+  bool can_use_http3 =
+      !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (end_stream) {

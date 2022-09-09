@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 export NAME=wasm-cc
+export UID
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"

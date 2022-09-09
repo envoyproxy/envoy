@@ -143,6 +143,12 @@ public:
     Responded
   };
 
+  struct HttpCallOptions {
+    Http::AsyncClient::RequestOptions request_options_;
+    bool is_async_request_{false};
+    bool return_duplicate_headers_{false};
+  };
+
   StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                       Http::RequestOrResponseHeaderMap& headers, bool end_stream, Filter& filter,
                       FilterCallbacks& callbacks, TimeSource& time_source);
@@ -306,8 +312,7 @@ private:
 
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
-  int doSynchronousHttpCall(lua_State* state, Tracing::Span& span);
-  int doAsynchronousHttpCall(lua_State* state, Tracing::Span& span);
+  int doHttpCall(lua_State* state, const HttpCallOptions& options);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
@@ -333,6 +338,7 @@ private:
   bool headers_continued_{};
   bool buffered_body_{};
   bool saw_body_{};
+  bool return_duplicate_headers_{};
   Filter& filter_;
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};

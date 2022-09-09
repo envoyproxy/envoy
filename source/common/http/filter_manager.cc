@@ -322,6 +322,10 @@ Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOption
   return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
 }
 
+OptRef<UpstreamStreamFilterCallbacks> ActiveStreamFilterBase::upstreamCallbacks() {
+  return parent_.filter_manager_callbacks_.upstreamCallbacks();
+}
+
 bool ActiveStreamDecoderFilter::canContinue() {
   // It is possible for the connection manager to respond directly to a request even while
   // a filter is trying to continue. If a response has already happened, we should not

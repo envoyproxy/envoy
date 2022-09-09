@@ -12,6 +12,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -302,9 +303,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
-      cluster_timeout_budget_stat_names_(stats.symbolTable()),
-      subscription_factory_(local_info, main_thread_dispatcher, *this,
-                            validation_context.dynamicValidationVisitor(), api, server) {
+      cluster_timeout_budget_stat_names_(stats.symbolTable()) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -321,6 +320,19 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (!cm_config.local_cluster_name().empty()) {
     local_cluster_name_ = cm_config.local_cluster_name();
   }
+
+  // Initialize the XdsResourceDelegate extension, if set on the bootstrap config.
+  if (bootstrap.has_xds_delegate_extension()) {
+    auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
+        bootstrap.xds_delegate_extension());
+    xds_resources_delegate_ =
+        factory.createXdsResourcesDelegate(bootstrap.xds_delegate_extension().typed_config(),
+                                           validation_context.dynamicValidationVisitor(), api);
+  }
+
+  subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
+      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()));
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
@@ -416,7 +428,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_resources_delegate_.get()),
+            Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or(""));
       }
     }
   } else {
@@ -842,7 +855,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
                         "host {} in cluster {} was ejected by the outlier detector",
-                        host->address(), host->cluster().name());
+                        host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -1748,14 +1761,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
   container->pools_->erasePool(priority, hash_key);
 
   // Guard deletion of the container with `do_not_delete_` to avoid deletion while
   // iterating through the container in `container->pools_->startDrain()`. See
   // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
   if (!container->do_not_delete_ && container->pools_->empty()) {
-    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
     host_http_conn_pool_map_.erase(
         host); // NOTE: `container` is erased after this point in the lambda.
   }
@@ -1835,7 +1848,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
       thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
       container.pools_.erase(erase_iter);
     }
