@@ -28,19 +28,22 @@ public:
   ThriftClientImplTest() = default;
   ~ThriftClientImplTest() override = default;
 
-  void setup() {
+  void setup(bool max_seq_id = false) {
     connection_ = new NiceMock<Network::MockClientConnection>();
     conn_info_.connection_ = connection_;
 
     EXPECT_CALL(callback_, createConnection_).WillOnce(Return(conn_info_));
+    EXPECT_CALL(callback_, onEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(*connection_, addReadFilter(_)).WillOnce(SaveArg<0>(&upstream_read_filter_));
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, noDelay(true));
 
     client_ = std::make_unique<ClientImpl>(callback_, transport_, protocol_, method_name_, host_,
-                                           initial_seq_id_);
+                                           max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_);
     client_->start();
 
+
+    connection_->raiseEvent(Network::ConnectionEvent::Connected);
     // No-OP currently.
     connection_->runHighWatermarkCallbacks();
     connection_->runLowWatermarkCallbacks();
@@ -175,6 +178,26 @@ TEST_F(ThriftClientImplTest, Error) {
   upstream_read_filter_->onData(idl_exception_response, false);
 
   EXPECT_CALL(*connection_, close(_));
+  client_->close();
+}
+
+TEST_F(ThriftClientImplTest, SuccessWithMaxSeqId) {
+  InSequence s;
+
+  setup(/* max_seq_id */ true);
+
+  // Expect client write the simple request.
+  EXPECT_CALL(*connection_, write(_, _));
+
+  bool success = client_->makeRequest();
+  EXPECT_TRUE(success);
+
+  EXPECT_CALL(callback_, onResponseResult(true));
+
+  Buffer::OwnedImpl success_response;
+  writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
+  upstream_read_filter_->onData(success_response, false);
+
   client_->close();
 }
 

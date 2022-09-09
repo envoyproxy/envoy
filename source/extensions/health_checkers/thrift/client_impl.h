@@ -120,10 +120,10 @@ private:
   }
 
   int32_t sequenceId() {
-    seq_id_++;
     if (seq_id_ == std::numeric_limits<int32_t>::max()) {
       seq_id_ = 0;
     }
+    seq_id_++;
     return seq_id_;
   }
   ClientCallback& parent_;
