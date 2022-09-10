@@ -150,7 +150,7 @@ public:
   // iterations (e.g. for maglev/hash-ring policies). Otherwise, expected more than one host to be
   // selected over at least n iterations and at most m.
   void runTest(Http::TestRequestHeaderMapImpl& request_headers,
-               const std::string expected_host_type, const int n = 1, const int m = 2) {
+               const std::string expected_host_type, const int n = 1, const int m = 1000) {
     ASSERT_LT(n, m);
 
     std::set<std::string> hosts;
