@@ -37,7 +37,8 @@ has_metric_with_at_least_1 () {
     stat="$1"
     shift
     response=$(_curl "http://localhost:${PORT_ADMIN}/stats?filter=${stat}")
-    value=$(echo "${response}" | cut -f2 -d':' | tr -d ' ')
+    # Extract number from rows like 'kafka.kafka_broker.request.api_versions_request: 123'.
+    value=$(echo "${response}" | grep "${stat}:" | cut -f2 -d':' | tr -d ' ')
     re='^[0-9]+$'
     [[ ${value} =~ ${re} && ${value} -gt 0 ]] || {
         echo "ERROR: metric check for [${stat}]" >&2
@@ -53,7 +54,12 @@ EXPECTED_BROKER_STATS=(
     "kafka.kafka_broker.request.metadata_request"
     "kafka.kafka_broker.request.create_topics_request"
     "kafka.kafka_broker.request.produce_request"
-    "kafka.kafka_broker.request.fetch_request")
+    "kafka.kafka_broker.request.fetch_request"
+    "kafka.kafka_broker.response.api_versions_response"
+    "kafka.kafka_broker.response.metadata_response"
+    "kafka.kafka_broker.response.create_topics_response"
+    "kafka.kafka_broker.response.produce_response"
+    "kafka.kafka_broker.response.fetch_response")
 for stat in "${EXPECTED_BROKER_STATS[@]}"; do
     has_metric_with_at_least_1 "${stat}"
 done
