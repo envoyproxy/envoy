@@ -4662,6 +4662,7 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
   Http::MockFilterChainManager manager;
   EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager));
 
+  EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
   cluster->info()->createFilterChain(manager);
 }
 
