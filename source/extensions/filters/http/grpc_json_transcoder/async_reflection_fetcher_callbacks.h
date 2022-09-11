@@ -37,15 +37,15 @@ public:
   /**
    * Callback for a successful Server Reflection response.
    */
-  void onReceiveMessage(ServerReflectionResponsePtr&& message) {
+  void onReceiveMessage(ServerReflectionResponsePtr&& message) override {
     on_success_callback_(this, std::move(message));
   }
 
   /**
    * See RawAsyncStreamCallbacks for documentation of these methods.
    */
-  void onCreateInitialMetadata(Http::RequestHeaderMap&) {}
-  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&){};
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override{};
 
   /**
    * These two are used for detecting unexpected errors.

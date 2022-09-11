@@ -36,6 +36,7 @@ abc
 abcd
 abd
 ar
+arbitrarily
 btree
 CAS
 CB
@@ -631,6 +632,7 @@ decrypt
 dedup
 dedupe
 deduplicate
+deduplicated
 deduplicates
 deduplication
 deflater
@@ -935,6 +937,7 @@ nonblocking
 noncopyable
 nonresponsive
 noop
+noops
 nop
 npos
 nthreads
@@ -1054,6 +1057,8 @@ pubkey
 pwd
 py
 qdtext
+qiwzhang
+qiwzhang's
 qps
 quantile
 quantiles
@@ -1093,6 +1098,7 @@ refcount
 referencee
 referer
 refetch
+reflection
 refvec
 regex
 regexes

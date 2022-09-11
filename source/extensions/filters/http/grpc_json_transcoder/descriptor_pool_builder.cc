@@ -47,18 +47,18 @@ void DescriptorPoolBuilder::requestDescriptorPool(
 void DescriptorPoolBuilder::loadFileDescriptorProtos(const FileDescriptorSet& file_descriptor_set) {
   // We dedup the file_descriptor_set because multiple gRPC services can be
   // defined in a single proto file, and different gRPC services can share
-  // protos. When gRPC refleciton is used, we make a request for the file
+  // protos. When gRPC reflection is used, we make a request for the file
   // descriptors associated with each gRPC service so these can overlap.
   //
-  // After dedupping, we perform a topological sort on the file_descriptor_set
-  // so that dependencies are always built before the files that depend on
-  // them. This is needed because gRPC server reflection is not guaranteed to
-  // return transitive dependencies in a sorted order.
+  // After deduplication, we perform a topological sort on the
+  // file_descriptor_set so that dependencies are always built before the files
+  // that depend on them. This is needed because gRPC server reflection is not
+  // guaranteed to return transitive dependencies in a sorted order.
   //
   // Note that the decision to put this logic in this class rather than
   // AsyncReflectionFetcher makes this class more general-purpose (all sources
   // of file descriptors no longer need to be pre-processed) at the cost of
-  // additional cycles when the input is already deduped and topologically
+  // additional cycles when the input is already deduplicated and topologically
   // sorted. If performance becomes an issue, this decision may need to be
   // revisited.
   absl::flat_hash_map<std::string, Envoy::Protobuf::FileDescriptorProto> filename_to_descriptor;

@@ -49,7 +49,7 @@ void AsyncReflectionFetcher::startReflectionRpcs() {
     remaining_callbacks_.insert(callbacks);
     Http::AsyncClient::StreamOptions options;
 
-    // Default of 5s is chosen arbitarily.
+    // Default of 5s is chosen arbitrarily.
     options.setTimeout(std::chrono::milliseconds(reflection_cluster_config_.request_timeout()
                                                      ? reflection_cluster_config_.request_timeout()
                                                      : 5000));
