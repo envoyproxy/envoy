@@ -58,6 +58,11 @@ envoy.tls.key_providers.cryptomb:
   - envoy.tls.key_providers
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.tls.key_providers.qat:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
@@ -76,5 +81,10 @@ envoy.filters.http.language:
 envoy.network.connection_balance.dlb:
   categories:
   - envoy.network.connection_balance
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.regex_engines.hyperscan:
+  categories:
+  - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha

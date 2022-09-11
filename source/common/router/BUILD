@@ -309,6 +309,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -322,7 +323,9 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],
 )
 

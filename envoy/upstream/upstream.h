@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -28,8 +29,13 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "fmt/format.h"
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 /**
@@ -711,9 +717,18 @@ class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {
 class TypedLoadBalancerFactory;
 
 /**
- * Information about a given upstream cluster.
+ * This is a function used by upstream binding config to select the source address based on the
+ * target address. Given the target address through the parameter expect the source address
+ * returned.
  */
-class ClusterInfo {
+using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
+    const Network::Address::InstanceConstSharedPtr&)>;
+
+/**
+ * Information about a given upstream cluster.
+ * This includes the information and interfaces for building an upstream filter chain.
+ */
+class ClusterInfo : public Http::FilterChainFactory {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
@@ -958,11 +973,12 @@ public:
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
-   * Returns an optional source address for upstream connections to bind to.
+   * Returns an source address function which select source address for upstream connections to bind
+   * to.
    *
-   * @return a source address to bind to or nullptr if no bind need occur.
+   * @return return a function used to select the source address.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+  virtual AddressSelectFn sourceAddressFn() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.
@@ -1128,3 +1144,18 @@ using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>
 
 } // namespace Upstream
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+    absl::string_view out =
+        host.hostname().empty() ? host.hostname() : host.address()->asStringView();
+    return formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace fmt

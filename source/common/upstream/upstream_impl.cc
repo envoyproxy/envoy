@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
@@ -51,6 +52,7 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
 #include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -60,17 +62,60 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-const Network::Address::InstanceConstSharedPtr
-getSourceAddress(const envoy::config::cluster::v3::Cluster& cluster,
-                 const envoy::config::core::v3::BindConfig& bind_config) {
+AddressSelectFn
+getSourceAddressFnFromBindConfig(const std::string& cluster_name,
+                                 const envoy::config::core::v3::BindConfig& bind_config) {
+  if (bind_config.additional_source_addresses_size() > 1) {
+    throw EnvoyException(fmt::format(
+        "{}'s upstream binding config has more than one additional source addresses. Only one "
+        "additional source can be supported in BindConfig's additional_source_addresses field",
+        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  }
+
+  std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
+  source_address_list.emplace_back(
+      Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
+  if (bind_config.additional_source_addresses_size() == 1) {
+    source_address_list.emplace_back(
+        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
+    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has two same IP version source addresses. Only two "
+          "different IP version source addresses can be supported in BindConfig's source_address "
+          "and additional_source_addresses fields",
+          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+    }
+  }
+
+  return [source_address_list = std::move(source_address_list)](
+             const Network::Address::InstanceConstSharedPtr& address) {
+    if (address->type() == Network::Address::Type::Ip) {
+      for (auto& source_address : source_address_list) {
+        ASSERT(source_address->type() == Network::Address::Type::Ip);
+        if (source_address->ip()->version() == address->ip()->version()) {
+          return source_address;
+        }
+      }
+    }
+    // If this isn't IP address and no same version IP address, then fallback
+    // to legacy behavior just return the address in the `BindConfig::source_address`
+    // field.
+    return source_address_list[0];
+  };
+}
+
+AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
+                                   const envoy::config::core::v3::BindConfig& bind_config) {
+  std::string cluster_name = cluster.name();
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(
-        cluster.upstream_bind_config().source_address());
+    return getSourceAddressFnFromBindConfig(cluster_name, cluster.upstream_bind_config());
   }
+
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
   if (bind_config.has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(bind_config.source_address());
+    cluster_name = "";
+    return getSourceAddressFnFromBindConfig(cluster_name, bind_config);
   }
 
   return nullptr;
@@ -279,15 +324,6 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSo
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    return createConnection(
-        dispatcher, cluster(), transport_socket_options->http11ProxyInfo()->proxy_address,
-        {transport_socket_options->http11ProxyInfo()->proxy_address}, transportSocketFactory(),
-        options, transport_socket_options, shared_from_this());
-  }
   return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
@@ -352,18 +388,29 @@ Host::CreateConnectionData HostImpl::createConnection(
   Network::ConnectionSocket::OptionsSharedPtr connection_options =
       combineConnectionSocketOptions(cluster, options);
 
-  ASSERT(!address->envoyInternalAddress() ||
-         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
+  auto source_address_fn = cluster.sourceAddressFn();
 
-  Network::ClientConnectionPtr connection =
-      address_list.size() > 1
-          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
-                dispatcher, address_list, cluster.sourceAddress(), socket_factory,
-                transport_socket_options, host, connection_options)
-          : dispatcher.createClientConnection(
-                address, cluster.sourceAddress(),
-                socket_factory.createTransportSocket(transport_socket_options, host),
-                connection_options, transport_socket_options);
+  Network::ClientConnectionPtr connection;
+  // If the transport socket options indicate the connection should be
+  // redirected to a proxy, create the TCP connection to the proxy's address not
+  // the host's address.
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
+    connection = dispatcher.createClientConnection(
+        transport_socket_options->http11ProxyInfo()->proxy_address,
+        source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  } else if (address_list.size() > 1) {
+    connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
+        dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
+        connection_options);
+  } else {
+    connection = dispatcher.createClientConnection(
+        address, source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
@@ -801,6 +848,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 }
 
 ClusterInfoImpl::ClusterInfoImpl(
+    Init::Manager& init_manager, Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& config,
     const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
     TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
@@ -843,7 +891,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
-      source_address_(getSourceAddress(config, bind_config)),
+      source_address_fn_(getSourceAddressFn(config, bind_config)),
       lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
@@ -871,7 +919,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.cluster_type())
               : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      upstream_context_(server_context, init_manager, *stats_scope_) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -978,6 +1027,30 @@ ClusterInfoImpl::ClusterInfoImpl(
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(std::move(callback));
   }
+
+  if (http_protocol_options_) {
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+    if (http_filters.empty()) {
+      auto* codec_filter = http_filters.Add();
+      codec_filter->set_name("envoy.filters.http.upstream_codec");
+      codec_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    }
+    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
+      throw EnvoyException(
+          fmt::format("The codec filter is the only valid terminal upstream filter"));
+    }
+    std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+            upstream_context_.getServerFactoryContext());
+
+    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+    Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+                            Server::Configuration::UpstreamHttpFilterConfigFactory>
+        helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
+               upstream_context_, prefix);
+    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
+  }
 }
 
 // Configures the load balancer based on config.load_balancing_policy
@@ -1081,6 +1154,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 }
 
 ClusterImplBase::ClusterImplBase(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source)
@@ -1101,7 +1175,8 @@ ClusterImplBase::ClusterImplBase(
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
-      new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
+      new ClusterInfoImpl(init_manager_, server_context, cluster,
+                          factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
                           factory_context),
       [&dispatcher](const ClusterInfoImpl* self) {
@@ -1116,8 +1191,7 @@ ClusterImplBase::ClusterImplBase(
           fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
                       cluster.name(), cluster.DebugString()));
     }
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
-        !matcher_supports_alpn) {
+    if (!matcher_supports_alpn) {
       throw EnvoyException(fmt::format(
           "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
           cluster.name(), cluster.DebugString()));

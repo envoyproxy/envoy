@@ -41,18 +41,214 @@
 namespace Envoy {
 namespace Router {
 
+void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
+  callbacks_->clusterInfo()->stats().upstream_flow_control_resumed_reading_total_.inc();
+  callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
+}
+
+void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
+  callbacks_->clusterInfo()->stats().upstream_flow_control_paused_reading_total_.inc();
+  callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
+}
+
+void UpstreamCodecFilter::onUpstreamConnectionEstablished() {
+  if (latched_end_stream_.has_value()) {
+    const bool end_stream = *latched_end_stream_;
+    latched_end_stream_.reset();
+    Http::FilterHeadersStatus status = decodeHeaders(*latched_headers_, end_stream);
+    if (status == Http::FilterHeadersStatus::Continue) {
+      callbacks_->continueDecoding();
+    }
+  }
+}
+
+// This is the last stop in the filter chain: take the headers and ship them to the codec.
+Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                             bool end_stream) {
+  ASSERT(callbacks_->upstreamCallbacks());
+  if (!callbacks_->upstreamCallbacks()->upstream()) {
+    latched_headers_ = headers;
+    latched_end_stream_ = end_stream;
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
+
+  ENVOY_STREAM_LOG(trace, "proxying headers", *callbacks_);
+  calling_encode_headers_ = true;
+  const Http::Status status =
+      callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
+
+  calling_encode_headers_ = false;
+  if (!status.ok() || deferred_reset_) {
+    deferred_reset_ = false;
+    // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
+    // erroneously remove required headers.
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
+    const std::string details =
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
+                               absl::nullopt, details);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  upstreamTiming().onFirstUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
+
+  if (end_stream) {
+    upstreamTiming().onLastUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
+  }
+  if (callbacks_->upstreamCallbacks()->pausedForConnect()) {
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
+  return Http::FilterHeadersStatus::Continue;
+}
+
+// This is the last stop in the filter chain: take the data and ship it to the codec.
+Http::FilterDataStatus UpstreamCodecFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
+  ENVOY_STREAM_LOG(trace, "proxying {} bytes", *callbacks_, data.length());
+  callbacks_->upstreamCallbacks()->upstreamStreamInfo().addBytesSent(data.length());
+  // TODO(alyssawilk) test intermediate filters calling continue.
+  callbacks_->upstreamCallbacks()->upstream()->encodeData(data, end_stream);
+  if (end_stream) {
+    upstreamTiming().onLastUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+// This is the last stop in the filter chain: take the trailers and ship them to the codec.
+Http::FilterTrailersStatus UpstreamCodecFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
+  ENVOY_STREAM_LOG(trace, "proxying trailers", *callbacks_);
+  callbacks_->upstreamCallbacks()->upstream()->encodeTrailers(trailers);
+  upstreamTiming().onLastUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
+  return Http::FilterTrailersStatus::Continue;
+}
+
+// This is the last stop in the filter chain: take the metadata and ship them to the codec.
+Http::FilterMetadataStatus UpstreamCodecFilter::decodeMetadata(Http::MetadataMap& metadata_map) {
+  ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
+  ENVOY_STREAM_LOG(trace, "proxying metadata", *callbacks_);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.emplace_back(std::make_unique<Http::MetadataMap>(metadata_map));
+  callbacks_->upstreamCallbacks()->upstream()->encodeMetadata(metadata_map_vector);
+  return Http::FilterMetadataStatus::Continue;
+}
+
+// Store the callbacks from the UpstreamFilterManager, for sending the response to.
+void UpstreamCodecFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+  callbacks_->addDownstreamWatermarkCallbacks(*this);
+  callbacks_->upstreamCallbacks()->addUpstreamCallbacks(*this);
+  callbacks_->upstreamCallbacks()->setUpstreamToDownstream(bridge_);
+}
+
+// This is the response 1xx headers arriving from the codec. Send them through the filter manager.
+void UpstreamCodecFilter::CodecBridge::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
+  // The filter manager can not handle more than 1 1xx header, so only forward
+  // the first one.
+  if (!seen_1xx_headers_) {
+    seen_1xx_headers_ = true;
+    filter_.callbacks_->encode1xxHeaders(std::move(headers));
+  }
+}
+
+// This is the response headers arriving from the codec. Send them through the filter manager.
+void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                                     bool end_stream) {
+  // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
+  // byte.
+  filter_.upstreamTiming().onFirstUpstreamRxByteReceived(
+      filter_.callbacks_->dispatcher().timeSource());
+
+  if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
+      Http::Utility::getResponseStatus(*headers) == 200) {
+    filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
+    filter_.callbacks_->continueDecoding();
+  }
+
+  maybeEndDecode(end_stream);
+  filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
+                                    StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+}
+
+// This is response data arriving from the codec. Send it through the filter manager.
+void UpstreamCodecFilter::CodecBridge::decodeData(Buffer::Instance& data, bool end_stream) {
+  maybeEndDecode(end_stream);
+  filter_.callbacks_->encodeData(data, end_stream);
+}
+
+// This is response trailers arriving from the codec. Send them through the filter manager.
+void UpstreamCodecFilter::CodecBridge::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
+  maybeEndDecode(true);
+  filter_.callbacks_->encodeTrailers(std::move(trailers));
+}
+
+// This is response metadata arriving from the codec. Send it through the filter manager.
+void UpstreamCodecFilter::CodecBridge::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
+  filter_.callbacks_->encodeMetadata(std::move(metadata_map));
+}
+
+void UpstreamCodecFilter::CodecBridge::dumpState(std::ostream& os, int indent_level) const {
+  filter_.callbacks_->upstreamCallbacks()->dumpState(os, indent_level);
+}
+
+void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
+  if (end_stream) {
+    filter_.upstreamTiming().onLastUpstreamRxByteReceived(
+        filter_.callbacks_->dispatcher().timeSource());
+  }
+}
+
+// The upstream filter manager class.
+class UpstreamFilterManager : public Http::FilterManager {
+public:
+  UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
+                        Event::Dispatcher& dispatcher, OptRef<const Network::Connection> connection,
+                        uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
+                        bool proxy_100_continue, uint32_t buffer_limit,
+                        const Http::FilterChainFactory& filter_chain_factory,
+                        UpstreamRequest& request)
+      : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
+                      proxy_100_continue, buffer_limit, filter_chain_factory),
+        upstream_request_(request) {}
+
+  StreamInfo::StreamInfo& streamInfo() override {
+    return upstream_request_.parent_.callbacks()->streamInfo();
+  }
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return upstream_request_.parent_.callbacks()->streamInfo();
+  }
+  // Send local replies via the downstream filter manager.
+  // Local replies will not be seen by upstream filters.
+  void sendLocalReply(Http::Code code, absl::string_view body,
+                      const std::function<void(Http::ResponseHeaderMap& headers)>& modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override {
+    state().decoder_filter_chain_aborted_ = true;
+    state().encoder_filter_chain_aborted_ = true;
+    state().remote_encode_complete_ = true;
+    state().local_complete_ = true;
+    // TODO(alyssawilk) this should be done through the router to play well with hedging.
+    upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
+                                                          details);
+  }
+  UpstreamRequest& upstream_request_;
+};
+
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                  std::unique_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
-      encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
+      calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
+      encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
+      reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
+      allow_upstream_filters_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
       stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
@@ -72,6 +268,21 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   if (cluster_info.has_value()) {
     stream_info_.setUpstreamClusterInfo(*cluster_info);
   }
+  if (!allow_upstream_filters_) {
+    return;
+  }
+
+  // Set up the upstream filter manager.
+  filter_manager_callbacks_ = std::make_unique<UpstreamRequestFilterManagerCallbacks>(*this);
+  filter_manager_ = std::make_unique<UpstreamFilterManager>(
+      *filter_manager_callbacks_, parent_.callbacks()->dispatcher(),
+      parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
+      parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
+      *parent_.cluster(), *this);
+  parent_.cluster()->createFilterChain(*filter_manager_);
+  // The cluster will always create a codec filter, which sets the upstream
+  // interface. Fast-fail any tests that don't set up mocks correctly.
+  ASSERT(upstream_interface_.has_value());
 }
 
 UpstreamRequest::~UpstreamRequest() { cleanUp(); }
@@ -81,9 +292,13 @@ void UpstreamRequest::cleanUp() {
     return;
   }
   cleaned_up_ = true;
+
+  if (allow_upstream_filters_) {
+    filter_manager_->destroyFilters();
+  }
+
   if (span_ != nullptr) {
-    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
-                                                     upstream_trailers_.get(), stream_info_,
+    Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
                                                      Tracing::EgressConfig::get());
   }
 
@@ -115,7 +330,7 @@ void UpstreamRequest::cleanUp() {
   // Ditto for request/response size histograms.
   Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
       parent_.cluster()->requestResponseSizeStats();
-  if (req_resp_stats_opt.has_value()) {
+  if (req_resp_stats_opt.has_value() && parent_.downstreamHeaders()) {
     auto& req_resp_stats = req_resp_stats_opt->get();
     req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
     req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
@@ -137,8 +352,16 @@ void UpstreamRequest::cleanUp() {
     parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
     --downstream_data_disabled_;
   }
+  if (allow_upstream_filters_) {
+    // The upstream filter chain callbacks own headers/trailers while they are traversing the filter
+    // chain. Make sure to not delete them immediately when the stream ends, as the stream often
+    // ends during filter chain processing and it causes use-after-free violations.
+    parent_.callbacks()->dispatcher().deferredDelete(std::move(filter_manager_callbacks_));
+  }
 }
 
+// This is called by the FilterManager when all filters have processed 1xx headers. Forward them
+// on to the router.
 void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
@@ -147,11 +370,15 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
+// This is called by the FilterManager when all filters have processed headers. Forward them
+// on to the router.
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  ASSERT(headers.get());
   ENVOY_STREAM_LOG(trace, "upstream response headers:\n{}", *parent_.callbacks(), *headers);
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
+
   addResponseHeadersSize(headers->byteSize());
 
   // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
@@ -171,12 +398,17 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
     return;
   }
 
-  // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
-  // byte.
-  upstreamTiming().onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
-  maybeEndDecode(end_stream);
+  if (!allow_upstream_filters_) {
+    // TODO(rodaine): This is actually measuring after the headers are parsed and not the first
+    // byte.
+    upstreamTiming().onFirstUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
+    maybeEndDecode(end_stream);
+  }
 
   awaiting_headers_ = false;
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseHeaders(*span_, headers.get());
+  }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*headers);
   }
@@ -187,6 +419,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
     paused_for_connect_ = false;
   }
 
+  ASSERT(headers.get());
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
 }
 
@@ -194,7 +427,9 @@ void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   resetPerTryIdleTimer();
-  maybeEndDecode(end_stream);
+  if (!allow_upstream_filters_) {
+    maybeEndDecode(end_stream);
+  }
   stream_info_.addBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
 }
@@ -203,7 +438,12 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   ENVOY_STREAM_LOG(trace, "upstream response trailers:\n{}", *parent_.callbacks(), *trailers);
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  maybeEndDecode(true);
+  if (!allow_upstream_filters_) {
+    maybeEndDecode(true);
+  }
+  if (span_ != nullptr) {
+    Tracing::HttpTracerUtility::onUpstreamResponseTrailers(*span_, trailers.get());
+  }
   if (!parent_.config().upstream_logs_.empty()) {
     upstream_trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*trailers);
   }
@@ -213,16 +453,21 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
+  if (connection()) {
+    const auto addressProvider = connection()->connectionInfoProviderSharedPtr();
+    DUMP_DETAILS(addressProvider);
+  }
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
-  DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
+  if (filter_manager_) {
+    filter_manager_->dumpState(os, indent_level);
+  }
 }
 
 const Route& UpstreamRequest::route() const { return *parent_.route(); }
 
-const Network::Connection& UpstreamRequest::connection() const {
-  return *parent_.callbacks()->connection();
+OptRef<const Network::Connection> UpstreamRequest::connection() const {
+  return parent_.callbacks()->connection();
 }
 
 void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
@@ -232,7 +477,6 @@ void UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
 void UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
     upstreamTiming().onLastUpstreamRxByteReceived(parent_.callbacks()->dispatcher().timeSource());
-    decode_complete_ = true;
   }
 }
 
@@ -243,17 +487,33 @@ void UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstShare
   parent_.onUpstreamHostSelected(host);
 }
 
-void UpstreamRequest::encodeHeaders(bool end_stream) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = end_stream;
+void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = end_stream;
 
+  // Kick off creation of the upstream connection immediately upon receiving headers.
+  // In future it may be possible for upstream filters to delay this, or influence connection
+  // creation but for now optimize for minimal latency and fetch the connection
+  // as soon as possible.
   conn_pool_->newStream(this);
+  if (!allow_upstream_filters_) {
+    return;
+  }
+
+  auto* headers = parent_.downstreamHeaders();
+
+  // Make sure that when we are forwarding CONNECT payload we do not do so until
+  // the upstream has accepted the CONNECT request.
+  if (headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
+    paused_for_connect_ = true;
+  }
+
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->streamInfo().setRequestHeaders(*parent_.downstreamHeaders());
+  filter_manager_->decodeHeaders(*parent_.downstreamHeaders(), end_stream);
 }
 
-void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = end_stream;
-
+void UpstreamRequest::acceptDataFromRouterOld(Buffer::Instance& data, bool end_stream) {
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
@@ -277,9 +537,20 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
-  ASSERT(!encode_complete_);
-  encode_complete_ = true;
+void UpstreamRequest::acceptDataFromRouter(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = end_stream;
+
+  if (!allow_upstream_filters_) {
+    acceptDataFromRouterOld(data, end_stream);
+    return;
+  }
+
+  filter_manager_->decodeData(data, end_stream);
+}
+
+void UpstreamRequest::acceptTrailersFromRouterOld(Http::RequestTrailerMap& trailers) {
+  router_sent_end_stream_ = true;
   encode_trailers_ = true;
 
   if (!upstream_) {
@@ -293,7 +564,20 @@ void UpstreamRequest::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   }
 }
 
-void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
+void UpstreamRequest::acceptTrailersFromRouter(Http::RequestTrailerMap& trailers) {
+  if (!allow_upstream_filters_) {
+    acceptTrailersFromRouterOld(trailers);
+    return;
+  }
+
+  ASSERT(!router_sent_end_stream_);
+  router_sent_end_stream_ = true;
+  encode_trailers_ = true;
+
+  filter_manager_->decodeTrailers(trailers);
+}
+
+void UpstreamRequest::acceptMetadataFromRouterOld(Http::MetadataMapPtr&& metadata_map_ptr) {
   if (!upstream_) {
     ENVOY_STREAM_LOG(trace, "upstream_ not ready. Store metadata_map to encode later: {}",
                      *parent_.callbacks(), *metadata_map_ptr);
@@ -304,6 +588,15 @@ void UpstreamRequest::encodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
     metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
     upstream_->encodeMetadata(metadata_map_vector);
   }
+}
+
+void UpstreamRequest::acceptMetadataFromRouter(Http::MetadataMapPtr&& metadata_map_ptr) {
+  if (!allow_upstream_filters_) {
+    acceptMetadataFromRouterOld(std::move(metadata_map_ptr));
+    return;
+  }
+
+  filter_manager_->decodeMetadata(*metadata_map_ptr);
 }
 
 void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
@@ -326,8 +619,14 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
 }
 
 void UpstreamRequest::resetStream() {
+  if (conn_pool_->cancelAnyPendingStream()) {
+    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
+    ASSERT(!upstream_);
+  }
+
   // Don't reset the stream if we're already done with it.
-  if (encode_complete_ && decode_complete_) {
+  if (upstreamTiming().last_upstream_tx_byte_sent_.has_value() &&
+      upstreamTiming().last_upstream_rx_byte_received_.has_value()) {
     return;
   }
 
@@ -336,16 +635,12 @@ void UpstreamRequest::resetStream() {
     span_->setTag(Tracing::Tags::get().Canceled, Tracing::Tags::get().True);
   }
 
-  if (conn_pool_->cancelAnyPendingStream()) {
-    ENVOY_STREAM_LOG(debug, "canceled pool request", *parent_.callbacks());
-    ASSERT(!upstream_);
-  }
-
   if (upstream_) {
     ENVOY_STREAM_LOG(debug, "resetting pool request", *parent_.callbacks());
     upstream_->resetStream();
     clearRequestEncoder();
   }
+  reset_stream_ = true;
 }
 
 void UpstreamRequest::resetPerTryIdleTimer() {
@@ -446,10 +741,12 @@ void UpstreamRequest::onPoolReady(
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
+  } else if (allow_upstream_filters_) {
+    // We only pause for CONNECT for HTTP upstreams. If this is a TCP upstream, unpause.
+    paused_for_connect_ = false;
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
-  parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo()) {
     auto& upstream_timing = info.upstreamInfo()->upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
@@ -496,8 +793,19 @@ void UpstreamRequest::onPoolReady(
   // the encoder.
   parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
 
-  calling_encode_headers_ = true;
-  auto* headers = parent_.downstreamHeaders();
+  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  if (parent_.dynamicMaxStreamDuration().has_value()) {
+    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
+  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
+  }
+  if (max_stream_duration.has_value() && max_stream_duration->count()) {
+    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(*max_stream_duration);
+  }
+
   const auto* route_entry = parent_.route()->routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
@@ -513,6 +821,13 @@ void UpstreamRequest::onPoolReady(
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
+  for (auto* callback : upstream_callbacks_) {
+    callback->onUpstreamConnectionEstablished();
+    return;
+  }
+
+  auto* headers = parent_.downstreamHeaders();
+  calling_encode_headers_ = true;
   upstreamTiming().onFirstUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
 
   // Make sure that when we are forwarding CONNECT payload we do not do so until
@@ -520,20 +835,6 @@ void UpstreamRequest::onPoolReady(
   if (protocol.has_value() &&
       headers->getMethodValue() == Http::Headers::get().MethodValues.Connect) {
     paused_for_connect_ = true;
-  }
-
-  absl::optional<std::chrono::milliseconds> max_stream_duration;
-  if (parent_.dynamicMaxStreamDuration().has_value()) {
-    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
-  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-        upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
-  }
-
-  if (max_stream_duration.has_value() && max_stream_duration->count()) {
-    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-        [this]() -> void { onStreamMaxDurationReached(); });
-    max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
   const Http::Status status =
@@ -558,6 +859,9 @@ void UpstreamRequest::onPoolReady(
 }
 
 void UpstreamRequest::encodeBodyAndTrailers() {
+  if (allow_upstream_filters_) {
+    return;
+  }
   // It is possible to get reset in the middle of an encodeHeaders() call. This happens for
   // example in the HTTP/2 codec if the frame cannot be encoded for some reason. This should never
   // happen but it's unclear if we have covered all cases so protect against it and test for it.
@@ -576,17 +880,24 @@ void UpstreamRequest::encodeBodyAndTrailers() {
 
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());
-      upstream_->encodeData(*buffered_request_body_, encode_complete_ && !encode_trailers_);
+      upstream_->encodeData(*buffered_request_body_, router_sent_end_stream_ && !encode_trailers_);
     }
 
     if (encode_trailers_) {
       upstream_->encodeTrailers(*parent_.downstreamTrailers());
     }
 
-    if (encode_complete_) {
+    if (router_sent_end_stream_) {
       upstreamTiming().onLastUpstreamTxByteSent(parent_.callbacks()->dispatcher().timeSource());
     }
   }
+}
+
+UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() {
+  if (allow_upstream_filters_) {
+    return *upstream_interface_;
+  }
+  return *this;
 }
 
 void UpstreamRequest::onStreamMaxDurationReached() {
@@ -664,6 +975,63 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
     --downstream_data_disabled_;
   }
 }
+
+Http::RequestHeaderMapOptRef UpstreamRequestFilterManagerCallbacks::requestHeaders() {
+  return {*upstream_request_.parent_.downstreamHeaders()};
+}
+
+Http::RequestTrailerMapOptRef UpstreamRequestFilterManagerCallbacks::requestTrailers() {
+  if (upstream_request_.parent_.downstreamTrailers()) {
+    return {*upstream_request_.parent_.downstreamTrailers()};
+  }
+  if (trailers_) {
+    return {*trailers_};
+  }
+  return {};
+}
+
+const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::scope() {
+  return upstream_request_.parent_.callbacks()->scope();
+}
+
+const Tracing::Config& UpstreamRequestFilterManagerCallbacks::tracingConfig() {
+  return upstream_request_.parent_.callbacks()->tracingConfig();
+}
+
+Tracing::Span& UpstreamRequestFilterManagerCallbacks::activeSpan() {
+  return upstream_request_.parent_.callbacks()->activeSpan();
+}
+
+void UpstreamRequestFilterManagerCallbacks::resetStream(
+    Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason) {
+  // The filter manager needs to disambiguate between a filter-driven reset,
+  // which should force reset the stream, and a codec driven reset, which should
+  // tell the router the stream reset, and let the router make the decision to
+  // send a local reply, or retry the stream.
+  if (reset_reason == Http::StreamResetReason::LocalReset &&
+      transport_failure_reason != "codec_error") {
+    upstream_request_.parent_.callbacks()->resetStream();
+    return;
+  }
+  return upstream_request_.onResetStream(reset_reason, transport_failure_reason);
+}
+
+Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clusterInfo() {
+  return upstream_request_.parent_.callbacks()->clusterInfo();
+}
+
+Router::RouteConstSharedPtr
+UpstreamRequestFilterManagerCallbacks::route(const Router::RouteCallback&) {
+  return upstream_request_.parent_.callbacks()->route();
+}
+
+Http::Http1StreamEncoderOptionsOptRef
+UpstreamRequestFilterManagerCallbacks::http1StreamEncoderOptions() {
+  return upstream_request_.parent_.callbacks()->http1StreamEncoderOptions();
+}
+
+REGISTER_FACTORY(UpstreamCodecFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Router
 } // namespace Envoy

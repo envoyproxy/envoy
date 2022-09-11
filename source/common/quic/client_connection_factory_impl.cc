@@ -17,7 +17,12 @@ createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
   Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_info->quic_config_);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
+
   quic_info->quic_config_.set_max_time_before_crypto_handshake(crypto_timeout);
+  if (quic_info->quic_config_.max_time_before_crypto_handshake() <
+      quic_info->quic_config_.max_idle_time_before_crypto_handshake()) {
+    quic_info->quic_config_.set_max_idle_time_before_crypto_handshake(crypto_timeout);
+  }
   // Default enable RVCM connection option so that port migration is enabled.
   quic::QuicTagVector connection_options;
   if (quic_info->quic_config_.HasSendConnectionOptions()) {

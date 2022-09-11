@@ -41,7 +41,8 @@ ActiveQuicListener::ActiveQuicListener(
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
-      crypto_server_stream_factory_(crypto_server_stream_factory) {
+      crypto_server_stream_factory_(crypto_server_stream_factory),
+      connection_id_generator_(quic::kQuicDefaultConnectionIdLength) {
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
@@ -62,8 +63,8 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names,
-      crypto_server_stream_factory_);
+      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
+      connection_id_generator_);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =

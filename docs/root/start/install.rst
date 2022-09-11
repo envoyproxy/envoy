@@ -131,7 +131,7 @@ Tools images
 
 The Envoy project ships images for tools that are separate from the proxy binary but are useful
 in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
-tools in `/usr/local/bin` include:
+tools in ``/usr/local/bin`` include:
 
 * :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
 
@@ -160,13 +160,13 @@ The following table shows the available Docker images
      - amd64
      - arm64
    * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     - Release binary with symbols stripped on top of an Ubuntu 20.04 base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
    * - `envoyproxy/envoy-contrib <https://hub.docker.com/r/envoyproxy/envoy-contrib/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu Bionic base.
+     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu 20.04 base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
@@ -184,31 +184,31 @@ The following table shows the available Docker images
      -
      -
    * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - Release binary with debug symbols on top of an Ubuntu 20.04 base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
    * - `envoyproxy/envoy-contrib-debug <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu Bionic base.
+     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu 20.04 base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
    * - `envoyproxy/envoy-tools <https://hub.docker.com/r/envoyproxy/envoy-tools/tags/>`_
-     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu 20.04 base.
      - |DOCKER_IMAGE_TAG_NAME|
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
    * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
-     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     - Release binary with symbols stripped on top of an Ubuntu 20.04 base.
      -
      -
      - latest
      - latest
    * - `envoyproxy/envoy-contrib-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-dev/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu Bionic base.
+     - Release :ref:`contrib <install_contrib>` binary with symbols stripped on top of an Ubuntu 20.04 base.
      -
      -
      - latest
@@ -220,13 +220,13 @@ The following table shows the available Docker images
      - latest
      - latest
    * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
-     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - Release binary with debug symbols on top of an Ubuntu 20.04 base.
      -
      -
      - latest
      - latest
    * - `envoyproxy/envoy-contrib-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-contrib-debug-dev/tags/>`_
-     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu Bionic base.
+     - Release :ref:`contrib <install_contrib>` binary with debug symbols on top of an Ubuntu 20.04 base.
      -
      -
      - latest
@@ -238,7 +238,7 @@ The following table shows the available Docker images
      - latest
      -
    * - `envoyproxy/envoy-tools-dev <https://hub.docker.com/r/envoyproxy/envoy-tools-dev/tags/>`_
-     - Release :ref:`tools <install_tools>` on top of an Ubuntu Bionic base.
+     - Release :ref:`tools <install_tools>` on top of an Ubuntu 20.04 base.
      -
      -
      - latest

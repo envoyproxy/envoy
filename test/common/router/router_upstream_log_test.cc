@@ -91,7 +91,6 @@ public:
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
-    callbacks_.dispatcher_.delete_immediately_ = true;
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
@@ -121,6 +120,14 @@ public:
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
+        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
+          Http::FilterFactoryCb factory_cb =
+              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
   }
 
   void expectResponseTimerCreate() {

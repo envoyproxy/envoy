@@ -395,8 +395,8 @@ config_setting(
 config_setting(
     name = "boringssl_fips",
     constraint_values = [
-        "@bazel_tools//platforms:linux",
-        "@bazel_tools//platforms:x86_64",
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
     ],
     values = {"define": "boringssl=fips"},
 )
@@ -409,7 +409,7 @@ config_setting(
 config_setting(
     name = "zlib_ng",
     constraint_values = [
-        "@bazel_tools//platforms:linux",
+        "@platforms//os:linux",
     ],
     values = {"define": "zlib=ng"},
 )
@@ -458,6 +458,14 @@ alias(
     actual = select({
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
+    }),
+)
+
+alias(
+    name = "boringcrypto",
+    actual = select({
+        "//bazel:boringssl_fips": "@boringssl_fips//:crypto",
+        "//conditions:default": "@boringssl//:crypto",
     }),
 )
 
@@ -707,7 +715,7 @@ platform(
 platform(
     name = "android_armeabi",
     constraint_values = [
-        "@platforms//cpu:arm",  # TODO(keith): This should be armv7 https://github.com/bazelbuild/bazel/issues/14982
+        "@platforms//cpu:armv7",
         "@platforms//os:android",
     ],
 )

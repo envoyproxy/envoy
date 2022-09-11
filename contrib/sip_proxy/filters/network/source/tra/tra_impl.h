@@ -95,6 +95,12 @@ public:
   };
 
 private:
+  void sendRequest(
+      const std::string& method,
+      envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
+      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info);
+
+private:
   class AsyncRequestCallbacks
       : public Grpc::AsyncRequestCallbacks<
             envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse>,

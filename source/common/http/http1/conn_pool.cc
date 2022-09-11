@@ -24,9 +24,9 @@ namespace Http {
 namespace Http1 {
 
 ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
-    : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
+    : RequestEncoderWrapper(&parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
-  RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
 }
 
 ActiveClient::StreamWrapper::~StreamWrapper() {
