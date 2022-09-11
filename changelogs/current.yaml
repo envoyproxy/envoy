@@ -21,6 +21,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: grpc_json_transcoder
+  change: |
+    Support grpc reflection for building json transcoding.
 - area: resource_monitors
   change: |
     changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.

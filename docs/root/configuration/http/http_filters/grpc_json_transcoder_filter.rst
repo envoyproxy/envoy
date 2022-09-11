@@ -104,3 +104,18 @@ gRPC or RESTful JSON requests to localhost:51051.
 
 .. literalinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
+
+
+Modified Envoy configuration to use gRPC reflection
+---------------------------------------------------
+Rather than using a statically generated configuration, Envoy can fetch service
+definitions via grpc reflection. This can be done by replacing
+``proto_descriptor`` in the filter's config with the following:
+
+.. code-block:: yaml
+
+  reflection_cluster_config:
+    cluster_name: "<INSERT_GRPC_CLUSTER_NAME_HERE"
+
+Note that reflection must be configured on the target grpc service for this to
+work; the method for doing this is language-specific.
