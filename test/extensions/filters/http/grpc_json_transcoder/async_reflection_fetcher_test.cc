@@ -51,8 +51,7 @@ class AsyncReflectionFetcherTest : public testing::Test {
 public:
   AsyncReflectionFetcherTest()
       : api_(Api::createApiForTest()),
-        mock_async_client_(std::make_shared<Envoy::Grpc::MockAsyncClient>()) {
-  }
+        mock_async_client_(std::make_shared<Envoy::Grpc::MockAsyncClient>()) {}
 
 protected:
   Api::ApiPtr api_;

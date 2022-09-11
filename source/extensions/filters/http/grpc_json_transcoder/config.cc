@@ -52,7 +52,7 @@ JsonTranscoderConfigSharedPtr GrpcJsonTranscoderFilterConfig::createConfig(
     std::vector<Envoy::Grpc::RawAsyncClientSharedPtr> async_clients;
     async_clients.reserve(proto_config.services_size());
 
-        for (int i = 0; i < proto_config.services_size(); i++) {
+    for (int i = 0; i < proto_config.services_size(); i++) {
       async_clients.push_back(std::make_shared<Envoy::Grpc::AsyncClientImpl>(
           context.clusterManager(), config, context.api().timeSource()));
     }

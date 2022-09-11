@@ -46,7 +46,7 @@ public:
       : reflection_cluster_config_(reflection_cluster_config), init_manager_(init_manager),
         services_(std::begin(services), std::end(services)) {
     // Wrap RawAsyncClient into AsyncClient.
-    for (auto & async_client : async_clients) {
+    for (auto& async_client : async_clients) {
       async_clients_.emplace_back(async_client);
     }
   }
