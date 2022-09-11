@@ -16,7 +16,9 @@ namespace GrpcJsonTranscoder {
 
 void AsyncReflectionFetcher::requestFileDescriptors(
     std::function<void(Envoy::Protobuf::FileDescriptorSet)> file_descriptors_available) {
+  Thread::LockGuard guard_(receive_message_mutex_);
   file_descriptors_available_ = file_descriptors_available;
+
   // Register to init_manager, force the listener to wait for completion of the
   // reflection Rpcs.
   init_target_ = std::make_unique<Init::TargetImpl>("JsonGrpcFilter: Grpc Reflection Rpcs",
