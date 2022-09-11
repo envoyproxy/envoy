@@ -5,7 +5,6 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/grpc/async_client_impl.h"
 
-using grpc::reflection::v1alpha::ServerReflection;
 using grpc::reflection::v1alpha::ServerReflectionRequest;
 using grpc::reflection::v1alpha::ServerReflectionResponse;
 

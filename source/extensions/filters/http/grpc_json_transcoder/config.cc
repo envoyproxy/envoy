@@ -50,7 +50,9 @@ JsonTranscoderConfigSharedPtr GrpcJsonTranscoderFilterConfig::createConfig(
     config.mutable_envoy_grpc()->set_cluster_name(
         proto_config.reflection_cluster_config().cluster_name());
     std::vector<Envoy::Grpc::RawAsyncClientSharedPtr> async_clients;
-    for (int i = 0; i < proto_config.services_size(); i++) {
+    async_clients.reserve(proto_config.services_size());
+
+        for (int i = 0; i < proto_config.services_size(); i++) {
       async_clients.push_back(std::make_shared<Envoy::Grpc::AsyncClientImpl>(
           context.clusterManager(), config, context.api().timeSource()));
     }

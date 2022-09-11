@@ -44,10 +44,10 @@ public:
                          std::vector<Grpc::RawAsyncClientSharedPtr> async_clients,
                          Init::Manager& init_manager)
       : reflection_cluster_config_(reflection_cluster_config), init_manager_(init_manager),
-        services_(std::begin(services), std::end(services)), async_clients_() {
+        services_(std::begin(services), std::end(services)) {
     // Wrap RawAsyncClient into AsyncClient.
-    for (size_t i = 0; i < async_clients.size(); i++) {
-      async_clients_.emplace_back(async_clients[i]);
+    for (auto & async_client : async_clients) {
+      async_clients_.emplace_back(async_client);
     }
   }
 

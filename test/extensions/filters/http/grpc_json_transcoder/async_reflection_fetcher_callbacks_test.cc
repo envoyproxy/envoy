@@ -23,18 +23,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByMove;
-using testing::Invoke;
 using testing::MockFunction;
-using testing::NiceMock;
-using testing::Return;
 
-using Envoy::Protobuf::FileDescriptorProto;
-using Envoy::Protobuf::FileDescriptorSet;
-using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::ProtobufUtil::StatusCode;
-using Envoy::Server::Configuration::MockFactoryContext;
-using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
 
@@ -48,7 +38,7 @@ namespace {
 
 class AsyncReflectionFetcherCallbacksTest : public testing::Test {
 public:
-  AsyncReflectionFetcherCallbacksTest() {}
+  AsyncReflectionFetcherCallbacksTest() = default;
 };
 
 /**

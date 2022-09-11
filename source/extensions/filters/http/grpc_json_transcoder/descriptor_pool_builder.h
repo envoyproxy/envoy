@@ -60,7 +60,7 @@ public:
    */
   virtual void
   loadFileDescriptorProtos(const Envoy::Protobuf::FileDescriptorSet& file_descriptor_set);
-  virtual ~DescriptorPoolBuilder() {}
+  virtual ~DescriptorPoolBuilder() = default;
 
 private:
   /**

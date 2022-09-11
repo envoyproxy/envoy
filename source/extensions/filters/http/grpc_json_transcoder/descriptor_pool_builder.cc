@@ -98,9 +98,9 @@ void DescriptorPoolBuilder::loadFileDescriptorProtos(const FileDescriptorSet& fi
     top_sorted_filenames.push_back(node);
     no_incoming_edges.erase(node);
 
-    for (auto dependent_node : outgoing_edges[node]) {
+    for (const auto& dependent_node : outgoing_edges[node]) {
       incoming_edges[dependent_node].erase(node);
-      if (incoming_edges[dependent_node].size() == 0) {
+      if (incoming_edges[dependent_node].empty()) {
         no_incoming_edges.insert(dependent_node);
       }
     }
@@ -117,7 +117,7 @@ void DescriptorPoolBuilder::loadFileDescriptorProtos(const FileDescriptorSet& fi
 
   std::unique_ptr<Protobuf::DescriptorPool> descriptor_pool =
       std::make_unique<Protobuf::DescriptorPool>();
-  for (auto filename : top_sorted_filenames) {
+  for (const auto& filename : top_sorted_filenames) {
     if (!descriptor_pool->BuildFile(filename_to_descriptor[filename])) {
       ENVOY_LOG(error, "transcoding_filter: Unable to build proto descriptor pool");
       return;

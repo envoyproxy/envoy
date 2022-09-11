@@ -23,18 +23,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::ByMove;
-using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 
-using Envoy::Protobuf::FileDescriptorProto;
 using Envoy::Protobuf::FileDescriptorSet;
-using Envoy::Protobuf::util::MessageDifferencer;
-using Envoy::ProtobufUtil::StatusCode;
 using Envoy::Server::Configuration::MockFactoryContext;
-using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
 
@@ -57,7 +51,7 @@ class AsyncReflectionFetcherTest : public testing::Test {
 public:
   AsyncReflectionFetcherTest()
       : api_(Api::createApiForTest()),
-        mock_async_client_(std::make_shared<Envoy::Grpc::MockAsyncClient>()), mock_async_stream_() {
+        mock_async_client_(std::make_shared<Envoy::Grpc::MockAsyncClient>()) {
   }
 
 protected:
@@ -99,7 +93,7 @@ TEST_F(AsyncReflectionFetcherTest, StartReflectionRpcs) {
                                                   async_clients, context_.initManager());
   EXPECT_CALL(*mock_async_client_, startRaw(_, _, _, _)).WillOnce(Return(&mock_async_stream_));
   EXPECT_CALL(mock_async_stream_, sendMessageRaw_(_, true));
-  EXPECT_TRUE(async_reflection_fetcher.getRemainingCallBacksForTest().size() == 0);
+  EXPECT_TRUE(async_reflection_fetcher.getRemainingCallBacksForTest().empty());
   async_reflection_fetcher.startReflectionRpcs();
   EXPECT_TRUE(async_reflection_fetcher.getRemainingCallBacksForTest().size() == 1);
   async_clients.clear();
