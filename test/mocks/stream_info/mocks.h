@@ -130,6 +130,8 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, setSanitizedPath, (const Http::RequestHeaderMap&));
+  MOCK_METHOD(const absl::string_view, getSanitizedPath, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
@@ -154,6 +156,8 @@ public:
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
+  absl::string_view sanitized_path_;
+  
 };
 
 } // namespace StreamInfo

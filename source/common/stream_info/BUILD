@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:dump_state_utils",
         "//source/common/network:socket_lib",
+        "//source/common/router:config_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

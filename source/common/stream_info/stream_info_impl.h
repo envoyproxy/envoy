@@ -17,6 +17,8 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/router/config_impl.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -312,6 +314,16 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
+  void setSanitizedPath(const Http::RequestHeaderMap& headers) override {
+    sanitized_path_ = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
+    auto pos = sanitized_path_.find_first_of(";");
+    if (pos != absl::string_view::npos) {
+      sanitized_path_.remove_suffix(sanitized_path_.length() - pos);
+    }
+  }
+
+  const absl::string_view getSanitizedPath() const override { return sanitized_path_; }
+
   // This function is used to persist relevant information from the original
   // stream into to the new one, when recreating the stream. Generally this
   // includes information about the downstream stream, but not the upstream
@@ -342,6 +354,8 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
+  absl::string_view sanitized_path_;
+
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
