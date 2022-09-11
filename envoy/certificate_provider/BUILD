@@ -16,6 +16,8 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/common:callback",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/ssl:connection_interface",
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],

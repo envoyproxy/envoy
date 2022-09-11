@@ -115,7 +115,7 @@ public:
   /**
    * @return the set of capabilities for Certificate Provider instance specified in this context
    */
-  virtual CertificateProvider::CertificateProvider::Capabilites certProviderCaps() const PURE;
+  virtual CertificateProvider::CertificateProvider::Capabilities certProviderCaps() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

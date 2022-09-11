@@ -5,6 +5,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
@@ -21,18 +22,53 @@ public:
   virtual Envoy::Ssl::ConnectionInfoConstSharedPtr connectionInfo() const PURE;
 };
 
-using OnDemandUpdateMetadataPtr = std::unique_ptr<OnDemandUpdateMetadata>;
+using OnDemandUpdateMetadataPtr = std::shared_ptr<OnDemandUpdateMetadata>;
+
+class OnDemandUpdateCallbacks {
+  public:
+    virtual ~OnDemandUpdateCallbacks() = default;
+
+    /**
+     * Called when cert is already in cache.
+     * @param host supplies host of cert.
+     */
+    virtual void onCacheHit(const std::string& host) const PURE;
+    /**
+     * Called when cert cache is missed.
+     * @param host supplies host of cert.
+     */
+    virtual void onCacheMiss(const std::string& host) const PURE;
+};
+
+enum class OnDemandUpdateStatus {
+  // The cert is in cache. No self-signing needed.
+  InCache,
+  // The cert is not in cache. Self-sign cert, callbacks will be called at a later time unless cancelled.
+  Loading,
+};
+
+class OnDemandUpdateHandle {
+  public:
+    virtual ~OnDemandUpdateHandle() = default;
+  };
+
+using OnDemandUpdateHandlePtr = std::unique_ptr<OnDemandUpdateHandle>;
+  
+struct OnDemandUpdateResult {
+  OnDemandUpdateStatus status_;
+  OnDemandUpdateHandlePtr handle_;
+};
 
 class CertificateProvider {
 public:
-  struct Capabilites {
+  struct Capabilities {
     /* whether or not a provider supports generating identity certificates on demand */
     bool provide_on_demand_identity_certs = false;
   };
 
   virtual ~CertificateProvider() = default;
 
-  virtual Capabilites capabilities() const PURE;
+  virtual Capabilities capabilities() const PURE;
 
   /**
    * @return CA certificate used for validation
@@ -51,12 +87,15 @@ public:
    * Add on-demand callback into certificate provider, this function might be invoked from worker
    * thread during runtime
    *
-   * @param metadata is passed to provider for certs fetching/refreshing
+   * @param cert_name is certificate provider name in commontlscontext configuration.
+   * @param metadata is passed to provider for certs fetching/refreshing.
+   * @param thread_local_dispatcher is the dispatcher from callee's thread.
+   * @param callback registers callback to be executed for on demand update.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandlePtr
-  addOnDemandUpdateCallback(const std::string& cert_name, OnDemandUpdateMetadataPtr metadata,
-                            std::function<void()> thread_local_callback) PURE;
+  virtual OnDemandUpdateResult
+  addOnDemandUpdateCallback(const std::string& cert_name, Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+                             Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callback) PURE;
 
   /**
    * Add certificate update callback into certificate provider for asychronous usage.

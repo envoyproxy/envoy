@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.certificate_providers.local_certificate.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.certificate_providers.local_certificate.v3";
+option java_outer_classname = "LocalCertificateProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/certificate_providers/local_certificate/v3;local_certificatev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Local Certificate Provider]
+
+// [#extension: envoy.certificate_providers.local_certificate]
+message LocalCertificate {
+  // Key and cert of root ca used to sign certificates.
+  config.core.v3.DataSource rootca_cert = 1;
+
+  config.core.v3.DataSource rootca_key = 2;
+}

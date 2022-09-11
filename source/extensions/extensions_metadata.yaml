@@ -1246,3 +1246,11 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.certificate_providers.local_certificate:
+  categories:
+  - envoy.certificate_providers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.certificate_providers.local_certificate.v3.LocalCertificate
+  

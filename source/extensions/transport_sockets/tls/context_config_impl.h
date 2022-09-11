@@ -61,7 +61,7 @@ public:
   void setSecretUpdateCallback(std::function<void()> callback) override;
   Ssl::HandshakerFactoryCb createHandshaker() const override;
   Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
-  CertificateProvider::CertificateProvider::Capabilites certProviderCaps() const override {
+  CertificateProvider::CertificateProvider::Capabilities certProviderCaps() const override {
     return cert_provider_caps_;
   }
   Ssl::SslCtxCb sslctxCb() const override { return sslctx_cb_; }
@@ -111,7 +111,7 @@ private:
 
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
-  CertificateProvider::CertificateProvider::Capabilites cert_provider_caps_;
+  CertificateProvider::CertificateProvider::Capabilities cert_provider_caps_;
   Ssl::SslCtxCb sslctx_cb_;
   Server::Configuration::TransportSocketFactoryContext& factory_context_;
   const std::string tls_keylog_path_;

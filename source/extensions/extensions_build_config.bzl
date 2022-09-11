@@ -361,6 +361,12 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # Certificate providers
+    #
+
+    "envoy.certificate_providers.local_certificate":    "//source/extensions/certificate_providers/local_certificate:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
