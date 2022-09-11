@@ -2087,7 +2087,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters(
       {"local_service_grpc", "default-boring-service"}, {});
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
     stream_info.setSanitizedPath(headers);
     EXPECT_EQ(stream_info.getSanitizedPath(), "path-bluh;env=prod");
     TestConfigImpl config(route_configuration, factory_context_, true);
@@ -2099,7 +2100,8 @@ virtual_hosts:
   // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
   route_configuration.set_ignore_path_parameters_in_path_matching(true);
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
     stream_info.setSanitizedPath(headers);
     EXPECT_EQ(stream_info.getSanitizedPath(), "path-bluh");
     TestConfigImpl config(route_configuration, factory_context_, true);
@@ -8281,51 +8283,55 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   // Exact matches
   Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/api", "GET");
-  //stream_info.setSanitizedPath(headers);
+  // stream_info.setSanitizedPath(headers);
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api?param=true", "GET");
   stream_info.setSanitizedPath(headers);
-  EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api?param=true", "GET"), stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ(
+      "path-separated-cluster",
+      config.route(genHeaders("path.prefix.com", "/rest/api?param=true", "GET"), stream_info, 0)
+          ->routeEntry()
+          ->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api#fragment", "GET");
   stream_info.setSanitizedPath(headers);
-  EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api#fragment", "GET"),
-            stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ(
+      "path-separated-cluster",
+      config.route(genHeaders("path.prefix.com", "/rest/api#fragment", "GET"), stream_info, 0)
+          ->routeEntry()
+          ->clusterName());
 
   // Prefix matches
   headers = genHeaders("path.prefix.com", "/rest/api/", "GET");
   stream_info.setSanitizedPath(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"),
-            stream_info, 0)
+            config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET");
   stream_info.setSanitizedPath(headers);
-  EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET"), stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ(
+      "path-separated-cluster",
+      config
+          .route(genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET"), stream_info, 0)
+          ->routeEntry()
+          ->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET");
   stream_info.setSanitizedPath(headers);
-  EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET"), stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ(
+      "path-separated-cluster",
+      config
+          .route(genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET"), stream_info, 0)
+          ->routeEntry()
+          ->clusterName());
 
   // Non-matching prefixes
   headers = genHeaders("path.prefix.com", "/rest/apithing", "GET");
   stream_info.setSanitizedPath(headers);
   EXPECT_EQ("default-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/apithing", "GET"),stream_info, 0)
+            config.route(genHeaders("path.prefix.com", "/rest/apithing", "GET"), stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
 }

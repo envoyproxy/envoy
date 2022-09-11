@@ -157,7 +157,6 @@ public:
   absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
   absl::string_view sanitized_path_;
-  
 };
 
 } // namespace StreamInfo

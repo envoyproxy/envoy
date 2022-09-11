@@ -15,10 +15,10 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-#include "source/common/network/socket_impl.h"
-#include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/http/path_utility.h"
+#include "source/common/network/socket_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "absl/strings/str_replace.h"
 
