@@ -42,7 +42,7 @@ public:
   virtual bool connectionAllowed() PURE;
 
   /**
-   * Called when an quit command has been received.
+   * Called when a quit command has been received.
    */
   virtual void onQuit() PURE;
 
