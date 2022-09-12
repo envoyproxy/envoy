@@ -549,7 +549,7 @@ message Cluster {
 
     // The port to override for the original dst address. This port
     // will take precedence over filter state and header override ports
-    google.protobuf.UInt32Value upstream_port_override = 3;
+    google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
   }
 
   // Common configuration for all load balancer implementations.
