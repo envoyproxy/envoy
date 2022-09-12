@@ -36,6 +36,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: http
+  change: |
+    changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
