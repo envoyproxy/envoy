@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package envoy.type.http.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.http.v3";
+option java_outer_classname = "HeaderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/http/v3;httpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Http header API]
+
+// Header defines an API for obtaining HTTP Header.
+message Header {
+  // The name that will be used to obtain header value from downstream HTTP request or generate
+  // new header for downstream.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Path will be used to match the requests.
+  // If no path is specified here, all requests are included.
+  string path = 2;
+}

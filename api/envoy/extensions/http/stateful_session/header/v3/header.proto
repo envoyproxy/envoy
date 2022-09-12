@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.extensions.http.stateful_session.header.v3;
+
+import "envoy/type/http/v3/header.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.header.v3";
+option java_outer_classname = "HeaderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/stateful_session/header/v3;headerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// This extension allows the session state to be tracked via request headers.
+//
+// This extension encodes the address of the upstream host selected by the load balancer
+// into a response header.
+// When new requests are incoming, this extension will try to parse the specific upstream host
+// address by header name. If the address parsed from the header corresponds to a valid
+// upstream host, this upstream host will be selected first.
+// TODO - add more comments
+
+// [#extension: envoy.http.stateful_session.header]
+message HeaderBasedSessionState {
+  // The header configuration used to track session state
+  type.http.v3.Header header = 1 [(validate.rules).message = {required: true}];
+}
