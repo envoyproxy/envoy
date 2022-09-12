@@ -8,7 +8,7 @@ namespace Http {
 namespace StatefulSession {
 namespace Header {
 
-Envoy::Http::SessionStateFactorySharedPtr 
+Envoy::Http::SessionStateFactorySharedPtr
 HeaderBasedSessionStateFactoryConfig::createSessionStateFactory(
     const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& context) {
 
@@ -17,7 +17,7 @@ HeaderBasedSessionStateFactoryConfig::createSessionStateFactory(
   return std::make_shared<HeaderBasedSessionStateFactory>(proto_config);
 }
 
-REGISTER_FACTORY(HeaderBasedSessionStateFactoryConfig , Envoy::Http::SessionStateFactoryConfig);
+REGISTER_FACTORY(HeaderBasedSessionStateFactoryConfig, Envoy::Http::SessionStateFactoryConfig);
 
 } // namespace Header
 } // namespace StatefulSession

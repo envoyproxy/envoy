@@ -9,23 +9,23 @@ namespace Extensions {
 namespace Http {
 namespace StatefulSession {
 namespace Header {
-  
+
 class HeaderBasedSessionStateFactoryConfig : public Envoy::Http::SessionStateFactoryConfig {
 public:
-    Envoy::Http::SessionStateFactorySharedPtr
-    createSessionStateFactory(const Protobuf::Message& config, 
-                              Server::Configuration::CommonFactoryContext& context) override;
+  Envoy::Http::SessionStateFactorySharedPtr
+  createSessionStateFactory(const Protobuf::Message& config,
+                            Server::Configuration::CommonFactoryContext& context) override;
 
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-        return std::make_unique<
-            envoy::extensions::http::stateful_session::header::v3::HeaderBasedSessionState>();
-    }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::http::stateful_session::header::v3::HeaderBasedSessionState>();
+  }
 
-    std::string name() const override { return "envoy.http.stateful_session.header"; }
+  std::string name() const override { return "envoy.http.stateful_session.header"; }
 };
 
 } // namespace Header
 } // namespace StatefulSession
-} // namespace Extensions
 } // namespace Http
+} // namespace Extensions
 } // namespace Envoy

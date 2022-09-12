@@ -7,6 +7,7 @@
 #include "envoy/http/stateful_session.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
 namespace Envoy {
@@ -20,36 +21,48 @@ using HeaderBasedSessionStateProto =
 
 class HeaderBasedSessionStateFactory : public Envoy::Http::SessionStateFactory {
 public:
-    class SessionStateImpl : public Envoy::Http::SessionState {
-    public:
-        SessionStateImpl(absl::optional<std::string> address,
-                         const HeaderBasedSessionStateFactory& factory)
-            : upstream_address_(std::move(address)), factory_(factory) {
-                std::ignore = factory_;
-            } 
+  class SessionStateImpl : public Envoy::Http::SessionState {
+  public:
+    SessionStateImpl(absl::optional<std::string> address) : upstream_address_(std::move(address)) {}
 
-        absl::optional<absl::string_view> upstreamAddress() const override {return upstream_address_; }
-        void onUpdate(const Upstream::HostDescription& host,
-                      Envoy::Http::ResponseHeaderMap& headers) override;
-    
-    private:
-        absl::optional<std::string> upstream_address_;
-        const HeaderBasedSessionStateFactory& factory_;
-    };
+    absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
+    void onUpdate(const Upstream::HostDescription& host,
+                  Envoy::Http::ResponseHeaderMap& headers) override;
 
-    HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
+  private:
+    absl::optional<std::string> upstream_address_;
+  };
 
-    Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap& headers) const override {
-        return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
+  HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
+
+  Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap& headers) const override {
+    if (!requestPathMatch(headers.getPathValue())) {
+      return nullptr;
     }
+    return std::make_unique<SessionStateImpl>(parseAddress(headers));
+  }
+
+  bool requestPathMatch(absl::string_view request_path) const {
+    ASSERT(path_matcher_ != nullptr);
+    return path_matcher_(request_path);
+  }
 
 private:
-    absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-        std::ignore = headers;
-        return "0.0.0.0:8080"; // TODO - implement
+  absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
+    std::string address;
+    auto he = headers.STSHost();
+    if (he != nullptr) {
+      auto header_value = he->value().getStringView();
+      address = Envoy::Base64::decode(header_value);
     }
 
-    const std::string name_;
+    return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
+  }
+
+  const std::string name_;
+  const std::string path_;
+
+  std::function<bool(absl::string_view)> path_matcher_;
 };
 
 } // namespace Header
