@@ -68,9 +68,10 @@ protected:
 
   template <typename Resource>
   void checkSavedResources(const XdsSourceId& source_id,
+                           const std::vector<std::string>& resource_names,
                            const std::vector<DecodedResourceRef>& expected_resources) {
     // Retrieve the xDS resources.
-    const auto retrieved_resources = xds_delegate_->getResources(source_id, /*resource_names=*/{});
+    const auto retrieved_resources = xds_delegate_->getResources(source_id, resource_names);
     // Check that they're the same.
     EXPECT_EQ(expected_resources.size(), retrieved_resources.size());
     for (size_t i = 0; i < expected_resources.size(); ++i) {
@@ -104,7 +105,9 @@ TEST_F(KeyValueStoreXdsDelegateTest, SaveAndRetrieve) {
   // Save xDS resources.
   xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
 
-  checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, saved_resources.refvec_);
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"some_resource_1", "some_resource_2"},
+      saved_resources.refvec_);
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
@@ -141,12 +144,13 @@ TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
   xds_delegate_->onConfigUpdated(source_id_2_runtime, authority_2_runtime_resources.refvec_);
   xds_delegate_->onConfigUpdated(source_id_2_cluster, authority_2_cluster_resources.refvec_);
 
-  checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id_1,
-                                                            authority_1_runtime_resources.refvec_);
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id_1, /*resource_names=*/{"some_resource_1"}, authority_1_runtime_resources.refvec_);
   checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id_2_runtime,
+                                                            /*resource_names=*/{"some_resource_2"},
                                                             authority_2_runtime_resources.refvec_);
-  checkSavedResources<envoy::config::cluster::v3::Cluster>(source_id_2_cluster,
-                                                           authority_2_cluster_resources.refvec_);
+  checkSavedResources<envoy::config::cluster::v3::Cluster>(
+      source_id_2_cluster, /*resource_names=*/{"cluster_1"}, authority_2_cluster_resources.refvec_);
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
@@ -187,8 +191,37 @@ TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
   // Make sure all resources are present and at their latest versions.
   const auto all_resources =
       TestUtility::decodeResources({runtime_resource_1, runtime_resource_2, runtime_resource_3});
-  checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, all_resources.refvec_);
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"some_resource_1", "some_resource_2", "some_resource_3"},
+      all_resources.refvec_);
 }
+
+TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
+  const std::string authority_1 = "rtds_cluster";
+  auto runtime_resource_1 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_1
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  auto runtime_resource_2 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_2
+    layer:
+      abc: xyz
+  )EOF");
+  const auto saved_resources =
+      TestUtility::decodeResources({runtime_resource_1, runtime_resource_2});
+  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  // Save xDS resources.
+  xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
+
+  // Empty resource names, or just one entry with "*" means wildcard.
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, /*resource_names=*/{},
+                                                            saved_resources.refvec_);
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, /*resource_names=*/{"*"},
+                                                            saved_resources.refvec_);
+}
+
 // TODO(abeyad): add test for resource eviction.
 
 } // namespace

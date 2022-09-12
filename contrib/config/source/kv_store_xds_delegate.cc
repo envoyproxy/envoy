@@ -42,13 +42,12 @@ KeyValueStoreXdsDelegate::KeyValueStoreXdsDelegate(KeyValueStorePtr&& xds_config
 std::vector<envoy::service::discovery::v3::Resource>
 KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
                                        const std::vector<std::string>& resource_names) const {
-  if (resource_names.empty()) {
-    // Empty names means wildcard.
+  if (resource_names.empty() || (resource_names.size() == 1 && resource_names[0] == "*")) {
+    // Empty names or one entry with "*" means wildcard.
     return getAllResources(source_id);
   }
 
   std::vector<envoy::service::discovery::v3::Resource> resources;
-  resources.resize(resource_names.size());
   for (const std::string& resource_name : resource_names) {
     if (auto existing_resource = xds_config_store_->get(constructKey(source_id, resource_name))) {
       envoy::service::discovery::v3::Resource r;
@@ -66,6 +65,7 @@ KeyValueStoreXdsDelegate::getAllResources(const XdsSourceId& source_id) const {
   // expectation is we won't be iterating over too many values. But still, try to find a better way.
   xds_config_store_->iterate(
       [&resources, &source_id](const std::string& key, const std::string& value) {
+        // TODO(abeyad): Don't include TTL'ed resources.
         if (absl::StartsWith(key, absl::StrCat(KEY_PREFIX, source_id.toKey()))) {
           // The source id is a prefix of the key, so it should be included in the list of returned
           // resources.

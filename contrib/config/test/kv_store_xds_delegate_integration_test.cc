@@ -100,7 +100,6 @@ public:
 
   void initialize() override {
     HttpIntegrationTest::initialize();
-    // Register admin port.
     registerTestServerPorts({});
   }
 
@@ -123,8 +122,8 @@ public:
   }
 
 protected:
-  FakeUpstream& getSdsUpstream() { return *fake_upstreams_[1]; }
-  FakeUpstream& getRtdsUpstream() { return *fake_upstreams_[2]; }
+  std::unique_ptr<FakeUpstream>& getSdsUpstream() { return fake_upstreams_[1]; }
+  std::unique_ptr<FakeUpstream>& getRtdsUpstream() { return fake_upstreams_[2]; }
 
   void addXdsCluster(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      const std::string& cluster_name) {
@@ -145,6 +144,9 @@ protected:
   }
 
   void closeConnection(FakeHttpConnectionPtr& connection) {
+    if (!connection) {
+      return;
+    }
     AssertionResult result = connection->close();
     RELEASE_ASSERT(result, result.message());
     result = connection->waitForDisconnect();
@@ -161,7 +163,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, SDS_CLUSTER_NAME, getSdsUpstream().localAddress());
+    setGrpcService(*grpc_service, SDS_CLUSTER_NAME, getSdsUpstream()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getClientSecret() {
@@ -207,8 +209,10 @@ protected:
 
   void shutdownAndRestartTestServer() {
     // Reset the test server.
-    on_server_init_function_ = nullptr;
+    closeConnection(sds_connection_);
+    closeConnection(rtds_connection_);
     test_server_.reset();
+    on_server_init_function_ = nullptr;
 
     // Set up a new Envoy, using the previous Envoy's configuration, and create the test server.
     ConfigHelper helper(version_, *api_,
@@ -230,6 +234,11 @@ protected:
     for (int i = 0; i < static_resources.listeners_size(); ++i) {
       named_ports.push_back(static_resources.listeners(i).name());
     }
+
+    // Simulate the upstream xDS servers going down.
+    getSdsUpstream().reset();
+    getRtdsUpstream().reset();
+
     createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false,
                                  test_server_);
     registerTestServerPorts(named_ports, test_server_);
@@ -248,7 +257,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
     {
       // SDS.
-      initXdsStream(getSdsUpstream(), sds_connection_, sds_stream_);
+      initXdsStream(*getSdsUpstream(), sds_connection_, sds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
           /*expected_type_url=*/Config::TypeUrl::get().Secret, /*expected_version=*/"",
           /*expected_resource_names=*/{std::string(CLIENT_CERT_NAME)}, /*expect_node=*/true,
@@ -260,7 +269,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
     }
     {
       // RTDS.
-      initXdsStream(getRtdsUpstream(), rtds_connection_, rtds_stream_);
+      initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
       EXPECT_TRUE(compareSotwDiscoveryRequest(
           /*expected_type_url=*/Config::TypeUrl::get().Runtime,
           /*expected_version=*/"",
@@ -313,9 +322,10 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   // Kill the current test server, and restart it using the same configuration.
   shutdownAndRestartTestServer();
 
-  // Wait until SDS and RTDS have been loaded from disk and updated the Envoy instance.
+  // Wait until SDS and RTDS have been loaded from the KV store and updated the Envoy instance.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  // Two runtime loads are expected, one for the admin layer and one for the RTDS layer.
   test_server_->waitForCounterGe("runtime.load_success", 2);
 
   // Verify that the latest resource values are used by Envoy.

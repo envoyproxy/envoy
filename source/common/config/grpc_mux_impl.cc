@@ -90,15 +90,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
     }
   }
 
-  if (starting_) {
-    // On the initialization of the gRPC mux, load the persisted config, if available. If the xDS
-    // server cannot be reached, the locally persisted config will be used until connectivity is
-    // established with the xDS server.
-    loadConfigFromDelegate(
-        std::string(type_url),
-        std::vector<std::string>{request.resource_names().begin(), request.resource_names().end()});
-  }
-
   if (api_state.must_send_node_ || !skip_subsequent_node_ || first_stream_request_) {
     // Node may have been cleared during a previous request.
     request.mutable_node()->CopyFrom(local_info_.node());
@@ -109,7 +100,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_.sendMessage(request);
   first_stream_request_ = false;
-  starting_ = false;
 
   // clear error_detail after the request is sent if it exists.
   if (apiStateFor(type_url).request_.has_error_detail()) {
@@ -300,6 +290,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
+  starting_ = false;
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
@@ -389,7 +380,17 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
+    if (starting_) {
+      // On the initialization of the gRPC mux, if connection to the xDS server fails, load the
+      // persisted config, if available. The locally persisted config will be used until
+      // connectivity is established with the xDS server.
+      loadConfigFromDelegate(
+          /*type_url=*/api_state.first,
+          std::vector<std::string>{api_state.second->request_.resource_names().begin(),
+                                   api_state.second->request_.resource_names().end()});
+    }
   }
+  starting_ = false;
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
