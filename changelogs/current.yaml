@@ -23,7 +23,7 @@ behavior_changes:
     ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by
     the connection pools. For HTTP pools, please use ``idle_timeout`` to limit the duration of the open upstream
     connections. This behavior change can be reverted by setting runtime guard
-    ``envoy.original_dst_rely_on_idle_timeout``.
+    ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
