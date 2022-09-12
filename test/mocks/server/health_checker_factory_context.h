@@ -30,7 +30,10 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
-    return std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();
+    if (!event_logger_) {
+      event_logger_ = std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();
+    }
+    return std::move(event_logger_);
   }
 
   testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
@@ -38,6 +41,7 @@ public:
   testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Api::MockApi> api_{};
+  std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
 };
 
 } // namespace Configuration
