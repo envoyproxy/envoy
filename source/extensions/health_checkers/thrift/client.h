@@ -39,12 +39,12 @@ public:
   virtual void start() PURE;
 
   /**
-   * Make a simple thrift request.
+   * Send the health check request.
    */
   virtual bool sendRequest() PURE;
 
   /**
-   * Closes the underlying network connection.
+   * Close the underlying network connection.
    */
   virtual void close() PURE;
 };

@@ -16,7 +16,7 @@ namespace ThriftHealthChecker {
 using namespace Envoy::Extensions::NetworkFilters;
 using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
 
-// The simple response decoder decodes the response and inform the health
+// The simple response decoder decodes the response and informs the health
 // check session if it's a success response or not.
 class SimpleResponseDecoder : public DecoderCallbacks,
                               public PassThroughDecoderEventHandler,
@@ -57,7 +57,7 @@ class ClientImpl;
 
 // Network::ClientConnection takes a shared pointer callback but we need a
 // unique DeferredDeletable pointer for connection management. Therefore we
-// need additional wrapper class.
+// need an additional wrapper class.
 class ThriftSessionCallbacks : public Network::ConnectionCallbacks,
                                public Network::ReadFilterBaseImpl {
 public:

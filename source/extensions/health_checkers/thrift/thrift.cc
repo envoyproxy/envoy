@@ -37,7 +37,6 @@ ThriftHealthChecker::ThriftHealthChecker(
   }
 }
 
-// ThriftActiveHealthCheckSession:
 ThriftHealthChecker::ThriftActiveHealthCheckSession::ThriftActiveHealthCheckSession(
     ThriftHealthChecker& parent, const Upstream::HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),
@@ -95,7 +94,6 @@ ThriftHealthChecker::ThriftActiveHealthCheckSession::createConnection() {
                                             parent_.transportSocketMatchMetadata().get());
 }
 
-// Network::ConnectionCallbacks
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {

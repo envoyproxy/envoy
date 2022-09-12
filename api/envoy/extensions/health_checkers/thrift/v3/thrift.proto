@@ -23,8 +23,8 @@ message Thrift {
 
   reserved "service_name", "request_headers_to_add";
 
-  // Specifies the method name should be set to each request that is sent to
-  // the thrift host. Note that method name is case sensitive.
+  // Specifies the method name should be set to each health check request to an upstream host.
+  // Note that method name is case sensitive.
   string method_name = 2 [(validate.rules).string = {min_len: 1}];
 
   // Configures the transport type to be used with the health checks. Note that

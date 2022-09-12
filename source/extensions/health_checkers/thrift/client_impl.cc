@@ -45,7 +45,6 @@ FilterStatus SimpleResponseDecoder::messageEnd() {
   return FilterStatus::Continue;
 }
 
-// ThriftSessionCallbacks
 void ThriftSessionCallbacks::onEvent(Network::ConnectionEvent event) { parent_.onEvent(event); }
 
 void ThriftSessionCallbacks::onAboveWriteBufferHighWatermark() {
@@ -57,7 +56,6 @@ void ThriftSessionCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 Network::FilterStatus ThriftSessionCallbacks::onData(Buffer::Instance& data, bool) {
-  // Response data flow to ClientImpl and then SimpleResponseDecoder.
   parent_.onData(data);
   return Network::FilterStatus::StopIteration;
 }
