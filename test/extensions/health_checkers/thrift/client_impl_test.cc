@@ -48,8 +48,6 @@ public:
     connection_->runLowWatermarkCallbacks();
   }
 
-  void onConnected() {}
-
   void writeMessage(Buffer::Instance& buffer, NetworkFilters::ThriftProxy::MessageType msg_type) {
     Buffer::OwnedImpl msg;
     ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
@@ -112,7 +110,7 @@ public:
   const NetworkFilters::ThriftProxy::ProtocolType protocol_{
       NetworkFilters::ThriftProxy::ProtocolType::Binary};
   const std::string method_name_{"foo"};
-  const int32_t initial_seq_id_{9527};
+  const int32_t initial_seq_id_{0};
 };
 
 TEST_F(ThriftClientImplTest, Success) {
@@ -120,7 +118,7 @@ TEST_F(ThriftClientImplTest, Success) {
 
   setup();
 
-  // Expect client write the simple request.
+  // Expect that the client writes the health check request.
   EXPECT_CALL(*connection_, write(_, _));
 
   bool success = client_->sendRequest();
@@ -141,7 +139,7 @@ TEST_F(ThriftClientImplTest, Execption) {
 
   setup();
 
-  // Expect client write the simple request.
+  // Expect that the client writes the health check request.
   EXPECT_CALL(*connection_, write(_, _));
 
   bool success = client_->sendRequest();
@@ -163,13 +161,13 @@ TEST_F(ThriftClientImplTest, Error) {
 
   setup();
 
-  // Expect client write the simple request.
+  // Expect that the client writes the health check request.
   EXPECT_CALL(*connection_, write(_, _));
 
   bool success = client_->sendRequest();
   EXPECT_TRUE(success);
 
-  // Exception fails the response.
+  // IDL exception response fails the response.
   EXPECT_CALL(client_callback_, onResponseResult(false));
 
   Buffer::OwnedImpl idl_exception_response;
@@ -185,7 +183,7 @@ TEST_F(ThriftClientImplTest, SuccessWithMaxSeqId) {
 
   setup(/* max_seq_id */ true);
 
-  // Expect client write the simple request.
+  // Expect that the client writes the health check request.
   EXPECT_CALL(*connection_, write(_, _));
 
   bool success = client_->sendRequest();

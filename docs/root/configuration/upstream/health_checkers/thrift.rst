@@ -9,7 +9,7 @@ responses and exceptions to check upstream hosts. It sends a request with
 and expects a success response in exchange. The upstream host can also respond with an exception to cause the check to fail.
 The :ref:`transport <envoy_v3_api_field_extensions.health_checkers.thrift.v3.Thrift.transport>` and
 :ref:`protocol <envoy_v3_api_field_extensions.health_checkers.thrift.v3.Thrift.protocol>` types to be set for each health
-check request must be configured to enable Thrift health checks.
+check request must be configured to enable Thrift health checks. The sequence id is always 0 for each health check request.
 
 
 An example for :ref:`custom_health_check <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`

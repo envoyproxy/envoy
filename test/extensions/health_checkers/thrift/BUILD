@@ -62,7 +62,6 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -81,6 +80,5 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:test_runtime_lib",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )

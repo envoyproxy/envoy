@@ -71,8 +71,10 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
 }
 
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onTimeout() {
-  expect_close_ = true;
-  client_->close();
+  if (client_) {
+    expect_close_ = true;
+    client_->close();
+  }
 }
 
 void ThriftHealthChecker::ThriftActiveHealthCheckSession::onResponseResult(bool is_success) {
@@ -83,7 +85,7 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onResponseResult(bool 
     handleFailure(envoy::data::core::v3::ACTIVE, /* retriable */ false);
   }
 
-  if (!parent_.reuse_connection_) {
+  if (client_ && !parent_.reuse_connection_) {
     expect_close_ = true;
     client_->close();
   }
@@ -103,8 +105,11 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onEvent(Network::Conne
     if (!expect_close_) {
       handleFailure(envoy::data::core::v3::NETWORK);
     }
-    // Report failure if the connection was closed without receiving a full response.
-    parent_.dispatcher_.deferredDelete(std::move(client_));
+
+    if (client_) {
+      // Report failure if the connection was closed without receiving a full response.
+      parent_.dispatcher_.deferredDelete(std::move(client_));
+    }
   }
 }
 

@@ -44,7 +44,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/thrift/v3:pkg_cc_proto",
     ],
 )
@@ -61,7 +60,6 @@ envoy_cc_extension(
         "//envoy/server:health_checker_config_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/health_checkers/thrift/v3:pkg_cc_proto",
     ],
 )

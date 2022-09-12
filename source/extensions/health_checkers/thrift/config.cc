@@ -1,8 +1,6 @@
 #include "source/extensions/health_checkers/thrift/config.h"
 
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"

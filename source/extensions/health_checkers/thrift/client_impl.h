@@ -1,7 +1,5 @@
 #pragma once
 
-#include <chrono>
-
 #include "source/common/network/filter_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
@@ -38,9 +36,9 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
-  bool passthroughEnabled() const override { return true; };
+  bool passthroughEnabled() const override { return true; }
   bool isRequest() const override { return false; }
-  bool headerKeysPreserveCase() const override { return false; };
+  bool headerKeysPreserveCase() const override { return false; }
 
 private:
   TransportPtr transport_;
@@ -87,12 +85,12 @@ public:
       : parent_(callback), transport_(transport), protocol_(protocol), method_name_(method_name),
         host_(host), seq_id_(seq_id), fixed_seq_id_(fixed_seq_id) {}
 
+  void onData(Buffer::Instance& data);
+
   // Client
   void start() override;
   bool sendRequest() override;
   void close() override;
-
-  void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override { parent_.onEvent(event); }
@@ -120,6 +118,7 @@ private:
     seq_id_ = 0;
     return std::numeric_limits<int32_t>::max();
   }
+
   ClientCallback& parent_;
   const TransportType transport_;
   const ProtocolType protocol_;
@@ -132,7 +131,6 @@ private:
   bool fixed_seq_id_;
   ThriftSessionCallbacksSharedPtr session_callbacks_;
   SimpleResponseDecoderPtr response_decoder_;
-  absl::optional<bool> success_;
 };
 
 class ClientFactoryImpl : public ClientFactory {

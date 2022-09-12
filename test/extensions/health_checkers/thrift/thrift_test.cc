@@ -1,8 +1,6 @@
 #include <memory>
 
 #include "envoy/api/api.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
 #include "source/extensions/health_checkers/thrift/thrift.h"
 #include "source/extensions/health_checkers/thrift/utility.h"
@@ -37,6 +35,19 @@ public:
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
         event_logger_(new Upstream::MockHealthCheckEventLogger()), api_(Api::createApiForTest()) {}
 
+  void setup(const std::string& yaml) {
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
+    const auto& thrift_config = getThriftHealthCheckConfig(
+        health_check_config, ProtobufMessage::getStrictValidationVisitor());
+
+    cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+
+    health_checker_ = std::make_shared<ThriftHealthChecker>(
+        *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+  }
+
   void setup() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -54,13 +65,7 @@ public:
         protocol: BINARY
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
-    const auto& thrift_config = getThriftHealthCheckConfig(
-        health_check_config, ProtobufMessage::getStrictValidationVisitor());
-
-    health_checker_ = std::make_shared<ThriftHealthChecker>(
-        *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+    setup(yaml);
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -82,16 +87,11 @@ public:
         protocol: BINARY
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
-    const auto& thrift_config = getThriftHealthCheckConfig(
-        health_check_config, ProtobufMessage::getStrictValidationVisitor());
-
-    health_checker_ = std::make_shared<ThriftHealthChecker>(
-        *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+    setup(yaml);
   }
 
   void setupDoNotReuseConnection() {
+    // unset reuse_connection
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -109,13 +109,7 @@ public:
         protocol: BINARY
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
-    const auto& thrift_config = getThriftHealthCheckConfig(
-        health_check_config, ProtobufMessage::getStrictValidationVisitor());
-
-    health_checker_ = std::make_shared<ThriftHealthChecker>(
-        *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+    setup(yaml);
   }
 
   ClientPtr create(ClientCallback& callbacks, NetworkFilters::ThriftProxy::TransportType transport,
@@ -166,9 +160,6 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   InSequence s;
   setup();
 
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-
   expectSessionCreate();
   expectClientAndPingRequestCreate();
   health_checker_->start();
@@ -184,12 +175,13 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Failure on exception response
+  // Fail on the exception response.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseResponseResult(false);
 
+  // Shutdown *without* an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -202,9 +194,6 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   InSequence s;
   setup();
 
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-
   expectSessionCreate();
   expectClientAndPingRequestCreate();
   health_checker_->start();
@@ -220,7 +209,7 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Failure
+  // Fail on the exception response.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -229,7 +218,7 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Redis failure via disconnect
+  // Fail on disconnection.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -246,7 +235,7 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Shutdown with active request.
+  // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -258,9 +247,6 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
 TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   InSequence s;
   setupAlwaysLogHealthCheckFailures();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientAndPingRequestCreate();
@@ -277,7 +263,7 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Failure on exception response
+  // Fail on the exception response.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -287,7 +273,7 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Fail again
+  // Fail again.
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -296,6 +282,7 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
+  // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(4UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -309,9 +296,6 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   InSequence s;
   setup();
 
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-
   expectSessionCreate();
   expectClientAndPingRequestCreate();
   health_checker_->start();
@@ -319,7 +303,7 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   client_->runHighWatermarkCallbacks();
   client_->runLowWatermarkCallbacks();
 
-  // Failure on exception response
+  // Fail on the exception response.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -338,6 +322,7 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
+  // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -350,9 +335,6 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
 TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   InSequence s;
   setup();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientAndPingRequestCreate();
@@ -369,7 +351,7 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Failure on exception response
+  // Fail on disconnection.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -387,6 +369,7 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   expectPingRequestCreate();
   interval_timer_->invokeCallback();
 
+  // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(4UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
@@ -399,9 +382,6 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
 TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
   setupDoNotReuseConnection();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientAndPingRequestCreate();
@@ -429,7 +409,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Redis failure via disconnect, the connection was closed by the other end.
+  // Fail on disconnection. The connection was closed by the other end.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -446,10 +426,9 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   expectClientAndPingRequestCreate();
   interval_timer_->invokeCallback();
 
-  // Shutdown with active request.
+  // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
-  // The metrics expected after all tests have run.
   EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());

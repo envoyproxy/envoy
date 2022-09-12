@@ -1,12 +1,8 @@
 #pragma once
 
-#include <chrono>
-
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/thrift/v3/thrift.pb.h"
 
 #include "source/common/upstream/health_checker_base_impl.h"
@@ -39,7 +35,8 @@ protected:
   }
 
 private:
-  struct ThriftActiveHealthCheckSession : public ActiveHealthCheckSession, public ClientCallback {
+  class ThriftActiveHealthCheckSession : public ActiveHealthCheckSession, public ClientCallback {
+  public:
     ThriftActiveHealthCheckSession(ThriftHealthChecker& parent,
                                    const Upstream::HostSharedPtr& host);
     ~ThriftActiveHealthCheckSession() override;
@@ -58,6 +55,7 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
+  private:
     ThriftHealthChecker& parent_;
     const std::string& hostname_;
     ClientPtr client_;

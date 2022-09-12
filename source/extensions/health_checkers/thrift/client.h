@@ -59,14 +59,15 @@ public:
   virtual ~ClientFactory() = default;
 
   /**
-   * Create a client given an connection data.
-   * @param callbacks supplies response and network connection callbacks to the underlying network
-   * connection.
+   * Create a thrift client.
+   * @param callbacks supplies the connection data creation, network connection callbacks
+   *                  to the underlying network connection, and thrift response handling.
    * @param transport supplies the type of transport.
    * @param protocol supplies the type of protocol.
    * @param method_name supplies the method name.
    * @param data supplies the connection data.
    * @param seq_id supplies the initial sequence id.
+   * @param fixed_seq_id supplies whether we have sequence id fixed or not.
    */
   virtual ClientPtr create(ClientCallback& callbacks,
                            NetworkFilters::ThriftProxy::TransportType transport,
