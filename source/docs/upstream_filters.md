@@ -3,11 +3,16 @@
 Before coverting a filter to be an upstream filter you should do some basic
 functionality analysis. Make sure
 
-  * The filter does not use any downstream-only functionality, such as clearing
-    cached routes, or performing internal redirects.
-  * Either the filter does not sendLocalReply, or you thoroughly document how
+  * The filter does not use any downstream-only functionality, accessed via
+    downstreamCallbacks() such as clearing cached routes, or performing internal redirects.
+  * Either the filter does not sendLocalReply, or you test and document how
     sendLocalReply code paths will play with hedging / retries (cut off the
     hedge attempt, and local-reply failures won't trigger retries)
+  * Either the filter does not access streamInfo in a non-cost way, or you test
+    and document how the filter interacts with hedging and retries. Note that
+    for hedging, a single downstream StreamInfo is accessible in parallel to
+    both instances of the upstream filter instance, so it must be resiliant to
+    parallel access.
 
 Once you've done this, you're ready to convert. An example converted filter is the Envoy
 [Buffer](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/buffer/config.cc)
