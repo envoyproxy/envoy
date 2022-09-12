@@ -209,8 +209,6 @@ protected:
 
   void shutdownAndRestartTestServer() {
     // Reset the test server.
-    closeConnection(sds_connection_);
-    closeConnection(rtds_connection_);
     test_server_.reset();
     on_server_init_function_ = nullptr;
 
@@ -236,9 +234,12 @@ protected:
     }
 
     // Simulate the upstream xDS servers going down.
+    closeConnection(sds_connection_);
+    closeConnection(rtds_connection_);
     getSdsUpstream().reset();
     getRtdsUpstream().reset();
 
+    // Create and start the new Envoy.
     createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false,
                                  test_server_);
     registerTestServerPorts(named_ports, test_server_);
