@@ -130,7 +130,7 @@ jobs:
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
       - name: 'Check connectivity'
         run: adb logcat -e "received headers with status 200" -m 1
   kotlinexperimentalapp:
@@ -164,6 +164,6 @@ jobs:
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
-          adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+          adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
       - name: 'Check connectivity'
         run: adb logcat -e "received headers with status 200" -m 1
