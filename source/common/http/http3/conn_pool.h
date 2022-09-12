@@ -174,6 +174,10 @@ private:
   quic::QuicServerId server_id_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
+
+  quic::DeterministicConnectionIdGenerator connection_id_generator_ {
+    quic::kQuicDefaultConnectionIdLength
+  }
 };
 
 std::unique_ptr<Http3ConnPoolImpl>

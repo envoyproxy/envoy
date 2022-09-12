@@ -1748,8 +1748,20 @@ envoy_cc_test_library(
 
 envoy_cc_library(
     name = "quic_platform_ip_address_family",
-    srcs = ["quiche/quic/platform/api/quic_ip_address_family.cc"],
     hdrs = ["quiche/quic/platform/api/quic_ip_address_family.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_bug_tracker",
+        ":quiche_common_ip_address_family",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_ip_address_family",
+    srcs = ["quiche/common/quiche_ip_address_family.cc"],
+    hdrs = ["quiche/common/quiche_ip_address_family.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -1760,8 +1772,22 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_ip_address",
-    srcs = ["quiche/quic/platform/api/quic_ip_address.cc"],
     hdrs = ["quiche/quic/platform/api/quic_ip_address.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        ":quic_platform_export",
+        ":quiche_common_ip_address",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_ip_address",
+    srcs = ["quiche/common/quiche_ip_address.cc"],
+    hdrs = ["quiche/common/quiche_ip_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -2410,6 +2436,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform",
+        ":quiche_common_text_utils_lib",
     ],
 )
 
@@ -2424,6 +2451,7 @@ envoy_cc_library(
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
         ":quic_core_clock_lib",
+        ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_frames_frames_lib",
         ":quic_core_interval_set_lib",
         ":quic_core_types_lib",
@@ -2920,6 +2948,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform_base",
         ":quiche_common_text_utils_lib",
+        "@com_google_absl//absl/cleanup",
     ],
 )
 
@@ -3325,9 +3354,9 @@ envoy_cc_library(
         "//conditions:default": ["quiche/quic/core/io/socket_posix.cc"],
     }),
     hdrs = [
+        "quiche/quic/core/io/connecting_client_socket.h",
         "quiche/quic/core/io/socket.h",
         "quiche/quic/core/io/socket_factory.h",
-        "quiche/quic/core/io/stream_client_socket.h",
     ],
     copts = quiche_copts,
     repository = "@envoy",
@@ -4542,7 +4571,10 @@ envoy_cc_test_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
-    deps = [":quic_core_crypto_random_lib"],
+    deps = [
+        ":quic_core_crypto_random_lib",
+        ":quic_platform_test",
+    ],
 )
 
 envoy_cc_test_library(
@@ -4673,6 +4705,7 @@ envoy_cc_test_library(
     ],
     hdrs = [
         "quiche/quic/test_tools/crypto_test_utils.h",
+        "quiche/quic/test_tools/mock_connection_id_generator.h",
         "quiche/quic/test_tools/mock_quic_session_visitor.h",
         "quiche/quic/test_tools/mock_quic_time_wait_list_manager.h",
         "quiche/quic/test_tools/quic_buffered_packet_store_peer.h",

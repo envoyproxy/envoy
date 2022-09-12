@@ -230,7 +230,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
       quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
                          static_cast<uint16_t>(addr->ip()->port())),
-      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr,
+      quic::quic::DeterministicConnectionIdGenerator(quic::kQuicDefaultConnectionIdLength));
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
                                options);

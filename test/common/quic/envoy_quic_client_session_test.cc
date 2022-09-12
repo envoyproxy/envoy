@@ -40,9 +40,11 @@ public:
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Event::Dispatcher& dispatcher,
-                                Network::ConnectionSocketPtr&& connection_socket)
+                                Network::ConnectionSocketPtr&& connection_socket,
+                                ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
-                                  supported_versions, dispatcher, std::move(connection_socket)) {
+                                  supported_versions, dispatcher, std::move(connection_socket),
+                                  generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
@@ -68,7 +70,8 @@ public:
                                                         54321)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
+            connection_id_generator_)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
@@ -135,6 +138,8 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;

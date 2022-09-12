@@ -13,10 +13,10 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
-    Network::ConnectionSocketPtr connection_socket)
+    Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator)
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
-                           quic::Perspective::IS_SERVER, supported_versions),
+                           quic::Perspective::IS_SERVER, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)),
       defer_send_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_send_in_response_to_packet")) {
@@ -51,7 +51,7 @@ std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
 EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
   return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
       quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this,
-      context());
+      context(), connection_id_generator());
 }
 
 quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(
