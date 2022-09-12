@@ -8,9 +8,8 @@ class ShadowPolicyIntegrationTest : public testing::TestWithParam<Network::Addre
                                     public HttpIntegrationTest {
 public:
   ShadowPolicyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
-    // TODO(alyssawilk) fix
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    autonomous_allow_incomplete_streams_ = true;
     autonomous_upstream_ = true;
     setUpstreamCount(2);
   }
@@ -28,7 +27,7 @@ public:
         ConfigHelper::HttpProtocolOptions protocol_options =
             MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
                 (*cluster->mutable_typed_extension_protocol_options())
-                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
         protocol_options.add_http_filters()->set_name("on-local-reply-filter");
         protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
         (*cluster->mutable_typed_extension_protocol_options())
@@ -61,14 +60,20 @@ public:
         codec_client_->makeRequestWithBody(default_request_headers_, 0);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
-    //EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_EQ("200", response->headers().getStatusValue());
     EXPECT_EQ(10U, response->body().size());
+    test_server_->waitForCounterEq("cluster.cluster_1.internal.upstream_rq_completed", 1);
+    test_server_->waitForCounterEq("cluster.cluster_1.internal.upstream_rq_completed", 1);
 
-    upstream_headers_ = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+    upstream_headers_ =
+        reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
     EXPECT_TRUE(upstream_headers_ != nullptr);
-    mirror_headers_ = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
+    mirror_headers_ =
+        reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders();
     EXPECT_TRUE(mirror_headers_ != nullptr);
+
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 
     cleanupUpstreamAndDownstream();
   }
@@ -88,9 +93,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
   initialize();
 
   sendRequestAndValidateResponse();
-
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
 // Test request mirroring / shadowing with the original cluster having a local reply filter.
@@ -104,14 +106,10 @@ TEST_P(ShadowPolicyIntegrationTest, OriginalClusterWithLocalReply) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("400", response->headers().getStatusValue());
-
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
 // Test request mirroring / shadowing with the mirror cluster having a local reply filter.
-TEST_P(ShadowPolicyIntegrationTest, DISABLED_MirrorClusterWithLocalReply) {
-  // TODO(alyssawilk) fix.
+TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithLocalReply) {
   intitialConfigSetup("cluster_1", "");
   cluster_with_local_reply_filter_ = 1;
   setUpstreamProtocol(Http::CodecClient::Type::HTTP2);
@@ -121,9 +119,6 @@ TEST_P(ShadowPolicyIntegrationTest, DISABLED_MirrorClusterWithLocalReply) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
 }
 
 // Test request mirroring / shadowing with the cluster header.
@@ -135,9 +130,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
 
   initialize();
   sendRequestAndValidateResponse();
-
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
 } // namespace
