@@ -125,7 +125,10 @@ envoy_basic_cc_library(
         "abseil_strings",
         "fmtlib",
     ],
-    deps = ["//envoy/common:base_includes"],
+    deps = [
+        "//envoy/common:base_includes",
+        "@com_google_absl//absl/status",
+    ],
 )
 
 envoy_cc_library(
