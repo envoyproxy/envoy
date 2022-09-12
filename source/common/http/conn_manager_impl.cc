@@ -888,6 +888,9 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       }
 
       sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+      if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        connection_manager_.handleCodecError(validation_result.details());
+      }
       return false;
     }
   }

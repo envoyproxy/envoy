@@ -67,19 +67,11 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
-  enum class SkipOnStream { Upstream, Downstream, AnyStream };
-
-  bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
+  bool skipForH2Uhv() {
 #ifdef ENVOY_ENABLE_UHV
-    // H2 codec using oghttp2 does not call into UHV yet so tests that expect a UHV validation
-    // error will fail. Disable these tests for now.
-    return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
-           (stream == SkipOnStream::AnyStream ||
-            (stream == SkipOnStream::Downstream &&
-             downstreamProtocol() == Http::CodecType::HTTP2) ||
-            (stream == SkipOnStream::Upstream && upstreamProtocol() == Http::CodecType::HTTP2));
+    // Validation of upstream responses is not wired up yet
+    return GetParam().http2_implementation == Http2Impl::Oghttp2;
 #endif
-
     return false;
   }
 };
