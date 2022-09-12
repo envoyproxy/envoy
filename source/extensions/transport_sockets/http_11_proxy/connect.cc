@@ -7,12 +7,54 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/http1/balsa_parser.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
+
+using Http::Http1::CallbackResult;
+
+class SelfContainedParser : public Http::Http1::ParserCallbacks {
+public:
+  SelfContainedParser() : parser_(Http::Http1::MessageType::Response, this, 2000) {}
+  CallbackResult onMessageBegin() override { return CallbackResult::Success; }
+  CallbackResult onUrl(const char*, size_t) override { return CallbackResult::Success; }
+  CallbackResult onStatus(const char*, size_t) override { return CallbackResult::Success; }
+  CallbackResult onHeaderField(const char*, size_t) override { return CallbackResult::Success; }
+  CallbackResult onHeaderValue(const char*, size_t) override { return CallbackResult::Success; }
+  CallbackResult onHeadersComplete() override {
+    headers_complete_ = true;
+    parser_.pause();
+    return CallbackResult::Success;
+  }
+  void bufferBody(const char*, size_t) override {}
+  CallbackResult onMessageComplete() override { return CallbackResult::Success; }
+  void onChunkHeader(bool) override {}
+
+  bool headersComplete() const { return headers_complete_; }
+  Http::Http1::BalsaParser& parser() { return parser_; }
+
+private:
+  bool headers_complete_ = false;
+  Http::Http1::BalsaParser parser_;
+};
+
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(Buffer::Instance& buffer) {
+  SelfContainedParser parser;
+  while (parser.parser().getStatus() == Http::Http1::ParserStatus::Ok &&
+         !parser.headersComplete() && buffer.length() != 0) {
+    auto slice = buffer.frontSlice();
+    int parsed = parser.parser().execute(static_cast<const char*>(slice.mem_), slice.len_);
+    buffer.drain(parsed);
+  }
+  return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
+         parser.headersComplete() && parser.parser().statusCode() == 200;
+}
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
@@ -45,8 +87,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::doWrite(Buffer::Instance& buffer,
 
 Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) {
   if (need_to_strip_connect_response_) {
-    // Limit the CONNECT response headers to an arbitrary 200 bytes.
-    constexpr uint32_t MAX_RESPONSE_HEADER_SIZE = 200;
+    // Limit the CONNECT response headers to an arbitrary 2000 bytes.
+    constexpr uint32_t MAX_RESPONSE_HEADER_SIZE = 2000;
     char peek_buf[MAX_RESPONSE_HEADER_SIZE];
     Api::IoCallUint64Result result =
         callbacks_->ioHandle().recv(peek_buf, MAX_RESPONSE_HEADER_SIZE, MSG_PEEK);
@@ -68,16 +110,13 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
       ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
-    // Note this is not in any way proper HTTP/1.1 parsing.
-    // Before this is used with any untrusted upstream, proper checks should
-    // be done rather than this.
-    if (!absl::StartsWith(peek_data, "HTTP/1.1 200")) {
-      ENVOY_CONN_LOG(trace, "Response does not match strict connect checks",
+    // Make sure the response is a valid connect response and all the data is consumed.
+    if (!isValidConnectResponse(buffer) || buffer.length() != 0) {
+      ENVOY_CONN_LOG(trace, "Response does not appear to be a successful CONNECT upgrade",
                      callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
     ENVOY_CONN_LOG(trace, "Successfully stripped CONNECT header", callbacks_->connection());
-    buffer.drain(buffer.length());
     need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);
