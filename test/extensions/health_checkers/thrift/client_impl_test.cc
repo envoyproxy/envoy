@@ -38,8 +38,9 @@ public:
     EXPECT_CALL(*connection_, noDelay(true));
 
     ClientFactoryImpl& factory = ClientFactoryImpl::instance_;
-    client_ = factory.create(client_callback_, transport_, protocol_, method_name_, host_,
-                             max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_);
+    client_ =
+        factory.create(client_callback_, transport_, protocol_, method_name_, host_,
+                       max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_, false);
     client_->start();
 
     // No-OP currently.

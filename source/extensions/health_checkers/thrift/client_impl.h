@@ -82,16 +82,16 @@ class ClientImpl : public Client,
                    protected Logger::Loggable<Logger::Id::hc> {
 public:
   ClientImpl(ClientCallback& callback, TransportType transport, ProtocolType protocol,
-             const std::string& method_name, Upstream::HostSharedPtr host, int32_t seq_id)
+             const std::string& method_name, Upstream::HostSharedPtr host, int32_t seq_id,
+             bool fixed_seq_id)
       : parent_(callback), transport_(transport), protocol_(protocol), method_name_(method_name),
-        host_(host), seq_id_(seq_id) {}
+        host_(host), seq_id_(seq_id), fixed_seq_id_(fixed_seq_id) {}
 
   // Client
   void start() override;
   bool sendRequest() override;
   void close() override;
 
-  // For ThriftSessionCallbacks
   void onData(Buffer::Instance& data);
 
   // Network::ConnectionCallbacks
@@ -109,11 +109,16 @@ private:
   }
 
   int32_t sequenceId() {
-    if (seq_id_ == std::numeric_limits<int32_t>::max()) {
-      seq_id_ = 0;
+    if (!fixed_seq_id_) {
+      return seq_id_;
     }
-    seq_id_++;
-    return seq_id_;
+
+    if (seq_id_ != std::numeric_limits<int32_t>::max()) {
+      return seq_id_++;
+    }
+
+    seq_id_ = 0;
+    return std::numeric_limits<int32_t>::max();
   }
   ClientCallback& parent_;
   const TransportType transport_;
@@ -124,6 +129,7 @@ private:
   Upstream::HostDescriptionConstSharedPtr host_description_;
 
   int32_t seq_id_{0};
+  bool fixed_seq_id_;
   ThriftSessionCallbacksSharedPtr session_callbacks_;
   SimpleResponseDecoderPtr response_decoder_;
   absl::optional<bool> success_;
@@ -133,8 +139,8 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // ClientFactory
   ClientPtr create(ClientCallback& callbacks, TransportType transport, ProtocolType protocol,
-                   const std::string& method_name, Upstream::HostSharedPtr host,
-                   int32_t seq_id) override;
+                   const std::string& method_name, Upstream::HostSharedPtr host, int32_t seq_id,
+                   bool fixed_seq_id) override;
 
   static ClientFactoryImpl instance_;
 };

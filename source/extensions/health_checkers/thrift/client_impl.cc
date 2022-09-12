@@ -130,9 +130,10 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(ClientCallback& callbacks, TransportType transport,
                                     ProtocolType protocol, const std::string& method_name,
-                                    Upstream::HostSharedPtr host, int32_t seq_id) {
+                                    Upstream::HostSharedPtr host, int32_t seq_id,
+                                    bool fixed_seq_id) {
   auto client = std::make_unique<ClientImpl>(callbacks, transport, protocol, method_name,
-                                             std::move(host), seq_id);
+                                             std::move(host), seq_id, fixed_seq_id);
   return client;
 }
 

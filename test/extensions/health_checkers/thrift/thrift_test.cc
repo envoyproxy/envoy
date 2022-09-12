@@ -120,10 +120,13 @@ public:
 
   ClientPtr create(ClientCallback& callbacks, NetworkFilters::ThriftProxy::TransportType transport,
                    NetworkFilters::ThriftProxy::ProtocolType protocol,
-                   const std::string& method_name, Upstream::HostSharedPtr, int32_t) override {
+                   const std::string& method_name, Upstream::HostSharedPtr, int32_t seq_id,
+                   bool fixed_seq_id) override {
     EXPECT_EQ(transport, NetworkFilters::ThriftProxy::TransportType::Header);
     EXPECT_EQ(protocol, NetworkFilters::ThriftProxy::ProtocolType::Binary);
     EXPECT_EQ(method_name, "ping");
+    EXPECT_EQ(seq_id, 0);
+    EXPECT_TRUE(fixed_seq_id);
     return ClientPtr{create_(callbacks)};
   }
 

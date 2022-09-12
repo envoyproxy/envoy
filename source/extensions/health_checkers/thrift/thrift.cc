@@ -60,8 +60,9 @@ void ThriftHealthChecker::ThriftActiveHealthCheckSession::onInterval() {
   ENVOY_LOG(trace, "ThriftActiveHealthCheckSession onInterval");
   if (!client_) {
     ENVOY_LOG(trace, "ThriftActiveHealthCheckSession construct client");
-    client_ = parent_.client_factory_.create(*this, parent_.transport_, parent_.protocol_,
-                                             parent_.method_name_, host_, parent_.random_.random());
+    client_ = parent_.client_factory_.create(
+        *this, parent_.transport_, parent_.protocol_, parent_.method_name_, host_,
+        /* health checker seq id */ 0, /* fixed_seq_id */ true);
     client_->start();
     expect_close_ = false;
   }

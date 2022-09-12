@@ -72,7 +72,7 @@ public:
                            NetworkFilters::ThriftProxy::TransportType transport,
                            NetworkFilters::ThriftProxy::ProtocolType protocol,
                            const std::string& method_name, Upstream::HostSharedPtr host,
-                           int32_t seq_id) PURE;
+                           int32_t seq_id, bool fixed_seq_id) PURE;
 };
 
 } // namespace ThriftHealthChecker
