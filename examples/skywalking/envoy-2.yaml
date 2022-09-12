@@ -32,6 +32,7 @@ static_resources:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+              start_child_span: true
           route_config:
             name: service2_route
             virtual_hosts:
