@@ -18,10 +18,10 @@ envoy_cc_library(
         "//envoy/certificate_provider:certificate_provider_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/server:transport_socket_config_interface",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:callback_impl_lib",
-        "//source/common/config:datasource_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/protobuf:message_validator_lib",
         "@envoy_api//envoy/extensions/certificate_providers/local_certificate/v3:pkg_cc_proto",
     ],
@@ -33,8 +33,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":local_certificate_provider",
-        "//envoy/certificate_provider:certificate_provider_interface",
         "//envoy/certificate_provider:certificate_provider_factory_lib",
-        "@envoy_api//envoy/extensions/certificate_providers/local_certificate/v3:pkg_cc_proto",
+        "//envoy/certificate_provider:certificate_provider_interface",
     ],
 )

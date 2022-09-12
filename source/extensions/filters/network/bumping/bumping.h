@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/certificate_provider/certificate_provider.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/bumping/v3/bumping.pb.h"
@@ -34,9 +35,8 @@ namespace Bumping {
 
 /**
  * All bumping stats. @see stats_macros.h
- */  
-#define ALL_BUMPING_STATS(COUNTER)                                                        \
-  COUNTER(downstream_cx_no_route)
+ */
+#define ALL_BUMPING_STATS(COUNTER) COUNTER(downstream_cx_no_route)
 /**
  * Struct definition for all bumping stats. @see stats_macros.h
  */
@@ -89,9 +89,12 @@ public:
   const BumpingStats& stats() { return stats_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() {
-    return idle_timeout_;
-  }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+  Event::Dispatcher& main_dispatcher_;
+  Server::Configuration::FactoryContext& context_;
+  CertificateProvider::CertificateProviderSharedPtr tls_certificate_provider_;
+  std::string tls_certificate_name_;
+
 private:
   struct SimpleRouteImpl : public Route {
     SimpleRouteImpl(const Config& parent, absl::string_view cluster_name);
@@ -117,15 +120,32 @@ private:
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
+class BumpingMetadata : public CertificateProvider::OnDemandUpdateMetadata {
+public:
+  BumpingMetadata(Envoy::Ssl::ConnectionInfoConstSharedPtr info) : info_(info){};
+
+  Envoy::Ssl::ConnectionInfoConstSharedPtr connectionInfo() const { return info_; }
+
+private:
+  Envoy::Ssl::ConnectionInfoConstSharedPtr info_;
+};
+
+class OnDemandUpdateMetadata {
+public:
+  virtual ~OnDemandUpdateMetadata() = default;
+
+  virtual Envoy::Ssl::ConnectionInfoConstSharedPtr connectionInfo() const PURE;
+};
 /**
  * An implementation of a Bumping filter. This filter will instantiate a new outgoing TCP
- * connection using TCP connection pool for the configured cluster. The established connection 
+ * connection using TCP connection pool for the configured cluster. The established connection
  * is only used for getting upstream cert, no data exchange happens.
  */
 class Filter : public Network::ReadFilter,
                public Upstream::LoadBalancerContextBase,
                protected Logger::Loggable<Logger::Id::filter>,
-               public TcpProxy::GenericConnectionPoolCallbacks {
+               public TcpProxy::GenericConnectionPoolCallbacks,
+               public CertificateProvider::OnDemandUpdateCallbacks {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
   ~Filter() override;
@@ -136,7 +156,8 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // GenericConnectionPoolCallbacks
-  void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<TcpProxy::GenericUpstream>&& upstream,
+  void onGenericPoolReady(StreamInfo::StreamInfo* info,
+                          std::unique_ptr<TcpProxy::GenericUpstream>&& upstream,
                           Upstream::HostDescriptionConstSharedPtr& host,
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
@@ -144,23 +165,27 @@ public:
                             absl::string_view failure_reason,
                             Upstream::HostDescriptionConstSharedPtr host) override;
 
- // Upstream::LoadBalancerContext
+  // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  absl::optional<uint64_t> computeHashKey() override {
-    return {};
-  }
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }
+
+  // CertificateProvider::OnDemandUpdateCallbacks
+  void onCacheHit(const std::string& host) const override;
+  void onCacheMiss(const std::string& host) const override;
+
+  void requestCertificate(Ssl::ConnectionInfoConstSharedPtr info);
 
   struct UpstreamCallbacks : public Tcp::ConnectionPool::UpstreamCallbacks {
     UpstreamCallbacks(Filter* parent) : parent_(parent) {}
 
     // Tcp::ConnectionPool::UpstreamCallbacks
-    void onUpstreamData(Buffer::Instance&, bool) override {};
+    void onUpstreamData(Buffer::Instance&, bool) override{};
     void onEvent(Network::ConnectionEvent event) override;
-    void onAboveWriteBufferHighWatermark() override {};
-    void onBelowWriteBufferLowWatermark() override {};
+    void onAboveWriteBufferHighWatermark() override{};
+    void onBelowWriteBufferLowWatermark() override{};
 
     Filter* parent_{};
   };
@@ -175,9 +200,7 @@ protected:
     NoRoute,
   };
 
-  virtual RouteConstSharedPtr pickRoute() {
-    return config_->getRoute();
-  }
+  virtual RouteConstSharedPtr pickRoute() { return config_->getRoute(); }
 
   virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -188,7 +211,7 @@ protected:
   Network::FilterStatus establishUpstreamConnection();
 
   // The callback upon on demand cluster discovery response.
-  //void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
+  // void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();

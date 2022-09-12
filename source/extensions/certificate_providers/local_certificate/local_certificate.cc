@@ -1,6 +1,7 @@
+#include "source/extensions/certificate_providers/local_certificate/local_certificate.h"
+
 #include "envoy/extensions/certificate_providers/local_certificate/v3/local_certificate.pb.h"
 
-#include "source/extensions/certificate_providers/local_certificate/local_certificate.h"
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -12,9 +13,9 @@ namespace LocalCertificate {
 
 Provider::Provider(const envoy::config::core::v3::TypedExtensionConfig& config,
                    Server::Configuration::TransportSocketFactoryContext& factory_context,
-                   Api::Api& api): main_thread_dispatcher_(factory_context.mainThreadDispatcher()) {
-  envoy::extensions::certificate_providers::local_certificate::v3::
-      LocalCertificate message;
+                   Api::Api& api)
+    : main_thread_dispatcher_(factory_context.mainThreadDispatcher()) {
+  envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate message;
   Config::Utility::translateOpaqueConfig(config.typed_config(),
                                          ProtobufMessage::getStrictValidationVisitor(), message);
   ca_cert_ = Config::DataSource::read(message.rootca_cert(), true, api);
@@ -27,12 +28,10 @@ Envoy::CertificateProvider::CertificateProvider::Capabilities Provider::capabili
   return cap;
 }
 
-const std::string Provider::trustedCA(const std::string&) const{
-  return "";
-}
+const std::string Provider::trustedCA(const std::string&) const { return ""; }
 
 std::vector<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*>
-Provider::tlsCertificates(const std::string&) const{
+Provider::tlsCertificates(const std::string&) const {
   std::vector<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*> result;
   absl::ReaderMutexLock reader_lock{&certificates_lock_};
   for (auto& [_, value] : certificates_) {
@@ -41,12 +40,13 @@ Provider::tlsCertificates(const std::string&) const{
   return result;
 }
 
+::Envoy::CertificateProvider::OnDemandUpdateResult Provider::addOnDemandUpdateCallback(
+    const std::string&, ::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+    Event::Dispatcher& thread_local_dispatcher,
+    ::Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
 
-::Envoy::CertificateProvider::OnDemandUpdateResult Provider::addOnDemandUpdateCallback(const std::string&, ::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
-                                                              Event::Dispatcher& thread_local_dispatcher, ::Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
-
-  auto handle = std::make_unique<OnDemandUpdateHandleImpl>(on_demand_update_callbacks_, metadata->connectionInfo()->sni(),
-                                                           callback);
+  auto handle = std::make_unique<OnDemandUpdateHandleImpl>(
+      on_demand_update_callbacks_, metadata->connectionInfo()->sni(), callback);
   bool cache_hit = [&]() {
     absl::ReaderMutexLock reader_lock{&certificates_lock_};
     auto it = certificates_.find(metadata->connectionInfo()->sni());
@@ -55,31 +55,23 @@ Provider::tlsCertificates(const std::string&) const{
 
   if (cache_hit) {
     // Cache hit, run on-demand update callback directly
-    runOnDemandUpdateCallback(metadata->connectionInfo()->sni(),
-                              thread_local_dispatcher,
-                              true
-    );
+    runOnDemandUpdateCallback(metadata->connectionInfo()->sni(), thread_local_dispatcher, true);
     return {::Envoy::CertificateProvider::OnDemandUpdateStatus::InCache, std::move(handle)};
-  }
-  else {
+  } else {
     // Cache miss, generate self-signed cert
-    main_thread_dispatcher_.post([&] {
-      signCertificate(metadata, thread_local_dispatcher);
-    });
+    main_thread_dispatcher_.post([&] { signCertificate(metadata, thread_local_dispatcher); });
     return {::Envoy::CertificateProvider::OnDemandUpdateStatus::Loading, std::move(handle)};
   }
 }
 
 Common::CallbackHandlePtr Provider::addUpdateCallback(const std::string&,
                                                       std::function<void()> callback) {
-  return update_callback_manager_.add(callback);                              
+  return update_callback_manager_.add(callback);
 }
 
-void Provider::runAddUpdateCallback() {
-  update_callback_manager_.runCallbacks();
-}
+void Provider::runAddUpdateCallback() { update_callback_manager_.runCallbacks(); }
 
-void Provider::runOnDemandUpdateCallback(const std::string& host, 
+void Provider::runOnDemandUpdateCallback(const std::string& host,
                                          Event::Dispatcher& thread_local_dispatcher,
                                          bool in_cache) {
   auto host_it = on_demand_update_callbacks_.find(host);
@@ -88,14 +80,9 @@ void Provider::runOnDemandUpdateCallback(const std::string& host,
       auto& callbacks = pending_callbacks->callbacks_;
       pending_callbacks->cancel();
       if (in_cache) {
-        thread_local_dispatcher.post([&callbacks, host] {
-          callbacks.onCacheHit(host);
-        });
-      }
-      else {
-        thread_local_dispatcher.post([&callbacks, host] {
-          callbacks.onCacheMiss(host);
-        });
+        thread_local_dispatcher.post([&callbacks, host] { callbacks.onCacheHit(host); });
+      } else {
+        thread_local_dispatcher.post([&callbacks, host] { callbacks.onCacheMiss(host); });
       }
     }
     on_demand_update_callbacks_.erase(host_it);
@@ -104,8 +91,7 @@ void Provider::runOnDemandUpdateCallback(const std::string& host,
 
 void Provider::signCertificate(::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
                                Event::Dispatcher& thread_local_dispatcher) {
-  bssl::UniquePtr<BIO> bio(
-      BIO_new_mem_buf(const_cast<char*>(ca_cert_.data()), ca_cert_.size()));
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_cert_.data()), ca_cert_.size()));
   RELEASE_ASSERT(bio != nullptr, "");
   bssl::UniquePtr<X509> ca_cert;
   ca_cert.reset(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
@@ -162,23 +148,25 @@ void Provider::signCertificate(::Envoy::CertificateProvider::OnDemandUpdateMetad
   std::string key_pem(reinterpret_cast<const char*>(output), length);
 
   // Generate TLSCertificate
-  auto tls_certificate = std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
+  auto tls_certificate =
+      std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
   tls_certificate->mutable_certificate_chain()->set_inline_string(cert_pem);
   tls_certificate->mutable_private_key()->set_inline_string(key_pem);
 
   // Update certificates_ map
   {
     absl::WriterMutexLock writer_lock{&certificates_lock_};
-    certificates_.try_emplace(metadata->connectionInfo()->sni(), const_cast<envoy::extensions::transport_sockets::tls::v3::TlsCertificate*> (tls_certificate.get()));
+    certificates_.try_emplace(
+        metadata->connectionInfo()->sni(),
+        const_cast<envoy::extensions::transport_sockets::tls::v3::TlsCertificate*>(
+            tls_certificate.get()));
   }
 
   runAddUpdateCallback();
-  runOnDemandUpdateCallback(metadata->connectionInfo()->sni(),
-                            thread_local_dispatcher,
-                            false);
+  runOnDemandUpdateCallback(metadata->connectionInfo()->sni(), thread_local_dispatcher, false);
 }
 
 } // namespace LocalCertificate
-} // namespace CertificateProviders 
-} // namespace Extensions 
+} // namespace CertificateProviders
+} // namespace Extensions
 } // namespace Envoy

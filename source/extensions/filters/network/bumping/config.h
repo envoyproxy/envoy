@@ -19,6 +19,7 @@ class ConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::bumping::v3::Bumping> {
 public:
   ConfigFactory() : FactoryBase(NetworkFilterNames::get().Bumping, false) {}
+
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::bumping::v3::Bumping& proto_config,

@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/bumping/v3/bumping.pb.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -33,19 +34,28 @@ namespace Envoy {
 namespace Bumping {
 
 Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
-    : parent_(parent), cluster_name_(cluster_name) {}  
+    : parent_(parent), cluster_name_(cluster_name) {}
 
 Config::Config(const envoy::extensions::filters::network::bumping::v3::Bumping& config,
                Server::Configuration::FactoryContext& context)
-    : stats_scope_(context.scope().createScope(fmt::format("bumping.{}", config.stat_prefix()))),
+    : main_dispatcher_(context.getServerFactoryContext().mainThreadDispatcher()), context_(context),
+      stats_scope_(context.scope().createScope(fmt::format("bumping.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)),
-      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)){
+      max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)) {
   if (!config.cluster().empty()) {
     default_route_ = std::make_shared<const SimpleRouteImpl>(*this, config.cluster());
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+  }
+
+  if (config.has_tls_certificate_provider_instance()) {
+    tls_certificate_provider_ =
+        context.getTransportSocketFactoryContext()
+            .certificateProviderManager()
+            .getCertificateProvider(config.tls_certificate_provider_instance().instance_name());
+    tls_certificate_name_ = config.tls_certificate_provider_instance().certificate_name();
   }
 }
 
@@ -80,7 +90,7 @@ void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbac
 
   // Need to disable reads and writes to postpone downstream handshakes.
   // This will get re-enabled when transport socket is refreshed with mimic cert.
-  //TODO, needs refactoring
+  // TODO, needs refactoring
   read_callbacks_->connection().readDisable(true);
   read_callbacks_->connection().write_disable = true;
 }
@@ -103,8 +113,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
       cluster_manager_.getThreadLocalCluster(cluster_name);
 
   if (!thread_local_cluster) {
-    ENVOY_CONN_LOG(debug, "Cluster not found {}.",
-                   read_callbacks_->connection(), cluster_name);
+    ENVOY_CONN_LOG(debug, "Cluster not found {}.", read_callbacks_->connection(), cluster_name);
     config_->stats().downstream_cx_no_route_.inc();
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
     onInitFailure(UpstreamFailureReason::NoRoute);
@@ -135,7 +144,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
-  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
+  transport_socket_options_ =
+      Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
 
   if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key());
@@ -169,8 +179,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, TcpProxy::TunnelingConfigHelperOptConstRef(),
-                                                      this, *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(
+      cluster, TcpProxy::TunnelingConfigHelperOptConstRef(), this, *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -209,14 +219,22 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
                                 std::unique_ptr<TcpProxy::GenericUpstream>&& upstream,
                                 Upstream::HostDescriptionConstSharedPtr&,
                                 const Network::Address::InstanceConstSharedPtr&,
-                                Ssl::ConnectionInfoConstSharedPtr) {
+                                Ssl::ConnectionInfoConstSharedPtr info) {
 
-  // Ssl::ConnectionInfoConstSharedPtr should contains enough info for cert mimicking
-  //TODO Cert mimick
+  // Cert mimick
+  requestCertificate(info);
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   onUpstreamConnection();
-  read_callbacks_->continueReading();
+  // read_callbacks_->continueReading();
+}
+
+void Filter::requestCertificate(Ssl::ConnectionInfoConstSharedPtr info) {
+  config_->main_dispatcher_.post([this, info]() {
+    config_->tls_certificate_provider_->addOnDemandUpdateCallback(
+        config_->tls_certificate_name_, std::make_shared<BumpingMetadata>(info),
+        read_callbacks_->connection().dispatcher(), *this);
+  });
 }
 
 void Filter::onConnectTimeout() {
@@ -257,19 +275,12 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
       }
       establishUpstreamConnection();
-    } 
+    }
   }
 }
 
 void Filter::onUpstreamConnection() {
   connecting_ = false;
-
-  //TODO, interact with Cert Provider
-
-  // Re-enable downstream reads and writes now that the upstream connection is established
-  // so we have a place to send downstream data to.
-  read_callbacks_->connection().readDisable(false);
-  read_callbacks_->connection().write_disable = false;
 
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
                  read_callbacks_->connection(),
@@ -288,6 +299,23 @@ void Filter::disableIdleTimer() {
     idle_timer_->disableTimer();
     idle_timer_.reset();
   }
+}
+
+void Filter::onCacheHit(const std::string&) const {
+  // Re-enable downstream reads and writes
+  // so we have a place to send downstream data to.
+  read_callbacks_->connection().readDisable(false);
+  read_callbacks_->connection().write_disable = false;
+
+  read_callbacks_->continueReading();
+}
+
+void Filter::onCacheMiss(const std::string&) const {
+  // Re-enable downstream reads and writes
+  read_callbacks_->connection().readDisable(false);
+  read_callbacks_->connection().write_disable = false;
+
+  read_callbacks_->continueReading();
 }
 } // namespace Bumping
 } // namespace Envoy

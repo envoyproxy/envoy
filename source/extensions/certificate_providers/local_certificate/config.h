@@ -10,16 +10,18 @@ namespace CertificateProviders {
 namespace LocalCertificate {
 
 /**
- * Config registration for the LocalCertificate provider. @see CertificateProvider::CertificateProviderFactory
+ * Config registration for the LocalCertificate provider. @see
+ * CertificateProvider::CertificateProviderFactory
  */
 class LocalCertificateFactory : public CertificateProvider::CertificateProviderFactory {
 public:
-  std::string name() const override { return "envoy.certificate_providers.local_certificate";}
-  CertificateProvider::CertificateProviderSharedPtr
-  createCertificateProviderInstance(const envoy::config::core::v3::TypedExtensionConfig& config,
-                         Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) override;
+  std::string name() const override { return "envoy.certificate_providers.local_certificate"; }
+  CertificateProvider::CertificateProviderSharedPtr createCertificateProviderInstance(
+      const envoy::config::core::v3::TypedExtensionConfig& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Api::Api& api) override;
 };
 } // namespace LocalCertificate
-} // namespace CertificateProviders 
-} // namespace Extensions 
+} // namespace CertificateProviders
+} // namespace Extensions
 } // namespace Envoy

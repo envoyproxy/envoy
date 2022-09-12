@@ -4,8 +4,8 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
-#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
@@ -25,35 +25,36 @@ public:
 using OnDemandUpdateMetadataPtr = std::shared_ptr<OnDemandUpdateMetadata>;
 
 class OnDemandUpdateCallbacks {
-  public:
-    virtual ~OnDemandUpdateCallbacks() = default;
+public:
+  virtual ~OnDemandUpdateCallbacks() = default;
 
-    /**
-     * Called when cert is already in cache.
-     * @param host supplies host of cert.
-     */
-    virtual void onCacheHit(const std::string& host) const PURE;
-    /**
-     * Called when cert cache is missed.
-     * @param host supplies host of cert.
-     */
-    virtual void onCacheMiss(const std::string& host) const PURE;
+  /**
+   * Called when cert is already in cache.
+   * @param host supplies host of cert.
+   */
+  virtual void onCacheHit(const std::string& host) const PURE;
+  /**
+   * Called when cert cache is missed.
+   * @param host supplies host of cert.
+   */
+  virtual void onCacheMiss(const std::string& host) const PURE;
 };
 
 enum class OnDemandUpdateStatus {
   // The cert is in cache. No self-signing needed.
   InCache,
-  // The cert is not in cache. Self-sign cert, callbacks will be called at a later time unless cancelled.
+  // The cert is not in cache. Self-sign cert, callbacks will be called at a later time unless
+  // cancelled.
   Loading,
 };
 
 class OnDemandUpdateHandle {
-  public:
-    virtual ~OnDemandUpdateHandle() = default;
-  };
+public:
+  virtual ~OnDemandUpdateHandle() = default;
+};
 
 using OnDemandUpdateHandlePtr = std::unique_ptr<OnDemandUpdateHandle>;
-  
+
 struct OnDemandUpdateResult {
   OnDemandUpdateStatus status_;
   OnDemandUpdateHandlePtr handle_;
@@ -93,9 +94,9 @@ public:
    * @param callback registers callback to be executed for on demand update.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual OnDemandUpdateResult
-  addOnDemandUpdateCallback(const std::string& cert_name, Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
-                             Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callback) PURE;
+  virtual OnDemandUpdateResult addOnDemandUpdateCallback(
+      const std::string& cert_name, Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+      Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callback) PURE;
 
   /**
    * Add certificate update callback into certificate provider for asychronous usage.
