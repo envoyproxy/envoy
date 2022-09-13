@@ -132,7 +132,7 @@ jobs:
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
       - name: 'Check connectivity'
-        run: adb logcat -e "received headers with status 200" -m 1
+        run: adb logcat -e "received headers with status 301" -m 1
   kotlinexperimentalapp:
     name: kotlin_experimental_app
     needs: androidbuild
