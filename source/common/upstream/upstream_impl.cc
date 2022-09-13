@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
@@ -394,6 +395,7 @@ Host::CreateConnectionData HostImpl::createConnection(
   // redirected to a proxy, create the TCP connection to the proxy's address not
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address,
         source_address_fn ? source_address_fn(address) : nullptr,
@@ -918,7 +920,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
-      upstream_context_(server_context, init_manager) {
+      upstream_context_(server_context, init_manager, *stats_scope_) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -1026,19 +1028,28 @@ ClusterInfoImpl::ClusterInfoImpl(
     filter_factories_.push_back(std::move(callback));
   }
 
-  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+  if (http_protocol_options_) {
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+    if (http_filters.empty()) {
+      auto* codec_filter = http_filters.Add();
+      codec_filter->set_name("envoy.filters.http.upstream_codec");
+      codec_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    }
+    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
+      throw EnvoyException(
+          fmt::format("The codec filter is the only valid terminal upstream filter"));
+    }
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             upstream_context_.getServerFactoryContext());
-    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
                upstream_context_, prefix);
-    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
-    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
   }
 }
 

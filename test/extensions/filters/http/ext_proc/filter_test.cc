@@ -1921,7 +1921,7 @@ TEST_F(HttpFilterTest, ClearRouteCache) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
   });
@@ -1935,7 +1935,7 @@ TEST_F(HttpFilterTest, ClearRouteCache) {
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
-  EXPECT_CALL(encoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
   });
