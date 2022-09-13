@@ -14,6 +14,8 @@
     EXPECT_EQ(__erwd_result.details(), details_value);                                             \
   }                                                                                                \
   void(0)
+#define EXPECT_ACCEPT(result)                                                                      \
+  EXPECT_TRUE(result.ok()) << "rejected with details: " << result.details()
 
 namespace Envoy {
 namespace Extensions {

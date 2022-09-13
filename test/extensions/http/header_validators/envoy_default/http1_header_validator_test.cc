@@ -28,7 +28,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
   HeaderString invalid{"{deflate}"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateTransferEncodingHeader(valid).ok());
+  EXPECT_ACCEPT(uhv->validateTransferEncodingHeader(valid));
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateTransferEncodingHeader(invalid),
                              "uhv.http1.invalid_transfer_encoding");
@@ -46,10 +46,10 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryMethod) {
   HeaderString name{":method"};
   HeaderString valid{"GET"};
-  HeaderString invalid{"CUSTOM-METHOD"};
+  HeaderString valid_custom{"CUSTOM-METHOD"};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, invalid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid));
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid_custom));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
@@ -57,7 +57,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
   HeaderString valid{"envoy.com"};
   HeaderString invalid{"user:pass@envoy.com"};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
                              UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
@@ -68,7 +68,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntrySchemeValid) {
   HeaderString invalid{"http_ssh"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(scheme, valid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(scheme, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(scheme, invalid),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
@@ -78,7 +78,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryPath) {
   HeaderString valid{"/"};
   HeaderString invalid{"/ bad path"};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
@@ -88,7 +88,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryTransferEncoding) {
   HeaderString valid{"chunked"};
   HeaderString invalid{"{deflate}"};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(name, valid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(name, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(name, invalid),
                              "uhv.http1.invalid_transfer_encoding");
 }
@@ -99,7 +99,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestEntryHeaderContentLength) {
   HeaderString invalid{"10a2"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(content_length, valid).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(content_length, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(content_length, invalid),
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
@@ -114,7 +114,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGeneric) {
 
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderEntry(valid_name, valid_value).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
@@ -134,7 +134,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryStatus) {
   HeaderString valid{"200"};
   HeaderString invalid{"1024"};
   auto uhv = createH1(empty_config);
-  EXPECT_TRUE(uhv->validateResponseHeaderEntry(name, valid).ok());
+  EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(name, valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(name, invalid),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
@@ -149,7 +149,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGeneric) {
 
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateResponseHeaderEntry(valid_name, valid_value).ok());
+  EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().InvalidCharacters);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
@@ -164,7 +164,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapAllowed) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapAllowedHostAlias) {
@@ -175,7 +175,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapAllowedHostAlias) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapMissingPath) {
@@ -213,7 +213,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapStarPathAccept) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapStarPathReject) {
@@ -236,7 +236,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingValid) 
                                                   {"transfer-encoding", "chunked"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateConnectRegName) {
@@ -246,7 +246,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateConnectRegName) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateConnectIPv6) {
@@ -256,7 +256,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateConnectIPv6) {
                                                   {"x-foo", "bar"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateConnectInvalidUserInfo) {
@@ -303,7 +303,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
                                                   {"content-length", "10"}};
   auto uhv = createH1(allow_chunked_length_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
   EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
@@ -316,7 +316,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
                                                   {"content-length", "10"}};
   auto uhv = createH1(allow_chunked_length_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
   EXPECT_EQ(headers.getContentLengthValue(), "10");
 }
 
@@ -356,7 +356,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLength0ConnectAc
                                                   {"content-length", "0"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
   EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
@@ -408,7 +408,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
                                                   {"x_foo", "bar"}};
   auto uhv = createH1(drop_headers_with_underscores_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaderMap(headers));
   EXPECT_EQ(
       headers,
       ::Envoy::Http::TestRequestHeaderMapImpl(
@@ -420,7 +420,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapValid) {
       {":status", "200"}, {"x-foo", "bar"}, {"transfer-encoding", "chunked"}};
   auto uhv = createH1(empty_config);
 
-  EXPECT_TRUE(uhv->validateResponseHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapMissingStatus) {
@@ -486,7 +486,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders)
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x_foo", "bar"}};
   auto uhv = createH1(drop_headers_with_underscores_config);
 
-  EXPECT_TRUE(uhv->validateResponseHeaderMap(headers).ok());
+  EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
   EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
 }
 
