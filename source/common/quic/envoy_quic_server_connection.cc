@@ -26,7 +26,7 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     // UDP GSO sendmsg efficiency. But this optimization causes some test failures under Windows,
     // and Windows doesn't support GSO, do not apply this optimization on Windows.
     // TODO(#22976) Figure out if this is needed on Windows.
-    set_defer_send_in_response_to_packets(GetQuicFlag(FLAGS_quic_defer_send_in_response));
+    set_defer_send_in_response_to_packets(GetQuicFlag(quic_defer_send_in_response));
   }
 #endif
 }

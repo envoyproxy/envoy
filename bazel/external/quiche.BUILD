@@ -2473,6 +2473,7 @@ cc_library(
     name = "quic_core_deterministic_connection_id_generator_lib",
     srcs = ["quiche/quic/core/deterministic_connection_id_generator.cc"],
     hdrs = ["quiche/quic/core/deterministic_connection_id_generator.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_utils_lib",
@@ -2554,20 +2555,20 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_crypto_logging",
     srcs = [
-      "quiche/common/quiche_crypto_logging.cc",
+        "quiche/common/quiche_crypto_logging.cc",
     ],
     hdrs = [
-      "quiche/common/quiche_crypto_logging.h",
+        "quiche/common/quiche_crypto_logging.h",
     ],
     copts = quiche_copts,
+    external_deps = ["ssl"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    external_deps = ["ssl"],
     deps = [
-      ":quiche_common_platform_logging",
-      "@com_google_absl//absl/status",
-      "@com_google_absl//absl/strings",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
