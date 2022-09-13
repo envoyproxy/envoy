@@ -503,7 +503,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
 
   if (!per_route_config_->matchIncomingRequestInfo()) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   if (end_stream && method_->request_type_is_http_body_) {
