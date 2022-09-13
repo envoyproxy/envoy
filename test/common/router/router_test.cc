@@ -4210,7 +4210,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4254,7 +4254,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
@@ -4279,7 +4279,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   setNumPreviousRedirect(2);
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4301,11 +4301,13 @@ TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
 
   enableRedirects();
   sendRequest();
-  EXPECT_CALL(callbacks_, clearRouteCache()).WillOnce(InvokeWithoutArgs([&]() -> void {
-    // Direct message route should be matched after internal redirect
-    EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
-    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  }));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache())
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        // Direct message route should be matched after internal redirect
+        EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+        EXPECT_CALL(*callbacks_.route_, directResponseEntry())
+            .WillRepeatedly(Return(&direct_response));
+      }));
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4326,7 +4328,7 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
@@ -4348,7 +4350,7 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
@@ -4372,7 +4374,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4395,7 +4397,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_

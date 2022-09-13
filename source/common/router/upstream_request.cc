@@ -1022,11 +1022,6 @@ Upstream::ClusterInfoConstSharedPtr UpstreamRequestFilterManagerCallbacks::clust
   return upstream_request_.parent_.callbacks()->clusterInfo();
 }
 
-Router::RouteConstSharedPtr
-UpstreamRequestFilterManagerCallbacks::route(const Router::RouteCallback&) {
-  return upstream_request_.parent_.callbacks()->route();
-}
-
 Http::Http1StreamEncoderOptionsOptRef
 UpstreamRequestFilterManagerCallbacks::http1StreamEncoderOptions() {
   return upstream_request_.parent_.callbacks()->http1StreamEncoderOptions();

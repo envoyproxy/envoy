@@ -894,7 +894,7 @@ TEST_F(HttpFilterTest, ClearCache) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -942,7 +942,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -987,7 +987,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1032,7 +1032,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1078,7 +1078,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1117,7 +1117,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const Envoy::Http::RequestHeaderMap&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1166,7 +1166,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
                      const Envoy::Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) -> void {
             callbacks.onComplete(std::move(response_ptr));
           }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));

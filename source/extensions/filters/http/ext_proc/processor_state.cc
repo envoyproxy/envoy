@@ -63,7 +63,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       }
     }
     if (common_response.clear_route_cache()) {
-      filter_callbacks_->clearRouteCache();
+      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
     onFinishProcessorCall(Grpc::Status::Ok);
 
@@ -269,7 +269,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     }
 
     if (response.response().clear_route_cache()) {
-      filter_callbacks_->clearRouteCache();
+      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
     headers_ = nullptr;
 
