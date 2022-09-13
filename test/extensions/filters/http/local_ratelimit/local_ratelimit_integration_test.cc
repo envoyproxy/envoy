@@ -8,7 +8,6 @@ namespace {
 class LocalRateLimitFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                             public HttpProtocolIntegrationTest {
 protected:
-  LocalRateLimitFilterIntegrationTest() {}
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();
