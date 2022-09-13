@@ -9,10 +9,9 @@ absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
     const quic::QuicConnectionId& original) {
   auto new_cid = DeterministicConnectionIdGenerator::GenerateNextConnectionId(original);
-  if (!new_cid.has_value()) {
-    return new_cid;
+  if (new_cid.has_value()) {
+    adjustNewConnectionIdForRoutine(new_cid.value(), original);
   }
-  adjustNewConnectionIdForRoutine(new_cid.value(), original);
   return new_cid;
 }
 
@@ -20,10 +19,9 @@ absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
     const quic::QuicConnectionId& original, const quic::ParsedQuicVersion& version) {
   auto new_cid = DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(original, version);
-  if (!new_cid.has_value()) {
-    return new_cid;
+  if (new_cid.has_value()) {
+    adjustNewConnectionIdForRoutine(new_cid.value(), original);
   }
-  adjustNewConnectionIdForRoutine(new_cid.value(), original);
   return new_cid;
 }
 
