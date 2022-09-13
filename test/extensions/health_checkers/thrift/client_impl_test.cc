@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -27,7 +29,7 @@ public:
   ThriftClientImplTest() = default;
   ~ThriftClientImplTest() override = default;
 
-  void setup(bool max_seq_id = false) {
+  void setup(bool max_seq_id = false, bool fixed_seq_id = false) {
     connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
@@ -40,7 +42,7 @@ public:
     ClientFactoryImpl& factory = ClientFactoryImpl::instance_;
     client_ =
         factory.create(client_callback_, transport_, protocol_, method_name_, host_,
-                       max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_, false);
+                       max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_, fixed_seq_id);
     client_->start();
 
     // No-OP currently.
@@ -195,6 +197,68 @@ TEST_F(ThriftClientImplTest, SuccessWithMaxSeqId) {
   writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
   read_filter_->onData(success_response, false);
 
+  client_->close();
+}
+
+TEST_F(ThriftClientImplTest, SuccessWithFixedSeqId) {
+  InSequence s;
+
+  setup(initial_seq_id_, true);
+
+  constexpr int num_reqs = 2;
+  std::vector<std::string> request_strings(num_reqs);
+
+  for (int i = 0; i < num_reqs; i++) {
+    // Expect that the client writes the health check request.
+    EXPECT_CALL(*connection_, write(_, _)).WillOnce(
+      testing::Invoke([&](Buffer::Instance& data, bool){
+        request_strings[i] = data.toString();
+      }));
+    bool success = client_->sendRequest();
+    EXPECT_TRUE(success);
+
+    EXPECT_CALL(client_callback_, onResponseResult(true));
+
+    Buffer::OwnedImpl success_response;
+    writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
+    read_filter_->onData(success_response, false);
+  }
+
+  // same sequence id
+  EXPECT_EQ(request_strings[0], request_strings[1]);
+
+  EXPECT_CALL(*connection_, close(_));
+  client_->close();
+}
+
+TEST_F(ThriftClientImplTest, SuccessWithIncreasingSeqId) {
+  InSequence s;
+
+  setup(initial_seq_id_, false);
+
+  constexpr int num_reqs = 2;
+  std::vector<std::string> request_strings(num_reqs);
+
+  for (int i = 0; i < num_reqs; i++) {
+    // Expect that the client writes the health check request.
+    EXPECT_CALL(*connection_, write(_, _)).WillOnce(
+      testing::Invoke([&](Buffer::Instance& data, bool){
+        request_strings[i] = data.toString();
+      }));
+    bool success = client_->sendRequest();
+    EXPECT_TRUE(success);
+
+    EXPECT_CALL(client_callback_, onResponseResult(true));
+
+    Buffer::OwnedImpl success_response;
+    writeMessage(success_response, NetworkFilters::ThriftProxy::MessageType::Reply);
+    read_filter_->onData(success_response, false);
+  }
+
+  // different sequence ids
+  EXPECT_NE(request_strings[0], request_strings[1]);
+
+  EXPECT_CALL(*connection_, close(_));
   client_->close();
 }
 

@@ -107,7 +107,7 @@ private:
   }
 
   int32_t sequenceId() {
-    if (!fixed_seq_id_) {
+    if (fixed_seq_id_) {
       return seq_id_;
     }
 
