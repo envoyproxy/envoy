@@ -171,8 +171,15 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostMultiMapSharedPtr new_host_map = std::make_shared<HostMultiMap>(*getCurrentHostMap());
   auto it = new_host_map->find(address);
   if (it != new_host_map->end()) {
+    // If the entry already exists, that means the worker that posted this host
+    // had a stale host map. Because the host is potentially in that worker's
+    // connection pools, we save the host in the host map hosts_ list and the
+    // cluster priority set. Subsequently, the entire hosts_ list and the
+    // primary host are removed collectively, once no longer in use.
     it->second->hosts_.push_back(host);
   } else {
+    // The first worker that creates a host for the address defines the primary
+    // host structure.
     new_host_map->emplace(address, std::make_shared<HostsForAddress>(host));
   }
   ENVOY_LOG(debug, "addHost() adding {} {}.", *host, address);
@@ -203,7 +210,16 @@ void OriginalDstCluster::cleanup() {
       //
       // Using the used_ bit is preserved for backwards compatibility and to
       // add a delay between load balancers choosing a host and grabbing a
-      // handle on the host.
+      // handle on the host. This prevents the following interleaving:
+      //
+      // 1) worker 1: pools release host h
+      // 2) worker 1: auto h = lb.chooseHost(&ctx);
+      // 3) main: cleanup() // deletes h because h is not used by the pools
+      // 4) worker 1: auto handle = h.acquireHandle();
+      //
+      // Because the duration between steps 2) and 4) is O(instructions), step
+      // 3) will not delete h since it takes at least one cleanup_interval for
+      // the host to set used_ bit for h to false.
       bool keep = false;
       if (hosts->used_) {
         keep = true;
