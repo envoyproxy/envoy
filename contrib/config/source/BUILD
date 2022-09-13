@@ -12,6 +12,7 @@ envoy_cc_contrib_extension(
     name = "kv_store_xds_delegate",
     srcs = ["kv_store_xds_delegate.cc"],
     hdrs = ["kv_store_xds_delegate.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/common:time_interface",

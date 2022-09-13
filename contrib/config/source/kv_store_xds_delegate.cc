@@ -9,6 +9,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.h"
 #include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.validate.h"
 
@@ -93,7 +94,8 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
             decoded_resource.ttl().value().count()));
       }
       // TODO(abeyad): Set TTL parameter, if it exists.
-      xds_config_store_->addOrUpdate(constructKey(source_id, r.name()), r.SerializeAsString());
+      xds_config_store_->addOrUpdate(constructKey(source_id, r.name()), r.SerializeAsString(),
+                                     absl::nullopt);
     } else {
       ENVOY_LOG_MISC(warn,
                      "KeyValueStore xDS delegate didn't persist xDS update {}: missing resource",

@@ -128,7 +128,7 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
     }
 
     std::vector<DecodedResourcePtr> decoded_resources;
-    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
     std::string version_info;
     for (const auto& resource : resources) {
       if (version_info.empty()) {
