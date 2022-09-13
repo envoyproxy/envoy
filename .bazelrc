@@ -183,7 +183,7 @@ build:coverage --strategy=CoverageReport=sandboxed,local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
-build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//include[/:],//contrib(?!/.*/test)[/:]"
+build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
 build:test-coverage --test_arg="-l trace"
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
@@ -290,7 +290,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3de483a98c5e24973e710b4f97b2dabcd3cb621f
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

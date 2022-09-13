@@ -93,3 +93,8 @@ envoy.xds_delegates.kv_store:
   - envoy.xds_delegates
   security_posture: data_plane_agnostic
   status: wip
+envoy.filters.network.generic_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

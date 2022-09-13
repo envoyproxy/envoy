@@ -14,6 +14,33 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+
+QuicDispatcherStats generateStats(Stats::Scope& store) {
+  return {QUIC_DISPATCHER_STATS(POOL_COUNTER_PREFIX(store, "quic.dispatcher"))};
+}
+
+} // namespace
+
+EnvoyQuicTimeWaitListManager::EnvoyQuicTimeWaitListManager(quic::QuicPacketWriter* writer,
+                                                           Visitor* visitor,
+                                                           const quic::QuicClock* clock,
+                                                           quic::QuicAlarmFactory* alarm_factory,
+                                                           QuicDispatcherStats& stats)
+    : quic::QuicTimeWaitListManager(writer, visitor, clock, alarm_factory), stats_(stats) {}
+
+void EnvoyQuicTimeWaitListManager::SendPublicReset(
+    const quic::QuicSocketAddress& self_address, const quic::QuicSocketAddress& peer_address,
+    quic::QuicConnectionId connection_id, bool ietf_quic, size_t received_packet_length,
+    std::unique_ptr<quic::QuicPerPacketContext> packet_context) {
+  ENVOY_LOG_EVERY_POW_2_MISC(info, "Sending Stateless Reset on connection {}",
+                             connection_id.ToString());
+  stats_.stateless_reset_packets_sent_.inc();
+  quic::QuicTimeWaitListManager::SendPublicReset(self_address, peer_address, connection_id,
+                                                 ietf_quic, received_packet_length,
+                                                 std::move(packet_context));
+}
+
 EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
     quic::QuicVersionManager* version_manager,
@@ -32,7 +59,8 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       connection_handler_(connection_handler), listener_config_(&listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
-      crypto_server_stream_factory_(crypto_server_stream_factory) {}
+      crypto_server_stream_factory_(crypto_server_stream_factory),
+      quic_stats_(generateStats(listener_config.listenerScope())) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -44,6 +72,11 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
   connection_handler_.decNumConnections();
   quic_stat_names_.chargeQuicConnectionCloseStats(listener_config_->listenerScope(), error, source,
                                                   /*is_upstream*/ false);
+}
+
+quic::QuicTimeWaitListManager* EnvoyQuicDispatcher::CreateQuicTimeWaitListManager() {
+  return new EnvoyQuicTimeWaitListManager(writer(), this, helper()->GetClock(), alarm_factory(),
+                                          quic_stats_);
 }
 
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(

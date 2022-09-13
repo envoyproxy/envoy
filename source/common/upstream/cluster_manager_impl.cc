@@ -855,7 +855,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
                         "host {} in cluster {} was ejected by the outlier detector",
-                        host->address(), host->cluster().name());
+                        host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -1752,14 +1752,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
   container->pools_->erasePool(priority, hash_key);
 
   // Guard deletion of the container with `do_not_delete_` to avoid deletion while
   // iterating through the container in `container->pools_->startDrain()`. See
   // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
   if (!container->do_not_delete_ && container->pools_->empty()) {
-    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
     host_http_conn_pool_map_.erase(
         host); // NOTE: `container` is erased after this point in the lambda.
   }
@@ -1833,7 +1833,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
       thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
       container.pools_.erase(erase_iter);
     }
@@ -1960,13 +1960,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(
-      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
-      admin_, singleton_manager_, outlier_event_logger, added_via_api,
-      added_via_api ? validation_context_.dynamicValidationVisitor()
-                    : validation_context_.staticValidationVisitor(),
-      context_.api(), context_.options());
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+                                        ssl_context_manager_, outlier_event_logger, added_via_api,
+                                        added_via_api
+                                            ? validation_context_.dynamicValidationVisitor()
+                                            : validation_context_.staticValidationVisitor());
 }
 
 CdsApiPtr

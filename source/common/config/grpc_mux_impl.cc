@@ -155,7 +155,7 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
 GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
                                       const absl::flat_hash_set<std::string>& resources,
                                       SubscriptionCallbacks& callbacks,
-                                      OpaqueResourceDecoder& resource_decoder,
+                                      OpaqueResourceDecoderSharedPtr resource_decoder,
                                       const SubscriptionOptions&) {
   auto watch =
       std::make_unique<GrpcMuxWatchImpl>(resources, callbacks, resource_decoder, type_url, *this);
@@ -258,7 +258,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
     std::vector<DecodedResourcePtr> resources;
-    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
