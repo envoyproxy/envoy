@@ -44,7 +44,6 @@ public:
                          connection_id_generator_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(4u),
         stats_(
             {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
@@ -178,7 +177,7 @@ protected:
       quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;
