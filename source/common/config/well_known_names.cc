@@ -140,7 +140,7 @@ TagNameValues::TagNameValues() {
   // server.(worker_<id>.)*
   addRe2(
       WORKER_ID,
-      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)(worker_(\d+)\.))",
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
       "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
