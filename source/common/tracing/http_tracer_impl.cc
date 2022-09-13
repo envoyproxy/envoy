@@ -210,7 +210,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
-  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config);
+  onUpstreamResponseHeaders(span, response_headers);
+  onUpstreamResponseTrailers(span, response_trailers);
 
   CustomTagContext ctx{request_headers, stream_info};
 
@@ -224,10 +226,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.finishSpan();
 }
 
-void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
-                                             const Http::ResponseHeaderMap* response_headers,
-                                             const Http::ResponseTrailerMap* response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
+void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
   span.setTag(
       Tracing::Tags::get().HttpProtocol,
@@ -242,14 +241,26 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
     span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
   }
 
-  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config);
 
   span.finishSpan();
 }
 
-void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
-                                      const Http::ResponseTrailerMap* response_trailers,
-                                      const StreamInfo::StreamInfo& stream_info,
+void HttpTracerUtility::onUpstreamResponseHeaders(Span& span,
+                                                  const Http::ResponseHeaderMap* response_headers) {
+  if (response_headers && response_headers->GrpcStatus() != nullptr) {
+    addGrpcResponseTags(span, *response_headers);
+  }
+}
+
+void HttpTracerUtility::onUpstreamResponseTrailers(
+    Span& span, const Http::ResponseTrailerMap* response_trailers) {
+  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
+    addGrpcResponseTags(span, *response_trailers);
+  }
+}
+
+void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
                                       const Config& tracing_config) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
@@ -265,13 +276,6 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
   span.setTag(Tracing::Tags::get().HttpStatusCode, buildResponseCode(stream_info));
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
-
-  // GRPC data.
-  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
-    addGrpcResponseTags(span, *response_trailers);
-  } else if (response_headers && response_headers->GrpcStatus() != nullptr) {
-    addGrpcResponseTags(span, *response_headers);
-  }
 
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);

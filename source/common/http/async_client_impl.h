@@ -346,10 +346,7 @@ private:
   void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                    absl::string_view transport_failure_reason = "") override;
   Router::RouteConstSharedPtr route() override { return route_; }
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
-  void setRoute(Router::RouteConstSharedPtr) override {}
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
-  void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
@@ -422,7 +419,8 @@ private:
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }

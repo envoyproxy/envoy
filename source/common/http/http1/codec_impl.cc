@@ -465,6 +465,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
 
     std::string url = absl::StrCat(scheme->value().getStringView(), "://",
                                    host->value().getStringView(), path->value().getStringView());
+    ENVOY_CONN_LOG(trace, "Sending fully qualified URL: {}", connection_.connection(), url);
     connection_.buffer().addFragments(
         {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
   } else {
