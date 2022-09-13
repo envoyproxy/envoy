@@ -260,9 +260,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  config_->requestHeaderParser().evaluateHeaders(*headers, orig_request_headers,
-                                                 *Http::StaticEmptyHeaders::get().response_headers,
-                                                 stream_info);
+  config_->requestHeaderParser().evaluateHeaders(*headers, orig_request_headers, stream_info);
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

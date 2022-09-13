@@ -191,7 +191,7 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
        (options_.parent_context.stream_info->getRequestHeaders() != nullptr))
           ? *options_.parent_context.stream_info->getRequestHeaders()
           : *Http::StaticEmptyHeaders::get().request_headers,
-      *Http::StaticEmptyHeaders::get().response_headers, options_.parent_context.stream_info);
+      options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
     ctxt_.AddMetadata(std::string(header.key().getStringView()),

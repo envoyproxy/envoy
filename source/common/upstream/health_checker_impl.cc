@@ -382,8 +382,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(
-      *request_headers, *Http::StaticEmptyHeaders::get().request_headers,
-      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+      *request_headers, *Http::StaticEmptyHeaders::get().request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
   // Encoding will only fail if required request headers are missing.
   ASSERT(status.ok());
@@ -818,8 +817,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(
-      headers_message->headers(), *Http::StaticEmptyHeaders::get().request_headers,
-      *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+      headers_message->headers(), *Http::StaticEmptyHeaders::get().request_headers, stream_info);
 
   Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 

@@ -801,8 +801,7 @@ public:
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      request_headers_parser_->evaluateHeaders(
-          headers, headers, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+      request_headers_parser_->evaluateHeaders(headers, headers, stream_info);
       if (!host_rewrite_.empty()) {
         headers.setHost(host_rewrite_);
       }

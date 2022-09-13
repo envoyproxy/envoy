@@ -8,6 +8,7 @@
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/header_formatter.h"
 
@@ -59,6 +60,20 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo* stream_info) const;
+  /**
+   * Helper function used to evaluate headers when response headers are not available.
+   * This usually happens when evaluating upstream request headers.
+   */
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+                       const StreamInfo::StreamInfo& stream_info) const {
+    evaluateHeaders(headers, request_headers,
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+                       const StreamInfo::StreamInfo* stream_info) const {
+    evaluateHeaders(headers, request_headers,
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
