@@ -21,9 +21,13 @@ namespace Upstream {
 struct HostsForAddress {
   HostsForAddress(HostSharedPtr& host) : host_(host), used_(true) {}
 
-  // Primary host for the address.
+  // Primary host for the address. This is set by the first worker that posts
+  // to the main to add a host. The field is read by all workers.
   const HostSharedPtr host_;
   // Hosts that are added concurrently with host_ are stored in this list.
+  // This is populated by the subsequent workers that have not received the
+  // updated table with set host_. The field is only accessed from the main
+  // thread.
   std::vector<HostSharedPtr> hosts_;
   // Marks as recently used by load balancers.
   std::atomic<bool> used_;
@@ -70,7 +74,7 @@ public:
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
-    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return {nullptr}; }
+    HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     // Pool selection not implemented for OriginalDstCluster
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
