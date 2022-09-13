@@ -779,9 +779,10 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
-class ExternalHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
-                                      public testing::TestWithParam<Network::Address::IpVersion>,
-                                      public HealthCheckIntegrationTestBase {
+class ExternalHealthCheckIntegrationTest
+    : public Event::TestUsingSimulatedTime,
+      public testing::TestWithParam<Network::Address::IpVersion>,
+      public HealthCheckIntegrationTestBase {
 public:
   ExternalHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
 
@@ -790,24 +791,26 @@ public:
     cleanUpXdsConnection();
   }
 
-  // Adds a EXTERNAL active health check specifier to the given cluster, and waits for the first health
-  // check probe to be received.
+  // Adds a EXTERNAL active health check specifier to the given cluster, and waits for the first
+  // health check probe to be received.
   void initExternalHealthCheck(uint32_t cluster_idx) {
     auto& cluster_data = clusters_[cluster_idx];
     auto& cluster = cluster_data.cluster_;
     auto health_check = addHealthCheck(cluster_data.cluster_);
     auto* socket_address = cluster.mutable_load_assignment()
-          ->mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_endpoint()
-          ->mutable_health_check_config()
-          ->mutable_address()->mutable_socket_address();
+                               ->mutable_endpoints(0)
+                               ->mutable_lb_endpoints(0)
+                               ->mutable_endpoint()
+                               ->mutable_health_check_config()
+                               ->mutable_address()
+                               ->mutable_socket_address();
 
     health_check->mutable_tcp_health_check()->mutable_send()->set_text("50696E67"); // "Ping"
     health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
 
-    socket_address->set_address(
-    Network::Test::getLoopbackAddressString(ip_version_));
+    socket_address->set_address(Network::Test::getLoopbackAddressString(ip_version_));
     socket_address->set_port_value(
-    cluster_data.external_host_upstream_->localAddress()->ip()->port());
+        cluster_data.external_host_upstream_->localAddress()->ip()->port());
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
@@ -815,8 +818,8 @@ public:
         Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive EXTERNAL HC request.
-    ASSERT_TRUE(
-        cluster_data.external_host_upstream_->waitForRawConnection(cluster_data.external_host_fake_raw_connection_));
+    ASSERT_TRUE(cluster_data.external_host_upstream_->waitForRawConnection(
+        cluster_data.external_host_fake_raw_connection_));
     ASSERT_TRUE(cluster_data.external_host_fake_raw_connection_->waitForData(
         FakeRawConnection::waitForInexactMatch("Ping")));
   }
@@ -847,7 +850,8 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointWrongResponseExternal) 
   initExternalHealthCheck(cluster_idx);
 
   // Send the wrong reply ("Pong" is expected).
-  AssertionResult result = clusters_[cluster_idx].external_host_fake_raw_connection_->write("Poong");
+  AssertionResult result =
+      clusters_[cluster_idx].external_host_fake_raw_connection_->write("Poong");
   RELEASE_ASSERT(result, result.message());
 
   // Envoy will wait until timeout occurs because no correct reply was received.

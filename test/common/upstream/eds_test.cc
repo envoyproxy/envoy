@@ -705,8 +705,7 @@ TEST_F(EdsTest, MalformedIPForHealthChecks) {
   const auto decoded_resources =
       TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
   EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
-                            EnvoyException,
-                            "malformed IP address: foo.bar.com");
+                            EnvoyException, "malformed IP address: foo.bar.com");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
