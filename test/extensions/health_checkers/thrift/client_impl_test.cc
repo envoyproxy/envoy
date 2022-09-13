@@ -40,9 +40,9 @@ public:
     EXPECT_CALL(*connection_, noDelay(true));
 
     ClientFactoryImpl& factory = ClientFactoryImpl::instance_;
-    client_ =
-        factory.create(client_callback_, transport_, protocol_, method_name_, host_,
-                       max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_, fixed_seq_id);
+    client_ = factory.create(client_callback_, transport_, protocol_, method_name_, host_,
+                             max_seq_id ? std::numeric_limits<int32_t>::max() : initial_seq_id_,
+                             fixed_seq_id);
     client_->start();
 
     // No-OP currently.
@@ -210,10 +210,9 @@ TEST_F(ThriftClientImplTest, SuccessWithFixedSeqId) {
 
   for (int i = 0; i < num_reqs; i++) {
     // Expect that the client writes the health check request.
-    EXPECT_CALL(*connection_, write(_, _)).WillOnce(
-      testing::Invoke([&](Buffer::Instance& data, bool){
-        request_strings[i] = data.toString();
-      }));
+    EXPECT_CALL(*connection_, write(_, _))
+        .WillOnce(testing::Invoke(
+            [&](Buffer::Instance& data, bool) { request_strings[i] = data.toString(); }));
     bool success = client_->sendRequest();
     EXPECT_TRUE(success);
 
@@ -241,10 +240,9 @@ TEST_F(ThriftClientImplTest, SuccessWithIncreasingSeqId) {
 
   for (int i = 0; i < num_reqs; i++) {
     // Expect that the client writes the health check request.
-    EXPECT_CALL(*connection_, write(_, _)).WillOnce(
-      testing::Invoke([&](Buffer::Instance& data, bool){
-        request_strings[i] = data.toString();
-      }));
+    EXPECT_CALL(*connection_, write(_, _))
+        .WillOnce(testing::Invoke(
+            [&](Buffer::Instance& data, bool) { request_strings[i] = data.toString(); }));
     bool success = client_->sendRequest();
     EXPECT_TRUE(success);
 

@@ -112,6 +112,50 @@ public:
     setup(yaml);
   }
 
+  void startHealthChecker() {
+    EXPECT_NE(nullptr, health_checker_);
+    expectSessionCreate();
+    expectClientAndPingRequestCreate();
+    health_checker_->start();
+
+    client_->runHighWatermarkCallbacks();
+    client_->runLowWatermarkCallbacks();
+  }
+
+  void continueHealthCheck() {
+    expectPingRequestCreate();
+    interval_timer_->invokeCallback();
+  }
+
+  void restartHealthCheckSession() {
+    expectClientAndPingRequestCreate();
+    interval_timer_->invokeCallback();
+  }
+
+  void responseSuccess() {
+    EXPECT_CALL(*timeout_timer_, disableTimer());
+    EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+    client_->raiseResponseResult(true);
+  }
+
+  void responseFailure() {
+    EXPECT_CALL(*timeout_timer_, disableTimer());
+    EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+    client_->raiseResponseResult(false);
+  }
+
+  void disconnectHealthCheck() {
+    EXPECT_CALL(*timeout_timer_, disableTimer());
+    EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+    client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  }
+
+  void timeout() {
+    EXPECT_CALL(*timeout_timer_, disableTimer());
+    EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+    timeout_timer_->invokeCallback();
+  }
+
   ClientPtr create(ClientCallback& callbacks, NetworkFilters::ThriftProxy::TransportType transport,
                    NetworkFilters::ThriftProxy::ProtocolType protocol,
                    const std::string& method_name, Upstream::HostSharedPtr, int32_t seq_id,
@@ -160,26 +204,12 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   InSequence s;
   setup();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
+  startHealthChecker();
+  responseSuccess();
 
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
-
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Fail on the exception response.
+  continueHealthCheck();
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(false);
+  responseFailure();
 
   // Shutdown *without* an active request.
   EXPECT_CALL(*client_, close());
@@ -194,46 +224,22 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   InSequence s;
   setup();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
+  startHealthChecker();
+  responseSuccess();
 
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
-
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Fail on the exception response.
+  continueHealthCheck();
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(false);
+  responseFailure();
 
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
+  continueHealthCheck();
+  disconnectHealthCheck();
 
-  // Fail on disconnection.
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Timeout
+  restartHealthCheckSession();
+  // Close connection on timeout.
   EXPECT_CALL(*client_, close());
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  timeout_timer_->invokeCallback();
+  timeout();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
+  restartHealthCheckSession();
 
   // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
@@ -248,40 +254,21 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   InSequence s;
   setupAlwaysLogHealthCheckFailures();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
+  startHealthChecker();
+  responseSuccess();
 
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
-
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
+  continueHealthCheck();
   // Fail on the exception response.
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(false);
+  responseFailure();
 
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
+  continueHealthCheck();
   // Fail again.
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(false);
+  responseFailure();
 
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
+  continueHealthCheck();
   // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
@@ -296,31 +283,16 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   InSequence s;
   setup();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
-
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Fail on the exception response.
+  startHealthChecker();
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  disconnectHealthCheck();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Success
+  restartHealthCheckSession();
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
+  responseSuccess();
 
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
+  continueHealthCheck();
 
   // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
@@ -336,38 +308,18 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   InSequence s;
   setup();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
+  startHealthChecker();
+  responseSuccess();
 
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
-
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Fail on disconnection.
+  continueHealthCheck();
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  disconnectHealthCheck();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // Success
+  restartHealthCheckSession();
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseResponseResult(true);
+  responseSuccess();
 
-  expectPingRequestCreate();
-  interval_timer_->invokeCallback();
+  continueHealthCheck();
 
   // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
@@ -378,60 +330,69 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+// Host responses {EXCEPTION, EXCEPTION}.
+TEST_F(ThriftHealthCheckerTest, LogConsecutiveFailures) {
+  InSequence s;
+  setup();
+
+  startHealthChecker();
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  responseFailure();
+
+  continueHealthCheck();
+  responseFailure();
+
+  continueHealthCheck();
+
+  // Shutdown with an active request.
+  EXPECT_CALL(*client_, close());
+
+  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
 // Tests that thrift client will behave appropriately when reuse_connection is false.
 TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
   setupDoNotReuseConnection();
 
-  expectSessionCreate();
-  expectClientAndPingRequestCreate();
-  health_checker_->start();
-
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // The connection will close on success.
+  startHealthChecker();
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  // The connection will be closed on success.
   EXPECT_CALL(*client_, close());
+  // success response
   client_->raiseResponseResult(true);
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
-  // The connection will close on failure.
+  restartHealthCheckSession();
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+  // The connection will be closed on failure.
   EXPECT_CALL(*client_, close());
   client_->raiseResponseResult(false);
+  responseFailure();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
+  restartHealthCheckSession();
   // Fail on disconnection. The connection was closed by the other end.
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  disconnectHealthCheck();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
-
+  restartHealthCheckSession();
   // Timeout, the connection will be closed.
   EXPECT_CALL(*client_, close());
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  timeout_timer_->invokeCallback();
+  timeout();
 
-  expectClientAndPingRequestCreate();
-  interval_timer_->invokeCallback();
+  restartHealthCheckSession();
 
   // Shutdown with an active request.
   EXPECT_CALL(*client_, close());
 
   EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(4UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
