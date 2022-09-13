@@ -436,6 +436,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
     ],
 )
@@ -2024,4 +2025,25 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_test(
+    name = "xds_delegate_extension_integration_test",
+    srcs = ["xds_delegate_extension_integration_test.cc"],
+    external_deps = ["abseil_strings"],
+    deps = [
+        ":http_integration_lib",
+        ":xds_delegate_test_config_proto_cc_proto",
+        "//envoy/config:xds_resources_delegate_interface",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:v2_link_hacks",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "xds_delegate_test_config_proto",
+    srcs = ["xds_delegate_test_config.proto"],
 )

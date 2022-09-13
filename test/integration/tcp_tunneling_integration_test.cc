@@ -195,6 +195,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
     // In HTTP/3 end stream will be sent when the upstream connection is closed, and
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_TRUE(response_->waitForReset());
   } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
     ASSERT_TRUE(response_->waitForReset());
   } else {
@@ -595,6 +596,28 @@ TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamClose) {
   } else {
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   }
+}
+
+TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamCloseConnection) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.1 can't frame with FIN bits.
+    return;
+  }
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+
+  // Close upstream request and imitate idle connection closure.
+  upstream_request_->encodeData(2, true);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  tcp_client_->waitForHalfClose();
+
+  // Now send data upstream.
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+
+  // Finally close and clean up.
+  tcp_client_->close();
 }
 
 TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {

@@ -29,6 +29,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
@@ -1143,3 +1144,18 @@ using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>
 
 } // namespace Upstream
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+    absl::string_view out =
+        host.hostname().empty() ? host.hostname() : host.address()->asStringView();
+    return formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace fmt

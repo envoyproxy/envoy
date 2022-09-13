@@ -1,5 +1,6 @@
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
 
+#include <future>
 #include <string>
 #include <utility>
 
@@ -14,7 +15,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/status/status.h"
-#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
@@ -69,12 +69,16 @@ void HttpCacheImplementationTest::updateHeaders(
 LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_path) {
   LookupRequest request = makeLookupRequest(request_path);
   LookupContextPtr context = cache()->makeLookupContext(std::move(request), decoder_callbacks_);
-  absl::Notification lookup_result_received;
-  context->getHeaders([this, &lookup_result_received](LookupResult&& result) {
-    lookup_result_ = std::move(result);
-    lookup_result_received.Notify();
-  });
-  EXPECT_TRUE(lookup_result_received.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  auto headers_promise = std::make_shared<std::promise<LookupResult>>();
+  context->getHeaders(
+      [headers_promise](LookupResult&& result) { headers_promise->set_value(std::move(result)); });
+  auto headers_future = headers_promise->get_future();
+  if (std::future_status::ready == headers_future.wait_for(std::chrono::seconds(5))) {
+    lookup_result_ = headers_future.get();
+  } else {
+    EXPECT_TRUE(false) << "timed out in lookup " << request_path;
+  }
+
   return context;
 }
 
@@ -89,56 +93,60 @@ absl::Status HttpCacheImplementationTest::insert(
     LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
     const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
     std::chrono::milliseconds timeout) {
+  // For responses with body, we must wait for insertBody's callback before
+  // calling insertTrailers or completing. Note, in a multipart body test this
+  // would need to check for the callback having been called for *every* body part,
+  // but since the test only uses single-part bodies, inserting trailers or
+  // completing in direct response to the callback works.
+  std::shared_ptr<std::promise<bool>> insert_promise;
+  auto make_insert_callback = [&insert_promise]() {
+    insert_promise = std::make_shared<std::promise<bool>>();
+    return [insert_promise](bool success_ready_for_more) {
+      insert_promise->set_value(success_ready_for_more);
+    };
+  };
+  auto wait_for_insert = [&insert_promise, timeout](absl::string_view fn) {
+    auto future = insert_promise->get_future();
+    auto result = future.wait_for(timeout);
+    if (result == std::future_status::timeout) {
+      return absl::DeadlineExceededError(absl::StrCat("Timed out waiting for ", fn));
+    }
+    if (!future.get()) {
+      return absl::UnknownError(absl::StrCat("Insert was aborted by cache in ", fn));
+    }
+    return absl::OkStatus();
+  };
+
   InsertContextPtr inserter = cache()->makeInsertContext(std::move(lookup), encoder_callbacks_);
   const ResponseMetadata metadata{time_system_.systemTime()};
-  bool headers_end_stream = body.empty() && !trailers.has_value();
-  inserter->insertHeaders(headers, metadata, headers_end_stream);
 
+  bool headers_end_stream = body.empty() && !trailers.has_value();
+  inserter->insertHeaders(headers, metadata, make_insert_callback(), headers_end_stream);
+  auto status = wait_for_insert("insertHeaders()");
+  if (!status.ok()) {
+    return status;
+  }
   if (headers_end_stream) {
     return absl::OkStatus();
   }
-  if (!body.empty() && !trailers.has_value()) {
-    inserter->insertBody(Buffer::OwnedImpl(body), nullptr,
+
+  if (!body.empty()) {
+    inserter->insertBody(Buffer::OwnedImpl(body), make_insert_callback(),
                          /*end_stream=*/!trailers.has_value());
-    return absl::OkStatus();
-  }
-  if (body.empty() && trailers.has_value()) {
-    inserter->insertTrailers(trailers.value());
-    return absl::OkStatus();
+    auto status = wait_for_insert("insertBody()");
+    if (!status.ok()) {
+      return status;
+    }
   }
 
-  // For responses with body and trailers, wait for insertBody's callback before
-  // calling insertTrailers.
-  auto insert_mutex = std::make_shared<absl::Mutex>();
-  bool insert_done = false;
-  auto insert_cancelled = std::make_shared<bool>(false);
-  absl::Status insert_status;
-  InsertCallback insert_callback = [&trailers, &inserter, insert_mutex, &insert_done,
-                                    insert_cancelled, &insert_status](bool success_ready_for_more) {
-    absl::MutexLock lock(insert_mutex.get());
-    if (*insert_cancelled) {
-      return;
+  if (trailers.has_value()) {
+    inserter->insertTrailers(trailers.value(), make_insert_callback());
+    auto status = wait_for_insert("insertTrailers()");
+    if (!status.ok()) {
+      return status;
     }
-    if (!success_ready_for_more) {
-      insert_status = absl::UnknownError("Insert was aborted by cache");
-      insert_done = true;
-      return;
-    }
-    inserter->insertTrailers(trailers.value());
-    insert_status = absl::OkStatus();
-    insert_done = true;
-  };
-  inserter->insertBody(Buffer::OwnedImpl(body), insert_callback,
-                       /*end_stream=*/!trailers.has_value());
-
-  {
-    absl::MutexLock lock(insert_mutex.get());
-    if (!time_system_.waitFor(*insert_mutex, absl::Condition(&insert_done), timeout)) {
-      *insert_cancelled = true;
-      return absl::DeadlineExceededError("Timed out waiting for insertBody()");
-    }
-    return insert_status;
   }
+  return absl::OkStatus();
 }
 
 absl::Status HttpCacheImplementationTest::insert(absl::string_view request_path,
@@ -161,29 +169,36 @@ Http::ResponseHeaderMapPtr HttpCacheImplementationTest::getHeaders(LookupContext
 std::string HttpCacheImplementationTest::getBody(LookupContext& context, uint64_t start,
                                                  uint64_t end) {
   AdjustedByteRange range(start, end);
-  std::string body;
-  context.getBody(range, [&body](Buffer::InstancePtr&& data) {
+  auto body_promise = std::make_shared<std::promise<std::string>>();
+  context.getBody(range, [body_promise](Buffer::InstancePtr&& data) {
     EXPECT_NE(data, nullptr);
-    if (data) {
-      body = data->toString();
-    }
+    body_promise->set_value(data ? data->toString() : "");
   });
-  return body;
+  auto future = body_promise->get_future();
+  EXPECT_EQ(std::future_status::ready, future.wait_for(std::chrono::seconds(5)));
+  return future.get();
 }
 
 Http::TestResponseTrailerMapImpl HttpCacheImplementationTest::getTrailers(LookupContext& context) {
-  Http::TestResponseTrailerMapImpl trailers;
-  context.getTrailers([&trailers](Http::ResponseTrailerMapPtr&& data) {
+  auto trailers_promise =
+      std::make_shared<std::promise<std::shared_ptr<Http::ResponseTrailerMap>>>();
+  context.getTrailers([trailers_promise](Http::ResponseTrailerMapPtr&& data) {
     if (data) {
-      trailers = *data;
+      trailers_promise->set_value(std::move(data));
     }
   });
+  auto future = trailers_promise->get_future();
+  EXPECT_EQ(std::future_status::ready, future.wait_for(std::chrono::seconds(5)));
+  Http::TestResponseTrailerMapImpl trailers;
+  if (std::future_status::ready == future.wait_for(std::chrono::seconds(5))) {
+    trailers = *future.get();
+  }
   return trailers;
 }
 
 LookupRequest HttpCacheImplementationTest::makeLookupRequest(absl::string_view request_path) {
   request_headers_.setPath(request_path);
-  return LookupRequest(request_headers_, time_system_.systemTime(), vary_allow_list_);
+  return {request_headers_, time_system_.systemTime(), vary_allow_list_};
 }
 
 testing::AssertionResult HttpCacheImplementationTest::expectLookupSuccessWithHeaders(
@@ -387,10 +402,18 @@ TEST_P(HttpCacheImplementationTest, StreamingPut) {
   const std::string request_path("/path");
   InsertContextPtr inserter = cache()->makeInsertContext(lookup(request_path), encoder_callbacks_);
   ResponseMetadata metadata{time_system_.systemTime()};
-  inserter->insertHeaders(response_headers, metadata, false);
+  auto insert_promise = std::make_shared<std::promise<bool>>();
+  inserter->insertHeaders(
+      response_headers, metadata, [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
-  inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
+  inserter->insertBody(
+      Buffer::OwnedImpl("World!"),
+      [insert_promise](bool ready) { insert_promise->set_value(ready); }, true);
+  auto insert_future = insert_promise->get_future();
+  ASSERT_EQ(std::future_status::ready, insert_future.wait_for(std::chrono::seconds(5)))
+      << "timed out waiting for inserts to complete";
+  ASSERT_TRUE(insert_future.get());
 
   LookupContextPtr name_lookup = lookup(request_path);
   ASSERT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
