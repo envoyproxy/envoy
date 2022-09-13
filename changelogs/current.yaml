@@ -4,20 +4,17 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: build
   change: |
-    Fixed metric tag extraction so that worker_id is properly extracted from the listener stats. This changes the Prometheus name from
-    envoy_listener_worker_1_downstream_cx_active{envoy_listener_address="0.0.0.0_10000"} to envoy_listener_downstream_cx_active{envoy_listener_address="0.0.0.0_10000", envoy_worker_id="1"} .
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
 - area: stats http local_rate_limit
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
     is properly extracted. This changes the Prometheus name from
-    envoy_myprefix_http_local_rate_limit_rate_limited{} to envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
+    envoy_http_local_rate_limit_myprefix_rate_limited{} to envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
 - area: stats network local_rate_limit
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
     is properly extracted. This changes the Prometheus name from
-    envoy_local_rate_limit_rate_myprefix_limited{} to :-envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
-- area: stats server
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
+    envoy_local_rate_limit_myprefix_rate_limited{} to envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.

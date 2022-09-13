@@ -258,7 +258,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {local_ratelimit_prefix});
 
   // Local network Ratelimit
-  local_ratelimit_prefix.name_ = tag_names.LOCAL_RATELIMIT_PREFIX;
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_NETWORK_RATELIMIT_PREFIX;
   regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited",
                          "local_rate_limit.rate_limited", {local_ratelimit_prefix});
 
