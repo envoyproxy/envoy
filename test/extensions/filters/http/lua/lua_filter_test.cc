@@ -759,7 +759,7 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
@@ -2518,7 +2518,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
 
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(nullptr));
@@ -2549,7 +2549,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
       request_handle:headers():add("route_info", "This request is routed by ROUTE_TWO");
     end
   )EOF"};
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(ADD_HEADERS_SCRIPT);
   envoy::config::core::v3::DataSource source1, source2;

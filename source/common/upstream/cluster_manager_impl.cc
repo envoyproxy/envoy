@@ -1960,13 +1960,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(
-      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
-      admin_, singleton_manager_, outlier_event_logger, added_via_api,
-      added_via_api ? validation_context_.dynamicValidationVisitor()
-                    : validation_context_.staticValidationVisitor(),
-      context_.api(), context_.options());
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+                                        ssl_context_manager_, outlier_event_logger, added_via_api,
+                                        added_via_api
+                                            ? validation_context_.dynamicValidationVisitor()
+                                            : validation_context_.staticValidationVisitor());
 }
 
 CdsApiPtr
