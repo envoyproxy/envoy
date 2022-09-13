@@ -707,6 +707,11 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"quit"}), "+OK\r\n");
+}
+
 // This test sends an invalid Redis command from a fake
 // downstream client to the envoy proxy. Envoy will respond
 // with an invalid request error.
