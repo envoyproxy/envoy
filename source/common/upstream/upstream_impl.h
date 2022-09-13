@@ -307,16 +307,16 @@ private:
   std::atomic<uint32_t> weight_;
 
   struct HostHandleImpl : HostHandle {
-    HostHandleImpl(const std::shared_ptr<HostImpl>& parent) : parent_(parent) {
+    HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
       parent->handle_count_++;
     }
     ~HostHandleImpl() override {
-      if (auto host = parent.lock(); host != nullptr) {
+      if (const auto host = parent_.lock()) {
         ASSERT(host->handle_count_ > 0);
         host->handle_count_--;
       }
     }
-    const std::weak_ptr<HostImpl> parent_;
+    const std::weak_ptr<const HostImpl> parent_;
   };
   mutable std::atomic<uint32_t> handle_count_{};
 };
