@@ -48,6 +48,9 @@ bug_fixes:
 - area: transport_socket
   change: |
     fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
+- area: logger
+  change: |
+    added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
