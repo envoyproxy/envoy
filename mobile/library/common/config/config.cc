@@ -484,7 +484,7 @@ stats_config:
         - safe_regex:
             regex: '^pulse.*'
         - safe_regex:
-            regex: '^vhost.api.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'
+            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|retry.*|time|timeout|total)'
   use_all_default_tags:
     false
 watchdogs:
