@@ -73,21 +73,21 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
 
 RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   ActiveRequestPtr request(new ActiveRequest(*this, response_decoder));
-  request->encoder_ = &codec_->newStream(*request);
-  request->encoder_->getStream().addCallbacks(*request);
+  request->setEncoder(codec_->newStream(*request));
   LinkedList::moveIntoList(std::move(request), active_requests_);
 
   auto upstream_info = connection_->streamInfo().upstreamInfo();
   upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
 
   disableIdleTimer();
-  return *active_requests_.front()->encoder_;
+  return *active_requests_.front();
 }
 
 void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     ENVOY_CONN_LOG(debug, "connected", *connection_);
     connected_ = true;
+    return;
   }
 
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -117,7 +117,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
-      active_requests_.front()->encoder_->getStream().resetStream(reason);
+      active_requests_.front()->getStream().resetStream(reason);
     }
   }
 }
@@ -127,12 +127,29 @@ void CodecClient::responsePreDecodeComplete(ActiveRequest& request) {
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamPreDecodeComplete();
   }
+  request.decode_complete_ = true;
+  if (request.encode_complete_ || !request.wait_encode_complete_) {
+    completeRequest(request);
+  } else {
+    ENVOY_CONN_LOG(debug, "waiting for encode to complete", *connection_);
+  }
+}
+
+void CodecClient::requestEncodeComplete(ActiveRequest& request) {
+  ENVOY_CONN_LOG(debug, "encode complete", *connection_);
+  request.encode_complete_ = true;
+  if (request.decode_complete_) {
+    completeRequest(request);
+  }
+}
+
+void CodecClient::completeRequest(ActiveRequest& request) {
   deleteRequest(request);
 
   // HTTP/2 can send us a reset after a complete response if the request was not complete. Users
   // of CodecClient will deal with the premature response case and we should not handle any
   // further reset notification.
-  request.encoder_->getStream().removeCallbacks(request);
+  request.removeEncoderCallbacks();
 }
 
 void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
@@ -168,22 +185,30 @@ void CodecClient::onData(Buffer::Instance& data) {
 CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
-                                 Random::RandomGenerator& random_generator)
-    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator) {
+                                 Random::RandomGenerator& random_generator,
+                                 const Network::TransportSocketOptionsConstSharedPtr& options)
+    : NoConnectCodecClientProd(type, std::move(connection), host, dispatcher, random_generator,
+                               options) {
   connect();
 }
 
-NoConnectCodecClientProd::NoConnectCodecClientProd(CodecType type,
-                                                   Network::ClientConnectionPtr&& connection,
-                                                   Upstream::HostDescriptionConstSharedPtr host,
-                                                   Event::Dispatcher& dispatcher,
-                                                   Random::RandomGenerator& random_generator)
+NoConnectCodecClientProd::NoConnectCodecClientProd(
+    CodecType type, Network::ClientConnectionPtr&& connection,
+    Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
+    Random::RandomGenerator& random_generator,
+    const Network::TransportSocketOptionsConstSharedPtr& options)
     : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case CodecType::HTTP1: {
+    // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
+    // send fully qualified URLs iff the underlying transport is plaintext.
+    bool proxied = false;
+    if (options && options->http11ProxyInfo().has_value()) {
+      proxied = true;
+    }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount());
+        host->cluster().maxResponseHeadersCount(), proxied);
     break;
   }
   case CodecType::HTTP2: {

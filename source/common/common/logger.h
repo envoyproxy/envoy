@@ -64,6 +64,7 @@ namespace Logger {
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
+  FUNCTION(multi_connection)                                                                       \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
@@ -80,7 +81,8 @@ namespace Logger {
   FUNCTION(tracing)                                                                                \
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
-  FUNCTION(wasm)
+  FUNCTION(wasm)                                                                                   \
+  FUNCTION(websocket)
 
 // clang-format off
 enum class Id {
@@ -375,6 +377,15 @@ protected:
     return instance;
   }
 };
+
+namespace Utility {
+
+/**
+ * Sets the log format for a specific logger.
+ */
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
+
+} // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
 // https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.

@@ -72,6 +72,8 @@ public:
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
         store_, client_context_config_, time_system_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(verify_context_, transportSocketOptions())
+        .WillByDefault(ReturnRef(transport_socket_options_));
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -107,6 +109,7 @@ private:
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockProofVerifyContext> verify_context_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {

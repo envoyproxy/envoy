@@ -9,24 +9,21 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "source/common/common/thread.h"
-#include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration_tcp_client.h"
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/types/optional.h"
-#include "spdlog/spdlog.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -146,8 +143,10 @@ public:
 
   // Enable the listener access log
   void useListenerAccessLog(absl::string_view format = "");
-  // Waits for the nth access log entry, defaulting to log entry 0.
-  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0);
+  // Returns all log entries after the nth access log entry, defaulting to log entry 0.
+  // By default will trigger an expect failure if more than one entry is returned.
+  std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
+                               bool allow_excess_entries = false);
 
   std::string listener_access_log_name_;
 
@@ -208,11 +207,15 @@ public:
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version) {
+                                 const std::string& version, FakeStream* stream = nullptr) {
+    if (stream == nullptr) {
+      stream = xds_stream_.get();
+    }
+
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
@@ -221,7 +224,7 @@ public:
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    xds_stream_->sendGrpcMessage(discovery_response);
+    stream->sendGrpcMessage(discovery_response);
   }
 
   template <class T>
@@ -357,12 +360,24 @@ public:
     return *fake_upstreams_.back();
   }
 
+  // Adds a fake upstream to the integration test setup. If `autonomous_upstream` is true, then a
+  // AutonomousUpstream instance will be created instead of a FakeUpstream instance. If
+  // `autonomous_upstream` is true, then `autonomous_allow_incomplete_streams` determines whether
+  // an end-of-stream is required on connections between the Envoy and the fake upstream. If
+  // `autonomous_upstream` is false, then `autonomous_allow_incomplete_streams` is ignored.
   FakeUpstream&
   addFakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
-                  Http::CodecType type) {
+                  Http::CodecType type, bool autonomous_upstream,
+                  bool autonomous_allow_incomplete_streams = false) {
     auto config = configWithType(type);
-    fake_upstreams_.emplace_back(
-        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    if (autonomous_upstream) {
+      fake_upstreams_.emplace_back(
+          std::make_unique<AutonomousUpstream>(std::move(transport_socket_factory), 0, version_,
+                                               config, autonomous_allow_incomplete_streams));
+    } else {
+      fake_upstreams_.emplace_back(
+          std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    }
     return *fake_upstreams_.back();
   }
 

@@ -21,6 +21,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -54,6 +55,7 @@ public:
             Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
+    EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
@@ -105,8 +107,11 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
@@ -123,8 +128,11 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
@@ -168,11 +176,14 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
@@ -292,13 +303,14 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket->connectionInfoProvider().localAddress(), source_address_,
-        Network::Test::createRawBufferSocket(), nullptr);
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
     upstream_listener_ =
         dispatcher_->createListener(std::move(socket), listener_callbacks_, runtime_, true, false);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
+    EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
     client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(client_connection),
                                                    codec_, nullptr, host_, *dispatcher_);
 

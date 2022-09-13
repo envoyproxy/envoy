@@ -63,6 +63,13 @@ public:
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
 
   /**
+   * Return a vector of spdlog loggers as parameters to test. Tests are mainly
+   * for the behavior consistency between default loggers and fine-grained loggers.
+   * @return std::vector<spdlog::logger*>
+   */
+  static std::vector<spdlog::logger*> getSpdLoggersForTest();
+
+  /**
    * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
    * `--define google_grpc=disabled`.
    * @return a vector of Grpc versions to test.

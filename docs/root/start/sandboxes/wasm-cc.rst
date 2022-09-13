@@ -32,8 +32,8 @@ Change to the ``examples/wasm-cc`` folder in the Envoy repo, and start the compo
 
     $ pwd
     envoy/examples/wasm-cc
-    $ docker-compose build --pull
-    $ docker-compose up -d
+    $ docker-compose pull
+    $ docker-compose up --build -d
     $ docker-compose ps
 
         Name                     Command                State             Ports
@@ -82,6 +82,19 @@ The following diff shows the changes that have been made:
    These instructions for compiling an updated Wasm binary use the
    `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags>`_ image.
    You will need 4-5GB of disk space to accommodate this image.
+
+Export ``UID`` from your host system. This will ensure that the binary created inside the build container has the same permissions
+as your host user:
+
+.. code-block:: console
+
+   $ export UID
+
+.. note::
+
+   The build composition is designed to work in a similar way to the ``./ci/run_envoy_docker.sh`` command in the Envoy repo.
+
+   Bazel temporary artefacts are created in ``/tmp/envoy-docker-build`` with the uid taken from the ``UID`` env var.
 
 Stop the proxy server and compile the Wasm binary with the updated code:
 

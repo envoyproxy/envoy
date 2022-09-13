@@ -124,7 +124,8 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address = host()->cluster().sourceAddress();
+  auto source_address_fn = host()->cluster().sourceAddressFn();
+  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
   if (!source_address.get()) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
@@ -191,10 +192,10 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                 "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop")
                 ? std::make_unique<NoConnectCodecClientProd>(
                       CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-                      pool->dispatcher(), pool->randomGenerator())
-                : std::make_unique<CodecClientProd>(CodecType::HTTP3, std::move(data.connection_),
-                                                    data.host_description_, pool->dispatcher(),
-                                                    pool->randomGenerator());
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())
+                : std::make_unique<CodecClientProd>(
+                      CodecType::HTTP3, std::move(data.connection_), data.host_description_,
+                      pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions());
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info);

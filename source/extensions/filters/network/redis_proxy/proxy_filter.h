@@ -57,7 +57,7 @@ public:
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
   const std::string downstream_auth_username_;
-  const std::string downstream_auth_password_;
+  std::vector<std::string> downstream_auth_passwords_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -101,6 +101,7 @@ private:
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onQuit() override { parent_.onQuit(*this); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onAuth(const std::string& username, const std::string& password) override {
       parent_.onAuth(*this, username, password);
@@ -114,9 +115,11 @@ private:
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onQuit(PendingRequest& request);
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
+  bool checkPassword(const std::string& password);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
@@ -126,6 +129,7 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  bool connection_quit_;
 };
 
 } // namespace RedisProxy

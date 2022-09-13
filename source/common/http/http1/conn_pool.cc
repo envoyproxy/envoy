@@ -24,9 +24,9 @@ namespace Http {
 namespace Http1 {
 
 ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
-    : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
+    : RequestEncoderWrapper(&parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
-  RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
 }
 
 ActiveClient::StreamWrapper::~StreamWrapper() {
@@ -104,9 +104,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return std::make_unique<ActiveClient>(*pool, absl::nullopt);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP1, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(
+            CodecType::HTTP1, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http11}, absl::nullopt, nullptr);

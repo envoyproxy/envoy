@@ -67,7 +67,8 @@ public:
   }
 
   void prepareCheck() {
-    ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_filter_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
@@ -279,7 +280,8 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   failure_mode_allow: false
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -319,7 +321,8 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
     code: 503
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -360,7 +363,8 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   failure_mode_allow: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -395,7 +399,8 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   failure_mode_allow: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
@@ -454,7 +459,8 @@ TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
     max_request_bytes: 10
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
 
@@ -484,7 +490,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -526,7 +533,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -582,7 +590,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
     allow_partial_message: true
   )EOF");
 
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   ON_CALL(decoder_filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
@@ -870,7 +879,7 @@ TEST_F(HttpFilterTest, ClearCache) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -917,7 +926,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -961,7 +970,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1005,7 +1014,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1050,7 +1059,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1088,7 +1097,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
                      const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
@@ -1136,7 +1145,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
                            const StreamInfo::StreamInfo&) -> void {
         callbacks.onComplete(std::move(response_ptr));
       }));
-  EXPECT_CALL(decoder_filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
@@ -1596,11 +1605,9 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
 
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&auth_per_route));
-  EXPECT_CALL(*decoder_filter_callbacks_.route_,
-              traversePerFilterConfig("envoy.filters.http.ext_authz", _))
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, traversePerFilterConfig(_, _))
       .WillOnce(Invoke([&](const std::string&,
                            std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
         cb(auth_per_vhost);
@@ -1634,8 +1641,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1666,8 +1672,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1689,7 +1694,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   };
 
   test_disable(false);
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   // When filter is not disabled, setDecoderBufferLimit is called.
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
@@ -2353,8 +2359,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2380,8 +2385,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.ext_authz"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {
@@ -2403,7 +2407,8 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   };
 
   test_disable_request_body_buffering(false);
-  ON_CALL(decoder_filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
   // When request body buffering is not skipped, setDecoderBufferLimit is called.
   EXPECT_CALL(decoder_filter_callbacks_, setDecoderBufferLimit(_));
   EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);

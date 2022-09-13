@@ -6,29 +6,35 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - "10000:10000"
+    - "${PORT_PROXY:-10000}:10000"
 
   proxy-client:
     build:
       context: .
       dockerfile: Dockerfile-client
     ports:
-    - "20000:10000"
+    - "${PORT_PROXY_CLIENT:-20000}:10000"
 
   http-upstream1:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: http-upstream1
     environment:
     - HTTPS_PORT=0
 
   http-upstream2:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: http-upstream2
     environment:
     - HTTPS_PORT=0
 
   https-upstream3:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: https-upstream3
     environment:
     - HTTP_PORT=0

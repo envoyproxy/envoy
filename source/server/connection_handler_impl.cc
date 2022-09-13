@@ -29,9 +29,7 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime) {
-  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
-  if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
+  if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
@@ -71,17 +69,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
                                listener_reject_fraction_, disable_listeners_,
                                std::move(internal_listener));
   } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
-      if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
-          iter != listener_map_by_tag_.end()) {
-        iter->second->invokeListenerMethod(
-            [&config](Network::ConnectionHandler::ActiveListener& listener) {
-              listener.updateListenerConfig(config);
-            });
-        return;
-      }
-      IS_ENVOY_BUG("unexpected");
-    }
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -100,9 +87,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
-              runtime, *worker_index_, *this,
-              config.listenSocketFactories()[0]->getListenSocket(*worker_index_), dispatcher_,
-              config));
+              runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
+              dispatcher_, config));
     }
   }
 
@@ -124,12 +110,13 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           !address->ip()->ipv6()->v6only()) {
         if (address->ip()->isAnyAddress()) {
           // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-          // If there already one and it isn't shutdown for compatible addr,
-          // then won't insert a new one.
+          // Only override the listener when this is an update of the existing listener by
+          // checking the address, this ensures the Ipv4 address listener won't be override
+          // by the listener which has the same IPv4-mapped address.
           auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
           auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
           if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-              ipv4_any_listener->second->listener_->listener() == nullptr) {
+              *ipv4_any_listener->second->address_ == *address) {
             tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, per_address_details);
           }
         } else {
@@ -146,7 +133,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
       internal_listener_map_by_address_.insert_or_assign(
-          per_address_details->address_->asStringView(), per_address_details);
+          per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
@@ -189,28 +176,45 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             }
           }
         }
-      } else if (internal_listener_map_by_address_.contains(address_view) &&
-                 internal_listener_map_by_address_[address_view]->listener_tag_ ==
-                     per_address_details->listener_tag_) {
-        internal_listener_map_by_address_.erase(address_view);
+      } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+        const auto& address_id = address->envoyInternalAddress()->addressId();
+        if (internal_listener_map_by_address_.contains(address_id) &&
+            internal_listener_map_by_address_[address_id]->listener_tag_ ==
+                per_address_details->listener_tag_) {
+          internal_listener_map_by_address_.erase(address_id);
+        }
       }
     }
     listener_map_by_tag_.erase(listener_iter);
   }
 }
 
-Network::UdpListenerCallbacksOptRef
-ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
-  auto listener = findActiveListenerByTag(listener_tag);
-  if (listener.has_value()) {
+ConnectionHandlerImpl::PerAddressActiveListenerDetailsOptRef
+ConnectionHandlerImpl::findPerAddressActiveListenerDetails(
+    const ConnectionHandlerImpl::ActiveListenerDetailsOptRef active_listener_details,
+    const Network::Address::Instance& address) {
+  if (active_listener_details.has_value()) {
     // If the tag matches this must be a UDP listener.
-    // TODO(soulxu): return first listener here, this will be changed
-    // when UdpWorkerRouter supports the multiple addresses.
-    auto udp_listener = listener->get().per_address_details_list_[0]->udpListener();
-    ASSERT(udp_listener.has_value());
-    return udp_listener;
+    for (auto& details : active_listener_details->get().per_address_details_list_) {
+      if (*details->address_ == address) {
+        return *details;
+      }
+    }
   }
 
+  return absl::nullopt;
+}
+
+Network::UdpListenerCallbacksOptRef
+ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
+                                               const Network::Address::Instance& address) {
+  auto listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
+  if (listener.has_value()) {
+    // If the tag matches this must be a UDP listener.
+    ASSERT(listener->get().udpListener().has_value());
+    return listener->get().udpListener();
+  }
   return absl::nullopt;
 }
 
@@ -288,11 +292,12 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  if (auto listener_it = internal_listener_map_by_address_.find(address->asStringView());
+  if (auto listener_it =
+          internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
       listener_it != internal_listener_map_by_address_.end()) {
-    return Network::InternalListenerOptRef(listener_it->second->internalListener().value().get());
+    return {listener_it->second->internalListener().value().get()};
   }
-  return OptRef<Network::InternalListener>();
+  return {};
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
@@ -324,16 +329,12 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
                                                const Network::Address::Instance& address) {
-  auto active_listener = findActiveListenerByTag(listener_tag);
+  auto active_listener =
+      findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
   if (active_listener.has_value()) {
-    for (auto& details : active_listener->get().per_address_details_list_) {
-      if (*details->address_ == address) {
-        ASSERT(absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                   details->typed_listener_) &&
-               details->listener_->listener() != nullptr);
-        return {details->tcpListener().value().get()};
-      }
-    }
+    // If the tag matches this must be a TCP listener.
+    ASSERT(active_listener->get().tcpListener().has_value());
+    return active_listener->get().tcpListener().value().get();
   }
   return absl::nullopt;
 }

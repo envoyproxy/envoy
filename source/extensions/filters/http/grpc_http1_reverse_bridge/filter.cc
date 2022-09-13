@@ -83,8 +83,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Disable filter per route config if applies
   if (decoder_callbacks_->route() != nullptr) {
     const auto* per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            "envoy.filters.http.grpc_http1_reverse_bridge", decoder_callbacks_->route());
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
     if (per_route_config != nullptr && per_route_config->disabled()) {
       enabled_ = false;
       return Http::FilterHeadersStatus::Continue;
@@ -110,7 +109,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     // Clear the route cache to recompute the cache. This provides additional
     // flexibility around request modification through the route table.
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   return Http::FilterHeadersStatus::Continue;

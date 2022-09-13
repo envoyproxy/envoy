@@ -1,5 +1,7 @@
 #pragma once
 
+#include <openssl/safestack.h>
+
 #include <array>
 #include <deque>
 #include <functional>
@@ -63,7 +65,7 @@ struct TlsContext {
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
-  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options);
+  virtual bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
 
   /**
    * Logs successful TLS handshake and updates stats.
@@ -88,11 +90,21 @@ public:
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
-  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+  // TODO(danzh) remove when deprecate envoy.reloadable_features.tls_async_cert_validation
+  bool verifyCertChain(X509& leaf_cert, STACK_OF(X509)& intermediates, std::string& error_details);
+
+  // Validate cert asynchronously for a QUIC connection.
+  ValidationResults customVerifyCertChainForQuic(
+      STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      const CertValidator::ExtraValidationContext& validation_context,
+      const std::string& host_name);
 
   static void keylogCallback(const SSL* ssl, const char* line);
 
 protected:
+  friend class ContextImplPeer;
+
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
 
@@ -105,11 +117,19 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
+  // A SSL_CTX_set_custom_verify callback for asynchronous cert validation.
+  static enum ssl_verify_result_t customVerifyCallback(SSL* ssl, uint8_t* out_alert);
+
   bool parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl);
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
 
   void incCounter(const Stats::StatName name, absl::string_view value,
                   const Stats::StatName fallback) const;
+
+  // Helper function to validate cert for TCP connections asynchronously.
+  ValidationResults customVerifyCertChain(
+      Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
@@ -146,7 +166,8 @@ public:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     TimeSource& time_source);
 
-  bssl::UniquePtr<SSL> newSsl(const Network::TransportSocketOptions* options) override;
+  bssl::UniquePtr<SSL>
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
 
 private:
   int newSessionKey(SSL_SESSION* session);

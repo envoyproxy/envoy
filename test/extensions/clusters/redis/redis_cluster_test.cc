@@ -113,7 +113,7 @@ protected:
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
-        cluster_config,
+        server_context_, cluster_config,
         TestUtility::downcastAndValidate<
             const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
         *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
@@ -145,13 +145,12 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_,
-        dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, validation_visitor_, api, options_);
+        server_context_, cm, stats_store_, std::move(dns_resolver_), ssl_context_manager_,
+        std::move(outlier_event_logger), false, validation_visitor_);
 
     RedisClusterFactory factory = RedisClusterFactory();
-    factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
-                                    factory_context, std::move(scope));
+    factory.createClusterWithConfig(server_context_, cluster_config, config,
+                                    cluster_factory_context, factory_context, std::move(scope));
   }
 
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
@@ -662,6 +661,7 @@ protected:
     EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{

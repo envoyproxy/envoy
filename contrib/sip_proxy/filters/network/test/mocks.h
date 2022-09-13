@@ -193,12 +193,15 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig& config,
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const std::string&), ());
-  MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
-              (const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-               std::string&),
+              (const std::string&, const std::string&, const std::string&,
+               const absl::optional<TraContextMap>),
               ());
-  MOCK_METHOD(void, deleteTrafficRoutingAssistant, (const std::string&, const std::string&), ());
+  MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
+              (const std::string&, const std::string&, const absl::optional<TraContextMap>,
+               SipFilters::DecoderFilterCallbacks&, std::string&),
+              ());
+  MOCK_METHOD(void, deleteTrafficRoutingAssistant,
+              (const std::string&, const std::string&, const absl::optional<TraContextMap>), ());
   MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
   MOCK_METHOD(void, complete,
               (const TrafficRoutingAssistant::ResponseType&, const std::string&, const absl::any&),

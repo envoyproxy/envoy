@@ -52,9 +52,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                      Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
-      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(
-          handshaker_factory_cb(ctx_->newSsl(transport_socket_options_.get()),
-                                ctx_->sslExtendedSocketInfoIndex(), this))) {
+      info_(std::dynamic_pointer_cast<SslHandshakerImpl>(handshaker_factory_cb(
+          ctx_->newSsl(transport_socket_options_), ctx_->sslExtendedSocketInfoIndex(), this))) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(rawSsl());
   } else {
@@ -166,7 +165,9 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
-void SslSocket::onPrivateKeyMethodComplete() {
+void SslSocket::onPrivateKeyMethodComplete() { resumeHandshake(); }
+
+void SslSocket::resumeHandshake() {
   ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
   ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
@@ -188,6 +189,9 @@ void SslSocket::onSuccess(SSL* ssl) {
         .upstreamInfo()
         ->upstreamTiming()
         .onUpstreamHandshakeComplete(callbacks_->connection().dispatcher().timeSource());
+  } else {
+    callbacks_->connection().streamInfo().downstreamTiming().onDownstreamHandshakeComplete(
+        callbacks_->connection().dispatcher().timeSource());
   }
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
@@ -350,6 +354,13 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
 std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
+
+void SslSocket::onAsynchronousCertValidationComplete() {
+  ENVOY_CONN_LOG(debug, "Async cert validation completed", callbacks_->connection());
+  if (info_->state() == Ssl::SocketState::HandshakeInProgress) {
+    resumeHandshake();
+  }
+}
 
 namespace {
 SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {

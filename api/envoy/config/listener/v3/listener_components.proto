@@ -227,6 +227,12 @@ message FilterChain {
   // connections established with the listener. Order matters as the filters are
   // processed sequentially as connection events happen. Note: If the filter
   // list is empty, the connection will close by default.
+  //
+  // For QUIC listeners, network filters other than HTTP Connection Manager (HCM)
+  // can be created, but due to differences in the connection implementation compared
+  // to TCP, the onData() method will never be called. Therefore, network filters
+  // for QUIC listeners should only expect to do work at the start of a new connection
+  // (i.e. in onNewConnection()). HCM must be the last (or only) filter in the chain.
   repeated Filter filters = 3;
 
   // Whether the listener should expect a PROXY protocol V1 header on new
@@ -246,8 +252,8 @@ message FilterChain {
   core.v3.Metadata metadata = 5;
 
   // Optional custom transport socket implementation to use for downstream connections.
-  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
-  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the `typed_config`.
+  // To setup TLS, set a transport socket with name ``envoy.transport_sockets.tls`` and
+  // :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` in the ``typed_config``.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.
   // [#extension-category: envoy.transport_sockets.downstream]

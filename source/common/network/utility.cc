@@ -22,6 +22,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -200,7 +201,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     const Api::SysCallIntResult rc =
         Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-    RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+    RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
@@ -343,19 +344,32 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
+  SocketOptionName opt_dst;
+  SocketOptionName opt_tp;
+  if (*ipVersion == Address::IpVersion::v4) {
+    opt_dst = ENVOY_SOCKET_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IP_TRANSPARENT;
+  } else {
+    opt_dst = ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IPV6_TRANSPARENT;
+  }
+
   sockaddr_storage orig_addr;
   memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status;
-
-  if (*ipVersion == Address::IpVersion::v4) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  } else {
-    status =
-        sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  }
+  int status =
+      sock.getSocketOption(opt_dst.level(), opt_dst.option(), &orig_addr, &addr_len).return_value_;
 
   if (status != 0) {
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+      socklen_t flag_len = sizeof(int);
+      int is_tp;
+      status =
+          sock.getSocketOption(opt_tp.level(), opt_tp.option(), &is_tp, &flag_len).return_value_;
+      if (status == 0 && is_tp) {
+        return sock.ioHandle().localAddress();
+      }
+    }
     return nullptr;
   }
 
@@ -457,11 +471,15 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
-  } else {
-    ASSERT(address.type() == Address::Type::Ip);
+  } else if (address.type() == Address::Type::Ip) {
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  } else {
+    ASSERT(address.type() == Address::Type::EnvoyInternal);
+    auto* internal_address = proto_address.mutable_envoy_internal_address();
+    internal_address->set_server_listener_name(address.envoyInternalAddress()->addressId());
+    internal_address->set_endpoint_id(address.envoyInternalAddress()->endpointId());
   }
 }
 

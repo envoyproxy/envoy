@@ -18,6 +18,7 @@
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
+#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -100,9 +101,9 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 
 template <class T>
 std::unique_ptr<T>
-spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
-                               uint32_t max_headers_allowed, HeaderValidator& validator,
-                               absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block,
+                                uint32_t max_headers_allowed, HeaderValidator& validator,
+                                absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create();
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
@@ -137,7 +138,7 @@ spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
   return headers;
 }
 
-spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers);
+spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers);
 
 // Called when Envoy wants to reset the underlying QUIC stream.
 quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason);

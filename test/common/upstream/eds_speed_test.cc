@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -58,7 +59,9 @@ public:
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          random_, stats_, {}, true, std::move(config_validators_)));
+          random_, stats_, {}, true, std::move(config_validators_),
+          /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
+          /*target_xds_authority=*/""));
     }
     resetCluster(R"EOF(
       name: name
@@ -89,8 +92,8 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
-                                                std::move(scope), false);
+    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
+                                                factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
@@ -152,6 +155,7 @@ public:
            num_hosts);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   State& state_;
   bool use_unified_mux_;
   const std::string type_url_;
@@ -165,8 +169,9 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
-  Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{validation_visitor_, "cluster_name"};
+  Config::OpaqueResourceDecoderSharedPtr resource_decoder_{std::make_shared<
+      Config::OpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>>(
+      validation_visitor_, "cluster_name")};
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

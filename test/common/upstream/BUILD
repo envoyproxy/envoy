@@ -170,6 +170,7 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         ":utility_lib",
+        "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:protobuf_link_hacks",
@@ -474,6 +475,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:original_dst_cluster_lib",
         "//source/common/upstream:upstream_lib",
@@ -682,6 +684,7 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/common/upstream:static_cluster_lib",

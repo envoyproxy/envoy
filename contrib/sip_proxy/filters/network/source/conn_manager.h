@@ -66,12 +66,13 @@ public:
       Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info);
 
   virtual void updateTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                             const std::string& val);
-  virtual QueryStatus
-  retrieveTrafficRoutingAssistant(const std::string& type, const std::string& key,
-                                  SipFilters::DecoderFilterCallbacks& activetrans,
-                                  std::string& host);
-  virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key);
+                                             const std::string& val,
+                                             const absl::optional<TraContextMap> context);
+  virtual QueryStatus retrieveTrafficRoutingAssistant(
+      const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
+      SipFilters::DecoderFilterCallbacks& activetrans, std::string& host);
+  virtual void deleteTrafficRoutingAssistant(const std::string& type, const std::string& key,
+                                             const absl::optional<TraContextMap> context);
   virtual void subscribeTrafficRoutingAssistant(const std::string& type);
   void complete(const TrafficRoutingAssistant::ResponseType& type, const std::string& message_type,
                 const absl::any& resp) override;
@@ -247,7 +248,9 @@ private:
           transaction_id_(metadata->transactionId().value()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          metadata_(metadata) {}
+          metadata_(metadata) {
+      parent.stats_.request_active_.inc();
+    }
     ~ActiveTrans() override {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
@@ -346,6 +349,7 @@ private:
 
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
+  void setLocalResponseSent(absl::string_view transaction_id);
   void doDeferredTransDestroy(ActiveTrans& trans);
   void resetAllTrans(bool local_reset);
 

@@ -16,20 +16,15 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/fmt.h"
-#include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
-#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "absl/container/fixed_array.h"
-#include "absl/strings/str_join.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -89,7 +84,8 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options));
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), options,
+      nullptr));
 
   connection->enableHalfClose(enableHalfClose());
   return connection;
@@ -352,11 +348,16 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();
-  for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    const auto listen_addr = listener_it->get().listenSocketFactory().localAddress();
-    if (listen_addr->type() == Network::Address::Type::Ip) {
-      ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
-      registerPort(*port_it, listen_addr->ip()->port());
+  for (; port_it != port_names.end() && listener_it != listeners.end(); ++listener_it) {
+    auto socket_factory_it = listener_it->get().listenSocketFactories().begin();
+    for (; socket_factory_it != listener_it->get().listenSocketFactories().end() &&
+           port_it != port_names.end();
+         ++socket_factory_it, ++port_it) {
+      const auto listen_addr = (*socket_factory_it)->localAddress();
+      if (listen_addr->type() == Network::Address::Type::Ip) {
+        ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
+        registerPort(*port_it, listen_addr->ip()->port());
+      }
     }
   }
   const auto admin_addr =
@@ -482,13 +483,18 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
   return index;
 }
 
-std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
+std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
+                                                  bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
+      if (!allow_excess_entries) {
+        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
+            << "Waiting for entry " << entry << " but it was not the last entry";
+      }
       return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
@@ -518,7 +524,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    addFakeUpstream(std::move(context), Http::CodecType::HTTP2);
+    addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
 }
@@ -572,9 +578,14 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
+  if (stream == nullptr) {
+    stream = xds_stream_.get();
+  }
+
   envoy::service::discovery::v3::DiscoveryRequest discovery_request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+  VERIFY_ASSERTION(stream->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
     EXPECT_TRUE(discovery_request.has_node());

@@ -245,7 +245,16 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {}
+        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
+        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
+          Http::FilterFactoryCb factory_cb =
+              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
+  }
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -294,7 +303,7 @@ public:
   RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
-        std::move(async_client_transport_socket_), nullptr);
+        std::move(async_client_transport_socket_), nullptr, nullptr);
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, connectTimeout())
         .WillByDefault(Return(std::chrono::milliseconds(10000)));
     cm_.initializeThreadLocalClusters({"fake_cluster"});

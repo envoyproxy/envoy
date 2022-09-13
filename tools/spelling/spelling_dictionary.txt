@@ -28,8 +28,14 @@ BSON
 BPF
 Bdecoded
 Bencoded
+GiB
 Repick
+SION
 TRA
+abc
+abcd
+abd
+ar
 btree
 CAS
 CB
@@ -42,6 +48,7 @@ DLE
 DSR
 DSS
 EBADF
+ECH
 ENDIF
 ENOTCONN
 ENQ
@@ -53,6 +60,7 @@ ETX
 FS
 HEXDIG
 HEXDIGIT
+HPE
 LRU
 NAK
 OWS
@@ -149,9 +157,13 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+delims
 dereferencing
 differentially
 dnsresolvers
+endpos
+fo
+ghi
 guarddog
 GC
 GCC
@@ -218,6 +230,10 @@ LEDS
 LEV
 LF
 LHS
+hls
+integrations
+jkl
+lang
 libsxg
 LLVM
 LPT
@@ -261,6 +277,7 @@ Oauth
 OCSP
 OD
 ODCDS
+mpd
 oghttp
 OID
 OK
@@ -314,6 +331,7 @@ RFC
 RHS
 RLE
 RLS
+RLQS
 RNG
 RPC
 RSA
@@ -344,6 +362,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIMD
 SIO
 SMTP
 SNI
@@ -804,6 +823,7 @@ iteratively
 javascript
 jitter
 jittered
+js
 kafka
 keepalive
 keepalives
@@ -963,10 +983,12 @@ parsers
 passphrase
 passthrough
 pathname
+patt
 pausable
 pausedness
 pcall
 pcap
+pchar
 pclose
 performant
 pfctl
@@ -1107,6 +1129,7 @@ retriable
 retriggers
 revalidated
 revalidation
+reverify
 rfield
 rmdir
 rocketmq
@@ -1172,6 +1195,7 @@ srtt
 ssize
 stackdriver
 stacktrace
+startpos
 starttls
 startup
 stateful
@@ -1218,6 +1242,7 @@ subtrees
 subtype
 subtypes
 subzone
+suf
 superclass
 superset
 svc
@@ -1309,6 +1334,7 @@ username
 usr
 util
 utils
+va
 valgrind
 validator
 validators
@@ -1318,6 +1344,7 @@ variadic
 varint
 vec
 vectorize
+ver
 verifier
 verifiers
 versa
@@ -1328,6 +1355,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtt
 wakeup
 wakeups
 wamr
@@ -1376,3 +1404,4 @@ NSS
 SSLKEYLOGFILE
 DLB
 PCIE
+EDNS

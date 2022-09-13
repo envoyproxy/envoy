@@ -24,27 +24,29 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - "8000:8000"
-    - "8001:8001"
+    - "${PORT_PROXY:-10000}:8000"
 
   service1:
-    image: envoyproxy:tracing
+    build:
+      context: ../shared/tracing
     volumes:
     - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
     - SERVICE_NAME=1
 
   service2:
-    image: envoyproxy:tracing
+    build:
+      context: ../shared/tracing
     volumes:
     - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     environment:
     - SERVICE_NAME=2
 
   jaeger:
-    image: jaegertracing/all-in-one
+    build:
+      context: .
+      dockerfile: Dockerfile-jaeger
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:
-    - "9411:9411"
-    - "16686:16686"
+    - "${PORT_UI:-10000}:16686"

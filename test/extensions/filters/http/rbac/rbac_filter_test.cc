@@ -164,7 +164,8 @@ on_no_match:
     config_ = config;
     filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
 
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(callbacks_, connection())
+        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
     EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
@@ -343,7 +344,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.rbac"))
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
@@ -466,7 +467,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig("envoy.filters.http.rbac"))
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));

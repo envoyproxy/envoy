@@ -16,9 +16,11 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-// TODO: handle tracestate as well.
 constexpr absl::string_view kTraceParent = "traceparent";
+constexpr absl::string_view kTraceState = "tracestate";
 constexpr absl::string_view kDefaultVersion = "00";
+constexpr absl::string_view kServiceNameKey = "service.name";
+constexpr absl::string_view kDefaultServiceName = "unknown_service:envoy";
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
@@ -38,7 +40,7 @@ Span::Span(const Tracing::Config& config, const std::string& name, SystemTime st
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
   // Build span_context from the current span, then generate the child span from that context.
-  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled());
+  SpanContext span_context(kDefaultVersion, getTraceIdAsHex(), spanId(), sampled(), tracestate());
   return parent_tracer_.startSpan(config, name, start_time, span_context);
 }
 
@@ -46,7 +48,9 @@ void Span::finishSpan() {
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
       std::chrono::nanoseconds(time_source_.systemTime().time_since_epoch()).count());
-  parent_tracer_.sendSpan(span_);
+  if (sampled()) {
+    parent_tracer_.sendSpan(span_);
+  }
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context,
@@ -59,13 +63,43 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
   // Set the traceparent in the trace_context.
   trace_context.setByReferenceKey(kTraceParent, traceparent_header_value);
+  // Also set the tracestate.
+  trace_context.setByReferenceKey(kTraceState, span_.trace_state());
+}
+
+void Span::setTag(absl::string_view name, absl::string_view value) {
+  // The attribute key MUST be a non-null and non-empty string.
+  if (name.empty()) {
+    return;
+  }
+  // Attribute keys MUST be unique.
+  // If a value already exists for this key, overwrite it.
+  for (auto& key_value : *span_.mutable_attributes()) {
+    if (key_value.key() == name) {
+      key_value.mutable_value()->set_string_value(std::string{value});
+      return;
+    }
+  }
+  // If we haven't found an existing match already, we can add a new key/value.
+  opentelemetry::proto::common::v1::KeyValue key_value =
+      opentelemetry::proto::common::v1::KeyValue();
+  opentelemetry::proto::common::v1::AnyValue value_proto =
+      opentelemetry::proto::common::v1::AnyValue();
+  value_proto.set_string_value(std::string{value});
+  key_value.set_key(std::string{name});
+  *key_value.mutable_value() = value_proto;
+  *span_.add_attributes() = key_value;
 }
 
 Tracer::Tracer(OpenTelemetryGrpcTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
-               Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats)
+               Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
+               const std::string& service_name)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
-      tracing_stats_(tracing_stats) {
+      tracing_stats_(tracing_stats), service_name_(service_name) {
+  if (service_name.empty()) {
+    service_name_ = std::string{kDefaultServiceName};
+  }
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -84,10 +118,17 @@ void Tracer::flushSpans() {
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
-  ::opentelemetry::proto::trace::v1::InstrumentationLibrarySpans* instrumentation_library_span =
-      resource_span->add_instrumentation_library_spans();
+  opentelemetry::proto::common::v1::KeyValue key_value =
+      opentelemetry::proto::common::v1::KeyValue();
+  opentelemetry::proto::common::v1::AnyValue value_proto =
+      opentelemetry::proto::common::v1::AnyValue();
+  value_proto.set_string_value(std::string{service_name_});
+  key_value.set_key(std::string{kServiceNameKey});
+  *key_value.mutable_value() = value_proto;
+  (*resource_span->mutable_resource()->add_attributes()) = key_value;
+  ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
   for (const auto& pending_span : span_buffer_) {
-    (*instrumentation_library_span->add_spans()) = pending_span;
+    (*scope_span->add_spans()) = pending_span;
   }
   tracing_stats_.spans_sent_.add(span_buffer_.size());
   if (!exporter_->log(request)) {
@@ -135,6 +176,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   new_span.setId(Hex::uint64ToHex(span_id));
   // Respect the previous span's sampled flag.
   new_span.setSampled(previous_span_context.sampled());
+  if (!previous_span_context.tracestate().empty()) {
+    new_span.setTracestate(std::string{previous_span_context.tracestate()});
+  }
   return std::make_unique<Span>(new_span);
 }
 

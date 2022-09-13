@@ -8,7 +8,7 @@ namespace Rds {
 
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
-    std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>&& resource_decoder,
+    Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& route_config_name, const uint64_t manager_identifier,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
@@ -34,7 +34,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          *resource_decoder_, {});
+          resource_decoder_, {});
   local_init_manager_.add(local_init_target_);
 }
 
@@ -100,7 +100,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
     // (see discussion in #6879), and so we should do something other than ignoring here.
-    ENVOY_LOG(error,
+    ENVOY_LOG(trace,
               "Server sent a delta {} update attempting to remove a resource (name: {}). Ignoring.",
               rds_type_, removed_resources[0]);
   }
