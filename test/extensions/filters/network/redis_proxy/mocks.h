@@ -110,6 +110,7 @@ public:
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
   MOCK_METHOD(bool, connectionAllowed, ());
+  MOCK_METHOD(void, onQuit, ());
   MOCK_METHOD(void, onAuth, (const std::string& password));
   MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
