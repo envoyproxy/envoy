@@ -1,4 +1,10 @@
-date: August 23, 2022
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
 - area: listener
@@ -8,3 +14,11 @@ bug_fixes:
   change: |
     fixed a bug causing response headers set by a Lua script to not be sent in the response (https://github.com/envoyproxy/envoy/issues/22401).
     This bug was introduced in Envoy v1.23.0.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
