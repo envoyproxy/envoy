@@ -286,6 +286,7 @@ proto_library(
         "//envoy/service/event_reporting/v3:pkg",
         "//envoy/service/ext_proc/v3:pkg",
         "//envoy/service/extension/v3:pkg",
+	"//envoy/service/filter_chain/v3:pkg",
         "//envoy/service/health/v3:pkg",
         "//envoy/service/listener/v3:pkg",
         "//envoy/service/load_stats/v3:pkg",

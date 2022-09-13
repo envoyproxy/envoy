@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.service.filter_chain.v3;
+
+import "envoy/service/discovery/v3/discovery.proto";
+
+import "google/api/annotations.proto";
+
+import "envoy/annotations/resource.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.service.filter_chain.v3";
+option java_outer_classname = "FcdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: FCDS]
+
+// The resource_names field in DiscoveryRequest specifies a route configuration.
+// This allows an Envoy configuration with multiple HTTP listeners (and
+// associated HTTP connection manager filters) to use different route
+// configurations. Each listener will bind its HTTP connection manager filter to
+// a route table via this identifier.
+service FcdsDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.config.litener.v3.FilterChain";
+
+  rpc StreamFilterChains(stream discovery.v3.DiscoveryRequest)
+      returns (stream discovery.v3.DiscoveryResponse) {
+  }
+
+  rpc DeltaFilterChains(stream discovery.v3.DeltaDiscoveryRequest)
+      returns (stream discovery.v3.DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchFilterChains(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
+    option (google.api.http).post = "/v3/discovery:filterchains";
+    option (google.api.http).body = "*";
+  }
+}
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221 and protoxform to upgrade the file.
+message FcdsDummy {
+}

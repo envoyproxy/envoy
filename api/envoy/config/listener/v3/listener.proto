@@ -23,6 +23,7 @@ import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
+import "envoy/config/core/v3/config_source.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
@@ -44,7 +45,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -137,6 +138,9 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // FCDS: Filter Chain Discovery Service config block. filter_chains and fcds are mutually exclusive
+  Fcds fcds = 34;
 
   // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
   // network properties. This matcher is used as a replacement for the filter chain match condition
@@ -357,4 +361,9 @@ message Listener {
   // Whether the listener should limit connections based upon the value of
   // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
   bool ignore_global_conn_limit = 31;
+}
+
+message Fcds{
+  string fcds_name = 1 [(validate.rules).string.min_len = 1];
+  envoy.config.core.v3.ConfigSource config_source = 2 [(validate.rules).message.required = true];
 }

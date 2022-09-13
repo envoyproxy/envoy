@@ -689,7 +689,7 @@ void ListenerImpl::createListenerFilterFactories() {
 }
 
 void ListenerImpl::validateFilterChains() {
-  if (config_.filter_chains().empty() && !config_.has_default_filter_chain() &&
+  if (is_filterchain_missing() &&
       (socket_type_ == Network::Socket::Type::Stream ||
        !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
@@ -697,6 +697,9 @@ void ListenerImpl::validateFilterChains() {
     throw EnvoyException(
         fmt::format("error adding listener '{}': no filter chains specified",
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+  } else if (!config_.filter_chains().empty() && config_.has_fcds()) {
+     throw EnvoyException(fmt::format("error adding listener '{}': filter chains and fcds config are mutually exclusive",
+                                       absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   } else if (udp_listener_config_ != nullptr &&
              !udp_listener_config_->listener_factory_->isTransportConnectionless()) {
     // Early fail if any filter chain doesn't have transport socket configured.
@@ -722,11 +725,18 @@ void ListenerImpl::validateFilterChains() {
 void ListenerImpl::buildFilterChains() {
   transport_factory_context_->setInitManager(*dynamic_init_manager_);
   ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
-  filter_chain_manager_->addFilterChains(
-      config_.has_filter_chain_matcher() ? &config_.filter_chain_matcher() : nullptr,
-      config_.filter_chains(),
-      config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
-      *filter_chain_manager_);
+  if(config_.has_fcds()) {
+     ENVOY_LOG(debug, "buildFilterChains: adding the FCDS config watcher");
+     ListenerFilterChainFactoryBuilder* fcds_builder = new ListenerFilterChainFactoryBuilder(*this, *transport_factory_context_);
+     fcds_api_ = filter_chain_manager_.createFcdsApi(config_.fcds(), fcds_builder);
+  } else if (!config_.filter_chains().empty()) {	
+     ENVOY_LOG(debug, "buildFilterChains: processing filter_chain config");
+     filter_chain_manager_->addFilterChains(
+         config_.has_filter_chain_matcher() ? &config_.filter_chain_matcher() : nullptr,
+         config_.filter_chains(),
+         config_.has_default_filter_chain() ? &config_.default_filter_chain() : nullptr, builder,
+         *filter_chain_manager_);
+  }
 }
 
 void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& address) {
@@ -951,6 +961,10 @@ void ListenerImpl::initialize() {
     // manager directly.
     dynamic_init_manager_->initialize(local_init_watcher_);
   }
+
+  if(config_.has_fcds()) {
+     fcds_api_->initialize();
+  }
 }
 
 ListenerImpl::~ListenerImpl() {
@@ -1135,6 +1149,13 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "filter_chain_matcher"));
   return differencer.Compare(lhs, rhs);
+}
+
+bool ListenerImpl::is_filterchain_missing() {
+  if (config_.filter_chains().empty() && !config_.has_default_filter_chain() && !config_.has_fcds())
+    return true;
+
+  return false;
 }
 
 } // namespace Server

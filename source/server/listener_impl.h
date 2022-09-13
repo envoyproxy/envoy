@@ -442,6 +442,7 @@ private:
   void buildListenSocketOptions();
   void createListenerFilterFactories();
   void validateFilterChains();
+  bool is_filterchain_missing();
   void buildFilterChains();
   void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
@@ -515,6 +516,10 @@ private:
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
+
+
+  // FCDS API object holds the fcds config class
+  FcdsApiPtr fcds_api_;
 };
 
 } // namespace Server

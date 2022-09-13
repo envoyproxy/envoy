@@ -509,8 +509,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "filter_chain_manager_lib",
-    srcs = ["filter_chain_manager_impl.cc"],
-    hdrs = ["filter_chain_manager_impl.h"],
+    srcs = ["filter_chain_manager_impl.cc", "fcds_impl.cc"],
+    hdrs = ["filter_chain_manager_impl.h", "fcds_impl.h"],
     deps = [
         ":filter_chain_factory_context_callback",
         "//envoy/config:typed_metadata_interface",
@@ -528,7 +528,13 @@ envoy_cc_library(
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
         "//source/server:configuration_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+	"@envoy_api//envoy/service/filter_chain/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -580,6 +586,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":filter_chain_manager_lib",
         ":ssl_context_manager_lib",
         ":worker_lib",
         "//envoy/event:dispatcher_interface",
