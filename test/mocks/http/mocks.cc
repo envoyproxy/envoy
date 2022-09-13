@@ -63,8 +63,11 @@ template <class T> static void initializeMockStreamFilterCallbacks(T& callbacks)
   callbacks.route_.reset(new NiceMock<Router::MockRoute>());
   ON_CALL(callbacks, dispatcher()).WillByDefault(ReturnRef(callbacks.dispatcher_));
   ON_CALL(callbacks, streamInfo()).WillByDefault(ReturnRef(callbacks.stream_info_));
-  ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
   ON_CALL(callbacks, route()).WillByDefault(Return(callbacks.route_));
+  ON_CALL(callbacks, clusterInfo()).WillByDefault(Return(callbacks.cluster_info_));
+  ON_CALL(callbacks, downstreamCallbacks())
+      .WillByDefault(
+          Return(OptRef<DownstreamStreamFilterCallbacks>{callbacks.downstream_callbacks_}));
 }
 
 MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
