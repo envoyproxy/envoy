@@ -21,9 +21,6 @@ namespace {
 using ::Envoy::Config::XdsSourceId;
 using ::envoy::extensions::config::v3alpha::KeyValueStoreXdsDelegateConfig;
 
-// TODO(abeyad): Add a per-Envoy instance prefix to the storage key, to allow xDS resources to be
-// persisted per-running-Envoy when Envoy is embedded as a library (e.g. Envoy Mobile).
-
 // Constructs the key for the resource, to be used in the KeyValueStore.
 std::string constructKey(const XdsSourceId& source_id, const std::string& resource_name) {
   static constexpr char DELIMITER[] = "+";
