@@ -190,6 +190,10 @@ void OriginalDstCluster::cleanup() {
   if (!host_map->empty()) {
     ENVOY_LOG(trace, "Cleaning up stale original dst hosts.");
     for (const auto& [addr, hosts] : *host_map) {
+      // Address is kept in the cluster if either of the two things happen:
+      // 1) a host has been recently selected for the address; 2) none of the
+      // hosts are currently in any of the connection pools.
+      // The set of hosts for a single address are treated as a unit.
       bool keep = false;
       if (hosts->used_) {
         keep = true;
