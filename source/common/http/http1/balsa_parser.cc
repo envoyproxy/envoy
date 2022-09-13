@@ -93,12 +93,15 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
 } // anonymous namespace
 
-BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
+BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
+                         bool enable_trailers)
     : connection_(connection) {
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
-  framer_.set_balsa_trailer(&trailers_);
+  if (enable_trailers) {
+    framer_.set_balsa_trailer(&trailers_);
+  }
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
@@ -140,7 +143,12 @@ ParserStatus BalsaParser::getStatus() const { return status_; }
 uint16_t BalsaParser::statusCode() const { return headers_.parsed_response_code(); }
 
 bool BalsaParser::isHttp11() const {
-  return absl::EndsWith(headers_.first_line(), Http::Headers::get().ProtocolStrings.Http11String);
+  if (framer_.is_request()) {
+    return absl::EndsWith(headers_.first_line(), Http::Headers::get().ProtocolStrings.Http11String);
+  } else {
+    return absl::StartsWith(headers_.first_line(),
+                            Http::Headers::get().ProtocolStrings.Http11String);
+  }
 }
 
 absl::optional<uint64_t> BalsaParser::contentLength() const {
@@ -218,8 +226,8 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
 
 void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
                                            absl::string_view /*version_input*/,
-                                           absl::string_view status_input,
-                                           absl::string_view /*reason_input*/) {
+                                           absl::string_view /*status_input*/,
+                                           absl::string_view reason_input) {
   if (status_ == ParserStatus::Error) {
     return;
   }
@@ -227,7 +235,7 @@ void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  status_ = convertResult(connection_->onStatus(status_input.data(), status_input.size()));
+  status_ = convertResult(connection_->onStatus(reason_input.data(), reason_input.size()));
 }
 
 void BalsaParser::OnChunkLength(size_t chunk_length) {

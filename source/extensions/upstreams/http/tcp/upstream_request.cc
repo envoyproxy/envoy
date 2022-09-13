@@ -27,8 +27,7 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   Network::Connection& latched_conn = conn_data->connection();
   auto upstream =
       std::make_unique<TcpUpstream>(&callbacks_->upstreamToDownstream(), std::move(conn_data));
-  callbacks_->onPoolReady(std::move(upstream), host,
-                          latched_conn.connectionInfoProvider().localAddress(),
+  callbacks_->onPoolReady(std::move(upstream), host, latched_conn.connectionInfoProvider(),
                           latched_conn.streamInfo(), {});
 }
 

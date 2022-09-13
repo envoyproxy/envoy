@@ -2,6 +2,8 @@
 
 #include "envoy/http/codec.h"
 
+#include "source/common/network/socket_impl.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -19,14 +21,15 @@ public:
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
+  MOCK_METHOD(const Network::ConnectionInfoProvider&, connectionInfoProvider, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
 
   // Use the same underlying structure as StreamCallbackHelper to insure iteration stability
   // if we remove callbacks during iteration.
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
-  Network::Address::InstanceConstSharedPtr connection_local_address_;
+  Network::ConnectionInfoSetterImpl connection_info_provider_;
   Buffer::BufferMemoryAccountSharedPtr account_;
 
   void runHighWatermarkCallbacks() {

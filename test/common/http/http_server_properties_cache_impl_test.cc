@@ -37,12 +37,13 @@ public:
 
   void initialize() {
     protocols_ = std::make_unique<HttpServerPropertiesCacheImpl>(
-        dispatcher_, std::unique_ptr<KeyValueStore>(store_), max_entries_);
+        dispatcher_, std::move(suffixes_), std::unique_ptr<KeyValueStore>(store_), max_entries_);
   }
 
   size_t max_entries_ = 10;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  std::vector<std::string> suffixes_;
   MockKeyValueStore* store_;
   std::unique_ptr<HttpServerPropertiesCacheImpl> protocols_;
 
@@ -370,6 +371,57 @@ TEST_F(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Broken());
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+}
+
+TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "www.second.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
+}
+
+TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
+  std::string suffix = ".example.com";
+  std::string host1 = "www.example.com";
+  std::string host2 = "www.other.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_FALSE(protocols.has_value());
+}
+
+TEST_F(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "second.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+  protocols_->setAlternatives(origin2, protocols2_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols2_, protocols.ref());
 }
 
 } // namespace

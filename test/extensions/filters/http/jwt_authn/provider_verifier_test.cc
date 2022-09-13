@@ -68,10 +68,14 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
+      {"x-jwt-claim-sub", "value-to-be-replaced"},
+      {"x-jwt-claim-nested", "header-to-be-deleted"},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
+  EXPECT_EQ("test@example.com", headers.get_("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // Test to set the payload (hence dynamic metadata) with the header and payload extracted from the
@@ -140,10 +144,13 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
 
-  auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"sec-istio-auth-userinfo", ""}, {"x-jwt-claim-sub", ""}, {"x-jwt-claim-nested", ""}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // This test verifies that JWT must be issued by the provider specified in the requirement.
@@ -161,9 +168,15 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-sub
+      claim_name: sub
   other_provider:
     issuer: other_issuer
     forward_payload_header: other-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-issuer
+      claim_name: iss
 rules:
 - match:
     path: "/"
@@ -179,20 +192,24 @@ rules:
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
+      {"x-jwt-claim-sub", ""},
+      {"x-jwt-claim-issuer", ""},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_TRUE(headers.has("example-auth-userinfo"));
+  EXPECT_TRUE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-issuer"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
 // This test verifies that JWT requirement can override audiences
 TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
-  auto* requires =
+  auto* provider_and_audiences =
       proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
-  requires->set_provider_name("example_provider");
-  requires->add_audiences("invalid_service");
+  provider_and_audiences->set_provider_name("example_provider");
+  provider_and_audiences->add_audiences("invalid_service");
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 

@@ -429,6 +429,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -484,4 +485,21 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "config_impl_benchmark_test",
     benchmark_binary = "config_impl_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "header_formatter_speed_test",
+    srcs = ["header_formatter_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/common/stream_info:test_util",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "header_formatter_benchmark_test",
+    benchmark_binary = "header_formatter_speed_test",
 )

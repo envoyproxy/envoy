@@ -30,18 +30,38 @@ run_log "Receive a message using the Kafka consumer"
 kafka_client kafka-console-consumer --bootstrap-server proxy:10000 --topic $TOPIC --from-beginning --max-messages 1 | grep "$MESSAGE"
 
 run_log "Check admin kafka_broker stats"
+
+# This function verifies whether a given metric exists and has a value > 0.
+has_metric_with_at_least_1 () {
+    local stat response value
+    stat="$1"
+    shift
+    response=$(_curl "http://localhost:${PORT_ADMIN}/stats?filter=${stat}")
+    # Extract number from rows like 'kafka.kafka_broker.request.api_versions_request: 123'.
+    value=$(echo "${response}" | grep "${stat}:" | cut -f2 -d':' | tr -d ' ')
+    re='^[0-9]+$'
+    [[ ${value} =~ ${re} && ${value} -gt 0 ]] || {
+        echo "ERROR: metric check for [${stat}]" >&2
+        echo "EXPECTED: numeric value greater than 0" >&2
+        echo "RECEIVED:" >&2
+        echo "${response}" >&2
+        return 1
+    }
+}
+
 EXPECTED_BROKER_STATS=(
-    "kafka.kafka_broker.request.api_versions_request: 4"
-    "kafka.kafka_broker.request.find_coordinator_request: 1"
-    "kafka.kafka_broker.request.metadata_request: 4"
-    "kafka.kafka_broker.response.api_versions_response: 4"
-    "kafka.kafka_broker.response.find_coordinator_response: 1"
-    "kafka.kafka_broker.response.metadata_response: 4")
+    "kafka.kafka_broker.request.api_versions_request"
+    "kafka.kafka_broker.request.metadata_request"
+    "kafka.kafka_broker.request.create_topics_request"
+    "kafka.kafka_broker.request.produce_request"
+    "kafka.kafka_broker.request.fetch_request"
+    "kafka.kafka_broker.response.api_versions_response"
+    "kafka.kafka_broker.response.metadata_response"
+    "kafka.kafka_broker.response.create_topics_response"
+    "kafka.kafka_broker.response.produce_response"
+    "kafka.kafka_broker.response.fetch_response")
 for stat in "${EXPECTED_BROKER_STATS[@]}"; do
-    filter="$(echo "$stat" | cut -d: -f1)"
-    responds_with \
-        "$stat" \
-        "http://localhost:${PORT_ADMIN}/stats?filter=${filter}"
+    has_metric_with_at_least_1 "${stat}"
 done
 
 run_log "Check admin kafka_service stats"

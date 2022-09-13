@@ -1482,9 +1482,12 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
       {"header_key1", "header_value1"},
       {"header_key2", "header_value2"},
   };
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(metadata_map));
   for (uint32_t frame = 0; frame < AllFrameFloodLimit + 1; ++frame) {
-    codec_client_->sendMetadata(*request_encoder_, metadata_map);
+    request_encoder_->encodeMetadata(metadata_map_vector);
   }
+  codec_client_->connection()->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 
   // Upstream connection should be disconnected
   // Downstream client should receive 503 since upstream did not send response headers yet

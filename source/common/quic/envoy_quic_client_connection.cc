@@ -18,32 +18,35 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, supported_versions,
-                                dispatcher,
-                                createConnectionSocket(initial_peer_address, local_addr, options)) {
-}
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    quic::ConnectionIdGeneratorInterface& generator)
+    : EnvoyQuicClientConnection(
+          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
+          createConnectionSocket(initial_peer_address, local_addr, options), generator) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
-    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
+    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
+    quic::ConnectionIdGeneratorInterface& generator)
     : EnvoyQuicClientConnection(
           server_connection_id, helper, alarm_factory,
           new EnvoyQuicPacketWriter(
               std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
-          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket)) {}
+          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
+          generator) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
-    Network::ConnectionSocketPtr&& connection_socket)
+    Network::ConnectionSocketPtr&& connection_socket,
+    quic::ConnectionIdGeneratorInterface& generator)
     : quic::QuicConnection(server_connection_id, quic::QuicSocketAddress(),
                            envoyIpAddressToQuicSocketAddress(
                                connection_socket->connectionInfoProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
-                           quic::Perspective::IS_CLIENT, supported_versions),
+                           quic::Perspective::IS_CLIENT, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
 
 void EnvoyQuicClientConnection::processPacket(
@@ -175,7 +178,7 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
-  OnPathValidationFailureAtClient();
+  OnPathValidationFailureAtClient(/*is_multi_port=*/false);
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
@@ -266,6 +269,11 @@ void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidat
 void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
   connection_.onPathValidationFailure(std::move(context));
+}
+
+void EnvoyQuicClientConnection::OnCanWrite() {
+  quic::QuicConnection::OnCanWrite();
+  onWriteEventDone();
 }
 
 } // namespace Quic

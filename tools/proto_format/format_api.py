@@ -30,6 +30,7 @@ CONTRIB_V3_ALLOW_LIST = [
     'envoy.extensions.filters.http.squash.v3',
     'envoy.extensions.filters.network.client_ssl_auth.v3',
     'envoy.extensions.filters.network.generic_proxy.action.v3',
+    'envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3',
     'envoy.extensions.filters.network.generic_proxy.matcher.v3',
     'envoy.extensions.filters.network.generic_proxy.router.v3',
     'envoy.extensions.filters.network.generic_proxy.v3',

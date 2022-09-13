@@ -12,15 +12,15 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
-"source/common/http:96.3"
-"source/common/http/http2:96.4"
+"source/common/http:96.1"
+"source/common/http/http2:94.8"
 "source/common/io:98.0"
 "source/common/json:89.8"
 "source/common/matcher:92.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:94.8"
-"source/common/quic:91.8"
+"source/common/quic:92.6"
 "source/common/router:95.8" # Bump to 96.3 after 22879 is addressed
 "source/common/runtime:96.4"
 "source/common/secret:94.9"

@@ -98,7 +98,8 @@ public:
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return admin_filter_chain_.get();
   }
 
@@ -199,7 +200,7 @@ public:
   }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
-  void closeSocket();
+  void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() const {

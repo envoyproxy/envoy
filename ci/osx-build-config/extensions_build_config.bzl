@@ -17,3 +17,8 @@ WINDOWS_EXTENSIONS = {}
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
+MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
+
+# As part of (https://github.com/envoyproxy/envoy-mobile/issues/175) we turned down alwayslink for envoy libraries
+# This tracks libraries that should be registered as extensions.
+LEGACY_ALWAYSLINK = 1

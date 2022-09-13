@@ -66,9 +66,10 @@ public:
                                 Network::Address::InstanceConstSharedPtr local_addr,
                                 Event::Dispatcher& dispatcher,
                                 const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                bool validation_failure_on_path_response)
+                                bool validation_failure_on_path_response,
+                                quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
-                                  supported_versions, local_addr, dispatcher, options),
+                                  supported_versions, local_addr, dispatcher, options, generator),
         dispatcher_(dispatcher),
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
@@ -173,7 +174,7 @@ public:
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, options,
-        validation_failure_on_path_response_);
+        validation_failure_on_path_response_, connection_id_generator_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
@@ -181,7 +182,7 @@ public:
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
         quic::QuicServerId{
-            (host.empty() ? transport_socket_factory_->clientContextConfig().serverNameIndication()
+            (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
             static_cast<uint16_t>(port), false},
         transport_socket_factory_->getCryptoConfig(), &push_promise_index_, *dispatcher_,
@@ -273,7 +274,7 @@ public:
     transport_socket_factory_.reset(static_cast<QuicClientTransportSocketFactory*>(
         config_factory.createTransportSocketFactory(quic_transport_socket_config, context)
             .release()));
-    ASSERT(&transport_socket_factory_->clientContextConfig());
+    ASSERT(transport_socket_factory_->clientContextConfig());
   }
 
   void setConcurrency(size_t concurrency) {
@@ -366,6 +367,8 @@ protected:
   Ssl::ClientSslTransportOptions ssl_client_option_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> transport_socket_factory_;
   bool validation_failure_on_path_response_{false};
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
@@ -506,12 +509,12 @@ TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
 TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29",
+      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_disable_version_draft_29",
       "false");
   initialize();
 
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
             codec_client_->connection()->requestedServerName());
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
@@ -529,7 +532,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
             codec_client_->connection()->requestedServerName());
   // Send a complete request on the first connection.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -611,7 +614,7 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
             codec_client_->connection()->requestedServerName());
   // Send a complete request on the first connection.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

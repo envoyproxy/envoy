@@ -153,7 +153,8 @@ protected:
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
   std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>
-  createComplexSpecifier(uint32_t n_clusters, uint32_t n_localities, uint32_t n_endpoints) {
+  createComplexSpecifier(uint32_t n_clusters, uint32_t n_localities, uint32_t n_endpoints,
+                         bool disable_hc = false) {
     // Final specifier to return.
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> msg =
         std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
@@ -188,11 +189,13 @@ protected:
 
         // add some endpoints to the locality group with iterative naming for verification.
         for (uint32_t endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
-          auto* socket_address =
-              locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+          auto* endpoint = locality_endpoints->add_endpoints();
+
+          auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
           socket_address->set_address(
               absl::StrCat("127.", cluster_num, ".", loc_num, ".", endpoint_num));
           socket_address->set_port_value(1234);
+          endpoint->mutable_health_check_config()->set_disable_active_health_check(disable_hc);
         }
       }
     }
@@ -578,12 +581,9 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_.admin(), params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.server_context_.localInfo(),
-            params.server_context_.mainThreadDispatcher(), params.stats_,
-            params.server_context_.singletonManager(), params.tls_,
-            params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-            params.server_context_.options(), params.server_context_.accessLogManager());
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
@@ -896,6 +896,42 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
   checkHdsCounters(3, 0, 0, 3);
 }
 
+// Skip the endpoints with disabled active health check during message processing.
+TEST_F(HdsTest, TestUpdateEndpointsWithActiveHCflag) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message, and later add/remove endpoints from the second cluster.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Save list of hosts/endpoints for comparison later.
+  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(original_hosts.size(), 2);
+
+  // Ignoring the endpoints with disabled active health check.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2, true));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(new_hosts.size(), 0);
+}
+
 // Test adding, reusing, and removing health checks.
 TEST_F(HdsTest, TestUpdateHealthCheckers) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -1034,12 +1070,9 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_.admin(), params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.server_context_.localInfo(),
-            params.server_context_.mainThreadDispatcher(), params.stats_,
-            params.server_context_.singletonManager(), params.tls_,
-            params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-            params.server_context_.options(), params.server_context_.accessLogManager());
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =

@@ -74,7 +74,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -99,6 +99,15 @@ private:
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
+};
+
+using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainBaseAction : public Matcher::Action {
+public:
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
 };
 
 class FilterChainImpl : public Network::DrainableFilterChain {
@@ -165,7 +174,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -220,8 +229,8 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
-  const Network::FilterChain*
-  findFilterChain(const Network::ConnectionSocket& socket) const override;
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
+                                              const StreamInfo::StreamInfo& info) const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -257,8 +266,8 @@ public:
   void startDrainingSequenceForListenerFcds();
 private:
   void convertIPsToTries();
-  const Network::FilterChain*
-  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                          const StreamInfo::StreamInfo& info) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
@@ -423,6 +432,9 @@ private:
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 
+  // Index filter chains by name, used by the matcher actions.
+  FilterChainsByName filter_chains_by_name_;
+  
   // Hashmap to maintain fcds resource name (filter chain name) and filter chain config mapping
   FcdsResourcesMap fc_name_to_obj_map_;
 

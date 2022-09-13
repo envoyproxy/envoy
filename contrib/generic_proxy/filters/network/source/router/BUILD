@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_contrib_extension",
     "envoy_cc_library",
     "envoy_contrib_package",
 )
@@ -27,7 +28,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_contrib_extension(
     name = "config",
     srcs = [
         "config.cc",

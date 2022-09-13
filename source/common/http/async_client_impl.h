@@ -167,6 +167,13 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -232,6 +239,8 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
+    const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
+    const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -295,6 +304,8 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
+    static const Router::PathMatcherSharedPtr path_matcher_;
+    static const Router::PathRewriterSharedPtr path_rewriter_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
@@ -352,7 +363,9 @@ private:
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
-  const Tracing::Config& tracingConfig() override { return tracing_config_; }
+  OptRef<const Tracing::Config> tracingConfig() const override {
+    return makeOptRef<const Tracing::Config>(tracing_config_);
+  }
   void continueDecoding() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance&, bool) override {
