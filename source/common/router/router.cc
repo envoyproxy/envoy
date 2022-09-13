@@ -1727,7 +1727,11 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
   downstream_headers.setPath(path_and_query);
 
-  callbacks_->clearRouteCache();
+  // Only clear the route cache if there are downstream callbacks. There aren't, for example,
+  // for async connections.
+  if (callbacks_->downstreamCallbacks()) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   const auto route = callbacks_->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {
