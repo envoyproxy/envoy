@@ -232,7 +232,8 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 #ifdef __clang__
 #if defined(__linux__)
 #if defined(__has_feature) && !(__has_feature(thread_sanitizer))
-  ASSERT_TRUE(sizeof(s1) == 776 || sizeof(s1) == 792 || sizeof(s1) == 800 || sizeof(s1) == 816)
+  ASSERT_TRUE(sizeof(s1) == 776 || sizeof(s1) == 792 || sizeof(s1) == 800 || sizeof(s1) == 816 ||
+              sizeof(s1) == 832)
       << "If adding fields to StreamInfoImpl, please check to see if you "
          "need to add them to setFromForRecreateStream! Current size "
       << sizeof(s1);
@@ -249,6 +250,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+  EXPECT_EQ(s1.getSanitizedPath(), s2.getSanitizedPath());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {

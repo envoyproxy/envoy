@@ -336,6 +336,7 @@ struct StreamInfoImpl : public StreamInfo {
     // These two are set in the constructor, but to T(recreate), and should be T(create)
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
+    sanitized_path_ = info.getSanitizedPath();
   }
 
   TimeSource& time_source_;
