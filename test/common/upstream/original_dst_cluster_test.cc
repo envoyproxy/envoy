@@ -883,6 +883,73 @@ TEST_F(OriginalDstClusterTest, UseFilterState) {
   EXPECT_EQ("10.10.11.11:6666", host1->address()->asString());
 }
 
+TEST_F(OriginalDstClusterTest, UsePortOverride) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      upstream_port_override: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 80));
+
+  TestLoadBalancerContext lb_context1(&connection);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
+  post_cb();
+  ASSERT_NE(host1, nullptr);
+  EXPECT_EQ("10.10.11.11:443", host1->address()->asString());
+}
+
+TEST_F(OriginalDstClusterTest, UseFilterStateWithPortOverride) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      use_http_header: true
+      upstream_port_override: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(cluster_);
+  Event::PostCb post_cb;
+
+  // Filter state takes priority over header override.
+  NiceMock<Network::MockConnection> connection;
+  connection.stream_info_.filterState()->setData(
+      Network::DestinationAddress::key(),
+      std::make_shared<Network::DestinationAddress>(
+          std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 6666)),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  TestLoadBalancerContext lb_context1(&connection, Http::Headers::get().EnvoyOriginalDstHost.get(),
+                                      "127.0.0.1:5555");
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1);
+  post_cb();
+  ASSERT_NE(host1, nullptr);
+  // Port override takes priority over filter state, so 6666->443
+  EXPECT_EQ("10.10.11.11:443", host1->address()->asString());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

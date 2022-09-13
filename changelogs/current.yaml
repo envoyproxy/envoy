@@ -164,6 +164,9 @@ new_features:
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
     by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
+- area: cluster
+  change: |
+    added support to override original destination port via setting :ref:`upstream_port_override <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.upstream_port_override>`.
 - area: generic_proxy
   change: |
     added an new network filter :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
