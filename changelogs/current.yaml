@@ -41,7 +41,7 @@ minor_behavior_changes:
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
 - area: stats
   change: |
-    Default tag extraction rules were changed for `worker_id` extraction. Previously, `worker_` was removed from the original name during the extraction. This
+    Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the original name during the extraction. This
     led to the same base stat name for both the per-worker and overall stat. For instance, in prometheus stats, the following stats were produced: ::
 
       envoy_listener_downstream_cx_total{envoy_listener_address="vip"} 2
