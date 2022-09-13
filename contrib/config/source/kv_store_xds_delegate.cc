@@ -21,18 +21,13 @@ namespace {
 using ::Envoy::Config::XdsSourceId;
 using ::envoy::extensions::config::v3alpha::KeyValueStoreXdsDelegateConfig;
 
-// The supplied KeyValueStore may be shared with other parts of the application (e.g.
-// SharedPreferences on Android). Therefore, we introduce a prefix to the key to create a distinct
-// key namespace.
-static constexpr char KEY_PREFIX[] = "XDS_CONFIG_";
-
 // TODO(abeyad): Add a per-Envoy instance prefix to the storage key, to allow xDS resources to be
 // persisted per-running-Envoy when Envoy is embedded as a library (e.g. Envoy Mobile).
 
 // Constructs the key for the resource, to be used in the KeyValueStore.
 std::string constructKey(const XdsSourceId& source_id, const std::string& resource_name) {
   static constexpr char DELIMITER[] = "+";
-  return absl::StrCat(KEY_PREFIX, source_id.toKey(), DELIMITER, resource_name);
+  return absl::StrCat(source_id.toKey(), DELIMITER, resource_name);
 }
 
 } // namespace
@@ -67,7 +62,7 @@ KeyValueStoreXdsDelegate::getAllResources(const XdsSourceId& source_id) const {
   xds_config_store_->iterate(
       [&resources, &source_id](const std::string& key, const std::string& value) {
         // TODO(abeyad): Don't include TTL'ed resources.
-        if (absl::StartsWith(key, absl::StrCat(KEY_PREFIX, source_id.toKey()))) {
+        if (absl::StartsWith(key, source_id.toKey())) {
           // The source id is a prefix of the key, so it should be included in the list of returned
           // resources.
           envoy::service::discovery::v3::Resource r;
