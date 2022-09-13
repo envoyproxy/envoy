@@ -136,7 +136,8 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
-      quic::kQuicDefaultConnectionIdLength} EnvoyQuicClientConnection* quic_connection_;
+      quic::kQuicDefaultConnectionIdLength};
+  EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_{4u};

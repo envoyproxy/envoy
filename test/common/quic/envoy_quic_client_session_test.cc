@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -41,7 +42,7 @@ public:
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Event::Dispatcher& dispatcher,
                                 Network::ConnectionSocketPtr&& connection_socket,
-                                ConnectionIdGeneratorInterface& generator)
+                                quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {

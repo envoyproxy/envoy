@@ -16,6 +16,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 using testing::Return;
 
@@ -71,9 +72,8 @@ protected:
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   Stats::IsolatedStoreImpl store_;
   QuicStatNames quic_stat_names_{store_.symbolTable()};
-  quic::DeterministicConnectionIdGenerator connection_id_generator_ {
-    quic::kQuicDefaultConnectionIdLength
-  }
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
 };
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
@@ -131,10 +131,9 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
       info, crypto_config_,
       quic::QuicServerId{factory_->clientContextConfig().serverNameIndication(), port, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, store_, nullptr,
-      nullptr, connection_id_generator_)
+      nullptr, connection_id_generator_);
 
-      EnvoyQuicClientSession* session =
-          static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
 
   EXPECT_EQ(session->config()->GetInitialRoundTripTimeUsToSend(), 5);
   session->Initialize();

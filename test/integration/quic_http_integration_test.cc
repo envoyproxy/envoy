@@ -367,9 +367,8 @@ protected:
   Ssl::ClientSslTransportOptions ssl_client_option_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> transport_socket_factory_;
   bool validation_failure_on_path_response_{false};
-  quic::DeterministicConnectionIdGenerator connection_id_generator_ {
-    quic::kQuicDefaultConnectionIdLength
-  }
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
