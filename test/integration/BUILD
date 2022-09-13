@@ -1098,6 +1098,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "custom_response_integration_test",
+    srcs = [
+        "custom_response_integration_test.cc",
+    ],
+    shard_count = 4,
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/custom_response:factory",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "regex_engine_integration_test",
     srcs = ["regex_engine_integration_test.cc"],
     deps = [

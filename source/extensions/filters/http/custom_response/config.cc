@@ -65,12 +65,18 @@ public:
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    Server::Configuration::FactoryContext& context) {
+    Stats::StatName stats_prefix, Server::Configuration::FactoryContext& context)
+    : stat_names_(context.scope().symbolTable()),
+      stats_(stat_names_, context.scope(), stats_prefix) {
   for (const auto& source : config.custom_responses()) {
     auto source_ptr = std::make_shared<Response>(source, context);
-    // TODO check for empty name
+    if (source_ptr->name().empty()) {
+      throw EnvoyException("name cannot be empty");
+    }
+    if (responses_.contains(source_ptr->name())) {
+      throw EnvoyException("name needs to be unique");
+    }
     responses_.emplace(source_ptr->name(), std::move(source_ptr));
-    // TODO throw if repeated names found.
   }
   if (config.has_custom_response_matcher()) {
     CustomResponseNameActionValidationVisitor validation_visitor;

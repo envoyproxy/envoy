@@ -60,7 +60,7 @@ TEST(CustomResponseFilterConfigTest, CustomResponseFilter) {
                       input:
                         name: status_code
                         typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
+                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
                       value_match:
                         exact: "4xx"
                   on_match:

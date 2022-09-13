@@ -12,11 +12,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-void CustomResponseFilter::setEncoderFilterCallbacks(
-    Http::StreamEncoderFilterCallbacks& callbacks) {
-  encoder_callbacks_ = &callbacks;
-}
-
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   (void)end_stream;
@@ -29,13 +24,56 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
 
   // Handle remote body
   if (custom_response->isRemote()) {
+    // Modify the request headers & recreate stream.
+    ASSERT(downstream_headers_ != nullptr);
     auto& remote_data_source = custom_response->remoteDataSource();
-    ASSERT(remote_data_source.has_value());
-    client_ = std::make_unique<RemoteResponseClient>(*remote_data_source, factory_context_);
-    client_->fetchBody(
-        [this, custom_response, &headers](const Http::ResponseMessage* client_response) {
-          onRemoteResponse(headers, custom_response, client_response);
-        });
+    if (!remote_data_source.has_value()) {
+      ENVOY_LOG(trace, "RemoteDataSource is empty");
+      config_->stats().custom_response_redirect_invalid_uri_.inc();
+      return Http::FilterHeadersStatus::Continue;
+    }
+    Http::Utility::Url absolute_url;
+    if (!absolute_url.initialize(remote_data_source->http_uri().uri(), false)) {
+      ENVOY_LOG(trace, "Redirect for custom response failed: invalid location {}",
+                remote_data_source->http_uri().uri());
+      config_->stats().custom_response_redirect_invalid_uri_.inc();
+      return Http::FilterHeadersStatus::Continue;
+    }
+
+    // TODO: cache original host and path
+    // TODO: filter state/metadata to track that we've done a redirect
+    // Replace the original host, scheme and path.
+    downstream_headers_->setScheme(absolute_url.scheme());
+    downstream_headers_->setHost(absolute_url.hostAndPort());
+
+    auto path_and_query = absolute_url.pathAndQueryParams();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_reject_path_with_fragment")) {
+      // Envoy treats internal redirect as a new request and will reject it if URI path
+      // contains #fragment. However the Location header is allowed to have #fragment in URI path.
+      // To prevent Envoy from rejecting internal redirect, strip the #fragment from Location URI if
+      // it is present.
+      auto fragment_pos = path_and_query.find('#');
+      path_and_query = path_and_query.substr(0, fragment_pos);
+    }
+    downstream_headers_->setPath(path_and_query);
+
+    decoder_callbacks_->clearRouteCache();
+    const auto route = decoder_callbacks_->route();
+    // Don't allow a redirect to a non existing route.
+    if (!route) {
+      config_->stats().custom_response_redirect_no_route_.inc();
+      ENVOY_LOG(trace, "Redirect for custom response failed: no route found");
+      return Http::FilterHeadersStatus::Continue;
+    }
+    downstream_headers_->setMethod(Http::Headers::get().MethodValues.Get);
+    downstream_headers_->remove(Http::Headers::get().ContentLength);
+    // decoder_callbacks_->modifyDecodingBuffer(
+    //[](Buffer::Instance& data) { data.drain(data.length()); });
+    // decoder_callbacks_->recreateStream(&headers);
+    decoder_callbacks_->recreateStream(nullptr);
+    (void)factory_context_;
+
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -45,111 +83,6 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   custom_response->rewrite(headers, encoder_callbacks_->streamInfo(), body, code);
   encoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;
-}
-
-void CustomResponseFilter::onRemoteResponse(Http::ResponseHeaderMap& headers,
-                                            const ResponseSharedPtr& custom_response,
-                                            const Http::ResponseMessage* client_response) {
-  if (client_response != nullptr) {
-    auto body = client_response->bodyAsString();
-    Http::Code code;
-    custom_response->rewrite(headers, encoder_callbacks_->streamInfo(), body, code);
-    encoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
-  } else {
-    stats_.get_remote_response_failed_.inc();
-  }
-  encoder_callbacks_->continueEncoding();
-}
-
-void RemoteResponseClient::fetchBody(RequestCB callback) {
-  // Cancel any active requests.
-  cancel();
-  ASSERT(callback_ == nullptr);
-  callback_ = std::move(callback);
-
-  // Construct the request
-  absl::string_view host;
-  absl::string_view path;
-  Envoy::Http::Utility::extractHostPathFromUri(config_.http_uri().uri(), host, path);
-  Http::RequestMessagePtr request = std::make_unique<Envoy::Http::RequestMessageImpl>(
-      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
-          {{Envoy::Http::Headers::get().Method, "GET"},
-           {Envoy::Http::Headers::get().Host, std::string(host)},
-           {Envoy::Http::Headers::get().Path, std::string(path)}}));
-
-  const std::string cluster = config_.http_uri().cluster();
-  const std::string uri = config_.http_uri().uri();
-  const auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster);
-
-  // Failed to fetch the token if the cluster is not configured.
-  if (thread_local_cluster == nullptr) {
-    ENVOY_LOG(error, "Failed to fetch the token: [cluster = {}] is not found or configured.",
-              cluster);
-    onError();
-    return;
-  }
-
-  // Set up the request options.
-  struct Envoy::Http::AsyncClient::RequestOptions options =
-      Envoy::Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(config_.http_uri().timeout())));
-
-  if (config_.has_retry_policy()) {
-    route_retry_policy_ = Http::Utility::convertCoreToRouteRetryPolicy(
-        config_.retry_policy(), "5xx,gateway-error,connect-failure,reset");
-    options.setRetryPolicy(route_retry_policy_);
-    options.setBufferBodyForRetry(true);
-  }
-
-  active_request_ =
-      thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
-}
-
-void RemoteResponseClient::onSuccess(const Http::AsyncClient::Request&,
-                                     Http::ResponseMessagePtr&& response) {
-
-  auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
-  active_request_ = nullptr;
-  if (status.has_value()) {
-    uint64_t status_code = status.value();
-    if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
-      ASSERT(callback_ != nullptr);
-      callback_(response.get());
-      callback_ = nullptr;
-    } else {
-      ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
-      onError();
-    }
-  } else {
-    // This occurs if the response headers are invalid.
-    ENVOY_LOG(error, "Failed to get the response because response headers are not valid.");
-    onError();
-  }
-}
-
-void RemoteResponseClient::onFailure(const Http::AsyncClient::Request&,
-                                     Http::AsyncClient::FailureReason reason) {
-  // Http::AsyncClient::FailureReason only has one value: "Reset".
-  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  ENVOY_LOG(error, "Request failed: stream has been reset");
-  active_request_ = nullptr;
-  onError();
-}
-
-void RemoteResponseClient::cancel() {
-  if (active_request_) {
-    active_request_->cancel();
-    active_request_ = nullptr;
-  }
-}
-
-void RemoteResponseClient::onError() {
-  // Cancel if the request is active.
-  cancel();
-
-  ASSERT(callback_ != nullptr);
-  callback_(/*response_ptr=*/nullptr);
-  callback_ = nullptr;
 }
 
 } // namespace CustomResponse

@@ -10,11 +10,10 @@ namespace CustomResponse {
 Http::FilterFactoryCb CustomResponseFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto config_ptr = std::make_shared<FilterConfig>(config, context);
-  return [config_ptr, stats_prefix,
-          &context](Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
-    callbacks.addStreamFilter(
-        std::make_shared<CustomResponseFilter>(config_ptr, context, stats_prefix));
+  Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());
+  auto config_ptr = std::make_shared<FilterConfig>(config, prefix.statName(), context);
+  return [config_ptr, &context](Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
+    callbacks.addStreamFilter(std::make_shared<CustomResponseFilter>(config_ptr, context));
   };
 }
 
