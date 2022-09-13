@@ -2552,6 +2552,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_crypto_logging",
+    srcs = [
+      "quiche/common/quiche_crypto_logging.cc",
+    ],
+    hdrs = [
+      "quiche/common/quiche_crypto_logging.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    external_deps = ["ssl"],
+    deps = [
+      ":quiche_common_platform_logging",
+      "@com_google_absl//absl/status",
+      "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_crypto_crypto_handshake_lib",
     srcs = [
         "quiche/quic/core/crypto/cert_compressor.cc",
@@ -2722,6 +2742,7 @@ envoy_cc_library(
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_platform_base",
+        ":quiche_crypto_logging",
     ],
 )
 
