@@ -36,6 +36,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: health_check
+  change: |
+    support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 - area: http
   change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
@@ -48,6 +51,9 @@ bug_fixes:
 - area: transport_socket
   change: |
     fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
+- area: logger
+  change: |
+    added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -158,9 +164,15 @@ new_features:
   change: |
     added :ref:`independent_proxy <envoy_v3_api_field_config.trace.v3.ZipkinConfig.independent_proxy>` to make Envoy worked
     as independent hop for zipkin tracing.
+- area: cluster
+  change: |
+    added support to override original destination port via setting :ref:`upstream_port_override <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.upstream_port_override>`.
 - area: generic_proxy
   change: |
     added an new network filter :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: redis
+  change: |
+    added support for quit command to the redis proxy.
 
 deprecated:
 - area: http
