@@ -46,6 +46,14 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
 
 } // namespace
 
+bool forceV6() {
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
+#else
+  return false;
+#endif
+}
+
 void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockaddr_in* sin) {
 #if defined(__APPLE__)
   *sin = {{}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
@@ -240,16 +248,6 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
 
 InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::v4CompatibleAddress() const {
   if (!v6only_ && IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
-    struct sockaddr_in sin;
-    ipv6ToIpv4CompatibleAddress(&address_, &sin);
-    auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);
-    return addr.ok() ? addr.value() : nullptr;
-  }
-  return nullptr;
-}
-
-InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::forceV4CompatibleAddress() const {
-  if (IN6_IS_ADDR_V4MAPPED(&address_.sin6_addr)) {
     struct sockaddr_in sin;
     ipv6ToIpv4CompatibleAddress(&address_, &sin);
     auto addr = Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sin);

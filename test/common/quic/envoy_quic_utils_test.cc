@@ -34,22 +34,6 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
     EXPECT_EQ(quic_addr, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
   }
 
-  // Verify that a ipv4 mapped ipv6 Envoy address will be converted to ipv4 QuicSocketAddress.
-  std::string v4_mapped_v6_address = "::FFFF:1.2.3.4";
-  quic::QuicIpAddress quic_ip;
-  quic_ip.FromString(v4_mapped_v6_address);
-  quic::QuicSocketAddress quic_addr(quic_ip, 12345);
-  Network::Address::InstanceConstSharedPtr envoy_addr = Network::Address::addressFromSockAddrOrDie(
-      quic_addr.generic_address(), sizeof(sockaddr_in6), -1, /*v6only=*/true);
-  EXPECT_EQ(quic_addr.ToString(), envoy_addr->asStringView());
-  EXPECT_EQ(Network::Address::IpVersion::v6, envoy_addr->ip()->version());
-
-  std::string v4_addr = "1.2.3.4";
-  quic::QuicIpAddress quic_ip_v4;
-  quic_ip_v4.FromString(v4_addr);
-  quic::QuicSocketAddress quic_addr_v4(quic_ip_v4, 12345);
-  EXPECT_EQ(quic_addr_v4, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
-
   EXPECT_FALSE(envoyIpAddressToQuicSocketAddress(nullptr).IsInitialized());
 }
 

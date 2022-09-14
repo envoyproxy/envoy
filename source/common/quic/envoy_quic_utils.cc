@@ -42,14 +42,6 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_port = htons(port);
     ipv4_addr->sin_addr.s_addr = envoy_ip->ipv4()->address();
-  } else if (envoy_ip->ipv6()->forceV4CompatibleAddress() != nullptr) {
-    // Convert ipv4 mapped ipv6 address for QUIC.
-    auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
-    memset(ipv4_addr, 0, sizeof(sockaddr_in));
-    ipv4_addr->sin_family = AF_INET;
-    ipv4_addr->sin_port = htons(port);
-    ipv4_addr->sin_addr.s_addr =
-        envoy_ip->ipv6()->forceV4CompatibleAddress()->ip()->ipv4()->address();
   } else {
     // Create and return quic ipv6 address
     auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);

@@ -64,14 +64,6 @@ constexpr int messageTruncatedOption() {
 
 namespace Network {
 
-bool IoSocketHandleImpl::forceV6() {
-#if defined(__APPLE__) || defined(__ANDROID_API__)
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
-#else
-  return false;
-#endif
-}
-
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
     IoSocketHandleImpl::close();
@@ -574,9 +566,6 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  // TODO(mattklein123): If forceV6() is true, we should probably remap back to IPv4 from
-  // the mapped IPv6 address. Currently though it doesn't look like we use this function in the
-  // client path so this probably doesn't matter. If it turns out to matter we can fix this.
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
