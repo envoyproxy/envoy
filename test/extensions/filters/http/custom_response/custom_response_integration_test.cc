@@ -135,6 +135,8 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
   EXPECT_EQ(
       0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
+  EXPECT_EQ("x-bar2",
+            response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
   // TODO: add header and body modifications
 }
 

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
 
 #include "envoy/http/filter.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
@@ -25,6 +26,15 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   (void)end_stream;
+  // check if filterstate exists already.
+  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
+      "envoy.filters.http.custom_response");
+  if (filter_state) {
+    filter_state->evaluateHeaders(headers, encoder_callbacks_->streamInfo());
+    // std::string body;
+    // Http::Code code;
+    // filter_state->rewriteBody(headers, encoder_callbacks_->streamInfo(), body, code);
+  }
   auto custom_response = base_config_->getResponse(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
@@ -80,6 +90,9 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     }
     downstream_headers_->setMethod(Http::Headers::get().MethodValues.Get);
     downstream_headers_->remove(Http::Headers::get().ContentLength);
+    encoder_callbacks_->streamInfo().filterState()->setData(
+        "envoy.filters.http.custom_response", custom_response,
+        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
     // decoder_callbacks_->modifyDecodingBuffer(
     //[](Buffer::Instance& data) { data.drain(data.length()); });
     // decoder_callbacks_->recreateStream(&headers);

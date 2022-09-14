@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/enum_to_int.h"
@@ -21,7 +22,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-class Response {
+class Response : public StreamInfo::FilterState::Object {
 public:
   Response(const envoy::extensions::filters::http::custom_response::v3::CustomResponse::Response&
                response,
@@ -66,7 +67,7 @@ private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 };
 
-using ResponseSharedPtr = std::shared_ptr<const Response>;
+using ResponseSharedPtr = std::shared_ptr<Response>;
 
 } // namespace CustomResponse
 } // namespace HttpFilters

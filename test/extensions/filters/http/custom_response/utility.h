@@ -26,6 +26,11 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
     body_format:
       text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
       content_type: "text/html; charset=UTF-8"
+    headers_to_add:
+    - header:
+        key: "foo2"
+        value: "x-bar2"
+      append: false
   custom_response_matcher:
     matcher_list:
       matchers:
