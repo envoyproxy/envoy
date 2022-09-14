@@ -20,8 +20,8 @@ public:
 protected:
   size_t above_high_watermark_{0};
   size_t below_low_watermark_{0};
-  uint64_t high_watermark_{100};
-  uint64_t low_watermark_{60};
+  uint32_t high_watermark_{100};
+  uint32_t low_watermark_{60};
   EnvoyQuicSimulatedWatermarkBuffer simulated_watermark_buffer_;
 };
 

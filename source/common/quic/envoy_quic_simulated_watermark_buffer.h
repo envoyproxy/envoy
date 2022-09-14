@@ -15,7 +15,7 @@ namespace Quic {
 // It's no-op if provided low and high watermark are 0.
 class EnvoyQuicSimulatedWatermarkBuffer {
 public:
-  EnvoyQuicSimulatedWatermarkBuffer(uint64_t low_watermark, uint64_t high_watermark,
+  EnvoyQuicSimulatedWatermarkBuffer(uint32_t low_watermark, uint32_t high_watermark,
                                     std::function<void()> below_low_watermark,
                                     std::function<void()> above_high_watermark,
                                     spdlog::logger& logger)
@@ -25,11 +25,11 @@ public:
     ASSERT((high_watermark == 0 && low_watermark == 0) || (high_watermark_ > low_watermark_));
   }
 
-  uint64_t highWatermark() const { return high_watermark_; }
+  uint32_t highWatermark() const { return high_watermark_; }
 
-  uint64_t lowWatermark() const { return low_watermark_; }
+  uint32_t lowWatermark() const { return low_watermark_; }
 
-  void checkHighWatermark(uint64_t bytes_buffered) {
+  void checkHighWatermark(uint32_t bytes_buffered) {
     if (high_watermark_ > 0 && !is_full_ && bytes_buffered > high_watermark_) {
       // Transitioning from below low watermark to above high watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross high watermark {}",
@@ -39,7 +39,7 @@ public:
     }
   }
 
-  void checkLowWatermark(uint64_t bytes_buffered) {
+  void checkLowWatermark(uint32_t bytes_buffered) {
     if (low_watermark_ > 0 && is_full_ && bytes_buffered < low_watermark_) {
       // Transitioning from above high watermark to below low watermark.
       ENVOY_LOG_TO_LOGGER(logger_, debug, "Buffered {} bytes, cross low watermark {}",
@@ -60,8 +60,8 @@ public:
   bool isBelowLowWatermark() const { return !is_full_; }
 
 private:
-  uint64_t low_watermark_{0};
-  uint64_t high_watermark_{0};
+  uint32_t low_watermark_{0};
+  uint32_t high_watermark_{0};
   bool is_full_{false};
   std::function<void()> below_low_watermark_;
   std::function<void()> above_high_watermark_;
