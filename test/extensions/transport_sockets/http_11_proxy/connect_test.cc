@@ -408,6 +408,17 @@ TEST(ParseTest, TestValidResponse) {
   }
 }
 
+// The SelfContainedParser is only intended for header parsing but for coverage,
+// test a request with a body.
+TEST(ParseTest, CoverResponseBody) {
+  std::string headers = "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n";
+  std::string body = "ab";
+
+  SelfContainedParser parser;
+  parser.parser().execute(headers.c_str(), headers.length());
+  parser.parser().execute(body.c_str(), body.length());
+}
+
 } // namespace
 } // namespace Http11Connect
 } // namespace TransportSockets

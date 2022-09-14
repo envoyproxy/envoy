@@ -7,8 +7,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
-#include "source/common/http/http1/balsa_parser.h"
-#include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -16,33 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
-
-using Http::Http1::CallbackResult;
-
-class SelfContainedParser : public Http::Http1::ParserCallbacks {
-public:
-  SelfContainedParser() : parser_(Http::Http1::MessageType::Response, this, 2000) {}
-  CallbackResult onMessageBegin() override { return CallbackResult::Success; }
-  CallbackResult onUrl(const char*, size_t) override { return CallbackResult::Success; }
-  CallbackResult onStatus(const char*, size_t) override { return CallbackResult::Success; }
-  CallbackResult onHeaderField(const char*, size_t) override { return CallbackResult::Success; }
-  CallbackResult onHeaderValue(const char*, size_t) override { return CallbackResult::Success; }
-  CallbackResult onHeadersComplete() override {
-    headers_complete_ = true;
-    parser_.pause();
-    return CallbackResult::Success;
-  }
-  void bufferBody(const char*, size_t) override {}
-  CallbackResult onMessageComplete() override { return CallbackResult::Success; }
-  void onChunkHeader(bool) override {}
-
-  bool headersComplete() const { return headers_complete_; }
-  Http::Http1::BalsaParser& parser() { return parser_; }
-
-private:
-  bool headers_complete_ = false;
-  Http::Http1::BalsaParser parser_;
-};
 
 bool UpstreamHttp11ConnectSocket::isValidConnectResponse(Buffer::Instance& buffer) {
   SelfContainedParser parser;
