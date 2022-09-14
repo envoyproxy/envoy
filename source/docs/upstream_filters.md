@@ -8,6 +8,8 @@ functionality analysis. Make sure
   * Either the filter does not sendLocalReply, or you thoroughly document how
     sendLocalReply code paths will play with hedging / retries (cut off the
     hedge attempt, and local-reply failures won't trigger retries)
+  * Any code accessing the downstream connection checks to make sure it is
+    present. The downstream connection will not be available for mirrored/shadowed requests.
 
 Once you've done this, you're ready to convert. An example converted filter is the Envoy
 [Buffer](https://github.com/envoyproxy/envoy/blob/main/source/extensions/filters/http/buffer/config.cc)
@@ -29,3 +31,5 @@ Assuming your filter inherits from FactoryBase:
     add ``envoy.filters.http.upstream`` to the filter category.
 
 Your filter should now be available as an upstream filter.
+
+An example PR for conversion is [23071](https://github.com/envoyproxy/envoy/pull/23071)
