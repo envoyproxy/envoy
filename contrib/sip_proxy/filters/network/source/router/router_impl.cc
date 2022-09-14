@@ -290,6 +290,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   route_ = callbacks_->route();
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "no route matched", *callbacks_);
+    stats_.route_missing_.inc();
     throw AppException(AppExceptionType::UnknownMethod, "envoy no match route found");
   }
 
@@ -299,6 +300,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
+    stats_.unknown_cluster_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("unknown cluster '{}'", cluster_name));
   }
@@ -308,6 +310,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   ENVOY_STREAM_LOG(debug, "cluster '{}' matched", *callbacks_, cluster_name);
 
   if (cluster_->maintenanceMode()) {
+    stats_.upstream_rq_maintenance_mode_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("maintenance mode for cluster '{}'", cluster_name));
   }
@@ -325,6 +328,7 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
                                        bool& lb_ret) {
   auto conn_pool = thread_local_cluster_->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
+    stats_.no_healthy_upstream_.inc();
     if (dest.empty()) {
       throw AppException(AppExceptionType::InternalError,
                          fmt::format("envoy no healthy upstream endpoint during load balance"));
