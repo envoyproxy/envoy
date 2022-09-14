@@ -37,26 +37,45 @@ MAKE_STAT_NAMES_STRUCT(CustomResponseFilterStatNames, ALL_CUSTOM_RESPONSE_FILTER
 MAKE_STATS_STRUCT(CustomResponseFilterStats, CustomResponseFilterStatNames,
                   ALL_CUSTOM_RESPONSE_FILTER_STATS);
 
+class FilterConfigBase {
+public:
+  FilterConfigBase(
+      const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+      Server::Configuration::ServerFactoryContext& context);
+
+  ResponseSharedPtr getResponse(Http::ResponseHeaderMap& headers,
+                                const StreamInfo::StreamInfo& stream_info) const;
+
+  virtual ~FilterConfigBase() = default;
+
+protected:
+  absl::flat_hash_map<absl::string_view, ResponseSharedPtr> responses_;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
+};
+
 /**
  * Container class to store filter configuration, which includes custom
  * responses, and matching tree/list to get custom response for a particular
  * upstream response.
  */
-class FilterConfig {
+class FilterConfig : public FilterConfigBase {
 public:
   FilterConfig(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
                Stats::StatName prefix, Server::Configuration::FactoryContext& context);
 
-  ResponseSharedPtr getResponse(Http::ResponseHeaderMap& headers,
-                                const StreamInfo::StreamInfo& stream_info);
-
   CustomResponseFilterStats& stats() { return stats_; }
+
+  ~FilterConfig() override = default;
 
 private:
   CustomResponseFilterStatNames stat_names_;
   CustomResponseFilterStats stats_;
-  absl::flat_hash_map<absl::string_view, ResponseSharedPtr> responses_;
-  Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
+};
+
+class FilterConfigPerRoute : public FilterConfigBase, public Router::RouteSpecificFilterConfig {
+public:
+  using FilterConfigBase::FilterConfigBase;
+  ~FilterConfigPerRoute() override = default;
 };
 
 } // namespace CustomResponse

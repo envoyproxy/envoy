@@ -2,6 +2,7 @@
 
 #include "envoy/http/filter.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
@@ -12,10 +13,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
+Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeaderMap& header_map,
+                                                              bool) {
+  downstream_headers_ = &header_map;
+  const auto* per_route_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+  base_config_ = per_route_settings ? static_cast<const FilterConfigBase*>(per_route_settings)
+                                    : static_cast<const FilterConfigBase*>(config_.get());
+  return Http::FilterHeadersStatus::Continue;
+}
+
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   (void)end_stream;
-  auto custom_response = config_->getResponse(headers, encoder_callbacks_->streamInfo());
+  auto custom_response = base_config_->getResponse(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
   if (!custom_response) {
@@ -58,7 +69,9 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     }
     downstream_headers_->setPath(path_and_query);
 
-    decoder_callbacks_->clearRouteCache();
+    if (decoder_callbacks_->downstreamCallbacks()) {
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
     const auto route = decoder_callbacks_->route();
     // Don't allow a redirect to a non existing route.
     if (!route) {

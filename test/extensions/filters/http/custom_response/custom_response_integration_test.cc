@@ -6,6 +6,12 @@
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
+using envoy::config::route::v3::Route;
+using envoy::config::route::v3::VirtualHost;
+using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
+using Envoy::Protobuf::MapPair;
+using Envoy::ProtobufWkt::Any;
+
 namespace {
 constexpr char kDefaultConfig[] = R"EOF(
   custom_responses:
@@ -123,9 +129,8 @@ public:
 
           auto* filter = hcm.mutable_http_filters()->Add();
           filter->set_name("envoy.filters.http.custom_response");
-          const auto default_configuration = TestUtility::parseYaml<
-              envoy::extensions::filters::http::custom_response::v3::CustomResponse>(
-              custom_response_filter_config_);
+          const auto default_configuration =
+              TestUtility::parseYaml<CustomResponse>(custom_response_filter_config_);
           filter->mutable_typed_config()->PackFrom(default_configuration);
           hcm.mutable_http_filters()->SwapElements(0, 1);
         });
@@ -134,6 +139,20 @@ public:
 
   CustomResponseIntegrationTest()
       : HttpProtocolIntegrationTest(), custom_response_filter_config_{kDefaultConfig} {}
+
+  void setPerRouteConfig(Route* route, const CustomResponse& cfg) {
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(cfg));
+    route->mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.custom_response", cfg_any));
+  }
+
+  void setPerHostConfig(VirtualHost& vh, const CustomResponse& cfg) {
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(cfg));
+    vh.mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.custom_response", cfg_any));
+  }
 
 protected:
   Http::TestResponseHeaderMapImpl unauthorized_response_{{":status", "401"},
@@ -163,8 +182,8 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
-                                                0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   EXPECT_EQ("499", response->headers().getStatusValue());
   // EXPECT_EQ("not allowed", response->body()); //TODO
   // EXPECT_EQ("x-bar",
@@ -176,20 +195,25 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   EXPECT_EQ("221", response->headers().getStatusValue());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
+  EXPECT_EQ(
+      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   // TODO: add header and body modifications
 }
 
 TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
+  // Modify custom response route so there is no matching route entry
   custom_response_filter_config_.replace(custom_response_filter_config_.find("foo."), 4, "fo1.");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   EXPECT_EQ("502", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
@@ -198,7 +222,33 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   // TODO: add header and body modifications
 }
 
-// TODO: add a test with route-specific filters
+TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
+  // Modify custom response route so there is no matching route entry for hcm
+  // filter config
+  custom_response_filter_config_.replace(custom_response_filter_config_.find("foo."), 4, "fo1.");
+
+  // Add per route filter config
+  auto some_other_host = config_helper_.createVirtualHost("some.other.host");
+  std::string yaml_config(kDefaultConfig);
+  setPerRouteConfig(some_other_host.mutable_routes(0),
+                    TestUtility::parseYaml<CustomResponse>(kDefaultConfig));
+  config_helper_.addVirtualHost(some_other_host);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.other.host");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
+  EXPECT_EQ("221", response->headers().getStatusValue());
+
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
+  EXPECT_EQ(
+      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
+  //  TODO: add header and body modifications
+}
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),

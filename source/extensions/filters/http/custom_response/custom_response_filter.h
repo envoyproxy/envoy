@@ -18,10 +18,7 @@ namespace CustomResponse {
 class CustomResponseFilter : public Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override {
-    downstream_headers_ = &header_map;
-    return Http::FilterHeadersStatus::Continue;
-  }
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override;
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
@@ -37,13 +34,14 @@ public:
 
   CustomResponseFilter(std::shared_ptr<FilterConfig> config,
                        Server::Configuration::FactoryContext& context)
-      : config_{std::move(config)}, factory_context_(context) {}
+      : config_{std::move(config)}, base_config_{config_.get()}, factory_context_(context) {}
 
   void onRemoteResponse(Http::ResponseHeaderMap& headers, const ResponseSharedPtr& custom_response,
                         const Http::ResponseMessage* response);
 
 private:
   std::shared_ptr<FilterConfig> config_;
+  const FilterConfigBase* base_config_ = nullptr;
   Server::Configuration::FactoryContext& factory_context_;
   Http::RequestHeaderMap* downstream_headers_ = nullptr;
 };

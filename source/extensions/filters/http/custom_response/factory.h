@@ -21,6 +21,11 @@ public:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::custom_response::v3::CustomResponse& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace CustomResponse

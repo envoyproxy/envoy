@@ -62,12 +62,16 @@ public:
 };
 
 } // namespace
-
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Stats::StatName stats_prefix, Server::Configuration::FactoryContext& context)
-    : stat_names_(context.scope().symbolTable()),
-      stats_(stat_names_, context.scope(), stats_prefix) {
+    : FilterConfigBase(config, context.getServerFactoryContext()),
+      stat_names_(context.scope().symbolTable()),
+      stats_(stat_names_, context.scope(), stats_prefix) {}
+
+FilterConfigBase::FilterConfigBase(
+    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+    Server::Configuration::ServerFactoryContext& context) {
   for (const auto& source : config.custom_responses()) {
     auto source_ptr = std::make_shared<Response>(source, context);
     if (source_ptr->name().empty()) {
@@ -81,15 +85,15 @@ FilterConfig::FilterConfig(
   if (config.has_custom_response_matcher()) {
     CustomResponseNameActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Http::HttpMatchingData, CustomResponseActionFactoryContext> factory(
-        responses_, context.getServerFactoryContext(), validation_visitor);
+        responses_, context, validation_visitor);
     matcher_ = factory.create(config.custom_response_matcher())();
   } else {
     throw EnvoyException("matcher can not be unset");
   }
 }
 
-ResponseSharedPtr FilterConfig::getResponse(Http::ResponseHeaderMap& headers,
-                                            const StreamInfo::StreamInfo& stream_info) {
+ResponseSharedPtr FilterConfigBase::getResponse(Http::ResponseHeaderMap& headers,
+                                                const StreamInfo::StreamInfo& stream_info) const {
   if (!matcher_) {
     return ResponseSharedPtr{};
   }

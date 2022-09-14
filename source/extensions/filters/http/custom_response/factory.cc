@@ -17,6 +17,12 @@ Http::FilterFactoryCb CustomResponseFilterFactory::createFilterFactoryFromProtoT
   };
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+CustomResponseFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(config, context);
+}
 /**
  * Static registration for the filter. @see RegisterFactory.
  */

@@ -55,7 +55,8 @@ Response::Response(
 }
 
 void Response::rewrite(Http::ResponseHeaderMap& response_headers,
-                       StreamInfo::StreamInfo& stream_info, std::string& body, Http::Code& code) {
+                       StreamInfo::StreamInfo& stream_info, std::string& body,
+                       Http::Code& code) const {
 
   if (local_body_.has_value()) {
     body = local_body_.value();

@@ -29,7 +29,7 @@ public:
 
   // Rewrite the response.
   void rewrite(Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
-               std::string& body, Http::Code& code);
+               std::string& body, Http::Code& code) const;
 
   const std::string& name() const { return name_; }
 
@@ -64,7 +64,7 @@ private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 };
 
-using ResponseSharedPtr = std::shared_ptr<Response>;
+using ResponseSharedPtr = std::shared_ptr<const Response>;
 
 } // namespace CustomResponse
 } // namespace HttpFilters

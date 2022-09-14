@@ -48,3 +48,22 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "custom_response_integration_test",
+    srcs = [
+        "custom_response_integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.http.custom_response"],
+    deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/custom_response:factory",
+        "//test/integration:http_integration_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)

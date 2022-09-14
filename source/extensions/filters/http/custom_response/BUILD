@@ -68,7 +68,6 @@ envoy_cc_extension(
     hdrs = [
         "factory.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         ":config",
         ":custom_response_filter",
