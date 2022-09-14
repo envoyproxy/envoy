@@ -61,7 +61,7 @@ public:
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo* stream_info) const;
   /**
-   * Helper function used to evaluate headers when response headers are not available.
+   * Helper methods used to evaluate headers when response headers are not available.
    * This usually happens when evaluating upstream request headers.
    */
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
@@ -72,6 +72,28 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const StreamInfo::StreamInfo* stream_info) const {
     evaluateHeaders(headers, request_headers,
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
+
+  /**
+   * Helper methods to evaluate methods without explicitly passing request and response headers.
+   * The method will try to fetch request headers from steam_info. Response headers will always be
+   * empty.
+   */
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
+    evaluateHeaders(headers,
+                    stream_info.getRequestHeaders() != nullptr
+                        ? *stream_info.getRequestHeaders()
+                        : *Http::StaticEmptyHeaders::get().request_headers,
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
+    evaluateHeaders(headers,
+                    stream_info == nullptr
+                        ? *Http::StaticEmptyHeaders::get().request_headers
+                        : (stream_info->getRequestHeaders() != nullptr
+                               ? *stream_info->getRequestHeaders()
+                               : *Http::StaticEmptyHeaders::get().request_headers),
                     *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
   }
 
