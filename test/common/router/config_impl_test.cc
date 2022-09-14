@@ -8266,7 +8266,7 @@ virtual_hosts:
       {"path-separated-cluster", "case-sensitive-cluster", "default-cluster", "rewrite-cluster"},
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-  
+
   // Exact matches
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
