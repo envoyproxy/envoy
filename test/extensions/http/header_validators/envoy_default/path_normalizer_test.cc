@@ -278,7 +278,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRejectEncodedSlashes) {
   auto normalizer = create(reject_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -288,7 +288,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriRedirectEncodedSlashes) {
   auto normalizer = create(redirect_encoded_slash_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Redirect);
   EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
@@ -329,7 +329,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidBeyondRoot) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -339,7 +339,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidRelative) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -349,7 +349,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidCharacter) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
@@ -359,8 +359,39 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidEncoding) {
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriOriginForm) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "envoy.com:443"},
+                                                  {":method", "CONNECT"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "envoy.com:443");
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriAbsoluteForm) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443/some/../root"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "https://envoy.com:443/root");
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriAbsoluteFormRootless) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
+  EXPECT_EQ(headers.path(), "https://envoy.com:443/");
 }
 
 } // namespace EnvoyDefault

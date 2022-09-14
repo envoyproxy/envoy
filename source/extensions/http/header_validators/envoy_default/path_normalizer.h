@@ -15,8 +15,9 @@ public:
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config);
 
-  ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
-  normalizePathUri(::Envoy::Http::RequestHeaderMap& header_map) const;
+  using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult;
+
+  PathNormalizationResult normalizePathUri(::Envoy::Http::RequestHeaderMap& header_map) const;
 
   /*
    * The result of attempting to normalize and decode a percent-encoded octet.

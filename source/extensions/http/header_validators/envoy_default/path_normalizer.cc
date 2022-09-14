@@ -1,5 +1,6 @@
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
+#include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
@@ -142,11 +143,41 @@ std::string::iterator findStartOfPreviousSegment(std::string::iterator iter,
   return begin;
 }
 
-HeaderValidator::RequestHeaderMapValidationResult
+PathNormalizer::PathNormalizationResult
 PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
+  // Attempt to parse the request-target to see if it is in origin-form. We are only normalizing
+  // the path component of the request-target, so if is is origin or absolute form we will extract
+  // the path. From RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2:
+  //
+  // request-target = origin-form
+  //                / absolute-form
+  //                / authority-form
+  //                / asterisk-form
+  //
+  // origin-form    = absolute-path [ "?" query ]
+  // absolute-form  = absolute-URI
+  // authority-form = uri-host ":" port
+  // asterisk-form  = "*"
+  const auto original_uri = header_map.path();
+  if (original_uri == "*") {
+    // Asterisk form
+    return PathNormalizationResult::success();
+  }
+
+  const bool is_connect_method =
+      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
+  ::Envoy::Http::Utility::Url url;
+  const bool is_origin_form = !url.initialize(original_uri, is_connect_method);
+  // If is_origin_form==true, then the original_uri is treated as origin-form and must begin with
+  // a "/" character.
+  if (!is_origin_form && url.pathAndQueryParams().empty() && is_connect_method) {
+    // CONNECT requests must be in authority-form with no path specified.
+    return PathNormalizationResult::success();
+  }
+
   // Make a copy of the original path and then create a readonly string_view to it. The string_view
   // is used for optimized sub-strings and the path is modified in place.
-  absl::string_view original_path = header_map.path();
+  absl::string_view original_path = is_origin_form ? original_uri : url.pathAndQueryParams();
   std::string path{original_path.data(), original_path.length()};
   absl::string_view path_view{path};
 
@@ -159,8 +190,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (read == end || *read != '/') {
     // Reject empty or relative paths
-    return {HeaderValidator::RejectOrRedirectAction::Reject,
-            UhvResponseCodeDetail::get().InvalidUrl};
+    return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   ++read;
@@ -200,8 +230,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         ABSL_FALLTHROUGH_INTENDED;
       case PercentDecodeResult::Reject:
         // Reject the request
-        return {HeaderValidator::RejectOrRedirectAction::Reject,
-                UhvResponseCodeDetail::get().InvalidUrl};
+        return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
 
       case PercentDecodeResult::Normalized:
         // Valid encoding but outside the UNRESERVED character set. The encoding was normalized to
@@ -242,7 +271,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
           if (new_write == begin) {
             // This is an invalid ".." segment, most likely the full path is "/..", which attempts
             // to go above the root.
-            return {HeaderValidator::RejectOrRedirectAction::Reject,
+            return {PathNormalizationResult::Action::Reject,
                     UhvResponseCodeDetail::get().InvalidUrl};
           }
 
@@ -278,23 +307,39 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         *write++ = *read++;
       } else {
         // invalid path character
-        return {HeaderValidator::RejectOrRedirectAction::Reject,
-                UhvResponseCodeDetail::get().InvalidUrl};
+        return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
       }
     }
     }
   }
 
   absl::string_view normalized_path = path_view.substr(0, std::distance(begin, write));
-  header_map.setPath(normalized_path);
+  if (is_origin_form) {
+    // origin-form is the absolute path, set it
+    header_map.setPath(normalized_path);
+  } else {
+    // absolute and authority forms have a prefix that we need to keep
+    auto path_begin_index = original_uri.length() - original_path.length();
+    absl::string_view prefix;
+    if (original_uri.at(path_begin_index) == '/') {
+      // absolute-form
+      prefix = original_uri.substr(0, path_begin_index);
+    } else {
+      // The URL class sets the path to "/" if the path is empty for authority-form, which we
+      // detect if the first path character is not a "/". The authority-form is our entire prefix.
+      prefix = original_uri;
+    }
+
+    header_map.setPath(absl::StrCat(prefix, normalized_path));
+  }
 
   // redirect |= normalized_path != original_path;
   if (redirect) {
-    return {HeaderValidator::RejectOrRedirectAction::Redirect,
+    return {PathNormalizationResult::Action::Redirect,
             PathNormalizerResponseCodeDetail::get().RedirectNormalized};
   }
 
-  return HeaderValidator::RequestHeaderMapValidationResult::success();
+  return PathNormalizationResult::success();
 }
 
 } // namespace EnvoyDefault
