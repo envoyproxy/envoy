@@ -1,17 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.path.rewrite.pattern_template.v3;
+package envoy.extensions.path.rewrite.uri_template.v3;
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.path.rewrite.pattern_template.v3";
-option java_outer_classname = "PatternTemplateRewriteProto";
+option java_package = "io.envoyproxy.envoy.extensions.path.rewrite.uri_template.v3";
+option java_outer_classname = "UriTemplateRewriteProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/path/rewrite/pattern_template/v3;pattern_templatev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/path/rewrite/uri_template/v3;uri_templatev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Pattern Template Rewrite Config]
+// [#protodoc-title: Uri Template Rewrite Config]
+// [#extension: envoy.path.rewrite.uri_template.uri_template_rewriter]
 
 // Indicates that during forwarding, portions of the path that match the
 // pattern should be rewritten, even allowing the substitution of variables
@@ -52,7 +53,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * The path pattern ``/content/{format}/{lang}/{id}/{file}.vtt`` paired with a substitution
 //   string of ``/{lang}/{format}/{file}.vtt`` would transform ``/content/hls/en-us/12345/en_193913.vtt``
 //   into ``/en-us/hls/en_193913.vtt``.
-// [#not-implemented-hide:]
-message PatternTemplateRewriteConfig {
+message UriTemplateRewriteConfig {
   string path_template_rewrite = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }
