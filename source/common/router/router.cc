@@ -670,6 +670,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
         active_shadow_policies_.push_back(std::cref(policy_ref));
+        shadow_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_);
       }
     }
   }
@@ -804,6 +805,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
 
+  if (shadow_headers_) {
+    shadow_trailers_ = Http::createHeaderMap<Http::RequestTrailerMapImpl>(trailers);
+  }
+
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
@@ -881,12 +886,12 @@ void Filter::maybeDoShadowing() {
     }
 
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_)));
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
     if (callbacks_->decodingBuffer()) {
       request->body().add(*callbacks_->decodingBuffer());
     }
-    if (downstream_trailers_) {
-      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*downstream_trailers_));
+    if (shadow_trailers_) {
+      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
     }
 
     auto options = Http::AsyncClient::RequestOptions()
@@ -1727,7 +1732,11 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
   downstream_headers.setPath(path_and_query);
 
-  callbacks_->clearRouteCache();
+  // Only clear the route cache if there are downstream callbacks. There aren't, for example,
+  // for async connections.
+  if (callbacks_->downstreamCallbacks()) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
   const auto route = callbacks_->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {

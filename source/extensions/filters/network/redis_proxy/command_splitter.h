@@ -42,6 +42,11 @@ public:
   virtual bool connectionAllowed() PURE;
 
   /**
+   * Called when a quit command has been received.
+   */
+  virtual void onQuit() PURE;
+
+  /**
    * Called when an authentication command has been received with a password.
    * @param password supplies the AUTH password provided by the downstream client.
    */
