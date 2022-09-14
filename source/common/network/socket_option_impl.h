@@ -137,12 +137,14 @@ public:
                    int value, // Yup, int. See setsockopt(2).
                    absl::optional<Network::Socket::Type> socket_type = absl::nullopt)
       : SocketOptionImpl(in_state, optname,
-                         absl::string_view(reinterpret_cast<char*>(&value), sizeof(value)), socket_type) {}
+                         absl::string_view(reinterpret_cast<char*>(&value), sizeof(value)),
+                         socket_type) {}
 
   SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value,
                    absl::optional<Network::Socket::Type> socket_type = absl::nullopt)
-      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()), socket_type_(socket_type) {
+      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()),
+        socket_type_(socket_type) {
     ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
   }
 

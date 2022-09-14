@@ -15,7 +15,8 @@ SocketOptionFactory::buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepal
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   absl::optional<Network::Socket::Type> tcp_only = {Network::Socket::Type::Stream};
   options->push_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1, tcp_only));
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_KEEPALIVE, 1,
+      tcp_only));
 
   if (keepalive_config.keepalive_probes_.has_value()) {
     options->push_back(std::make_shared<Network::SocketOptionImpl>(
