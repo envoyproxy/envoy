@@ -3290,8 +3290,6 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
-  autonomous_upstream_ = true;
-  autonomous_allow_incomplete_streams_ = true;
   initialize();
 
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
@@ -3302,22 +3300,33 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
 
   // The response is larger than the stream flow control window. So the reset of it will
-  // likely be buffered QUIC stream send buffer.
+  // likely be buffered in the QUIC stream send buffer.
   constexpr uint64_t response_size = 100 * 1024;
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"content-length", "10"},
-                                     {"response_size_bytes", absl::StrCat(response_size)}});
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"content-length", "10"}});
   auto& encoder = encoder_decoder.first;
+
   std::string data(10, 'a');
   codec_client_->sendData(encoder, data, true);
 
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-length", absl::StrCat(response_size)}},
+      false);
+
   auto response = std::move(encoder_decoder.second);
   response->waitForHeaders();
-  // Reset stream while the quic server stream might have FIN buffered in its send buffer.
+  encoder.getStream().readDisable(true);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNoPost());
+  // Reset stream while the quic server stream has FIN buffered in its send buffer.
   codec_client_->sendReset(encoder);
   codec_client_->close();
 }
