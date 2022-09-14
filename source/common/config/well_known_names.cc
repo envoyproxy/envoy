@@ -165,6 +165,12 @@ TagNameValues::TagNameValues() {
 
   // redis.(<stat_prefix>.)*
   addTokenized(REDIS_PREFIX, "redis.$.**");
+
+  // (<stat_prefix>.).http_local_rate_limit.**
+  addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
+
+  // local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_NETWORK_RATELIMIT_PREFIX, "local_rate_limit.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
