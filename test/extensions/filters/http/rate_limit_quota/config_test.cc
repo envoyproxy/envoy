@@ -17,25 +17,40 @@ namespace {
 
 TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   std::string filter_config_yaml = R"EOF(
-    http_uri:
-      uri: http://test/path
-      cluster: test_cluster
-      timeout:
-        seconds: 5
-    retry_policy:
-      retry_back_off:
-        base_interval: 0.1s
-        max_interval: 32s
-      num_retries: 5
+  rlqs_server:
+    envoy_grpc:
+      cluster_name: "rate_limit_quota_server"
+  domain: test
+  bucket_matchers:
+    matcher_list:
+      matchers:
+        # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+        predicate:
+          single_predicate:
+            input:
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: environment
+            value_match:
+              exact: staging
+        on_match:
+          action:
+            name: rate_limit_quota
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+              bucket_id_builder:
+                bucket_id_builder:
+                  "name":
+                      string_value: "prod"
+              reporting_interval: 60s
   )EOF";
-  GcpAuthnFilterConfig filter_config;
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
-  GcpAuthnFilterFactory factory;
+  RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(filter_config, stats_prefix, context);
+      factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix, context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

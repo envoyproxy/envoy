@@ -21,8 +21,8 @@ void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
   ASSERT(stream_ != nullptr);
+  // TODO(tyxia) Build the report and handle end_stream later.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-  // TODO(tyxia) Handle end_stream later.
   send(std::move(reports), /*end_stream=*/true);
 }
 
@@ -45,8 +45,6 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
       std::string error_string = "Unable to establish the new stream";
       ENVOY_LOG(error, error_string);
       return absl::InternalError(error_string);
-      // TODO(tyxia) Error handling later
-      // re-try or other kinds of error handling actions
     }
   }
   return absl::OkStatus();
