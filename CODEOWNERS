@@ -265,6 +265,10 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
+# path match by pattern
+/*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
+# path rewrite by pattern
+/*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -293,3 +297,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
+/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch

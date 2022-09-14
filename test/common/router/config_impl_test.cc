@@ -5143,7 +5143,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Cannot specify both prefix_rewrite and regex_rewrite");
+      "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
 }
 
 TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
@@ -8817,6 +8817,572 @@ virtual_hosts:
   const auto& internal_redirect_policy =
       config.route(headers, 0)->routeEntry()->internalRedirectPolicy();
   EXPECT_FALSE(internal_redirect_policy.enabled());
+}
+
+TEST_F(RouteConfigurationV2, TemplatePatternIsDisabledWhenNotSpecifiedInRouteAction) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match:
+          safe_regex:
+            regex: "/regex"
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers =
+      genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const auto& pattern_template_policy = config.route(headers, 0)->routeEntry()->pathMatcher();
+  EXPECT_TRUE(pattern_template_policy == nullptr);
+}
+
+TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/bar/{country}/{lang}"
+        route:
+          cluster: some-cluster
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/bar/{lang}/{country}"
+
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/bar/one/two", "GET");
+
+  const auto& pattern_match_policy = config.route(headers, 0)->routeEntry()->pathMatcher();
+  EXPECT_TRUE(pattern_match_policy != nullptr);
+  EXPECT_EQ(pattern_match_policy->uriTemplate(), "/bar/{country}/{lang}");
+
+  const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewriter();
+  EXPECT_TRUE(pattern_rewrite_policy != nullptr);
+  EXPECT_EQ(pattern_rewrite_policy->uriTemplate(), "/bar/{lang}/{country}");
+}
+
+TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{lang}/{state}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster", "default-cluster"},
+                                                       {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Pattern matches
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster",
+            config.route(genHeaders("path.prefix.com", "/rest/spanish/mexico", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, MixedPathPatternMatch) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{lang}/{state}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-one}
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/boo/{go}/{fly}/{bat}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-two}
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
+          case_sensitive: false
+        route: { cluster: path-pattern-cluster-three}
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"path-pattern-cluster-one", "path-pattern-cluster-two", "path-pattern-cluster-three"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  // Pattern matches
+  EXPECT_EQ("path-pattern-cluster-one",
+            config.route(genHeaders("path.prefix.com", "/rest/english/wa", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster-one",
+            config.route(genHeaders("path.prefix.com", "/rest/spanish/mexico", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("path-pattern-cluster-two",
+            config.route(genHeaders("path.prefix.com", "/boo/go/fly/bat", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ("path-pattern-cluster-two",
+            config.route(genHeaders("path.prefix.com", "/boo/snow/flew/cone", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+
+  EXPECT_EQ("path-pattern-cluster-three",
+            config.route(genHeaders("path.prefix.com", "/foo/boo/hat/bat/bat/sat", "GET"), 0)
+                ->routeEntry()
+                ->clusterName());
+  EXPECT_EQ(
+      "path-pattern-cluster-three",
+      config.route(genHeaders("path.prefix.com", "/foo/boo/spanish/mexico/lisk/fisl", "GET"), 0)
+          ->routeEntry()
+          ->clusterName());
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteSimple) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/rest/{two}/{one}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/rest/two/one", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/rest/two/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteSimpleTwo) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one=*}/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/two/one", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/two/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchRewriteCaseSensitive) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
+          case_sensitive: true
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/REST/{one}/{two}"
+          case_sensitive: true
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/TEST/{one}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/two/one", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/two/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+
+  headers = genHeaders("path.prefix.com", "/REST/one/two", "GET");
+  route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/TEST/one", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/TEST/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchConfigMissingBracket) {
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{two}/{one}"
+  )EOF";
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "path_match_policy.path_template /rest/{one/{two} is invalid");
+}
+
+TEST_F(RouteMatcherTest, PatternMatchConfigMissingVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/rest/{one}/{two}/{missing}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException,
+      "mismatch between variables in path_match_policy /rest/{one}/{two} and path_rewrite_policy "
+      "/rest/{one}/{two}/{missing}");
+}
+
+TEST_F(RouteMatcherTest, PatternMatchInvalidVariableName) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{on==e}/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/rest/{one}/{two}/{missing}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "path_match_policy.path_template /rest/{on==e}/{two} is invalid");
+}
+
+TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/*/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{two}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/two", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/two", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchWildcardAtEndVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/**"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{one}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/two/three/four", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/one", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/one", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchWildcardAtEndVariableNamed) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one=*}/{last=**}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{last}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/two/three/four", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/two/three/four", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/two/three/four", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchWildcardMiddleVariableNamed) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{middle=videos/*}/end"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{middle}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/videos/three/end", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/videos/three", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/videos/three", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchCaseSensitiveVariableNames) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{One}/end"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/{One}/{one}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/lower/upper/end", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ("/upper/lower", route->currentUrlPathAfterRewrite(headers));
+  route->finalizeRequestHeaders(headers, stream_info, true);
+  EXPECT_EQ("/upper/lower", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
+}
+
+TEST_F(RouteMatcherTest, PatternMatchCaseTooManyVariableNames) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException,
+      "path_match_policy.path_template /rest/{one}/{two}/{three}/{four}/{five}/{six} is invalid");
 }
 
 TEST_F(RouteConfigurationV2, DefaultInternalRedirectPolicyIsSensible) {

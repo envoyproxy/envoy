@@ -168,6 +168,22 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
+class MockPathRewriter : public PathRewriter {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(absl::StatusOr<std::string>, rewritePath,
+              (absl::string_view path, absl::string_view rewrite_pattern), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
+  MOCK_METHOD(absl::Status, isCompatiblePathMatcher, (PathMatcherSharedPtr path_matcher), (const));
+};
+
+class MockPathMatcher : public PathMatcher {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, match, (absl::string_view path), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
+};
+
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
@@ -380,6 +396,8 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
+  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
+  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -417,6 +435,8 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
+  testing::NiceMock<MockPathMatcher> path_matcher_;
+  testing::NiceMock<MockPathRewriter> path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
