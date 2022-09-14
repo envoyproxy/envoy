@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.http.custom_response.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -34,9 +33,7 @@ message CustomResponse {
   // [#next-free-field: 7]
   message Response {
     message RemoteDataSource {
-      config.core.v3.HttpUri http_uri = 1;
-
-      config.core.v3.RetryPolicy retry_policy = 2;
+      string uri = 1 [(validate.rules).string = {min_len: 1}];
     }
 
     // The new response status code if specified.

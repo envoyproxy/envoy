@@ -43,9 +43,9 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
       return Http::FilterHeadersStatus::Continue;
     }
     Http::Utility::Url absolute_url;
-    if (!absolute_url.initialize(remote_data_source->http_uri().uri(), false)) {
+    if (!absolute_url.initialize(remote_data_source->uri(), false)) {
       ENVOY_LOG(trace, "Redirect for custom response failed: invalid location {}",
-                remote_data_source->http_uri().uri());
+                remote_data_source->uri());
       config_->stats().custom_response_redirect_invalid_uri_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
@@ -92,8 +92,13 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // Handle local body
   std::string body;
   Http::Code code;
-  custom_response->rewrite(headers, encoder_callbacks_->streamInfo(), body, code);
-  encoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt, "");
+  custom_response->rewriteBody(headers, encoder_callbacks_->streamInfo(), body, code);
+
+  const auto mutate_headers = [custom_response = custom_response,
+                               this](Http::ResponseHeaderMap& headers) {
+    custom_response->evaluateHeaders(headers, encoder_callbacks_->streamInfo());
+  };
+  encoder_callbacks_->sendLocalReply(code, body, mutate_headers, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;
 }
 

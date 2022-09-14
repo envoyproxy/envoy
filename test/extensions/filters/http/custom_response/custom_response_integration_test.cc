@@ -5,7 +5,13 @@
 
 #include "test/integration/http_protocol_integration.h"
 
+#include "utility.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace CustomResponse {
+
 using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
@@ -13,79 +19,6 @@ using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
 namespace {
-constexpr char kDefaultConfig[] = R"EOF(
-  custom_responses:
-  - name: 400_response
-    status_code: 499
-    local:
-      inline_string: "not allowed"
-    headers_to_add:
-    - header:
-        key: "foo"
-        value: "x-bar"
-      append: false
-    body_format:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
-  - name: gateway_error_response
-    remote:
-      http_uri:
-        uri: "https://foo.example/gateway_error"
-        cluster: "foo"
-        timeout:
-          seconds: 2
-    body_format:
-      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
-      content_type: "text/html; charset=UTF-8"
-  custom_response_matcher:
-    matcher_list:
-      matchers:
-        # Apply the 400_response policy to any 4xx response
-      - predicate:
-          single_predicate:
-            input:
-              name: status_code
-              typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
-            value_match:
-              exact: "4xx"
-        on_match:
-          action:
-            name: custom_response
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: 400_response
-        # Apply the gateway_error_response policy to status codes 502, 503 and 504.
-      - predicate:
-          or_matcher:
-            predicate:
-            - single_predicate:
-                input:
-                  name: status_code
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                value_match:
-                  exact: "502"
-            - single_predicate:
-                input:
-                  name: status_code
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                value_match:
-                  exact: "503"
-            - single_predicate:
-                input:
-                  name: status_code
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                value_match:
-                  exact: "504"
-        on_match:
-          action:
-            name: custom_response
-            typed_config:
-              "@type": type.googleapis.com/google.protobuf.StringValue
-              value: gateway_error_response
-  )EOF";
 
 constexpr char kTestHeaderKey[] = "test-header";
 
@@ -182,12 +115,12 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
+                                                0, 0, std::chrono::minutes(15));
   EXPECT_EQ("499", response->headers().getStatusValue());
-  // EXPECT_EQ("not allowed", response->body()); //TODO
-  // EXPECT_EQ("x-bar",
-  // response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+  EXPECT_EQ("not allowed", response->body()); // TODO
+  EXPECT_EQ("x-bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
 
 TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
@@ -195,8 +128,8 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(15));
   EXPECT_EQ("221", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
@@ -229,9 +162,8 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
 
   // Add per route filter config
   auto some_other_host = config_helper_.createVirtualHost("some.other.host");
-  std::string yaml_config(kDefaultConfig);
   setPerRouteConfig(some_other_host.mutable_routes(0),
-                    TestUtility::parseYaml<CustomResponse>(kDefaultConfig));
+                    TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig)));
   config_helper_.addVirtualHost(some_other_host);
 
   initialize();
@@ -253,4 +185,7 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+} // namespace CustomResponse
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

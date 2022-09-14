@@ -28,9 +28,11 @@ public:
            Server::Configuration::CommonFactoryContext& context);
 
   // Rewrite the response.
-  void rewrite(Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
-               std::string& body, Http::Code& code) const;
+  void rewriteBody(Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
+                   std::string& body, Http::Code& code) const;
 
+  void evaluateHeaders(Http::ResponseHeaderMap& response_headers,
+                       StreamInfo::StreamInfo& stream_info) const;
   const std::string& name() const { return name_; }
 
   const absl::optional<envoy::extensions::filters::http::custom_response::v3::CustomResponse::

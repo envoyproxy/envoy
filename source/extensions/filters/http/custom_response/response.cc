@@ -54,15 +54,18 @@ Response::Response(
   header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
 }
 
-void Response::rewrite(Http::ResponseHeaderMap& response_headers,
-                       StreamInfo::StreamInfo& stream_info, std::string& body,
-                       Http::Code& code) const {
+void Response::evaluateHeaders(Http::ResponseHeaderMap& response_headers,
+                               StreamInfo::StreamInfo& stream_info) const {
+  header_parser_->evaluateHeaders(response_headers, stream_info);
+}
+
+void Response::rewriteBody(Http::ResponseHeaderMap& response_headers,
+                           StreamInfo::StreamInfo& stream_info, std::string& body,
+                           Http::Code& code) const {
 
   if (local_body_.has_value()) {
     body = local_body_.value();
   }
-
-  header_parser_->evaluateHeaders(response_headers, stream_info);
 
   if (status_code_.has_value()) {
     code = *status_code_;

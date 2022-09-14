@@ -5,11 +5,21 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_extension_cc_test_library(
+    name = "utility_lib",
+    hdrs = ["utility.h"],
+    extension_names = ["envoy.filters.http.custom_response"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
 
 envoy_extension_cc_test(
     name = "config_test",
@@ -17,6 +27,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.custom_response"],
     deps = [
+        ":utility_lib",
         "//source/common/http:message_lib",
         "//source/common/network/matching:inputs_lib",
         "//source/extensions/filters/http/custom_response:config",
@@ -34,6 +45,7 @@ envoy_extension_cc_test(
     srcs = ["custom_response_filter_test.cc"],
     extension_names = ["envoy.filters.http.custom_response"],
     deps = [
+        ":utility_lib",
         "//source/common/http:message_lib",
         "//source/common/network/matching:inputs_lib",
         "//source/extensions/filters/http/custom_response:config",
@@ -56,6 +68,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.custom_response"],
     deps = [
+        ":utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/custom_response:factory",

@@ -14,94 +14,13 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 namespace {
-constexpr absl::string_view DefaultConfig = R"EOF(
-  custom_responses:
-  - name: 400_response
-    status_code: 401
-    local:
-      inline_string: "not allowed"
-    headers_to_add:
-    - header:
-        key: "foo"
-        value: "x-bar"
-      append: false
-    body_format:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
-  - name: gateway_error_response
-    remote:
-      http_uri:
-        uri: "https://www.foo.example/gateway_error"
-        cluster: "foo"
-        timeout:
-          seconds: 2
-    body_format:
-      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
-      content_type: "text/html; charset=UTF-8"
-  custom_response_matcher:
-    matcher_tree:
-      input:
-        name: server_name
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
-      exact_match_map:
-        map:
-          server1.example.foo:
-            matcher:
-              matcher_list:
-                matchers:
-                  # Apply 400_response to status code 400
-                - predicate:
-                    single_predicate:
-                      input:
-                        name: status_code
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
-                      value_match:
-                        exact: "4xx"
-                  on_match:
-                    action:
-                      name: custom_response
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: 400_response
-                  # Apply gateway_error_response to status codes 502, 503 and 504
-                - predicate:
-                    or_matcher:
-                      predicate:
-                      - single_predicate:
-                          input:
-                            name: status_code
-                            typed_config:
-                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                          value_match:
-                            exact: "502"
-                      - single_predicate:
-                          input:
-                            name: status_code
-                            typed_config:
-                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                          value_match:
-                            exact: "503"
-                      - single_predicate:
-                          input:
-                            name: status_code
-                            typed_config:
-                              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
-                          value_match:
-                            exact: "504"
-                  on_match:
-                    action:
-                      name: custom_response
-                      typed_config:
-                        "@type": type.googleapis.com/google.protobuf.StringValue
-                        value: gateway_error_response
-)EOF";
 
 class CustomResponseFilterTest : public testing::Test {
 public:
@@ -125,7 +44,7 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void createConfig(const absl::string_view config_str = DefaultConfig) {
+  void createConfig(const absl::string_view config_str = kDefaultConfig) {
     envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
     TestUtility::loadFromYaml(std::string(config_str), filter_config);
     Stats::StatNameManagedStorage prefix("stats", context_.scope().symbolTable());
