@@ -78,6 +78,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+- area: tracing
+  change: |
+    removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
 - area: http
