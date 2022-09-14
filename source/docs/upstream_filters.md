@@ -27,8 +27,7 @@ Assuming your filter inherits from FactoryBase:
     Please note if you use the init manager or a stats context you *must* get
     them from DualInfo rather than from the server factory context or xDS
     reloads will not work correctly and may leak memory.
-  * Add ``using UpstreamMyFilterFactory = MyFilterFactory;`` and
-    ``DECLARE_FACTORY(UpstreamMyFilterFactory)`` in your config.h file and
+  * Add ``using UpstreamMyFilterFactory = MyFilterFactory;`` in your config.h file and
     ``REGISTER_FACTORY(UpstreamMyFilterFactory, Server::Configuration::UpstreamHttpFilterConfigFactory);`` to
     your config.cc file.
   * If your filter is listed in ``source/extensions/extensions_metadata.yaml``
