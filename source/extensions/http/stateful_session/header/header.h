@@ -23,9 +23,8 @@ class HeaderBasedSessionStateFactory : public Envoy::Http::SessionStateFactory {
 public:
   class SessionStateImpl : public Envoy::Http::SessionState {
   public:
-    SessionStateImpl(absl::optional<std::string> address,
-                     const HeaderBasedSessionStateFactory& factory)
-        : upstream_address_(std::move(address)), factory_(factory) {}
+    SessionStateImpl(absl::optional<std::string> address, const std::string name)
+        : upstream_address_(std::move(address)), name_(name) {}
 
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
     void onUpdate(const Upstream::HostDescription& host,
@@ -33,7 +32,7 @@ public:
 
   private:
     absl::optional<std::string> upstream_address_;
-    const HeaderBasedSessionStateFactory& factory_;
+    const std::string name_;
   };
 
   HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
@@ -42,7 +41,7 @@ public:
     if (!requestPathMatch(headers.getPathValue())) {
       return nullptr;
     }
-    return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
+    return std::make_unique<SessionStateImpl>(parseAddress(headers), name_);
   }
 
   bool requestPathMatch(absl::string_view request_path) const {
@@ -52,7 +51,7 @@ public:
 
 private:
   absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    auto hdr = headers.get(name_);
+    auto hdr = headers.get(Envoy::Http::LowerCaseString(name_));
     if (hdr.empty()) {
       return absl::nullopt;
     }
@@ -62,9 +61,7 @@ private:
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
-  Envoy::Http::LowerCaseString getHeaderName() const { return name_; }
-
-  Envoy::Http::LowerCaseString name_;
+  const std::string name_;
   const std::string path_;
 
   std::function<bool(absl::string_view)> path_matcher_;
