@@ -87,10 +87,11 @@ public:
 
   struct DualInfo {
     DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context)
-        : init_manager(context.initManager()) {}
+        : init_manager(context.initManager()), scope(context.scope()) {}
     DualInfo(Server::Configuration::FactoryContext& context)
-        : init_manager(context.initManager()) {}
+        : init_manager(context.initManager()), scope(context.scope()) {}
     Init::Manager& init_manager;
+    Stats::Scope& scope;
   };
 
   Http::FilterFactoryCb
