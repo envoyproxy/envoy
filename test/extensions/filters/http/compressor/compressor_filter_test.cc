@@ -812,39 +812,45 @@ TEST_F(MultipleFiltersTest, UseFirstRegisteredFilterWhenWildcard) {
   EXPECT_EQ(1, stats2_.counter("test2.compressor.test2.test.header_wildcard").value());
 }
 
-class ChooseFirstTest
-    : public MultipleFiltersTest,
-      public testing::WithParamInterface<std::tuple<std::string, bool, std::string>> {
+// TODO(giantcroc): Refactor the code of MultipleFiltersTest and CompressorFilterTest due to many
+// duplicate methods
+class ChooseFirstTest : public MultipleFiltersTest,
+                        public testing::WithParamInterface<
+                            std::tuple<std::string, std::string, std::string, bool, std::string>> {
 protected:
-  void SetUp() override {
+  // ChooseFirstTest Helpers
+  void setUpFilter(const std::string& choose_first1, const std::string& choose_first2) {
     envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-    TestUtility::loadFromJson(R"EOF(
-{
-  "choose_first": "true",
-  "compressor_library": {
+    TestUtility::loadFromJson(fmt::format(R"EOF(
+{{
+  "choose_first": {},
+  "compressor_library": {{
      "name": "test1",
-     "typed_config": {
+     "typed_config": {{
        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-     }
-  }
-}
+     }}
+  }}
+}}
 )EOF",
+                                          choose_first1),
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     auto config1 = std::make_shared<CompressorFilterConfig>(compressor, "test1.", stats1_, runtime_,
                                                             std::move(compressor_factory1));
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
-    TestUtility::loadFromJson(R"EOF(
-{
-  "compressor_library": {
+    TestUtility::loadFromJson(fmt::format(R"EOF(
+{{
+  "choose_first": {},
+  "compressor_library": {{
      "name": "test2",
-     "typed_config": {
+     "typed_config": {{
        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-     }
-  }
-}
+     }}
+  }}
+}}
 )EOF",
+                                          choose_first2),
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     auto config2 = std::make_shared<CompressorFilterConfig>(compressor, "test2.", stats2_, runtime_,
@@ -920,17 +926,23 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-INSTANTIATE_TEST_SUITE_P(ChooseFirstTestSuite, ChooseFirstTest,
-                         testing::Values(std::make_tuple("test1", true, "test1"),
-                                         std::make_tuple("test2, test1", true, "test1"),
-                                         std::make_tuple("test2;q=1, test1;q=1", true, "test1"),
-                                         std::make_tuple("test2;q=1, test1;q=0.5", false, "")));
+INSTANTIATE_TEST_SUITE_P(
+    ChooseFirstTestSuite, ChooseFirstTest,
+    testing::Values(std::make_tuple("true", "false", "test1", true, "test1"),
+                    std::make_tuple("true", "false", "test2, test1", true, "test1"),
+                    std::make_tuple("true", "false", "test2;q=1, test1;q=1", true, "test1"),
+                    std::make_tuple("true", "false", "test2;q=1, test1;q=0.5", false, ""),
+                    std::make_tuple("true", "true", "test2, test1", true, "test1"),
+                    std::make_tuple("true", "true", "test2;q=1, test1;q=0.5", false, "")));
 
 TEST_P(ChooseFirstTest, Validate) {
-  const std::string& accept_encoding = std::get<0>(GetParam());
-  const bool is_compression_expected = std::get<1>(GetParam());
-  const std::string& content_encoding = std::get<2>(GetParam());
+  const std::string& choose_first1 = std::get<0>(GetParam());
+  const std::string& choose_first2 = std::get<1>(GetParam());
+  const std::string& accept_encoding = std::get<2>(GetParam());
+  const bool is_compression_expected = std::get<3>(GetParam());
+  const std::string& content_encoding = std::get<4>(GetParam());
 
+  setUpFilter(choose_first1, choose_first2);
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter1_->setDecoderFilterCallbacks(decoder_callbacks);
   filter1_->setEncoderFilterCallbacks(encoder_callbacks_);
