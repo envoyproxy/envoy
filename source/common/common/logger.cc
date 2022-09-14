@@ -240,28 +240,17 @@ std::vector<Logger>& Registry::allLoggers() {
   return *all_loggers;
 }
 
-spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }
+spdlog::logger& Registry::getLog(Id id) { return allLoggers()[static_cast<int>(id)].getLogger(); }
 
 void Registry::setLogLevel(spdlog::level::level_enum log_level) {
   for (Logger& logger : allLoggers()) {
-    logger.logger_->set_level(static_cast<spdlog::level::level_enum>(log_level));
+    logger.getLogger().set_level(static_cast<spdlog::level::level_enum>(log_level));
   }
 }
 
 void Registry::setLogFormat(const std::string& log_format) {
   for (Logger& logger : allLoggers()) {
-    auto formatter = std::make_unique<spdlog::pattern_formatter>();
-    formatter
-        ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
-            CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
-        .set_pattern(log_format);
-
-    // Escape log payload as JSON string when it sees "%j".
-    formatter
-        ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
-            CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
-        .set_pattern(log_format);
-    logger.logger_->set_formatter(std::move(formatter));
+    Utility::setLogFormatForLogger(logger.getLogger(), log_format);
   }
 }
 
@@ -275,6 +264,24 @@ Logger* Registry::logger(const std::string& log_name) {
   }
   return logger_to_return;
 }
+namespace Utility {
+
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format) {
+  auto formatter = std::make_unique<spdlog::pattern_formatter>();
+  formatter
+      ->add_flag<CustomFlagFormatter::EscapeMessageNewLine>(
+          CustomFlagFormatter::EscapeMessageNewLine::Placeholder)
+      .set_pattern(log_format);
+
+  // Escape log payload as JSON string when it sees "%j".
+  formatter
+      ->add_flag<CustomFlagFormatter::EscapeMessageJsonString>(
+          CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
+      .set_pattern(log_format);
+  logger.set_formatter(std::move(formatter));
+}
+
+} // namespace Utility
 
 namespace CustomFlagFormatter {
 
