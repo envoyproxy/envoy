@@ -87,7 +87,6 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   // Set error tag when Grpc status code represents an upstream error. See
   // https://github.com/envoyproxy/envoy/issues/18877.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-
   if (grpc_status_code.has_value()) {
     const auto& status = grpc_status_code.value();
     if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
@@ -117,10 +116,6 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
         span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
         break;
       }
-    }
-  } else {
-    if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     }
   }
 }
