@@ -250,6 +250,18 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("ratelimit.foo_ratelimiter.over_limit", "ratelimit.over_limit",
                          {ratelimit_prefix});
 
+  // Local Http Ratelimit
+  Tag local_ratelimit_prefix;
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_HTTP_RATELIMIT_PREFIX;
+  local_ratelimit_prefix.value_ = "foo_ratelimiter";
+  regex_tester.testRegex("foo_ratelimiter.http_local_rate_limit.ok", "http_local_rate_limit.ok",
+                         {local_ratelimit_prefix});
+
+  // Local network Ratelimit
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_NETWORK_RATELIMIT_PREFIX;
+  regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited",
+                         "local_rate_limit.rate_limited", {local_ratelimit_prefix});
+
   // Dynamo
   Tag dynamo_http_prefix;
   dynamo_http_prefix.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
@@ -392,19 +404,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
 
   // Listener worker id
   listener_address.value_ = "127.0.0.1_3012";
   regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   listener_address.value_ = "myprefix";
   regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.watchdog_miss", {worker_id});
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+                         {worker_id});
 
   // Thrift Proxy Prefix
   Tag thrift_prefix;
