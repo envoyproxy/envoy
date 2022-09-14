@@ -276,22 +276,18 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
   if (route->routeEntry()->includeVirtualHostRateLimits()) {
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
-    const auto* specific_per_route_config = getConfig();
-    if (specific_per_route_config != nullptr) {
-      switch (specific_per_route_config->virtualHostRateLimits()) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-      case envoy::extensions::common::ratelimit::v3::INCLUDE:
-        vh_rate_limits_ = VhRateLimitOptions::Include;
-        break;
-      case envoy::extensions::common::ratelimit::v3::IGNORE:
-        vh_rate_limits_ = VhRateLimitOptions::Ignore;
-        break;
-      case envoy::extensions::common::ratelimit::v3::OVERRIDE:
-        vh_rate_limits_ = VhRateLimitOptions::Override;
-        break;
-      }
-    } else {
+    const auto* config = getConfig();
+    switch (config->virtualHostRateLimits()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::common::ratelimit::v3::INCLUDE:
+      vh_rate_limits_ = VhRateLimitOptions::Include;
+      break;
+    case envoy::extensions::common::ratelimit::v3::IGNORE:
+      vh_rate_limits_ = VhRateLimitOptions::Ignore;
+      break;
+    case envoy::extensions::common::ratelimit::v3::OVERRIDE:
       vh_rate_limits_ = VhRateLimitOptions::Override;
+      break;
     }
   }
   return vh_rate_limits_;
