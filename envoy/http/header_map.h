@@ -310,7 +310,6 @@ private:
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedHost)                                                                       \
   HEADER_FUNC(ForwardedProto)                                                                      \
-  HEADER_FUNC(STSHost)                                                                             \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(Method)                                                                              \

@@ -196,7 +196,6 @@ public:
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
-  const LowerCaseString STSHost{"x-stateful-session-host"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString GrpcTimeout{"grpc-timeout"};

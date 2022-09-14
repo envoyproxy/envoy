@@ -12,13 +12,16 @@ void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     const std::string encoded_address =
         Envoy::Base64::encode(host_address.data(), host_address.length());
-    headers.addReferenceKey(Envoy::Http::Headers::get().STSHost, encoded_address);
+    headers.addReferenceKey(factory_.getHeaderName(), encoded_address);
   }
 }
 
 HeaderBasedSessionStateFactory::HeaderBasedSessionStateFactory(
     const HeaderBasedSessionStateProto& config)
     : name_(config.header().name()), path_(config.header().path()) {
+  if (config.header().name().empty()) {
+    throw EnvoyException("Header name must be specified");
+  }
   // If no request path is specified or root path is specified then this session state will
   // be enabled for any request
   if (path_.empty() || path_ == "/") {

@@ -23,7 +23,9 @@ class HeaderBasedSessionStateFactory : public Envoy::Http::SessionStateFactory {
 public:
   class SessionStateImpl : public Envoy::Http::SessionState {
   public:
-    SessionStateImpl(absl::optional<std::string> address) : upstream_address_(std::move(address)) {}
+    SessionStateImpl(absl::optional<std::string> address,
+                     const HeaderBasedSessionStateFactory& factory)
+        : upstream_address_(std::move(address)), factory_(factory) {}
 
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
     void onUpdate(const Upstream::HostDescription& host,
@@ -31,6 +33,7 @@ public:
 
   private:
     absl::optional<std::string> upstream_address_;
+    const HeaderBasedSessionStateFactory& factory_;
   };
 
   HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
@@ -39,7 +42,7 @@ public:
     if (!requestPathMatch(headers.getPathValue())) {
       return nullptr;
     }
-    return std::make_unique<SessionStateImpl>(parseAddress(headers));
+    return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
   }
 
   bool requestPathMatch(absl::string_view request_path) const {
@@ -49,17 +52,19 @@ public:
 
 private:
   absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    std::string address;
-    auto he = headers.STSHost();
-    if (he != nullptr) {
-      auto header_value = he->value().getStringView();
-      address = Envoy::Base64::decode(header_value);
+    auto hdr = headers.get(name_);
+    if (hdr.empty()) {
+      return absl::nullopt;
     }
 
+    auto header_value = hdr[0]->value().getStringView();
+    std::string address = Envoy::Base64::decode(header_value);
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
-  const std::string name_;
+  Envoy::Http::LowerCaseString getHeaderName() const { return name_; }
+
+  Envoy::Http::LowerCaseString name_;
   const std::string path_;
 
   std::function<bool(absl::string_view)> path_matcher_;
