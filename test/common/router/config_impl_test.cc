@@ -6301,12 +6301,12 @@ virtual_hosts:
                 request_headers_to_add:
                   - header:
                       key: x-req-cluster
-                      value: cluster1
+                      value: cluster-adding-this-value
                 response_headers_to_add:
                   - header:
                       key: x-resp-cluster
-                      value: cluster1
-                response_headers_to_remove: [ "x-remove-cluster1" ]
+                      value: cluster-adding-this-value
+                response_headers_to_remove: [ "x-header-to-remove-cluster" ]
                 host_rewrite_literal: "new_host1"
   )EOF";
 
@@ -6317,17 +6317,17 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("x-route-to-this-cluster", "cluster1");
-    Http::TestResponseHeaderMapImpl resp_headers({{"x-remove-cluster1", "value"}});
+    Http::TestResponseHeaderMapImpl resp_headers({{"x-header-to-remove-cluster", "value"}});
     auto dynamic_route = config.route(headers, 0);
     const RouteEntry* route = dynamic_route->routeEntry();
     EXPECT_EQ("cluster1", route->clusterName());
 
     route->finalizeRequestHeaders(headers, stream_info, true);
-    EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
+    EXPECT_EQ("cluster-adding-this-value", headers.get_("x-req-cluster"));
     EXPECT_EQ("new_host1", headers.getHostValue());
 
     route->finalizeResponseHeaders(resp_headers, stream_info);
-    EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
+    EXPECT_EQ("cluster-adding-this-value", resp_headers.get_("x-resp-cluster"));
     EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
   }
 }

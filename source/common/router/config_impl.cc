@@ -1212,7 +1212,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
     } else if (!cluster_header_name_.get().empty()) {
-      return pickClusterViaClusterHeader(cluster_header_name_, headers);
+      return pickClusterViaClusterHeader(cluster_header_name_, headers,
+                                         /*route_selector_override=*/nullptr);
     } else {
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
       // cluster specifier plugin.
@@ -1270,7 +1271,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     if (selected_value >= begin && selected_value < end) {
       if (!cluster->clusterHeaderName().get().empty() &&
           !headers.get(cluster->clusterHeaderName()).empty()) {
-        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers, cluster.get());
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers,
+                                           static_cast<RouteEntryAndRoute*>(cluster.get()));
       }
       return cluster;
     }

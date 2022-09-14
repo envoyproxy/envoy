@@ -929,7 +929,7 @@ private:
   RouteConstSharedPtr
   pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
                               const Http::HeaderMap& headers,
-                              const RouteEntryAndRoute* route_selector_override = nullptr) const;
+                              const RouteEntryAndRoute* route_selector_override) const;
 
   RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
                                           bool ignore_overflow) const;
