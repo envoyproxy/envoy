@@ -8,7 +8,7 @@ functionality analysis. Make sure
   * Either the filter does not sendLocalReply, or you test and document how
     sendLocalReply code paths will play with hedging / retries (cut off the
     hedge attempt, and local-reply failures won't trigger retries)
-  * Either the filter does not access streamInfo in a non-cost way, or you test
+  * Either the filter does not access streamInfo in a non-const way, or you test
     and document how the filter interacts with hedging and retries. Note that
     for hedging, a single downstream StreamInfo is accessible in parallel to
     both instances of the upstream filter instance, so it must be resiliant to
@@ -27,10 +27,9 @@ Assuming your filter inherits from FactoryBase:
     Please note if you use the init manager or a stats context you *must* get
     them from DualInfo rather than from the server factory context or xDS
     reloads will not work correctly and may leak memory.
-  * Add ``UpstreamMyFilterFactory = MyFilterFactory;`` and
-    ``DECLARE_FACTORY(UpstreamMyFilterFactory`` in your config.h file and
-    ``REGISTER_FACTORY(UpstreamMyFilterFactory,
-                     Server::Configuration::UpstreamHttpFilterConfigFactory){"envoy.my_filter"};`` to
+  * Add ``using UpstreamMyFilterFactory = MyFilterFactory;`` and
+    ``DECLARE_FACTORY(UpstreamMyFilterFactory)`` in your config.h file and
+    ``REGISTER_FACTORY(UpstreamMyFilterFactory, Server::Configuration::UpstreamHttpFilterConfigFactory);`` to
     your config.cc file.
   * If your filter is listed in ``source/extensions/extensions_metadata.yaml``
     add ``envoy.filters.http.upstream`` to the filter category.
