@@ -327,6 +327,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp2) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 // Test Http3 failing to HTTP/2
 TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -356,6 +357,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
+#endif
 
 // TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in
 // case DNS to those endpoints is disallowed.
