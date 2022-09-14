@@ -392,19 +392,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
 
   // Listener worker id
   listener_address.value_ = "127.0.0.1_3012";
   regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   listener_address.value_ = "myprefix";
   regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
-                         "listener.downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.watchdog_miss", {worker_id});
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+                         {worker_id});
 
   // Thrift Proxy Prefix
   Tag thrift_prefix;

@@ -49,6 +49,21 @@ minor_behavior_changes:
 - area: http
   change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
+- area: stats
+  change: |
+    Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the original name during the extraction. This
+    led to the same base stat name for both the per-worker and overall stat. For instance, in prometheus stats, the following stats were produced: ::
+
+      envoy_listener_downstream_cx_total{} 2.
+      envoy_listener_downstream_cx_total{envoy_worker_id="0"} 1.
+      envoy_listener_downstream_cx_total{envoy_worker_id="1"} 1.
+
+    This resulted in ``sum(envoy_listener_downstream_cx_total)`` producing 4, even though there are only 2 connections.
+    The new behavior results in stats such as this: ::
+
+      envoy_listener_downstream_cx_total{} 2.
+      envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
+      envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
