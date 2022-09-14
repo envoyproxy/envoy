@@ -178,7 +178,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   auto path_is_asterisk = path == "*";
-  auto path_is_absolute = path.empty() ? false : path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
@@ -286,8 +285,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       return {RequestHeaderMapValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUrl};
     }
-  } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
-             path_is_absolute) {
+  } else if (!config_.uri_path_normalization_options().skip_path_normalization()) {
     // Validate and normalize the path, which must be a valid URI. This is only run if the config
     // is active and the path is absolute (starts with "/").
     //

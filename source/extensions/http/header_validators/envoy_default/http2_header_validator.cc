@@ -137,17 +137,17 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
   bool path_is_asterisk = path == "*";
-  bool path_is_absolute = !path.empty() && path.at(0) == '/';
+  bool path_is_empty = path.empty();
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
+  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme", and
     // ":path" pseudo-header fields, unless they are CONNECT requests (Section 8.5). An HTTP
     // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
-    auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
-                                : UhvResponseCodeDetail::get().InvalidScheme;
+    auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
+                                 : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
   } else if (is_connect_method) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
@@ -162,7 +162,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //
     // TODO - Add support for extended CONNECT requests: envoy.reloadable_features.use_rfc_connect
     absl::string_view details;
-    if (!path.empty()) {
+    if (!path_is_empty) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
@@ -176,9 +176,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   // Step 2: Validate and normalize the :path pseudo header
-  if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
-    // The :path must be in absolute-form or, for an OPTIONS request, in asterisk-form. This is
-    // based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
+  if ((path_is_empty && !is_connect_method) || (path_is_asterisk && !is_options_method)) {
+    // The :path must not be empty for non-CONNECT requests and only OPTIONS requests accept a
+    // :path of "*". This is based on RFC 9113,
+    // https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // This pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or "https"
     // URIs that do not contain a path component MUST include a value of '/'. The exceptions to
@@ -192,12 +193,12 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
             UhvResponseCodeDetail::get().InvalidUrl};
   }
 
-  if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
+  if (!config_.uri_path_normalization_options().skip_path_normalization() && !path_is_empty) {
     // Validate and normalize the path, which must be a valid URI. This is only run if the config
-    // is active and the path is absolute (starts with "/").
+    // is active and the path is not empty.
     //
-    // If path normalization is disabled or the path isn't absolute then the path will be validated
-    // against the RFC character set in validateRequestHeaderEntry.
+    // If path normalization is disabled then the path will be validated against the RFC character
+    // set in validateRequestHeaderEntry.
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result) {
       return path_result;
