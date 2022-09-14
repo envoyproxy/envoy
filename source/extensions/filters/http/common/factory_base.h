@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/filter_factory.h"
 #include "envoy/server/filter_config.h"
 
 namespace Envoy {
