@@ -3,11 +3,16 @@
 Before coverting a filter to be an upstream filter you should do some basic
 functionality analysis. Make sure
 
-  * The filter does not use any downstream-only functionality, such as clearing
-    cached routes, or performing internal redirects.
-  * Either the filter does not sendLocalReply, or you thoroughly document how
+  * The filter does not use any downstream-only functionality, accessed via
+    downstreamCallbacks() such as clearing cached routes, or performing internal redirects.
+  * Either the filter does not sendLocalReply, or you test and document how
     sendLocalReply code paths will play with hedging / retries (cut off the
     hedge attempt, and local-reply failures won't trigger retries)
+  * Either the filter does not access streamInfo in a non-cost way, or you test
+    and document how the filter interacts with hedging and retries. Note that
+    for hedging, a single downstream StreamInfo is accessible in parallel to
+    both instances of the upstream filter instance, so it must be resiliant to
+    parallel access.
   * Any code accessing the downstream connection checks to make sure it is
     present. The downstream connection will not be available for mirrored/shadowed requests.
 

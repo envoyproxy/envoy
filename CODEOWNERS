@@ -293,3 +293,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
+/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch
