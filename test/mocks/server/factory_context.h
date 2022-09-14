@@ -91,6 +91,7 @@ public:
   MOCK_METHOD(Stats::Scope&, scope, ());
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
 } // namespace Configuration
