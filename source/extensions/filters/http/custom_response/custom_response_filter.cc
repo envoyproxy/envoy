@@ -2,7 +2,6 @@
 
 #include "envoy/http/filter.h"
 
-#include "source/common/http/utility.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
