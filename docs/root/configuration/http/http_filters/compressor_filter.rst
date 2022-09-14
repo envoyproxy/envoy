@@ -197,7 +197,7 @@ specific to responses only:
 .. attention:
 
    In case the compressor is not configured to compress responses with the field
-   `response_direction_config` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
+   ``response_direction_config`` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
    message the stats are rooted in the legacy tree
-   <stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*, that is without
+   ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``, that is without
    the direction prefix.

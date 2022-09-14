@@ -32,12 +32,12 @@ public:
   /*
    * Validate the TE header.
    */
-  HeaderEntryValidationResult validateTEHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateTEHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :authority pseudo header.
    */
-  HeaderEntryValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
   HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;

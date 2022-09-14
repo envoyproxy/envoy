@@ -830,7 +830,7 @@ Supported variable names are:
         - header:
             key: "x-request-start"
             value: "%START_TIME(%s.%3f)%"
-          append: true
+          append_action: APPEND_IF_EXISTS_OR_ADD
 
 %RESPONSE_FLAGS%
     Additional details about the response or connection, if any. Possible values and their meanings

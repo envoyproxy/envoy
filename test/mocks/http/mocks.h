@@ -62,7 +62,7 @@ public:
   MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-  MOCK_METHOD(void, encodeMetadata, (MetadataMapVector&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr &&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
   MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
@@ -92,7 +92,8 @@ public:
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(const Router::RouteEntry::UpgradeMap*, upgradeMap, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback& cb));
@@ -104,6 +105,7 @@ public:
   MOCK_METHOD(void, onResponseDataTooLarge, ());
   MOCK_METHOD(void, onRequestDataTooLarge, ());
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(void, onLocalReply, (Code code));
   MOCK_METHOD(Tracing::Config&, tracingConfig, ());
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
@@ -200,10 +202,11 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager));
+  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager));
+               FilterChainManager& manager),
+              (const));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -221,9 +224,10 @@ public:
   ~MockStreamDecoderFilterCallbacks() override;
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD(const Network::Connection*, connection, ());
+  MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
@@ -250,6 +254,8 @@ public:
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
 
   // Http::StreamDecoderFilterCallbacks
   // NOLINTNEXTLINE(readability-identifier-naming)
@@ -316,9 +322,10 @@ public:
   ~MockStreamEncoderFilterCallbacks() override;
 
   // Http::StreamFilterCallbacks
-  MOCK_METHOD(const Network::Connection*, connection, ());
+  MOCK_METHOD(OptRef<const Network::Connection>, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetStream,
+              (Http::StreamResetReason reset_reason, absl::string_view transport_failure_reason));
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (std::function<void()>));
@@ -340,6 +347,8 @@ public:
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
   MOCK_METHOD(void, traversePerFilterConfig,
               (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
+  MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
@@ -354,7 +363,6 @@ public:
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
-  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;

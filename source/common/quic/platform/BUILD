@@ -49,6 +49,8 @@ envoy_quiche_platform_impl_cc_library(
         "//source/common/http:utility_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",
+        "@com_github_google_quiche//:quiche_protocol_flags_list_lib",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -72,9 +74,6 @@ envoy_quiche_platform_impl_cc_library(
 
 envoy_quiche_platform_impl_cc_library(
     name = "quic_base_impl_lib",
-    hdrs = [
-        "quic_flags_impl.h",
-    ],
     external_deps = [
         "abseil_base",
         "abseil_hash",

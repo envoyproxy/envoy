@@ -220,7 +220,7 @@ private:
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
-    void encodeMetadata(MetadataMapVector& metadata) override;
+    void encodeMetadata(MetadataMapPtr&& metadata) override;
     void setRequestTrailers(Http::RequestTrailerMapPtr&& request_trailers) override {
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
@@ -273,13 +273,13 @@ private:
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
-    void resetStream() override;
+    void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                     absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -288,6 +288,7 @@ private:
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
 
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -354,7 +355,7 @@ private:
     // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
     // Call header validator extension to validate request header map after it was deserialized.
     // If header map failed validation, it sends an error response and returns false.
-    bool validateHeaders(bool end_stream);
+    bool validateHeaders();
 
     ConnectionManagerImpl& connection_manager_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
@@ -370,7 +371,7 @@ private:
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
-    FilterManager filter_manager_;
+    DownstreamFilterManager filter_manager_;
 
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;

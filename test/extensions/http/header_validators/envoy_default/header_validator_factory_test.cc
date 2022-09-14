@@ -4,7 +4,6 @@
 #include "source/extensions/http/header_validators/envoy_default/config.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
-#include "source/extensions/http/header_validators/envoy_default/null_header_validator.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"

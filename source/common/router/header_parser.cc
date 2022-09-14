@@ -37,8 +37,7 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // The statement machine does minimal validation of the arguments (if any) and does not know the
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
-HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value,
-                                 bool append) {
+HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& header_value) {
   const std::string& key = header_value.key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -55,7 +54,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
   absl::string_view format(header_value.value());
   if (format.empty()) {
-    return std::make_unique<PlainHeaderFormatter>("", append);
+    return std::make_unique<PlainHeaderFormatter>("");
   }
 
   std::vector<HeaderFormatterPtr> formatters;
@@ -89,7 +88,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       state = ParserState::VariableName;
       if (pos > start) {
         absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal)));
       }
       start = pos + 1;
       break;
@@ -98,8 +97,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
       // Consume "VAR" from "%VAR%" or "%VAR(...)%"
       if (ch == '%') {
         // Found complete variable name, add formatter.
-        formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start)));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -179,8 +177,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
     case ParserState::ExpectVariableEnd:
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
-        formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start)));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -205,7 +202,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   if (pos > start) {
     // Trailing constant data.
     absl::string_view literal = format.substr(start, pos - start);
-    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal)));
   }
 
   ASSERT(!formatters.empty());
@@ -214,22 +211,36 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
     return std::move(formatters[0]);
   }
 
-  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
+  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters));
 }
 
 } // namespace
 
-HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
+HeaderParserPtr
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header(), append);
+    HeaderAppendAction append_action;
+
+    if (header_value_option.has_append()) {
+      // 'append' is set and ensure the 'append_action' value is equal to the default value.
+      if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
+        throw EnvoyException("Both append and append_action are set and it's not allowed");
+      }
+
+      append_action = header_value_option.append().value()
+                          ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                          : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+    } else {
+      append_action = header_value_option.append_action();
+    }
+
+    HeaderFormatterPtr header_formatter = parseInternal(header_value_option.header());
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
         HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value(),
-                          header_value_option.keep_empty_value()});
+                          append_action, header_value_option.keep_empty_value()});
   }
 
   return header_parser;
@@ -237,22 +248,22 @@ HeaderParserPtr HeaderParser::configure(
 
 HeaderParserPtr HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
-    bool append) {
+    HeaderAppendAction append_action) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HeaderFormatterPtr header_formatter = parseInternal(header_value, append);
+    HeaderFormatterPtr header_formatter = parseInternal(header_value);
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value.key()),
-        HeadersToAddEntry{std::move(header_formatter), header_value.value()});
+        HeadersToAddEntry{std::move(header_formatter), header_value.value(), append_action});
   }
 
   return header_parser;
 }
 
-HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add,
-    const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
+HeaderParserPtr
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+                        const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 
   for (const auto& header : headers_to_remove) {
@@ -285,10 +296,19 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     const std::string value =
         stream_info != nullptr ? entry.formatter_->format(*stream_info) : entry.original_value_;
     if (!value.empty() || entry.add_if_empty_) {
-      if (entry.formatter_->append()) {
+      switch (entry.append_action_) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
         headers.addReferenceKey(key, value);
-      } else {
+        break;
+      case HeaderValueOption::ADD_IF_ABSENT:
+        if (auto header_entry = headers.get(key); header_entry.empty()) {
+          headers.addReferenceKey(key, value);
+        }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
         headers.setReferenceKey(key, value);
+        break;
       }
     }
   }
@@ -302,17 +322,33 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
     if (do_formatting) {
       const std::string value = entry.formatter_->format(stream_info);
       if (!value.empty() || entry.add_if_empty_) {
-        if (entry.formatter_->append()) {
-          transforms.headers_to_append.push_back({key, value});
-        } else {
-          transforms.headers_to_overwrite.push_back({key, value});
+        switch (entry.append_action_) {
+        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+          transforms.headers_to_append_or_add.push_back({key, value});
+          break;
+        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+          transforms.headers_to_overwrite_or_add.push_back({key, value});
+          break;
+        case HeaderValueOption::ADD_IF_ABSENT:
+          transforms.headers_to_add_if_absent.push_back({key, value});
+          break;
+        default:
+          break;
         }
       }
     } else {
-      if (entry.formatter_->append()) {
-        transforms.headers_to_append.push_back({key, entry.original_value_});
-      } else {
-        transforms.headers_to_overwrite.push_back({key, entry.original_value_});
+      switch (entry.append_action_) {
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        transforms.headers_to_append_or_add.push_back({key, entry.original_value_});
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        transforms.headers_to_overwrite_or_add.push_back({key, entry.original_value_});
+        break;
+      case HeaderValueOption::ADD_IF_ABSENT:
+        transforms.headers_to_add_if_absent.push_back({key, entry.original_value_});
+        break;
+      default:
+        break;
       }
     }
   }

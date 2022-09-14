@@ -16,7 +16,6 @@ envoy_cc_library(
         "header_validator_factory.cc",
         "http1_header_validator.cc",
         "http2_header_validator.cc",
-        "null_header_validator.cc",
         "path_normalizer.cc",
     ],
     hdrs = [
@@ -25,7 +24,6 @@ envoy_cc_library(
         "header_validator_factory.h",
         "http1_header_validator.h",
         "http2_header_validator.h",
-        "null_header_validator.h",
         "path_normalizer.h",
     ],
     deps = [

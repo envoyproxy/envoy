@@ -88,6 +88,7 @@ private:
   const std::string& exposeHeaders();
   const std::string& maxAge();
   bool allowCredentials();
+  bool allowPrivateNetworkAccess();
   bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);

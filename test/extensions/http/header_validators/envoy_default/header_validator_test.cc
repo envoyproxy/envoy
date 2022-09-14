@@ -1,5 +1,6 @@
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
 
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
 namespace Envoy {
@@ -55,18 +56,23 @@ protected:
 
 TEST_F(BaseHeaderValidatorTest, ValidateMethodPermissive) {
   HeaderString valid{"GET"};
-  HeaderString custom{"CUSTOM-METHOD"};
+  HeaderString valid_lowercase{"post"};
+  HeaderString custom{"Custom-Method"};
   auto uhv = createBase(empty_config);
-  EXPECT_TRUE(uhv->validateMethodHeader(valid).ok());
-  EXPECT_TRUE(uhv->validateMethodHeader(custom).ok());
+  EXPECT_ACCEPT(uhv->validateMethodHeader(valid));
+  EXPECT_ACCEPT(uhv->validateMethodHeader(valid_lowercase));
+  EXPECT_ACCEPT(uhv->validateMethodHeader(custom));
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateMethodStrict) {
+TEST_F(BaseHeaderValidatorTest, ValidateMethodRestricted) {
   HeaderString valid{"GET"};
+  HeaderString post_lowercase{"post"};
   HeaderString custom{"CUSTOM-METHOD"};
   auto uhv = createBase(restrict_http_methods_config);
-  EXPECT_TRUE(uhv->validateMethodHeader(valid).ok());
+  EXPECT_ACCEPT(uhv->validateMethodHeader(valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateMethodHeader(custom),
+                             UhvResponseCodeDetail::get().InvalidMethod);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateMethodHeader(post_lowercase),
                              UhvResponseCodeDetail::get().InvalidMethod);
 }
 
@@ -75,8 +81,8 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeValid) {
   HeaderString valid_mixed_case{"hTtPs"};
   auto uhv = createBase(empty_config);
 
-  EXPECT_TRUE(uhv->validateSchemeHeader(valid).ok());
-  EXPECT_TRUE(uhv->validateSchemeHeader(valid_mixed_case).ok());
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid));
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_mixed_case));
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidChar) {
@@ -95,73 +101,39 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidStartChar) {
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusNoneValid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::WholeNumber;
-  HeaderString valid{"200"};
-  HeaderString valid_outside_of_range{"1024"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid_outside_of_range).ok());
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusNoneInvalid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::WholeNumber;
-  HeaderString invalid{"asdf"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeValid) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
+TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRange) {
   HeaderString valid{"200"};
   HeaderString invalid_max{"1024"};
   HeaderString invalid_min{"99"};
+  HeaderString invalid_overflow{"4294967297"}; // UINT32_MAX + 1
   auto uhv = createBase(empty_config);
 
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_max),
+  EXPECT_ACCEPT(uhv->validateStatusHeader(valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_max),
                              UhvResponseCodeDetail::get().InvalidStatus);
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_min),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_min),
+                             UhvResponseCodeDetail::get().InvalidStatus);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(invalid_overflow),
                              UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeInvalidMin) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
-  HeaderString invalid_min{"99"};
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
   auto uhv = createBase(empty_config);
+  std::string name{"aaaaa"};
+  for (int i = 0; i < 0xff; ++i) {
+    char c = static_cast<char>(i);
+    HeaderString header_string{"x"};
+    name[2] = c;
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_min),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
+    setHeaderStringUnvalidated(header_string, name);
 
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRangeInvalidMax) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
-  HeaderString invalid_max{"1024"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_max),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusOfficalCodes) {
-  auto mode = BaseHttpHeaderValidator::StatusPseudoHeaderValidationMode::OfficialStatusCodes;
-  HeaderString valid{"200"};
-  HeaderString invalid_unregistered{"420"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateStatusHeader(mode, valid).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateStatusHeader(mode, invalid_unregistered),
-                             UhvResponseCodeDetail::get().InvalidStatus);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderNameValid) {
-  HeaderString valid{"x-foo"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
+    auto result = uhv->validateGenericHeaderName(header_string);
+    if (testChar(kGenericHeaderNameCharTable, c)) {
+      EXPECT_ACCEPT(result);
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+    }
+  }
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
@@ -172,32 +144,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
                              UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictValid) {
-  HeaderString valid{"x-foo"};
-  HeaderString valid_underscore{"x_foo"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid).ok());
-  EXPECT_TRUE(uhv->validateGenericHeaderName(valid_underscore).ok());
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidChar) {
-  HeaderString invalid_eascii{"x-foo\x80"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_eascii),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
   HeaderString invalid_empty{""};
   auto uhv = createBase(empty_config);
 
@@ -205,37 +152,85 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {
                              UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
+  HeaderString drop_underscore{"x_foo"};
+  auto uhv = createBase(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(drop_underscore);
+  EXPECT_EQ(result.action(), decltype(result)::Action::DropHeader);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
+}
+
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
-  HeaderString valid{"hello world"};
-  HeaderString valid_eascii{"value\x80"};
-  HeaderString invalid_newline;
   auto uhv = createBase(empty_config);
+  std::string name{"aaaaa"};
+  for (int i = 0; i < 0xff; ++i) {
+    char c = static_cast<char>(i);
+    HeaderString header_string{"x"};
+    name[2] = c;
 
-  setHeaderStringUnvalidated(invalid_newline, "hello\nworld");
+    setHeaderStringUnvalidated(header_string, name);
 
-  EXPECT_TRUE(uhv->validateGenericHeaderValue(valid).ok());
-  EXPECT_TRUE(uhv->validateGenericHeaderValue(valid_eascii).ok());
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderValue(invalid_newline),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+    auto result = uhv->validateGenericHeaderValue(header_string);
+    if (testChar(kGenericHeaderValueCharTable, c)) {
+      EXPECT_ACCEPT(result);
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+    }
+  }
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateContentLength) {
   HeaderString valid{"100"};
   HeaderString invalid{"10a2"};
+  HeaderString invalid_overflow{"18446744073709551618"}; // UINT64_MAX + 1
   auto uhv = createBase(empty_config);
 
-  EXPECT_TRUE(uhv->validateContentLengthHeader(valid).ok());
+  EXPECT_ACCEPT(uhv->validateContentLengthHeader(valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateContentLengthHeader(invalid_overflow),
                              UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValid) {
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValidRegName) {
   HeaderString valid{"envoy.com:443"};
   HeaderString valid_no_port{"envoy.com"};
   auto uhv = createBase(empty_config);
 
-  EXPECT_TRUE(uhv->validateHostHeader(valid).ok());
-  EXPECT_TRUE(uhv->validateHostHeader(valid_no_port).ok());
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_no_port));
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidRegName) {
+  HeaderString invalid{"env<o>y.com"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValidIPv6) {
+  HeaderString valid{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:443"};
+  HeaderString valid_no_port{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_no_port));
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6) {
+  HeaderString invalid_missing_closing_bracket{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
+  HeaderString invalid_chars{"[200z:0db8:85a3:0000:0000:8a2e:0370:7334]"};
+  HeaderString invalid_no_brackets{"200z:0db8:85a3:0000:0000:8a2e:0370:7334"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_missing_closing_bracket),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_chars),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_no_brackets),
+                             UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidEmpty) {
@@ -251,7 +246,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidUserInfo) {
   auto uhv = createBase(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_userinfo),
-                             UhvResponseCodeDetail::get().InvalidHost);
+                             UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidPortNumber) {
@@ -284,6 +279,53 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidPort0) {
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_port_0),
                              UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6PortDelim) {
+  HeaderString invalid_port_delim{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]66000"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_port_delim),
+                             UhvResponseCodeDetail::get().InvalidHost);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharacters) {
+  HeaderString valid{"/parent/child"};
+  HeaderString invalid{"/parent child"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersQuery) {
+  HeaderString valid{"/root?x=1"};
+  HeaderString invalid{"/root?x=1|2"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
+  HeaderString valid{"/root?x=1#fragment"};
+  HeaderString invalid{"/root#frag|ment"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
+  EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
+                             UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(BaseHeaderValidatorTest, HasChunkedTransferEncoding) {
+  HeaderString is_chunked{"gzip, other, chunked , other2"};
+  HeaderString not_chunked{"gzip, x=1"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_TRUE(uhv->hasChunkedTransferEncoding(is_chunked));
+  EXPECT_FALSE(uhv->hasChunkedTransferEncoding(not_chunked));
 }
 
 } // namespace EnvoyDefault

@@ -14,6 +14,8 @@
     EXPECT_EQ(__erwd_result.details(), details_value);                                             \
   }                                                                                                \
   void(0)
+#define EXPECT_ACCEPT(result)                                                                      \
+  EXPECT_TRUE(result.ok()) << "rejected with details: " << result.details()
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +39,11 @@ protected:
 )EOF";
 
   static constexpr absl::string_view reject_headers_with_underscores_config = R"EOF(
-    reject_headers_with_underscores: true
+    headers_with_underscores_action: REJECT_REQUEST
+)EOF";
+
+  static constexpr absl::string_view drop_headers_with_underscores_config = R"EOF(
+    headers_with_underscores_action: DROP_HEADER
 )EOF";
 
   static constexpr absl::string_view allow_chunked_length_config = R"EOF(

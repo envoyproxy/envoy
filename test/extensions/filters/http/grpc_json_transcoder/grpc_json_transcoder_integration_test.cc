@@ -280,6 +280,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       },
       R"({"id":"20","theme":"Children"})");
 
+#ifndef ENVOY_ENABLE_UHV
+  // TODO - UHV disallows square brackets, per RFC.
   // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -292,6 +294,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
           {"content-type", "application/json"},
       },
       R"({"id":"20","theme":"Children"})");
+#endif
 
   // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
   // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"

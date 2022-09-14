@@ -67,25 +67,61 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
-protected:
-  struct BytesCountExpectation {
-    BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
-                          int header_bytes_received)
-        : wire_bytes_sent_{wire_bytes_sent}, wire_bytes_received_{wire_bytes_received},
-          header_bytes_sent_{header_bytes_sent}, header_bytes_received_{header_bytes_received} {}
-    int wire_bytes_sent_;
-    int wire_bytes_received_;
-    int header_bytes_sent_;
-    int header_bytes_received_;
-  };
+  bool skipForH2Uhv() {
+#ifdef ENVOY_ENABLE_UHV
+    // Validation of upstream responses is not wired up yet
+    return GetParam().http2_implementation == Http2Impl::Oghttp2;
+#endif
+    return false;
+  }
+};
 
-  void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                          BytesCountExpectation h2_expectation,
-                                          BytesCountExpectation h3_expectation, const int id = 0);
+class UpstreamDownstreamIntegrationTest
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+      public HttpIntegrationTest {
+public:
+  UpstreamDownstreamIntegrationTest()
+      : HttpIntegrationTest(
+            std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
+            ConfigHelper::httpProxyConfig(std::get<0>(GetParam()).downstream_protocol ==
+                                          Http::CodecType::HTTP3)) {
+    setupHttp2Overrides(std::get<0>(GetParam()).http2_implementation);
+    config_helper_.addRuntimeOverride(
+        Runtime::defer_processing_backedup_streams,
+        std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");
+  }
+  static std::string testParamsToString(
+      const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
+    return fmt::format(
+        "{}_{}",
+        HttpProtocolIntegrationTest::protocolTestParamsToString(
+            ::testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(params.param), 0)),
+        std::get<1>(params.param) ? "DownstreamFilter" : "UpstreamFilter");
+  }
 
-  void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
-                                            BytesCountExpectation h2_expectation,
-                                            BytesCountExpectation h3_expectation, const int id = 0);
+  static std::vector<std::tuple<HttpProtocolTestParams, bool>> getDefaultTestParams(
+      const std::vector<Http::CodecType>& downstream_protocols = {Http::CodecType::HTTP1,
+                                                                  Http::CodecType::HTTP2},
+      const std::vector<Http::CodecType>& upstream_protocols = {Http::CodecType::HTTP1,
+                                                                Http::CodecType::HTTP2}) {
+    std::vector<std::tuple<HttpProtocolTestParams, bool>> ret;
+    std::vector<HttpProtocolTestParams> protocol_defaults =
+        HttpProtocolIntegrationTest::getProtocolTestParams(downstream_protocols,
+                                                           upstream_protocols);
+    for (auto& param : protocol_defaults) {
+      ret.push_back(std::make_tuple(param, true));
+      ret.push_back(std::make_tuple(param, false));
+    }
+    return ret;
+  }
+
+  void SetUp() override {
+    setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
+    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+    testing_downstream_filter_ = std::get<1>(GetParam());
+  }
+
+  bool testing_downstream_filter_;
 };
 
 } // namespace Envoy

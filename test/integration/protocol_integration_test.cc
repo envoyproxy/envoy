@@ -76,6 +76,12 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
   });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_route()->mutable_auto_host_rewrite()->set_value(true);
+      });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -568,13 +574,17 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Missing host for CONNECT
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
-
-  auto response = std::move((codec_client_->startRequest(headers)).second);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("missing_required_header"));
+  // Wait to process STOP_SENDING on the client for quic.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_TRUE(response->waitForReset());
+  }
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
@@ -1648,6 +1658,11 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+  if (skipForH2Uhv()) {
+    // TODO - UHV upstream support
+    return;
+  }
+
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -1676,6 +1691,11 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
+  if (skipForH2Uhv()) {
+    // TODO - UHV upstream upstream
+    return;
+  }
+
   initialize();
 
   // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
@@ -1943,6 +1963,8 @@ name: local-reply-during-encode-data
   // Wait for the upstream request and begin sending a response with end_stream = false.
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
+  // Finish sending response headers before aborting the response.
+  response->waitForHeaders();
   upstream_request_->encodeData(size_, false);
   Http::TestResponseTrailerMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
@@ -2744,6 +2766,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
+#ifdef ENVOY_ENABLE_UHV
+  // Extended CONNECT requests are not implemented in UHV.
+  return;
+#endif
+
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
@@ -3044,6 +3071,8 @@ TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeData) {
   waitForNextUpstreamRequest(0);
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, false);
+  // Finish sending response headers before aborting the response.
+  response->waitForHeaders();
   // This much data should cause the add-body-filter to overflow response buffer
   upstream_request_->encodeData(16 * 1024, false);
   upstream_request_->encodeData(64 * 1024, false);
@@ -3650,6 +3679,11 @@ TEST_P(ProtocolIntegrationTest, BufferContinue) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not track consistency of content-length and amount of DATA in HTTP/2
+  return;
+#endif
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -3677,6 +3711,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not track consistency of content-length and amount of DATA in HTTP/2
+  return;
+#endif
+
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // HTTP/1.x request rely on Content-Length header to determine payload length. So there is no
     // inconsistency but the request will hang there waiting for the rest bytes.
@@ -3725,7 +3764,11 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // For HTTP/3 since the packets are black holed, there is no client side
     // indication of connection close. Wait on Envoy stats instead.
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+    std::string counter_scope = version_ == Network::Address::IpVersion::v4
+                                    ? "listener.127.0.0.1_0.http3.downstream.tx."
+                                    : "listener.[__1]_0.http3.downstream.tx.";
+    std::string error_code = "quic_connection_close_error_code_QUIC_PACKET_WRITE_ERROR";
+    test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1);
     codec_client_->close();
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());

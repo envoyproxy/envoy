@@ -21,7 +21,7 @@ HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol p
     : config_(config), protocol_(protocol), stream_info_(stream_info),
       header_values_(::Envoy::Http::Headers::get()), path_normalizer_(config) {}
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
   // HTTP Method Registry, from iana.org:
   // source: https://www.iana.org/assignments/http-methods/http-methods.xhtml
@@ -32,7 +32,6 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
   //       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
   // token = 1*tchar
   // method = token
-  //
   static absl::node_hash_set<absl::string_view> kHttpMethodRegistry = {
       "ACL",
       "BASELINE-CONTROL",
@@ -83,21 +82,21 @@ HeaderValidator::validateMethodHeader(const HeaderString& value) {
     is_valid = kHttpMethodRegistry.contains(method);
   } else {
     is_valid = !method.empty();
-    for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
-      is_valid = testChar(kMethodHeaderCharTable, method.at(i));
+    for (auto iter = method.begin(); iter != method.end() && is_valid; ++iter) {
+      is_valid &= testChar(kMethodHeaderCharTable, *iter);
     }
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidMethod};
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidMethod};
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateSchemeHeader(const HeaderString& value) {
-  //
   // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.1:
   //
   // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
@@ -108,94 +107,54 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // the sake of robustness but should only produce lowercase scheme names for consistency.
   //
   // The validation mode controls whether uppercase letters are permitted.
-  //
-  const auto& value_string_view = value.getStringView();
+  absl::string_view scheme = value.getStringView();
 
-  if (value_string_view.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
+  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidScheme};
   }
 
-  auto character_it = value_string_view.begin();
-
-  // The first character must be an ALPHA
-  auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z') ||
-                               (*character_it >= 'A' && *character_it <= 'Z');
-  if (!valid_first_character) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
-  }
-
-  for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!testChar(kSchemeHeaderCharTable, *character_it)) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidScheme};
-    }
-  }
-
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-HeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode& mode,
-                                      const HeaderString& value) {
+HeaderValidator::HeaderValueValidationResult
+HeaderValidator::validateStatusHeader(const HeaderString& value) {
+  // Validate that the response :status header is a valid whole number between 100 and 999
+  // (inclusive). This is based on RFC 9110, although the Envoy implementation is more permissive
+  // and allows status codes larger than 599,
+  // https://www.rfc-editor.org/rfc/rfc9110.html#section-15:
   //
-  // This is based on RFC 7231, https://datatracker.ietf.org/doc/html/rfc7231#section-6,
-  // describing the list of response status codes and the list of registered response status codes,
-  // https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml.
-  //
-  static const absl::node_hash_set<std::uint32_t> kOfficialStatusCodes = {
-      100, 102, 103, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302,
-      303, 304, 305, 306, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409,
-      410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428,
-      429, 431, 451, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511,
-  };
-  static const uint32_t kMinimumResponseStatusCode = 100;
-  static const uint32_t kMaximumResponseStatusCode = 599;
+  // The status code of a response is a three-digit integer code that describes the result of the
+  // request and the semantics of the response, including whether the request was successful and
+  // what content is enclosed (if any). All valid status codes are within the range of 100 to 599,
+  // inclusive.
 
+  static uint32_t kMinimumResponseStatusCode = 100;
+  static uint32_t kMaximumResponseStatusCode = 999;
   const auto& value_string_view = value.getStringView();
-
-  auto buffer_start = value_string_view.data();
-  auto buffer_end = buffer_start + value_string_view.size();
 
   // Convert the status to an integer.
   std::uint32_t status_value{};
-  auto result = std::from_chars(buffer_start, buffer_end, status_value);
-  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
+  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), status_value);
+  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidStatus};
   }
 
-  bool is_valid = false;
-
-  switch (mode) {
-  case StatusPseudoHeaderValidationMode::WholeNumber:
-    is_valid = true;
-    break;
-
-  case StatusPseudoHeaderValidationMode::ValueRange:
-    is_valid =
-        status_value >= kMinimumResponseStatusCode && status_value <= kMaximumResponseStatusCode;
-    break;
-
-  case StatusPseudoHeaderValidationMode::OfficialStatusCodes:
-    is_valid = kOfficialStatusCodes.contains(status_value);
-    break;
-
-  default:
-    break;
+  if (status_value < kMinimumResponseStatusCode || status_value > kMaximumResponseStatusCode) {
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidStatus};
   }
 
-  if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidStatus};
-  }
-
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
-  //
   // Verify that the header name is valid. This also honors the underscore in
   // header configuration setting.
   //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
   //
   // header-field   = field-name ":" OWS field-value OWS
   // field-name     = token
@@ -205,154 +164,255 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
-  //
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores = !config_.reject_headers_with_underscores();
-  // This header name is initially invalid if the name is empty or if the name
-  // matches an incompatible connection-specific header.
+  bool allow_underscores =
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
+  // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().EmptyHeaderName};
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
   bool is_valid = true;
   char c = '\0';
 
-  for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
-    c = key_string_view.at(i);
-    is_valid = testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
+  for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
+    c = *iter;
+    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
   }
 
-  if (!is_valid) {
+  if (!is_valid && c == '_' &&
+      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
+    return {HeaderEntryValidationResult::Action::DropHeader,
+            UhvResponseCodeDetail::get().InvalidUnderscore};
+  } else if (!is_valid) {
     auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
                             : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {RejectAction::Reject, details};
+    return {HeaderEntryValidationResult::Action::Reject, details};
   }
 
   return HeaderEntryValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
-  //
   // Verify that the header value is valid.
   //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
   //
   // header-field   = field-name ":" OWS field-value OWS
-  // field-value    = *( field-content / obs-fold )
-  // field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
+  // field-value    = *field-content
+  // field-content  = field-vchar
+  //                  [ 1*( SP / HTAB / field-vchar ) field-vchar ]
   // field-vchar    = VCHAR / obs-text
   // obs-text       = %x80-FF
   //
   // VCHAR          =  %x21-7E
   //                   ; visible (printing) characters
-  //
   const auto& value_string_view = value.getStringView();
   bool is_valid = true;
 
-  for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
-    is_valid = testChar(kGenericHeaderValueCharTable, value_string_view.at(i));
+  for (auto iter = value_string_view.begin(); iter != value_string_view.end() && is_valid; ++iter) {
+    is_valid &= testChar(kGenericHeaderValueCharTable, *iter);
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidCharacters};
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidCharacters};
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
-  //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6:
   //
   // Content-Length = 1*DIGIT
-  //
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
-  auto buffer_start = value_string_view.data();
-  auto buffer_end = buffer_start + value_string_view.size();
-
-  std::uint32_t int_value{};
-  auto result = std::from_chars(buffer_start, buffer_end, int_value);
-  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidContentLength};
+  std::uint64_t int_value{};
+  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), int_value);
+  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidContentLength};
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateHostHeader(const HeaderString& value) {
-  //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.4,
+  // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-7.2,
   // and RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2:
   //
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
-  //
-  const auto& value_string_view = value.getStringView();
+  const auto host = value.getStringView();
+  if (host.empty()) {
+    return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  }
 
-  auto user_info_delimiter = value_string_view.find('@');
+  // Check if the host/:authority contains the deprecated userinfo component. This is based on RFC
+  // 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-4.2.4:
+  //
+  // Before making use of an "http" or "https" URI reference received from an untrusted source, a
+  // recipient SHOULD parse for userinfo and treat its presence as an error; it is likely being
+  // used to obscure the authority for the sake of phishing attacks.
+  auto user_info_delimiter = host.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    return {HeaderValueValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidHostDeprecatedUserInfo};
   }
 
-  // identify and validate the port, if present
-  auto port_delimiter = value_string_view.find(':');
-  auto host_string_view = value_string_view.substr(0, port_delimiter);
-
-  if (host_string_view.empty()) {
-    // reject empty host, which happens if the authority is just the port (e.g.- ":80").
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+  // Determine if the host is in IPv4, reg-name, or IPv6 form.
+  auto result = host.at(0) == '[' ? validateHostHeaderIPv6(host) : validateHostHeaderRegName(host);
+  if (!result.ok()) {
+    return {HeaderValueValidationResult::Action::Reject, result.details()};
   }
 
-  if (port_delimiter != absl::string_view::npos) {
-    // Validate the port is an integer and a valid port number (uint16_t)
-    auto port_string_view = value_string_view.substr(port_delimiter + 1);
+  const auto port_string = result.port();
+  if (!port_string.empty()) {
+    // Validate the port, which will be in the form of ":<uint16_t>"
+    bool is_valid = true;
+    if (port_string.at(0) != ':') {
+      // The port must begin with ":"
+      is_valid = false;
+    } else {
+      // parse the port number
+      std::uint16_t port_int{};
+      auto result = std::from_chars(std::next(port_string.begin()), port_string.end(), port_int);
 
-    auto port_string_view_size = port_string_view.size();
-    if (port_string_view_size == 0 || port_string_view_size > 5) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+      if (result.ec != std::errc() || result.ptr != port_string.end() || port_int == 0) {
+        is_valid = false;
+      }
     }
 
-    auto buffer_start = port_string_view.data();
-    auto buffer_end = buffer_start + port_string_view.size();
-
-    std::uint32_t port_integer_value{};
-    auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
-    if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
-    }
-
-    if (port_integer_value == 0 || port_integer_value >= 65535) {
-      return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidHost};
+    if (!is_valid) {
+      return {HeaderValueValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidHost};
     }
   }
 
-  return HeaderEntryValidationResult::success();
+  return HeaderValueValidationResult::success();
 }
 
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-HeaderValidator::validateGenericPathHeader(const HeaderString& value) {
-  const auto& path = value.getStringView();
-  auto size = path.size();
-  bool is_valid = size > 0;
+HeaderValidator::HostHeaderValidationResult
+HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
+  // Validate an IPv6 address host header value. This is a simplified check based on RFC 3986,
+  // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only validates the characters,
+  // not the syntax of the address.
 
-  for (std::size_t i{0}; i < size && is_valid; ++i) {
-    is_valid = testChar(kPathHeaderCharTable, path.at(i));
+  // Validate that the address is enclosed between "[" and "]".
+  std::size_t closing_bracket = host.rfind(']');
+  if (host.empty() || host.at(0) != '[' || closing_bracket == absl::string_view::npos) {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+  }
+
+  // Get the address substring between the brackets.
+  const auto address = host.substr(1, closing_bracket - 1);
+  // Get the trailing port substring
+  const auto port_string = host.substr(closing_bracket + 1);
+  // Validate the IPv6 address characters
+  bool is_valid = !address.empty();
+  for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
+    is_valid &= testChar(kHostIPv6AddressCharTable, *iter);
   }
 
   if (!is_valid) {
-    return {RejectAction::Reject, UhvResponseCodeDetail::get().InvalidUrl};
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
   }
 
-  return HeaderEntryValidationResult::success();
+  return HostHeaderValidationResult::success(address, port_string);
+}
+
+HeaderValidator::HostHeaderValidationResult
+HeaderValidator::validateHostHeaderRegName(absl::string_view host) {
+  // Validate a reg-name address host header value. This is a simplified check based on RFC 3986,
+  // https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only validates the characters,
+  // not the syntax of the address.
+
+  // Identify the port trailer
+  auto port_delimiter = host.find(':');
+  const auto address = host.substr(0, port_delimiter);
+  bool is_valid = !address.empty();
+
+  // Validate the reg-name characters
+  for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
+    is_valid &= testChar(kHostRegNameCharTable, *iter);
+  }
+
+  if (!is_valid) {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+  }
+
+  const auto port_string =
+      port_delimiter != absl::string_view::npos ? host.substr(port_delimiter) : absl::string_view();
+  return HostHeaderValidationResult::success(address, port_string);
+}
+
+HeaderValidator::HeaderValueValidationResult
+HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
+  const auto& path = value.getStringView();
+  bool is_valid = !path.empty();
+
+  auto iter = path.begin();
+  auto end = path.end();
+  // Validate the path component of the URI
+  for (; iter != end && is_valid; ++iter) {
+    const char ch = *iter;
+    if (ch == '?' || ch == '#') {
+      // This is the start of the query or fragment portion of the path which uses a different
+      // character table.
+      break;
+    }
+
+    is_valid &= testChar(kPathHeaderCharTable, ch);
+  }
+
+  if (is_valid && iter != end && *iter == '?') {
+    // Validate the query component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      const char ch = *iter;
+      if (ch == '#') {
+        break;
+      }
+
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, ch);
+    }
+  }
+
+  if (is_valid && iter != end && *iter == '#') {
+    // Validate the fragment component of the URI
+    ++iter;
+    for (; iter != end && is_valid; ++iter) {
+      is_valid &= testChar(kUriQueryAndFragmentCharTable, *iter);
+    }
+  }
+
+  if (!is_valid) {
+    return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
+  }
+
+  return HeaderValueValidationResult::success();
+}
+
+bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
+  const auto encoding = value.getStringView();
+  for (const auto token : StringUtil::splitToken(encoding, ",", true, true)) {
+    if (token == header_values_.TransferEncodingValues.Chunked) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 } // namespace EnvoyDefault

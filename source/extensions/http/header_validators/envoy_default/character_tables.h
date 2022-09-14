@@ -8,14 +8,13 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-inline bool testChar(const uint32_t table[8], char c) {
+constexpr bool testChar(const uint32_t table[8], char c) {
   uint8_t uc = static_cast<uint8_t>(c);
   return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
 }
 
-//
 // Header name character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
 //
 // SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
@@ -25,10 +24,8 @@ inline bool testChar(const uint32_t table[8], char c) {
 // tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
-//                ; any VCHAR, except delimiters
 // SPELLCHECKER(on)
-//
-const uint32_t kGenericHeaderNameCharTable[] = {
+constexpr uint32_t kGenericHeaderNameCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -44,22 +41,21 @@ const uint32_t kGenericHeaderNameCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
-//
 // Header value character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.5:
 //
 // SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
-// field-value    = *( field-content / obs-fold )
-// field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
+// field-value    = *field-content
+// field-content  = field-vchar
+//                  [ 1*( SP / HTAB / field-vchar ) field-vchar ]
 // field-vchar    = VCHAR / obs-text
 // obs-text       = %x80-FF
 //
 // VCHAR          =  %x21-7E
 //                   ; visible (printing) characters
 // SPELLCHECKER(on)
-//
-const uint32_t kGenericHeaderValueCharTable[] = {
+constexpr uint32_t kGenericHeaderValueCharTable[] = {
     // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -75,18 +71,16 @@ const uint32_t kGenericHeaderValueCharTable[] = {
     0b11111111111111111111111111111111,
 };
 
-//
 // :method header character table.
-// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1
+// From RFC 9110: https://www.rfc-editor.org/rfc/rfc9110.html#section-9.1
 //
 // SPELLCHECKER(off)
 // method = token
-// token = 1*tchar
-// tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
-//       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+// token  = 1*tchar
+// tchar  = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
+//        /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 // SPELLCHECKER(on)
-//
-const uint32_t kMethodHeaderCharTable[] = {
+constexpr uint32_t kMethodHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -102,29 +96,6 @@ const uint32_t kMethodHeaderCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
-//
-// :scheme header character table.
-// From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.1
-//
-// scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
-//
-const uint32_t kSchemeHeaderCharTable[] = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b00000000000101101111111111000000,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b01111111111111111111111111100000,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b01111111111111111111111111100000,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
-
-//
 // :path header character table.
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
 //
@@ -148,8 +119,7 @@ const uint32_t kSchemeHeaderCharTable[] = {
 //
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 // SPELLCHECKER(on)
-//
-const uint32_t kPathHeaderCharTable[] = {
+constexpr uint32_t kPathHeaderCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
@@ -165,19 +135,105 @@ const uint32_t kPathHeaderCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
-//
 // Unreserved characters.
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
 //
 // unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
-//
-const uint32_t kUnreservedCharTable[] = {
+constexpr uint32_t kUnreservedCharTable[] = {
     // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b00000000000001101111111111000000,
     //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
     0b01111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+// Transfer-Encoding HTTP/1.1 header character table.
+// From RFC 9110: https://www.rfc-editor.org/rfc/rfc9110.html#section-10.1.4
+//
+// SPELLCHECKER(off)
+// Transfer-Encoding   = #transfer-coding
+// transfer-coding     = token *( OWS ";" OWS transfer-parameter )
+// transfer-parameter  = token BWS "=" BWS ( token / quoted-string )
+// SPELLCHECKER(on)
+constexpr uint32_t kTransferEncodingHeaderCharTable[] = {
+    // control characters
+    0b00000000010000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b11111111001111101111111111010100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100011,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111101010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+// An IPv6 address, excluding the surrounding "[" and "]" characters. This is based on RFC 3986,
+// https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2, that only allows hex digits and the
+// ":" separator.
+constexpr uint32_t kHostIPv6AddressCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b00000000000000001111111111100000,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111110000000000000000000000000,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111110000000000000000000000000,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+// A host reg-name character table, which covers both IPv4 addresses and hostnames.
+// From RFC 3986: https://www.rfc-editor.org/rfc/rfc3986.html#section-3.2.2
+//
+// SPELLCHECKER(off)
+// reg-name    = *( unreserved / pct-encoded / sub-delims )
+// SPELLCHECKER(on)
+constexpr uint32_t kHostRegNameCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111101111111111010100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+// A URI query and fragment character table. From RFC 3986:
+// https://datatracker.ietf.org/doc/html/rfc3986#section-3.4
+//
+// SPELLCHECKER(off)
+// query       = *( pchar / "/" / "?" )
+// fragment    = *( pchar / "/" / "?" )
+// SPELLCHECKER(on)
+constexpr uint32_t kUriQueryAndFragmentCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111111111111111110101,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111100001,
     //`abcdefghijklmnopqrstuvwxyz{|}~
     0b01111111111111111111111111100010,
     // extended ascii
