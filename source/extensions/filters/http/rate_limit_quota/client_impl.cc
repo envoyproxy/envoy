@@ -18,13 +18,12 @@ void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
 }
 
 void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
-
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
   ASSERT(stream_ != nullptr);
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-  // TODO(tyxia) end_stream
-  send(std::move(reports), /*end_stream*/ true);
+  // TODO(tyxia) Handle end_stream later.
+  send(std::move(reports), /*end_stream=*/true);
 }
 
 void RateLimitClientImpl::send(
@@ -46,7 +45,7 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
       std::string error_string = "Unable to establish the new stream";
       ENVOY_LOG(error, error_string);
       return absl::InternalError(error_string);
-      // TODO(tyxia) Error handling
+      // TODO(tyxia) Error handling later
       // re-try or other kinds of error handling actions
     }
   }

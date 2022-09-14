@@ -30,7 +30,7 @@ using BucketId = ::envoy::service::rate_limit_quota::v3::BucketId;
 class RateLimitQuotaValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
 public:
-  // TODO(tyxia) Add validation later once CEL expression is added.
+  // TODO(tyxia) Add actual validation later once CEL expression is added.
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
                                           absl::string_view) override {
     return absl::OkStatus();

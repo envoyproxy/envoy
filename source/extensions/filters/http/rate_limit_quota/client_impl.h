@@ -57,7 +57,7 @@ private:
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_{};
   RateLimitQuotaCallbacks* callbacks_{};
-  // TODO(tyxia) Further look at this flag
+  // TODO(tyxia) Further look at the use of this flag later.
   bool stream_closed = false;
 };
 
