@@ -290,7 +290,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
-  starting_ = false;
+  previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
   ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
@@ -380,7 +380,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
     }
-    if (starting_) {
+    if (!previously_fetched_data_) {
       // On the initialization of the gRPC mux, if connection to the xDS server fails, load the
       // persisted config, if available. The locally persisted config will be used until
       // connectivity is established with the xDS server.
@@ -390,7 +390,7 @@ void GrpcMuxImpl::onEstablishmentFailure() {
                                    api_state.second->request_.resource_names().end()});
     }
   }
-  starting_ = false;
+  previously_fetched_data_ = true;
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
