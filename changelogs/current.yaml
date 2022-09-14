@@ -18,6 +18,13 @@ behavior_changes:
     stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
     streaming calls. This behavior change can be reverted by setting the
     ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
+- area: original_dst
+  change: |
+    ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by
+    the connection pools. For HTTP pools, please set :ref:`idle_timeout <faq_configuration_connection_timeouts>` to
+    limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
+    behavior change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

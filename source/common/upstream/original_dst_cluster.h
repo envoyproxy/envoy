@@ -18,8 +18,25 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostMapSharedPtr = std::shared_ptr<HostMap>;
-using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+struct HostsForAddress {
+  HostsForAddress(HostSharedPtr& host) : host_(host), used_(true) {}
+
+  // Primary host for the address. This is set by the first worker that posts
+  // to the main to add a host. The field is read by all workers.
+  const HostSharedPtr host_;
+  // Hosts that are added concurrently with host_ are stored in this list.
+  // This is populated by the subsequent workers that have not received the
+  // updated table with set host_. The field is only accessed from the main
+  // thread.
+  std::vector<HostSharedPtr> hosts_;
+  // Marks as recently used by load balancers.
+  std::atomic<bool> used_;
+};
+
+using HostsForAddressSharedPtr = std::shared_ptr<HostsForAddress>;
+using HostMultiMap = absl::flat_hash_map<std::string, HostsForAddressSharedPtr>;
+using HostMultiMapSharedPtr = std::shared_ptr<HostMultiMap>;
+using HostMultiMapConstSharedPtr = std::shared_ptr<const HostMultiMap>;
 
 /**
  * The OriginalDstCluster is a dynamic cluster that automatically adds hosts as needed based on the
@@ -78,7 +95,7 @@ public:
     // The optional original host provider that extracts the address from HTTP header map.
     const absl::optional<Http::LowerCaseString>& http_header_name_;
     const absl::optional<uint32_t> port_override_;
-    HostMapConstSharedPtr host_map_;
+    HostMultiMapConstSharedPtr host_map_;
   };
 
   const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
@@ -107,12 +124,12 @@ private:
     const std::shared_ptr<OriginalDstCluster> cluster_;
   };
 
-  HostMapConstSharedPtr getCurrentHostMap() {
+  HostMultiMapConstSharedPtr getCurrentHostMap() {
     absl::ReaderMutexLock lock(&host_map_lock_);
     return host_map_;
   }
 
-  void setHostMap(const HostMapConstSharedPtr& new_host_map) {
+  void setHostMap(const HostMultiMapConstSharedPtr& new_host_map) {
     absl::WriterMutexLock lock(&host_map_lock_);
     host_map_ = new_host_map;
   }
@@ -128,7 +145,7 @@ private:
   Event::TimerPtr cleanup_timer_;
 
   absl::Mutex host_map_lock_;
-  HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+  HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
   absl::optional<Http::LowerCaseString> http_header_name_;
   absl::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
