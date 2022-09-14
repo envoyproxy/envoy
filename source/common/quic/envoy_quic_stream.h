@@ -25,7 +25,7 @@ class EnvoyQuicStream : public virtual Http::StreamEncoder,
 public:
   // |buffer_limit| is the high watermark of the stream send buffer, and the low
   // watermark will be half of it.
-  EnvoyQuicStream(uint32_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
+  EnvoyQuicStream(uint64_t buffer_limit, QuicFilterManagerConnectionImpl& filter_manager_connection,
                   std::function<void()> below_low_watermark,
                   std::function<void()> above_high_watermark, Http::Http3::CodecStats& stats,
                   const envoy::config::core::v3::Http3ProtocolOptions& http3_options)
@@ -87,7 +87,7 @@ public:
   }
 
   // SendBufferMonitor
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override {
     if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }
