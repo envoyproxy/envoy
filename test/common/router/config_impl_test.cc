@@ -2083,7 +2083,6 @@ virtual_hosts:
   )EOF";
   auto route_configuration = parseRouteConfigurationFromYaml(yaml);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  // Exact matches
   factory_context_.cluster_manager_.initializeClusters(
       {"local_service_grpc", "default-boring-service"}, {});
   {
@@ -8267,6 +8266,7 @@ virtual_hosts:
       {"path-separated-cluster", "case-sensitive-cluster", "default-cluster", "rewrite-cluster"},
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  
   // Exact matches
   EXPECT_EQ("path-separated-cluster",
             config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
