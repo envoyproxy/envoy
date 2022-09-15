@@ -401,16 +401,16 @@ envoy.filters.http.ratelimit:
   type_urls:
   - envoy.extensions.filters.http.ratelimit.v3.RateLimit
   - envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
-# TODO(tyxia) Add later when doc is ready
+# TODO(tyxia) Enable it later when all related docs are ready
 # envoy.filters.http.rate_limit_quota:
 #   categories:
 #   - envoy.filters.http
 #   security_posture: unknown
 #   status: wip
-#   type_urls:
-#   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
-#   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
-#   - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+  # type_urls:
+  # - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
+  # - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
+  # - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 envoy.filters.http.rbac:
   categories:
   - envoy.filters.http
