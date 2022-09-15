@@ -16,7 +16,6 @@ const RouteTracing* DelegatingRoute::tracingConfig() const { return base_route_-
 
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
-
     Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
   return base_route_->routeEntry()->finalizeResponseHeaders(headers, stream_info);
 }
