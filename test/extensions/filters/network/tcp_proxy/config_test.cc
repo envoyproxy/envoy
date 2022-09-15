@@ -50,24 +50,6 @@ TEST(ConfigTest, InvalidHeadersToAdd) {
   EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
 }
 
-TEST(ConfigTest, DuplicateResponseHeadersToAdd) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ConfigFactory factory;
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
-          factory.createEmptyConfigProto().get());
-  config.set_stat_prefix("prefix");
-  config.set_cluster("cluster");
-  config.mutable_tunneling_config()->set_hostname("example.com:80");
-  auto* header = config.mutable_tunneling_config()->add_response_headers_to_copy();
-  header->set_key("server");
-  header->set_header_name("server");
-  header = config.mutable_tunneling_config()->add_response_headers_to_copy();
-  header->set_key("server");
-  header->set_header_name("user-agent");
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), EnvoyException);
-}
-
 // Test that a minimal TcpProxy v2 config works.
 TEST(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
