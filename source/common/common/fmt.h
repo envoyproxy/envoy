@@ -2,6 +2,7 @@
 
 #include "envoy/common/platform.h" // Avert format.h including windows.h
 
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 #include "fmt/ostream.h"
@@ -21,5 +22,8 @@ template <> struct formatter<absl::string_view> : formatter<string_view> {
     return formatter<string_view>::format(fmt_string_view, ctx);
   }
 };
+
+// Provide formatter for absl::Status
+template <> struct formatter<absl::Status> : ostream_formatter {};
 
 } // namespace fmt

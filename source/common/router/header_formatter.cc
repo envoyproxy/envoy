@@ -236,8 +236,7 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor
 
 } // namespace
 
-StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
-    : append_(append) {
+StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(

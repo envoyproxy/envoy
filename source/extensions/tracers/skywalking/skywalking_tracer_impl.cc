@@ -28,8 +28,9 @@ using cpp2sky::TracerException;
 
 Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
-    : tracing_stats_{SKYWALKING_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
+    : tracing_stats_(std::make_shared<SkyWalkingTracerStats>(
+          SkyWalkingTracerStats{SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(
+              context.serverFactoryContext().scope(), "tracing.skywalking."))})),
       tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
@@ -72,7 +73,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     }
   }
 
-  return tracer.startSpan(trace_context.path(), tracing_context);
+  return tracer.startSpan(trace_context.path(), trace_context.protocol(), tracing_context);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,

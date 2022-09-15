@@ -34,7 +34,7 @@ class ConnectionImpl;
  */
 class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
-                          Logger::Loggable<Logger::Id::http>,
+                          public Logger::Loggable<Logger::Id::http>,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
@@ -316,10 +316,10 @@ private:
   virtual void allocTrailers() PURE;
 
   /**
-   * Called in order to complete an in progress header decode.
+   * Called for each header in order to complete an in progress header decode.
    * @return A status representing success.
    */
-  Status completeLastHeader();
+  Status completeCurrentHeader();
 
   /**
    * Check if header name contains underscore character.

@@ -49,7 +49,7 @@ public:
           auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
               config_traits_, proto_traits_, factory_context);
           auto resource_decoder =
-              std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<RouteConfiguration>>(
+              std::make_shared<Envoy::Config::OpaqueResourceDecoderImpl<RouteConfiguration>>(
                   factory_context.messageValidationContext().dynamicValidationVisitor(),
                   getNameFieldName());
           auto subscription = std::make_shared<RdsRouteConfigSubscription>(

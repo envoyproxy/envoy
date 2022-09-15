@@ -18,6 +18,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/static_cluster.h"
@@ -27,6 +29,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -1404,6 +1407,55 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   EXPECT_NE(connection, connection_data.connection_.get());
 }
 
+TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  Network::Address::InstanceConstSharedPtr proxy_address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:9999");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
+      "www.google.com", proxy_address);
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "name", std::vector<std::string>(), std::vector<std::string>(),
+          std::vector<std::string>(), absl::nullopt, nullptr, std::move(proxy_info));
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::MockTransportSocketFactory socket_factory;
+
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      address,
+  };
+  host->setAddressList(address_list);
+  auto connection = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, setBufferLimits(0));
+  EXPECT_CALL(*connection, connectionInfoSetter());
+  // The underlying connection should be created to the proxy address.
+  EXPECT_CALL(dispatcher, createClientConnection_(proxy_address, _, _, _))
+      .WillOnce(Return(connection));
+
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  // The created connection will be a raw connection to the proxy address rather
+  // than a happy eyeballs connection.
+  EXPECT_EQ(connection, connection_data.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
@@ -2183,7 +2235,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
               socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
+  EXPECT_THROW(
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
         Envoy::Stats::ScopeSharedPtr scope =
@@ -2196,7 +2248,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
         StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
                                   std::move(scope), false);
       },
-      EnvoyException, "invalid value \"fakelbtype\"");
+      EnvoyException);
 }
 
 // load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
@@ -2402,7 +2454,99 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+  }
+
+  {
+    // Test additional_source_addresses from bootstrap.
+    cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ("[2001::1]:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+  }
+
+  {
+    // Test no same IP version in multiple source addresses.
+    cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    cm_.bind_config_.clear_additional_source_addresses();
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+  }
+
+  {
+    // Test two same IP version addresses.
+    cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    cm_.bind_config_.clear_additional_source_addresses();
+    cm_.bind_config_.add_additional_source_addresses()->set_address("1.2.3.6");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
+        "different IP version source addresses can be supported in BindConfig's source_address and "
+        "additional_source_addresses fields");
+  }
+
+  {
+    // Test more than two multiple source addresses
+    cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    cm_.bind_config_.clear_additional_source_addresses();
+    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
+    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::2");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has more than one additional source addresses. Only "
+        "one additional source can be supported in BindConfig's additional_source_addresses field");
+  }
+
+  {
+    // Test non IP address case.
+    cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    cm_.bind_config_.clear_additional_source_addresses();
+    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::PipeInstance>("/test");
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -2416,12 +2560,36 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address,
+              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+  }
+
+  {
+    // Test cluster config has more than two multiple source addresses
+    config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
+        "2001::1");
+    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
+        "2001::2");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
+                                                        factory_context, std::move(scope), false),
+                              EnvoyException,
+                              "Cluster staticcluster's upstream binding config has more than one "
+                              "additional source addresses. Only one additional source can be "
+                              "supported in BindConfig's additional_source_addresses field");
   }
 
   {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    config.mutable_upstream_bind_config()->clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2429,7 +2597,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
         singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
     StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
                               false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address,
+              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
   }
 }
 
@@ -4472,6 +4643,27 @@ TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   auto cluster = makeCluster(yaml);
 
   EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
+}
+
+TEST_F(ClusterInfoImplTest, FilterChain) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster = makeCluster(yaml);
+  Http::MockFilterChainManager manager;
+  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager));
+
+  EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
+  cluster->info()->createFilterChain(manager);
 }
 
 } // namespace

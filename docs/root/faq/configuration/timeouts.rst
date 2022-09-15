@@ -14,6 +14,8 @@ This page summarizes the most important timeouts used in various scenarios.
 HTTP/gRPC
 ---------
 
+.. _faq_configuration_connection_timeouts:
+
 Connection timeouts
 ^^^^^^^^^^^^^^^^^^^
 
@@ -28,7 +30,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the idle timeout for upstream
   connections use the
-  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`
+  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`
 
 * The HTTP protocol :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream cluster

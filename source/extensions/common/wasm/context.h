@@ -218,7 +218,7 @@ public:
                                std::string_view details) override;
   void clearRouteCache() override {
     if (decoder_callbacks_) {
-      decoder_callbacks_->clearRouteCache();
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
 
@@ -281,15 +281,6 @@ public:
   absl::optional<google::api::expr::runtime::CelValue>
   FindValue(absl::string_view name, Protobuf::Arena* arena) const override {
     return findValue(name, arena, false);
-  }
-  bool IsPathUnknown(absl::string_view) const override { return false; }
-  const std::vector<google::api::expr::runtime::CelAttributePattern>&
-  unknown_attribute_patterns() const override {
-    static const std::vector<google::api::expr::runtime::CelAttributePattern> empty;
-    return empty;
-  }
-  const Protobuf::FieldMask& unknown_paths() const override {
-    return Protobuf::FieldMask::default_instance();
   }
 
   // Foreign function state

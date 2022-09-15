@@ -505,6 +505,11 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (to_lower_string == Common::Redis::SupportedCommands::quit()) {
+    callbacks.onQuit();
+    return nullptr;
+  }
+
   if (request->asArray().size() < 2) {
     // Commands other than PING all have at least two arguments.
     onInvalidRequest(callbacks);
