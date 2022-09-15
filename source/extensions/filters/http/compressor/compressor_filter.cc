@@ -323,7 +323,7 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   }
 
   // Find all compressors enabled for the filter chain.
-  std::map<std::string, std::pair<uint32_t, bool>> allowed_compressors;
+  std::map<std::string, CompressorInChain> allowed_compressors;
   uint32_t registration_count{0};
 
   auto typed_state =
@@ -409,7 +409,8 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
       if ((pair.second > choice.second) ||
-          (pair.second == choice.second && allowed_compressors[std::string(pair.first)].second)) {
+          (pair.second == choice.second &&
+           allowed_compressors[std::string(pair.first)].choose_first_)) {
         choice = pair;
       }
     }
@@ -433,9 +434,9 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   if (choice.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
     auto first_registered =
         std::min_element(allowed_compressors.begin(), allowed_compressors.end(),
-                         [](const std::pair<std::string, std::pair<uint32_t, bool>>& a,
-                            const std::pair<std::string, std::pair<uint32_t, bool>>& b) -> bool {
-                           return a.second.first < b.second.first;
+                         [](const std::pair<std::string, CompressorInChain>& a,
+                            const std::pair<std::string, CompressorInChain>& b) -> bool {
+                           return a.second.registration_count_ < b.second.registration_count_;
                          });
     return std::make_unique<CompressorFilter::EncodingDecision>(
         first_registered->first, CompressorFilter::EncodingDecision::HeaderStat::Wildcard);

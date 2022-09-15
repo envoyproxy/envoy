@@ -202,6 +202,11 @@ private:
     const HeaderStat stat_;
   };
 
+  struct CompressorInChain {
+    uint32_t registration_count_;
+    bool choose_first_;
+  };
+
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
   bool shouldCompress(const EncodingDecision& decision) const;
 
