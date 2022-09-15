@@ -113,7 +113,7 @@ using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 /**
- * Response header value for the tunnelled connections.
+ * Response header value for the tunneling connections.
  */
 class ResponseHeaderValue : public StreamInfo::FilterState::Object {
 public:
