@@ -30,10 +30,17 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // policies.
 message CustomResponse {
   // Definition of the custom response to be provided to the downstream.
-  // [#next-free-field: 7]
+  // [#next-free-field: 6]
   message Response {
     message RemoteDataSource {
       string uri = 1 [(validate.rules).string = {min_len: 1}];
+    }
+
+    message LocalDataSource {
+      config.core.v3.DataSource body = 1;
+
+      // Optional body format to be used for this response.
+      config.core.v3.SubstitutionFormatString body_format = 2;
     }
 
     // The new response status code if specified.
@@ -44,7 +51,7 @@ message CustomResponse {
     // The custom response generated either locally or retrieved
     // from a remote source.
     oneof body {
-      config.core.v3.DataSource local = 2;
+      LocalDataSource local = 2;
 
       RemoteDataSource remote = 3;
     }
@@ -57,9 +64,6 @@ message CustomResponse {
 
     // Name needs to be unique for selection using the unified matcher api.
     string name = 5 [(validate.rules).string = {min_len: 1}];
-
-    // Optional body format to be used for this response.
-    config.core.v3.SubstitutionFormatString body_format = 6;
   }
 
   // A list of custom responses.

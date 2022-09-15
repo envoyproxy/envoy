@@ -12,20 +12,19 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
   - name: 400_response
     status_code: 499
     local:
-      inline_string: "not allowed"
+      body:
+        inline_string: "not allowed"
+      body_format:
+        text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
     headers_to_add:
     - header:
         key: "foo"
         value: "x-bar"
       append: false
-    body_format:
-      text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
   - name: gateway_error_response
+    status_code: 299
     remote:
       uri: "https://foo.example/gateway_error"
-    body_format:
-      text_format: "<h1>%LOCAL_REPLY_BODY% %REQ(:path)%</h1>"
-      content_type: "text/html; charset=UTF-8"
     headers_to_add:
     - header:
         key: "foo2"

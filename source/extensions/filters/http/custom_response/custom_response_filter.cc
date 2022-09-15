@@ -104,8 +104,9 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
 
   // Handle local body
   std::string body;
-  Http::Code code;
-  custom_response->rewriteBody(headers, encoder_callbacks_->streamInfo(), body, code);
+  Http::Code code = custom_response->getStatusCodeForLocalReply(headers);
+  custom_response->formatBody(*downstream_headers_, headers, encoder_callbacks_->streamInfo(),
+                              body);
 
   const auto mutate_headers = [custom_response = custom_response,
                                this](Http::ResponseHeaderMap& headers) {

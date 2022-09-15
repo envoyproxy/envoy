@@ -29,8 +29,9 @@ public:
            Server::Configuration::CommonFactoryContext& context);
 
   // Rewrite the response.
-  void rewriteBody(Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
-                   std::string& body, Http::Code& code) const;
+  void formatBody(Http::RequestHeaderMap& request_headers,
+                  Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
+                  std::string& body) const;
 
   void evaluateHeaders(Http::ResponseHeaderMap& response_headers,
                        StreamInfo::StreamInfo& stream_info) const;
@@ -45,6 +46,8 @@ public:
   bool isRemote() const { return remote_data_source_.has_value(); }
 
   const absl::optional<Http::Code>& statusCode() const { return status_code_; }
+
+  Http::Code getStatusCodeForLocalReply(const Http::ResponseHeaderMap& response_headers) const;
 
 private:
   const std::string name_;
