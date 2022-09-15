@@ -236,6 +236,7 @@ protected:
     // Simulate the upstream xDS servers going down.
     closeConnection(sds_connection_);
     closeConnection(rtds_connection_);
+    rtds_upstream_port_ = getRtdsUpstream()->localAddress()->ip()->port();
     getSdsUpstream().reset();
     getRtdsUpstream().reset();
 
@@ -249,6 +250,7 @@ protected:
   FakeStreamPtr sds_stream_;
   FakeHttpConnectionPtr rtds_connection_;
   FakeStreamPtr rtds_stream_;
+  uint32_t rtds_upstream_port_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, KeyValueStoreXdsDelegateIntegrationTest,
@@ -334,6 +336,28 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("saz", getRuntimeKey("baz"));
+
+  // Reset the RTDS upstream to a FakeUpstream again, and re-establish the connection.
+  getRtdsUpstream().reset(
+      new FakeUpstream(rtds_upstream_port_, version_, configWithType(Http::CodecType::HTTP2)));
+
+  // Send v2 of the RTDS layer.
+  initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
+  auto rtds_resource_v2 = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+          name: some_rtds_layer
+          layer:
+            foo: zoo
+            baz: jazz
+  )EOF");
+  sendSotwDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {rtds_resource_v2}, /*version=*/"2", rtds_stream_.get());
+
+  test_server_->waitForCounterGe("runtime.load_success", 3);
+
+  // Verify that the values from the xDS response are used instead of from the persisted xDS once
+  // connectivity is re-established.
+  EXPECT_EQ("zoo", getRuntimeKey("foo"));
+  EXPECT_EQ("jazz", getRuntimeKey("baz"));
 }
 
 } // namespace
