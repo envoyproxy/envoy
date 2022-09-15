@@ -359,7 +359,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
     }
   }
   Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip);
+      Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {
