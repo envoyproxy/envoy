@@ -120,6 +120,8 @@ removed_config_or_runtime:
 new_features:
 - area: http
   change: |
+    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
+  change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
   change: |
     added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
