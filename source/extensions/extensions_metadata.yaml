@@ -149,6 +149,7 @@ envoy.filters.http.adaptive_concurrency:
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: stable
   type_urls:
