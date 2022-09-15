@@ -1756,7 +1756,6 @@ TEST_F(ThriftRouterTest, UpstreamDraining) {
 TEST_F(ThriftRouterTest, UpstreamPartialResponse) {
   initializeRouter();
 
-  // EXPECT_CALL(callbacks_, resetDownstreamConnection());
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
