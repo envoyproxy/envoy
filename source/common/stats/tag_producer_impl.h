@@ -98,7 +98,12 @@ private:
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
-  TagVector default_tags_;
+
+  // Keep track of which names have extractors. If an extractor is added and there's
+  // already one for that name, we set a bit in the extractor so we can decide whether
+  // we need do elide duplicate extractors during extraction. It is not valid to
+  // send duplicate tag names to Prometheus so this needs to be filtered out.
+  absl::flat_hash_map<absl::string_view, std::reference_wrapper<TagExtractor>> extractor_map_;
 };
 
 } // namespace Stats

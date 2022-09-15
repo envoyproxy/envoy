@@ -22,7 +22,9 @@ protected:
     ASSERT_EQ(expected.size(), actual.size());
     for (uint32_t i = 0; i < actual.size(); ++i) {
       EXPECT_EQ(expected[i].name_, actual[i].name_) << " index=" << i;
-      EXPECT_EQ(expected[i].value_, actual[i].value_) << " index=" << i;
+      if (expected[i].value_ != "*") {
+        EXPECT_EQ(expected[i].value_, actual[i].value_) << " index=" << i;
+      }
     }
   }
 
@@ -78,12 +80,14 @@ TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
   {
     TagProducerImpl producer{stats_config_};
     TagVector tags;
-    EXPECT_EQ("cluster.;upstream_rq",
-              producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
+    const std::string extracted_tag =
+        producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags);
+    EXPECT_TRUE(extracted_tag == "cluster.;upstream_rq_200" ||
+                extracted_tag == "cluster.response_code=300;upstream_rq")
+        << "extracted_tag=" << extracted_tag;
     checkTags(
         TagVector{
-            {tag_name_values_.RESPONSE_CODE, "200"},
-            {tag_name_values_.RESPONSE_CODE, "300"},
+            {tag_name_values_.RESPONSE_CODE, "*"},
             {tag_name_values_.CLUSTER_NAME, "xds-grpc"},
         },
         tags);
@@ -95,13 +99,15 @@ TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
   {
     TagProducerImpl producer{stats_config_, {{tag_name_values_.RESPONSE_CODE, "fixed"}}};
     TagVector tags;
-    EXPECT_EQ("cluster.;upstream_rq",
-              producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
+    const std::string stat_name = "cluster.xds-grpc.response_code=300;upstream_rq_200";
+    const std::string extracted_tag = producer.produceTags(stat_name, tags);
+    EXPECT_TRUE(extracted_tag == "cluster.;upstream_rq_200" ||
+                extracted_tag == "cluster.response_code=300;upstream_rq" ||
+                extracted_tag == stat_name)
+        << "extracted_tag=" << extracted_tag;
     checkTags(
         TagVector{
-            {tag_name_values_.RESPONSE_CODE, "fixed"},
-            {tag_name_values_.RESPONSE_CODE, "200"},
-            {tag_name_values_.RESPONSE_CODE, "300"},
+            {tag_name_values_.RESPONSE_CODE, "*"},
             {tag_name_values_.CLUSTER_NAME, "xds-grpc"},
         },
         tags);

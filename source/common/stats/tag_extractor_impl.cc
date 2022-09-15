@@ -294,5 +294,14 @@ bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& in
   return pattern_index == tokens_.size() && input_index == input_tokens.size();
 }
 
+TagExtractorFixedImpl::TagExtractorFixedImpl(absl::string_view name, absl::string_view value)
+    : TagExtractorImplBase(name, value) {}
+
+bool TagExtractorFixedImpl::extractTag(TagExtractionContext&, std::vector<Tag>& tags,
+                                       IntervalSet<size_t>&) const {
+  addTag(tags) = value_;
+  return true;
+}
+
 } // namespace Stats
 } // namespace Envoy
