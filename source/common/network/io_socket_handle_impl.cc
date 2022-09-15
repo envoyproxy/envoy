@@ -7,7 +7,6 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
