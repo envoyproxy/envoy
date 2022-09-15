@@ -39,7 +39,7 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   (void)end_stream;
-  // check if filterstate exists already.
+  // check if filter state exists already.
   auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
       "envoy.filters.http.custom_response");
   if (filter_state) {
