@@ -32,8 +32,7 @@ void GrpcClientImpl::cancel() {
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& request,
-                           Tracing::Span& parent_span, const Http::RequestHeaderMap&,
-                           const StreamInfo::StreamInfo& stream_info) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
   Http::AsyncClient::RequestOptions options;

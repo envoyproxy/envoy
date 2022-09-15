@@ -110,14 +110,13 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
       .WillByDefault(testing::ReturnRef(metadata));
   // Set check result default action.
   envoy::service::auth::v3::CheckRequest check_request;
-  ON_CALL(*client, check(_, _, _, _, _))
-      .WillByDefault(
-          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
-                     const Envoy::Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) -> void {
-            check_request = check_param;
-            callbacks.onComplete(makeAuthzResponse(resultCaseToCheckStatus(input.result())));
-          }));
+  ON_CALL(*client, check(_, _, _, _))
+      .WillByDefault(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                                const envoy::service::auth::v3::CheckRequest& check_param,
+                                Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        callbacks.onComplete(makeAuthzResponse(resultCaseToCheckStatus(input.result())));
+      }));
 
   // TODO: Add response headers.
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;

@@ -70,7 +70,7 @@ public:
         ->setRemoteAddress(addr_);
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(addr_);
-    EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _, _))
+    EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
         .WillOnce(
             WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
               request_callbacks_ = &callbacks;
@@ -194,7 +194,7 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -242,7 +242,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -278,7 +278,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -316,7 +316,7 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -353,7 +353,7 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
       addr_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -397,7 +397,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   response.dynamic_metadata = dynamic_metadata;
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -446,7 +446,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-nok");
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             Filters::Common::ExtAuthz::Response response{};
@@ -491,7 +491,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, check(_, _, _, _, _))
+  EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
@@ -533,7 +533,7 @@ TEST_F(ExtAuthzFilterTest, DisabledWithMetadata) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  EXPECT_CALL(*client_, check(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
 

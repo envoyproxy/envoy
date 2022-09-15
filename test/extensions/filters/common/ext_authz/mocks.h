@@ -24,8 +24,7 @@ public:
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(void, check,
               (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
-               Tracing::Span& parent_span, const Http::RequestHeaderMap& orig_request_headers,
-               const StreamInfo::StreamInfo& stream_info));
+               Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
 };
 
 class MockRequestCallbacks : public RequestCallbacks {

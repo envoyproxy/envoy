@@ -230,7 +230,6 @@ void RawHttpClientImpl::cancel() {
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
                               Tracing::Span& parent_span,
-                              const Http::RequestHeaderMap& orig_request_headers,
                               const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -260,7 +259,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     }
   }
 
-  config_->requestHeaderParser().evaluateHeaders(*headers, orig_request_headers, stream_info);
+  config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

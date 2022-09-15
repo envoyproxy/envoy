@@ -119,8 +119,7 @@ public:
 
     initialize(yaml);
     envoy::service::auth::v3::CheckRequest request;
-    client_->check(request_callbacks_, request, parent_span_,
-                   *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+    client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
     ProtobufWkt::Struct expected_dynamic_metadata;
     auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
@@ -170,8 +169,7 @@ public:
     const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
     auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
-    client_->check(request_callbacks_, request, parent_span_,
-                   *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+    client_->check(request_callbacks_, request, parent_span_, stream_info_);
     EXPECT_CALL(request_callbacks_,
                 onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
     client_->onSuccess(async_request_, std::move(check_response));
@@ -336,8 +334,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
@@ -365,8 +362,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const HeaderValuePair header2{"x-authz-header2", "value"};
   EXPECT_CALL(async_client_,
               send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is allowed.
   EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("OK")));
@@ -407,8 +403,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")),
                           expected_header.second);
 
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(stream_info, getRequestHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_, request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
@@ -426,8 +425,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   const auto check_response_headers =
       TestCommon::makeHeaderValueOption({{":status", "200", false},
@@ -446,8 +444,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
 // Response correctly.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   // When we call onSuccess() at the bottom of the test we expect that all the
   // headers-to-remove in that http response to have been correctly extracted
@@ -487,8 +484,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   // Check for child span tagging when the request is denied.
   EXPECT_CALL(child_span_, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
@@ -509,8 +505,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
@@ -529,8 +524,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
       TestCommon::makeHeaderValueOption({}));
 
   envoy::service::auth::v3::CheckRequest request;
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
   const auto check_response_headers = TestCommon::makeHeaderValueOption({{":method", "post", false},
@@ -545,8 +539,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   envoy::service::auth::v3::CheckRequest request;
 
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -559,8 +552,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   envoy::service::auth::v3::CheckRequest request;
 
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
@@ -572,8 +564,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v3::CheckRequest request;
 
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
-  client_->check(request_callbacks_, request, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
   client_->cancel();
@@ -588,7 +579,7 @@ TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
-                 *Http::StaticEmptyHeaders::get().request_headers, stream_info_);
+                 stream_info_);
 }
 
 } // namespace
