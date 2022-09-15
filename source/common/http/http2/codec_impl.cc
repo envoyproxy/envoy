@@ -534,18 +534,21 @@ void ConnectionImpl::StreamImpl::decodeData() {
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+  auto status_opt = Http::Utility::getResponseStatusOrNullopt(*headers);
+  if (status_opt.has_value()) {
+    const uint64_t status = status_opt.value();
 
-  if (!upgrade_type_.empty() && headers->Status()) {
-    Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
+    if (!upgrade_type_.empty() && headers->Status()) {
+      Http::Utility::transformUpgradeResponseFromH2toH1(*headers, upgrade_type_);
+    }
+
+    // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
+    // proxying is on an upgrade path.
+    received_noninformational_headers_ =
+        !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
   }
 
-  // Non-informational headers are non-1xx OR 101-SwitchingProtocols, since 101 implies that further
-  // proxying is on an upgrade path.
-  received_noninformational_headers_ =
-      !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
-
-  if (HeaderUtility::isSpecial1xx(*headers)) {
+  if (headers->Status() && HeaderUtility::isSpecial1xx(*headers)) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode1xxHeaders(std::move(headers));
   } else {

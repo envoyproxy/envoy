@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.upstreams.http.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
@@ -58,7 +59,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -163,4 +164,22 @@ message HttpProtocolOptions {
   // upstream filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
+
+  // Configuration options for Header Validation (UHV).
+  // UHV is an extensible mechanism for checking validity of HTTP responses.
+  //
+  // The default UHV checks the following:
+  //
+  // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
+  // #. Syntax of HTTP/1 response line
+  // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
+  // #. Syntax of HTTP/2 pseudo headers
+  // #. HTTP/3 header map validity according to `RFC 9114 section 4.3 <https://www.rfc-editor.org/rfc/rfc9114.html>`_
+  // #. Syntax of HTTP/3 pseudo headers
+  // #. Syntax of ``Content-Length`` and ``Transfer-Encoding``
+  // #. Validation of HTTP/1 responses with both ``Content-Length`` and ``Transfer-Encoding`` headers
+  //
+  // [#not-implemented-hide:]
+  // [#extension-category: envoy.http.header_validators]
+  config.core.v3.TypedExtensionConfig typed_header_validation_config = 7;
 }

@@ -12,6 +12,7 @@
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -54,6 +55,7 @@ public:
   const FiltersList http_filters_;
   const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
+  const Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool use_downstream_protocol_{};
   const bool use_http2_{};
   const bool use_http3_{};

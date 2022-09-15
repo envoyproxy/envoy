@@ -57,6 +57,7 @@ envoy_cc_library(
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",

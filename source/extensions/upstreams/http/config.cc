@@ -7,6 +7,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
@@ -93,6 +94,51 @@ getAlternateProtocolsCacheOptions(
   return absl::nullopt;
 }
 
+Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+    [[maybe_unused]] const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
+
+  Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
+  ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
+  if (!options.has_typed_header_validation_config()) {
+    // If header validator is not configured ensure that the defaults match Envoy's original
+    // behavior.
+    ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        uhv_config;
+    uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
+        getHttpOptions(options).allow_chunked_length());
+    legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
+    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+  }
+
+  const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
+      options.has_typed_header_validation_config() ? options.typed_header_validation_config()
+                                                  : legacy_header_validator_config;
+
+  auto* factory = Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(
+      header_validator_config);
+  if (!factory) {
+    throw EnvoyException(fmt::format("Header validator extension not found: '{}'",
+                                      header_validator_config.name()));
+  }
+
+  header_validator_factory = factory->createFromProto(
+      header_validator_config.typed_config(), validation_visitor);
+  if (!header_validator_factory) {
+    throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
+                                      header_validator_config.name()));
+  }
+#else
+  if (options.has_typed_header_validation_config()) {
+    throw EnvoyException(
+        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+                    options.typed_header_validation_config().name()));
+  }
+#endif
+  return header_validator_factory;
+}
+
 } // namespace
 
 uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
@@ -130,11 +176,45 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
               ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                     options.upstream_http_protocol_options())
               : absl::nullopt),
+<<<<<<< HEAD
       http_filters_(options.http_filters()),
       alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options)),
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {}
+=======
+      header_validator_factory_(createHeaderValidatorFactory(options, validation_visitor)) {
+  if (options.has_explicit_http_config()) {
+    if (options.explicit_http_config().has_http3_protocol_options()) {
+      use_http3_ = true;
+    } else if (options.explicit_http_config().has_http2_protocol_options()) {
+      use_http2_ = true;
+    }
+  }
+  if (options.has_use_downstream_protocol_config()) {
+    if (options.use_downstream_protocol_config().has_http3_protocol_options()) {
+      use_http3_ = true;
+    }
+    if (options.use_downstream_protocol_config().has_http2_protocol_options()) {
+      use_http2_ = true;
+    }
+    use_downstream_protocol_ = true;
+  }
+  http_filters_ = options.http_filters();
+  if (options.has_auto_config()) {
+    use_http2_ = true;
+    use_alpn_ = true;
+    use_http3_ = options.auto_config().has_http3_protocol_options();
+    if (use_http3_) {
+      if (!options.auto_config().has_alternate_protocols_cache_options()) {
+        throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
+                                         "is enabled with auto_config"));
+      }
+      alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
+    }
+  }
+}
+>>>>>>> db1d2bec80 (WiP)
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
