@@ -552,6 +552,13 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       config_message.hostname());
   hostname_fmt_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
       substitution_format_config, context);
+  for (const auto& header_copy : config_message.response_headers_to_copy()) {
+    auto it = response_header_mapping_.emplace(header_copy.key(), header_copy.header_name());
+    if (!it.second) {
+      throw EnvoyException(
+          absl::StrCat("Duplicate response header object key: ", header_copy.key()));
+    }
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
@@ -559,6 +566,24 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
                                absl::string_view());
+}
+
+void TunnelingConfigHelperImpl::copyResponseHeaders(
+    const Http::ResponseHeaderMap& headers,
+    const StreamInfo::FilterStateSharedPtr& filter_state) const {
+  for (const auto& [key, header_name] : response_header_mapping_) {
+    const auto header_value =
+        Http::HeaderUtility::getAllOfHeaderAsString(headers, Http::LowerCaseString(header_name));
+    const auto header_result = header_value.result();
+    if (header_result) {
+      filter_state->setData(absl::StrCat("envoy.tcp_proxy.tunnel_response_header.", key),
+                            std::make_shared<ResponseHeaderValue>(header_result.value()),
+                            StreamInfo::FilterState::StateType::ReadOnly,
+                            StreamInfo::FilterState::LifeSpan::Connection);
+    } else {
+      ENVOY_LOG(trace, "Missing response header to copy '{}'.", header_name);
+    }
+  }
 }
 
 void Filter::onConnectTimeout() {

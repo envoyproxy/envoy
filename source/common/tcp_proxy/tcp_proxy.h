@@ -112,7 +112,20 @@ using RouteConstSharedPtr = std::shared_ptr<const Route>;
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
-class TunnelingConfigHelperImpl : public TunnelingConfigHelper {
+/**
+ * Response header value for the tunnelled connections.
+ */
+class ResponseHeaderValue : public StreamInfo::FilterState::Object {
+public:
+  ResponseHeaderValue(absl::string_view header_value) : header_value_(header_value) {}
+  const std::string& value() const { return header_value_; }
+
+private:
+  const std::string header_value_;
+};
+
+class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
+                                  protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
@@ -121,11 +134,14 @@ public:
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+  void copyResponseHeaders(const Http::ResponseHeaderMap& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
 private:
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
+  absl::flat_hash_map<std::string, std::string> response_header_mapping_;
 };
 
 /**
@@ -359,6 +375,9 @@ public:
   }
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
+  }
+  StreamInfo::StreamInfo* downstreamInfo() const override {
+    return &read_callbacks_->connection().streamInfo();
   }
 
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {

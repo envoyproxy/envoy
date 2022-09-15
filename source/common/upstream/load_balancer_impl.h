@@ -187,6 +187,8 @@ public:
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
+  StreamInfo::StreamInfo* downstreamInfo() const override { return nullptr; }
+
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
   const Http::RequestHeaderMap* downstreamHeaders() const override { return nullptr; }

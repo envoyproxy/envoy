@@ -100,7 +100,7 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-  const StreamInfo::StreamInfo& downstream_info_;
+  StreamInfo::StreamInfo& downstream_info_;
 };
 
 class TcpUpstream : public GenericUpstream {
@@ -149,7 +149,7 @@ public:
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-               const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
@@ -157,7 +157,7 @@ protected:
   // The config object that is owned by the downstream network filter chain factory.
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
-  const StreamInfo::StreamInfo& downstream_info_;
+  StreamInfo::StreamInfo& downstream_info_;
 
 private:
   class DecoderShim : public Http::ResponseDecoder {
@@ -166,6 +166,7 @@ private:
     // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
+      parent_.config_.copyResponseHeaders(*headers, parent_.downstream_info_.filterState());
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
@@ -201,7 +202,7 @@ private:
 class Http1Upstream : public HttpUpstream {
 public:
   Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
 
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -211,7 +212,7 @@ public:
 class Http2Upstream : public HttpUpstream {
 public:
   Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;

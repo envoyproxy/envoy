@@ -35,6 +35,10 @@ public:
 
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  // Copy a subset of HTTP response headers to the downstream filter state.
+  virtual void copyResponseHeaders(const Http::ResponseHeaderMap& headers,
+                                   const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;

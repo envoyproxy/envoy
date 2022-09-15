@@ -256,6 +256,13 @@ const Network::Connection* Router::downstreamConnection() const {
   return callbacks_ != nullptr ? callbacks_->connection() : nullptr;
 }
 
+StreamInfo::StreamInfo* Router::downstreamInfo() const {
+  if (callbacks_ != nullptr) {
+    return &callbacks_->streamInfo();
+  }
+  return nullptr;
+}
+
 void Router::cleanup() {
   if (upstream_request_) {
     upstream_request_.reset();

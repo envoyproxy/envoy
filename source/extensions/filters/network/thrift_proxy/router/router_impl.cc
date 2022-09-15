@@ -513,6 +513,13 @@ const Network::Connection* Router::downstreamConnection() const {
   return nullptr;
 }
 
+StreamInfo::StreamInfo* Router::downstreamInfo() const {
+  if (callbacks_ != nullptr) {
+    return &callbacks_->streamInfo();
+  }
+  return nullptr;
+}
+
 void Router::cleanup() { upstream_request_.reset(); }
 
 } // namespace Router

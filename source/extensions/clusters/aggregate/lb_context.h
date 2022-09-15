@@ -29,6 +29,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return context_->downstreamConnection();
   }
+  StreamInfo::StreamInfo* downstreamInfo() const override { return context_->downstreamInfo(); }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return context_->metadataMatchCriteria();
   }

@@ -285,6 +285,7 @@ public:
 
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
+  StreamInfo::StreamInfo* downstreamInfo() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     const Envoy::Router::MetadataMatchCriteria* route_criteria =
         (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;

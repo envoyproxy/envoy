@@ -46,6 +46,11 @@ public:
   virtual const Network::Connection* downstreamConnection() const PURE;
 
   /**
+   * @return StreamInfo::StreamInfo* from the incoming connection or nullptr.
+   */
+  virtual StreamInfo::StreamInfo* downstreamInfo() const PURE;
+
+  /**
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
    * balancing.
    */

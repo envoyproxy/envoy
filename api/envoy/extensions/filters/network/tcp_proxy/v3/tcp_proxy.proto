@@ -99,6 +99,21 @@ message TcpProxy {
     // Neither ``:-prefixed`` pseudo-headers nor the Host: header can be overridden.
     repeated config.core.v3.HeaderValueOption headers_to_add = 3
         [(validate.rules).repeated = {max_items: 1000}];
+
+    // Defines the mapping from the header value to a filter state object key.
+    message HeaderToFilterState {
+      // Filter state object key, prefixed with ``envoy.tcp_proxy.tunnel_response_header.``.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // Header name.
+      string header_name = 2 [
+        (validate.rules).string = {min_len: 1, well_known_regex: HTTP_HEADER_NAME, strict: false}
+      ];
+    }
+
+    // Response header keys to copy to the downstream info for consumption
+    // by the network filters.
+    repeated HeaderToFilterState response_headers_to_copy = 4;
   }
 
   message OnDemand {
