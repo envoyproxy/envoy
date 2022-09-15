@@ -33,7 +33,6 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
     EXPECT_EQ(quic_addr.ToString(), envoy_addr->asStringView());
     EXPECT_EQ(quic_addr, envoyIpAddressToQuicSocketAddress(envoy_addr->ip()));
   }
-
   EXPECT_FALSE(envoyIpAddressToQuicSocketAddress(nullptr).IsInitialized());
 }
 
