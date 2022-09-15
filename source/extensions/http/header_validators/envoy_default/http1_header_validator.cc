@@ -272,10 +272,10 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     }
   } else if (!config_.uri_path_normalization_options().skip_path_normalization()) {
     // Validate and normalize the path, which must be a valid URI. This is only run if the config
-    // is active and the path is absolute (starts with "/").
+    // is active.
     //
-    // If path normalization is disabled or the path isn't absolute then the path will be validated
-    // against the RFC character set in validateRequestHeaderEntry.
+    // If path normalization is disabled then the path will be validated against the RFC character 
+    // set in validateRequestHeaderEntry.
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result.ok()) {
       return path_result;
