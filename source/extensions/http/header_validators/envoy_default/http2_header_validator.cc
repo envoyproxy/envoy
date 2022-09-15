@@ -203,6 +203,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     if (!path_result) {
       return path_result;
     }
+
+    path = header_map.path();
   }
 
   // Step 3: Verify each request header
