@@ -36,6 +36,7 @@ void RateLimitQuotaFilter::createMatcher() {
 // Perform the request matching.
 BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent requests.
+  // This avoids creating the data object for every request, which is expensive.
   if (data_ptr_ == nullptr) {
     if (callbacks_ != nullptr) {
       data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(
@@ -45,11 +46,6 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
     }
   }
 
-  // TODO(tyxia) avoid create the data object on every request which is very expensive!!!
-  // Thread safe?? Test multiple requests as well.
-  // Http::Matching::HttpMatchingDataImpl
-  // data(callbacks_->streamInfo().downstreamAddressProvider()); data.onRequestHeaders(headers);
-  // auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   BucketId id;
   if (data_ptr_ == nullptr || matcher_ == nullptr) {
     if (data_ptr_ == nullptr) {
