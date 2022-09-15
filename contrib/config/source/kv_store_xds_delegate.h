@@ -13,6 +13,9 @@ namespace Config {
 // The configured KeyValueStore should not do any storage or network I/O on the main thread in their
 // addOrUpdate() and get() implementations. Doing so would cause the main thread to block, since
 // the delegate is invoked on the main Envoy thread.
+//
+// The handling of wildcard resources is designed for use with O(100) resources or fewer, so it's
+// not currently advised to use this feature for large and complicated configurations.
 class KeyValueStoreXdsDelegate : public Envoy::Config::XdsResourcesDelegate {
 public:
   KeyValueStoreXdsDelegate(KeyValueStorePtr&& xds_config_store);
