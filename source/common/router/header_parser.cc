@@ -369,13 +369,12 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
 Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                          bool do_formatting) const {
   Http::HeaderTransforms transforms;
-  auto empty_req_map = Http::RequestHeaderMapImpl::create();
-  auto empty_response_map = Http::ResponseHeaderMapImpl::create();
 
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
       const std::string value =
-          entry.formatter_->format(*empty_req_map, *empty_response_map, stream_info);
+          entry.formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
+                                   *Http::StaticEmptyHeaders::get().response_headers, stream_info);
       if (!value.empty() || entry.add_if_empty_) {
         switch (entry.append_action_) {
         case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:

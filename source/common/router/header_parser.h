@@ -60,20 +60,6 @@ public:
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo* stream_info) const;
-  /**
-   * Helper methods used to evaluate headers when response headers are not available.
-   * This usually happens when evaluating upstream request headers.
-   */
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const StreamInfo::StreamInfo& stream_info) const {
-    evaluateHeaders(headers, request_headers,
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
-  }
-  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
-                       const StreamInfo::StreamInfo* stream_info) const {
-    evaluateHeaders(headers, request_headers,
-                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
-  }
 
   /**
    * Helper methods to evaluate methods without explicitly passing request and response headers.

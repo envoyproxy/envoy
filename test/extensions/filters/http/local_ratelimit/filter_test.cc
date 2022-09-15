@@ -172,7 +172,10 @@ TEST_F(FilterTest, RequestRateLimited) {
   // Add a custom header to the request.
   // Locally generated reply is configured to refer to this value.
   Http::TestRequestHeaderMapImpl request_headers{{"test-req-id", "123"}};
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
+  EXPECT_CALL(decoder_callbacks_2_, streamInfo).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&request_headers));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_2_->decodeHeaders(request_headers, false));
