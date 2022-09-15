@@ -23,7 +23,8 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& remote_address)
     : io_handle_(std::move(io_handle)),
       connection_info_provider_(
-          std::make_shared<ConnectionInfoSetterImpl>(local_address, remote_address)) {
+          std::make_shared<ConnectionInfoSetterImpl>(local_address, remote_address)),
+      sock_type_(Network::Socket::Type::Stream) {
 
   if (connection_info_provider_->localAddress() != nullptr) {
     addr_type_ = connection_info_provider_->localAddress()->type();

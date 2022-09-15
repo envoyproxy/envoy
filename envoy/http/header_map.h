@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "envoy/common/optref.h"
@@ -898,3 +899,15 @@ using HeaderMatcherSharedPtr = std::shared_ptr<HeaderMatcher>;
 
 } // namespace Http
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to use operator << defined in HeaderMap and LowerCaseString
+template <> struct formatter<::Envoy::Http::LowerCaseString> : ostream_formatter {};
+
+template <typename HeaderMapType>
+struct formatter<
+    HeaderMapType,
+    std::enable_if_t<std::is_base_of<::Envoy::Http::HeaderMap, HeaderMapType>::value, char>>
+    : ostream_formatter {};
+} // namespace fmt
