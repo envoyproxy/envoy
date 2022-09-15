@@ -103,6 +103,7 @@ private:
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onQuit() override { parent_.onQuit(*this); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onAuth(const std::string& username, const std::string& password) override {
       parent_.onAuth(*this, username, password);
@@ -118,6 +119,7 @@ private:
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onQuit(PendingRequest& request);
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
@@ -132,6 +134,7 @@ private:
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
   Common::Redis::Client::Transaction transaction_;
+  bool connection_quit_;
 };
 
 } // namespace RedisProxy

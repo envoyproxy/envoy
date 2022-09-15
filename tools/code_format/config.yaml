@@ -296,3 +296,5 @@ visibility_excludes:
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD
 - source/extensions/path/uri_template_lib/BUILD
+- source/extensions/path/match/uri_template/BUILD
+- source/extensions/path/rewrite/uri_template/BUILD

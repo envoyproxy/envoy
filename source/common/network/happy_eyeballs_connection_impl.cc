@@ -22,7 +22,7 @@ bool HappyEyeballsConnectionProvider::hasNextConnection() {
 ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const uint64_t id) {
   ASSERT(hasNextConnection());
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
-                  address_list_[next_address_]);
+                  address_list_[next_address_]->asStringView());
   auto& address = address_list_[next_address_++];
   return dispatcher_.createClientConnection(
       address, source_address_fn_ ? source_address_fn_(address) : nullptr,

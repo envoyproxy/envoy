@@ -612,9 +612,14 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
+  if (to_lower_string == Common::Redis::SupportedCommands::quit()) {
+    callbacks.onQuit();
+    return nullptr;
+  }
+
   if (request->asArray().size() < 2 &&
       Common::Redis::SupportedCommands::transactionCommands().count(to_lower_string) == 0) {
-    // Commands other than PING and transaction commands all have at least two arguments.
+    // Commands other than PING, QUIT and transaction commands all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }

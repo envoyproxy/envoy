@@ -63,28 +63,23 @@ By default it will use TCP and ALPN to select the best available protocol of HTT
 
 .. _arch_overview_http3_upstream:
 
-If HTTP/3 is configured in the automatic pool it will currently attempt an QUIC connection first,
-then 300ms later, if a QUIC connection is not established, will also attempt to establish a TCP connection.
-Whichever handshake succeeds will be used for the initial
-stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
-
-If an alternate protocol cache is configured via
-:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
-then HTTP/3 connections will only be attempted to servers which
+For auto-http with HTTP/3, an alternate protocol cache must be configured via
+:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`.  HTTP/3 connections will only be attempted to servers which
 advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_, (eventually
 the `HTTPS DNS resource record <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_ or "QUIC hints"
 which will be manually configured).
 If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
 
-If no alternate protocol cache is configured, then HTTP/3 connections will be attempted to
-all servers, even those which do not advertise HTTP/3.
+When HTTP/3 is attempted, Envoy will currently attempt an QUIC connection first,
+then 300ms later, if a QUIC connection is not established, will also attempt to establish a TCP connection.
+Whichever handshake succeeds will be used for the initial
+stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
 
-Further, HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+Further as HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
 It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
 means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
-back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
-the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
-to stay aprised of the latest and greatest changes.
+back to using HTTP/2 or HTTP/1.  This code path is still considered alpha until it has significant
+production burn time, but is considered ready for use.
 
 .. _arch_overview_happy_eyeballs:
 

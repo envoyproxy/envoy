@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "source/common/http/path_utility.h"
-#include "source/extensions/path/uri_template_lib/proto/rewrite_segments.pb.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -78,9 +77,9 @@ absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view
   return result;
 }
 
-absl::StatusOr<envoy::extensions::uri_template::RewriteSegments>
-parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) {
-  envoy::extensions::uri_template::RewriteSegments parsed_pattern;
+absl::StatusOr<RewriteSegments> parseRewritePattern(absl::string_view pattern,
+                                                    absl::string_view capture_regex) {
+  RewriteSegments parsed_pattern;
   RE2 regex = RE2(Internal::toStringPiece(capture_regex));
   if (!regex.ok()) {
     return absl::InternalError(regex.error());
@@ -97,14 +96,14 @@ parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex) 
   for (const auto& [str, kind] : processed_pattern) {
     switch (kind) {
     case RewriteStringKind::Literal:
-      parsed_pattern.add_segments()->set_literal(std::string(str));
+      parsed_pattern.push_back(RewriteSegment(std::string(str)));
       break;
     case RewriteStringKind::Variable:
       auto it = capture_index_map.find(std::string(str));
       if (it == capture_index_map.end()) {
         return absl::InvalidArgumentError("Nonexisting variable name");
       }
-      parsed_pattern.add_segments()->set_capture_index(it->second);
+      parsed_pattern.push_back(RewriteSegment(it->second));
       break;
     }
   }
@@ -126,39 +125,6 @@ absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_vi
     return status.status();
   }
   return parseRewritePattern(pattern, *std::move(status)).status();
-}
-
-absl::StatusOr<std::string> rewritePathTemplatePattern(
-    absl::string_view path, absl::string_view capture_regex,
-    const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern) {
-  RE2 regex = RE2(Internal::toStringPiece(capture_regex));
-  if (!regex.ok()) {
-    return absl::InternalError(regex.error());
-  }
-
-  // First capture is the whole matched regex pattern.
-  int capture_num = regex.NumberOfCapturingGroups() + 1;
-  std::vector<re2::StringPiece> captures(capture_num);
-  if (!regex.Match(Internal::toStringPiece(path), /*startpos=*/0,
-                   /*endpos=*/path.size(), RE2::ANCHOR_BOTH, captures.data(), captures.size())) {
-    return absl::InvalidArgumentError("Pattern does not match");
-  }
-
-  std::string rewritten_path;
-  for (const envoy::extensions::uri_template::RewriteSegments::RewriteSegment& segment :
-       rewrite_pattern.segments()) {
-    if (segment.has_literal()) {
-      absl::StrAppend(&rewritten_path, segment.literal());
-    } else if (segment.has_capture_index()) {
-      if (segment.capture_index() < 1 || segment.capture_index() >= capture_num) {
-        return absl::InvalidArgumentError("Invalid variable index");
-      }
-      absl::StrAppend(&rewritten_path,
-                      absl::string_view(captures[segment.capture_index()].as_string()));
-    }
-  }
-
-  return rewritten_path;
 }
 
 } // namespace UriTemplate
