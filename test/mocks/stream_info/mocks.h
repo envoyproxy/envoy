@@ -34,6 +34,9 @@ public:
   MOCK_METHOD(void, setUpstreamLocalAddress,
               (const Network::Address::InstanceConstSharedPtr& upstream_local_address));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
+  MOCK_METHOD(void, setUpstreamRemoteAddress,
+              (const Network::Address::InstanceConstSharedPtr& upstream_remote_address));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));

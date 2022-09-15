@@ -78,8 +78,8 @@ public:
     removeCallbacksHelper(callbacks);
   }
   uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
-  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->connectionInfoProvider().localAddress();
+  const Network::ConnectionInfoProvider& connectionInfoProvider() override {
+    return connection()->connectionInfoProvider();
   }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {

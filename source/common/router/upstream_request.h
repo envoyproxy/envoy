@@ -137,7 +137,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
-                   const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                   const Network::ConnectionInfoProvider& address_provider,
                    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override;
 
