@@ -406,6 +406,7 @@ envoy.filters.http.rate_limit_quota:
   - envoy.filters.http
   security_posture: unknown
   status: wip
+  # TODO(tyxia) uncomment once all the development work is done.
   # type_urls:
   # - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
   # - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
