@@ -522,6 +522,18 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapUriAuthorityFormReplaceHost) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "https://user:pass@envoy.com:443/root"},
+                                                  {":authority", "notenvoy.com"}};
+  auto uhv = createH1(redirect_encoded_slash_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Accept);
+  EXPECT_EQ(headers.path(), "https://user:pass@envoy.com:443/root");
+  EXPECT_EQ(headers.getHostValue(), "envoy.com:443");
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
