@@ -470,7 +470,7 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   auto sockaddr_len_to_use = address->sockAddrLen();
 #if defined(__APPLE__) || defined(__ANDROID_API__)
   sockaddr_in6 sin6;
-  if (sockaddr_to_use->sa_family == AF_INET && forceV6()) {
+  if (sockaddr_to_use->sa_family == AF_INET && Address::forceV6()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
 
     // Android always uses IPv6 dual stack. Convert IPv4 to the IPv6 mapped address when
