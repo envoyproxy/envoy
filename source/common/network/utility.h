@@ -334,6 +334,8 @@ public:
   static Api::IoCallUint64Result writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
                                                const Address::Instance& peer_address);
+  static Api::IoCallUint64Result writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
+                                               const Address::Ip* local_ip);
 
   /**
    * Read a packet from a given UDP socket and pass the packet to given UdpPacketProcessor.

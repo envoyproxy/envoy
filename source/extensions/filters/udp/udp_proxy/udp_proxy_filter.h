@@ -236,6 +236,7 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
+    bool connected_{};
 
     UdpProxySessionStats session_stats_{};
     absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
