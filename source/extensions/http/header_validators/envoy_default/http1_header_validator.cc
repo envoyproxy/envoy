@@ -216,7 +216,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     }
 
     if (header_map.ContentLength() &&
-        hasChunkedTransferEncoding(header_map.TransferEncoding()->value())) {
+        header_map.TransferEncoding()->value() == header_values_.TransferEncodingValues.Chunked) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
         return {RequestHeaderMapValidationResult::Action::Reject,
@@ -401,19 +401,13 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   // A server that receives a request message with a transfer coding it does not understand SHOULD
   // respond with 501 (Not Implemented).
   //
-  // This method validates that the transfer encoding syntax is correct but does not validate the
-  // actual context of the header.
+  // This method implements the existing (pre-UHV) Envoy behavior of only allowing a "chunked"
+  // Transfer-Encoding.
   const auto encoding = value.getStringView();
-  bool is_valid = true;
-  for (absl::string_view header_value : StringUtil::splitToken(encoding, ",", true)) {
-    for (auto iter = header_value.begin(); iter != header_value.end() && is_valid; ++iter) {
-      is_valid &= testChar(kTransferEncodingHeaderCharTable, *iter);
-    }
 
-    if (!is_valid) {
-      return {HeaderValueValidationResult::Action::Reject,
-              Http1ResponseCodeDetail::get().InvalidTransferEncoding};
-    }
+  if (!encoding.empty() && encoding != header_values_.TransferEncodingValues.Chunked) {
+    return {HeaderValueValidationResult::Action::Reject,
+            Http1ResponseCodeDetail::get().InvalidTransferEncoding};
   }
 
   return HeaderValueValidationResult::success();
