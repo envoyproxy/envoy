@@ -5,6 +5,16 @@ behavior_changes:
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
+- area: stats http local_rate_limit
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_http_local_rate_limit_myprefix_rate_limited{} to envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
+- area: stats network local_rate_limit
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_local_rate_limit_myprefix_rate_limited{} to envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
 - area: http
   change: |
     Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
@@ -18,6 +28,13 @@ behavior_changes:
     stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
     streaming calls. This behavior change can be reverted by setting the
     ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
+- area: original_dst
+  change: |
+    ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by
+    the connection pools. For HTTP pools, please set :ref:`idle_timeout <faq_configuration_connection_timeouts>` to
+    limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
+    behavior change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -36,9 +53,27 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: health_check
+  change: |
+    support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 - area: http
   change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
+- area: stats
+  change: |
+    Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the original name during the extraction. This
+    led to the same base stat name for both the per-worker and overall stat. For instance, in prometheus stats, the following stats were produced: ::
+
+      envoy_listener_downstream_cx_total{} 2.
+      envoy_listener_downstream_cx_total{envoy_worker_id="0"} 1.
+      envoy_listener_downstream_cx_total{envoy_worker_id="1"} 1.
+
+    This resulted in ``sum(envoy_listener_downstream_cx_total)`` producing 4, even though there are only 2 connections.
+    The new behavior results in stats such as this: ::
+
+      envoy_listener_downstream_cx_total{} 2.
+      envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
+      envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -90,6 +125,8 @@ new_features:
     ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: http
   change: |
+    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
+  change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
   change: |
     added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
@@ -114,6 +151,9 @@ new_features:
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
+- area: compression
+  change: |
+    added support for :ref:`choose_first<envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`.
 - area: cors
   change: |
     added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.

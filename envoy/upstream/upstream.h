@@ -39,6 +39,16 @@ class FilterChainManager;
 namespace Upstream {
 
 /**
+ * RAII handle for tracking the host usage by the connection pools.
+ **/
+class HostHandle {
+public:
+  virtual ~HostHandle() = default;
+};
+
+using HostHandlePtr = std::unique_ptr<HostHandle>;
+
+/**
  * An upstream host.
  */
 class Host : virtual public HostDescription {
@@ -186,14 +196,15 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @return the current boolean value of host being in use.
+   * @return the current boolean value of host being in use by any connection pool.
    */
   virtual bool used() const PURE;
 
   /**
-   * @param new_used supplies the new value of host being in use to be stored.
+   * Creates a handle for a host. Deletion of the handle signals that the
+   * connection pools no longer need this host.
    */
-  virtual void used(bool new_used) PURE;
+  virtual HostHandlePtr acquireHandle() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

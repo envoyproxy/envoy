@@ -1,17 +1,18 @@
 syntax = "proto3";
 
-package envoy.extensions.path.match.pattern_template.v3;
+package envoy.extensions.path.match.uri_template.v3;
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.path.match.pattern_template.v3";
-option java_outer_classname = "PatternTemplateMatchProto";
+option java_package = "io.envoyproxy.envoy.extensions.path.match.uri_template.v3";
+option java_outer_classname = "UriTemplateMatchProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/path/match/pattern_template/v3;pattern_templatev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/path/match/uri_template/v3;uri_templatev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Pattern Template Match Config]
+// [#protodoc-title: Uri Template Match Config]
+// [#extension: envoy.path.match.uri_template.uri_template_matcher]
 
 // If specified, the route is a template match rule meaning that the
 // ``:path`` header (without the query string) must match the given
@@ -38,7 +39,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * ``/videos/{file}`` would match ``/videos/1080p5000_00001.m4s``
 //
 // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
-// [#not-implemented-hide:]
-message PatternTemplateMatchConfig {
+message UriTemplateMatchConfig {
   string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
 }
