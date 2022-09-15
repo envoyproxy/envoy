@@ -864,17 +864,11 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    auto* header = proxy_config.mutable_tunneling_config()->add_response_headers_to_copy();
-    header->set_key("test_header");
-    header->set_header_name("test-header-name");
-    header = proxy_config.mutable_tunneling_config()->add_response_headers_to_copy();
-    header->set_key("absent_header");
-    header->set_header_name("absent-header-name");
+    proxy_config.mutable_tunneling_config()->set_emit_response_headers(true);
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "%FILTER_STATE(envoy.tcp_proxy.tunnel_response_header.test_header)% "
-        "%FILTER_STATE(envoy.tcp_proxy.tunnel_response_header.absent_header)%\n");
+        "%FILTER_STATE(envoy.tcp_proxy.tunnel_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
     proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
@@ -898,7 +892,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   // Send upgrade headers downstream, fully establishing the connection.
-  const std::string header_value;
+  const std::string header_value = "secret-value";
   default_response_headers_.addCopy("test-header-name", header_value);
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
@@ -906,8 +900,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
   closeConnection(fake_upstream_connection_);
 
   // Verify response header value is in the access log.
-  EXPECT_THAT(waitForAccessLog(access_log_filename),
-              testing::HasSubstr(absl::StrCat(header_value, " -")));
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(header_value));
 }
 
 TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {

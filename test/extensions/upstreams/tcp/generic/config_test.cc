@@ -23,8 +23,8 @@ namespace Generic {
 class TcpConnPoolTest : public ::testing::Test {
 public:
   TcpConnPoolTest() {
-    EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(downstream_stream_info_));
     EXPECT_CALL(lb_context_, downstreamConnection()).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(lb_context_, downstreamInfo()).WillRepeatedly(Return(&downstream_stream_info_));
   }
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   GenericConnPoolFactory factory_;
