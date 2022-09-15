@@ -291,7 +291,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
   auto uhv = createH1(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             "uhv.http1.content_length_and_chunked_not_allowed");
+                             "http1.content_length_and_chunked_not_allowed");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContentLengthAllow) {
