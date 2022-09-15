@@ -231,6 +231,7 @@ LEV
 LF
 LHS
 hls
+integrations
 jkl
 lang
 libsxg
@@ -1403,3 +1404,4 @@ NSS
 SSLKEYLOGFILE
 DLB
 PCIE
+EDNS

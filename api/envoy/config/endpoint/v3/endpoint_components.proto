@@ -44,6 +44,13 @@ message Endpoint {
     // to a non-empty value allows overriding the cluster level configuration for a specific
     // endpoint.
     string hostname = 2;
+
+    // Optional alternative health check host address.
+    //
+    // .. attention::
+    //
+    //   The form of the health check host address is expected to be a direct IP address.
+    core.v3.Address address = 3;
   }
 
   // The upstream host address.

@@ -117,7 +117,8 @@ void WatcherImpl::onDirectoryEvent() {
       return;
     }
 
-    RELEASE_ASSERT(result.err_ == nullptr, fmt::format("recv errored: {}", result.err_));
+    RELEASE_ASSERT(result.err_ == nullptr,
+                   fmt::format("recv errored: {}", result.err_->getErrorDetails()));
     if (data == 0) {
       // no callbacks to run; this is just a notification that a DirectoryWatch exited
       return;
