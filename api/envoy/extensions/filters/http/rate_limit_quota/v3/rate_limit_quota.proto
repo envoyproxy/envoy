@@ -29,7 +29,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Rate Limit Quota :ref:`configuration overview <config_http_filters_rate_limit_quota>`.
 // [#extension: envoy.filters.http.rate_limit_quota]
 
-// [#not-implemented-hide:]
 // Configures the Rate Limit Quota filter.
 //
 // Can be overridden in the per-route and per-host configurations.
@@ -139,7 +138,6 @@ message RateLimitQuotaFilterConfig {
       [(validate.rules).repeated = {max_items: 10}];
 }
 
-// [#not-implemented-hide:]
 // Per-route and per-host configuration overrides. The more specific definition completely
 // overrides the less specific definition.
 message RateLimitQuotaOverride {
@@ -160,7 +158,6 @@ message RateLimitQuotaOverride {
   xds.type.matcher.v3.Matcher bucket_matchers = 2;
 }
 
-// [#not-implemented-hide:]
 // Rate Limit Quota Bucket Settings to apply on the successful ``bucket_matchers`` match.
 //
 // Specify this message in the :ref:`Matcher.OnMatch.action
@@ -176,6 +173,7 @@ message RateLimitQuotaBucketSettings {
     oneof no_assignment_behavior {
       option (validate.required) = true;
 
+      // [#not-implemented-hide:]
       // Apply pre-configured rate limiting strategy until the server sends the first assignment.
       type.v3.RateLimitStrategy fallback_rate_limit = 1;
     }
@@ -197,13 +195,10 @@ message RateLimitQuotaBucketSettings {
     //
     // 1. Selected ``ExpiredAssignmentBehavior`` is no longer applied.
     // 2. The bucket is abandoned. The process of abandoning the bucket is described in the
-    //    :ref:`AbandonAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
-    //    message.
+    //    AbandonAction message.
     // 3. If a new request is matched into the bucket that has become abandoned,
     //    the data plane restarts the subscription to the bucket. The process of restarting the
-    //    subscription is described in the :ref:`AbandonAction
-    //    <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
-    //    message.
+    //    subscription is described in the AbandonAction message.
     //
     // If the field is not set, the ``ExpiredAssignmentBehavior`` time is **not limited**:
     // it applies to the bucket until replaced by an ``active`` assignment.
@@ -213,6 +208,7 @@ message RateLimitQuotaBucketSettings {
     oneof expired_assignment_behavior {
       option (validate.required) = true;
 
+      // [#not-implemented-hide:]
       // Apply the rate limiting strategy to all requests matched into the bucket until the RLQS
       // server sends a new assignment, or the :ref:`expired_assignment_behavior_timeout
       // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.ExpiredAssignmentBehavior.expired_assignment_behavior_timeout>`
@@ -257,26 +253,23 @@ message RateLimitQuotaBucketSettings {
         [(validate.rules).repeated = {max_items: 10}];
   }
 
-  // ``BucketIdBuilder`` makes it possible to build :ref:`BucketId
-  // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` with values substituted
+  // ``BucketIdBuilder`` makes it possible to build BucketId with values substituted
   // from the dynamic properties associated with each individual request. See usage examples in
   // the docs to :ref:`bucket_id_builder
   // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`
   // field.
   message BucketIdBuilder {
-    // Produces the value of the :ref:`BucketId
-    // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map.
+    // Produces the value of the BucketId map.
     message ValueBuilder {
       oneof value_specifier {
         option (validate.required) = true;
 
-        // Static string value — becomes the value in the :ref:`BucketId
-        // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map as is.
+        // Static string value — becomes the value in the BucketId
+        //  map as is.
         string string_value = 1;
 
         // Dynamic value — evaluated for each request. Must produce a string output, which becomes
-        // the value in the :ref:`BucketId <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>`
-        // map. For example, extensions with the ``envoy.matching.http.input`` category can be used.
+        // the value in the BucketId map. For example, extensions with the ``envoy.matching.http.input`` category can be used.
         config.core.v3.TypedExtensionConfig custom_value = 2;
       }
     }
@@ -299,8 +292,7 @@ message RateLimitQuotaBucketSettings {
 
   // ``BucketId`` builder.
   //
-  // :ref:`BucketId <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` is a map from
-  // the string key to the string value which serves as bucket identifier common for on
+  // BucketId is a map from the string key to the string value which serves as bucket identifier common for on
   // the control plane and the data plane.
   //
   // While ``BucketId`` is always static, ``BucketIdBuilder`` allows to populate map values
@@ -384,11 +376,10 @@ message RateLimitQuotaBucketSettings {
   // The interval at which the data plane (RLQS client) is to report quota usage for this bucket.
   //
   // When the first request is matched to a bucket with no assignment, the data plane is to report
-  // the request immediately in the :ref:`RateLimitQuotaUsageReports
-  // <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaUsageReports>` message.
+  // the request immediately in the RateLimitQuotaUsageReports message.
   // For the RLQS server, this signals that the data plane is now subscribed to
   // the quota assignments in this bucket, and will start sending the assignment as described in
-  // the :ref:`RLQS documentation <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
+  // the RLQS documentation.
   //
   // After sending the initial report, the data plane is to continue reporting the bucket usage with
   // the internal specified in this field.
@@ -415,7 +406,6 @@ message RateLimitQuotaBucketSettings {
   //
   // If not set, the bucket is abandoned when its ``active`` assignment expires.
   // The process of abandoning the bucket, and restarting the subscription is described in the
-  // :ref:`AbandonAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
-  // message.
+  // AbandonAction message.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
 }
