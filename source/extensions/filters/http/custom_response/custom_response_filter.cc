@@ -13,6 +13,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
+namespace {
+bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
+                  OptRef<const Network::Connection> connection) {
+  if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
+    return true;
+  }
+  if (connection.has_value() && !connection->ssl()) {
+    return true;
+  }
+  return false;
+}
+} // namespace
+
 Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeaderMap& header_map,
                                                               bool) {
   downstream_headers_ = &header_map;
@@ -30,10 +43,12 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
       "envoy.filters.http.custom_response");
   if (filter_state) {
-    filter_state->evaluateHeaders(headers, encoder_callbacks_->streamInfo());
-    // std::string body;
-    // Http::Code code;
-    // filter_state->rewriteBody(headers, encoder_callbacks_->streamInfo(), body, code);
+    filter_state->mutateHeaders(headers, encoder_callbacks_->streamInfo());
+    if (filter_state->statusCode().has_value()) {
+      auto const code = *filter_state->statusCode();
+      headers.setStatus(std::to_string(enumToInt(code)));
+      encoder_callbacks_->streamInfo().setResponseCode(static_cast<uint32_t>(code));
+    }
   }
   auto custom_response = base_config_->getResponse(headers, encoder_callbacks_->streamInfo());
 
@@ -59,9 +74,24 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
       config_->stats().custom_response_redirect_invalid_uri_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
+    // Don't change the scheme from the original request
+    const bool scheme_is_http =
+        schemeIsHttp(*downstream_headers_, decoder_callbacks_->connection());
 
-    // TODO: cache original host and path
-    // TODO: filter state/metadata to track that we've done a redirect
+    // Cache original host and path
+    const std::string original_host(downstream_headers_->getHostValue());
+    const std::string original_path(downstream_headers_->getPathValue());
+    const bool scheme_is_set = (downstream_headers_->Scheme() != nullptr);
+    Cleanup restore_original_headers([this, original_host, original_path, scheme_is_set,
+                                      scheme_is_http]() {
+      downstream_headers_->setHost(original_host);
+      downstream_headers_->setPath(original_path);
+      if (scheme_is_set) {
+        downstream_headers_->setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
+                                                      : Http::Headers::get().SchemeValues.Https);
+      }
+    });
+
     // Replace the original host, scheme and path.
     downstream_headers_->setScheme(absolute_url.scheme());
     downstream_headers_->setHost(absolute_url.hostAndPort());
@@ -96,8 +126,8 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     // decoder_callbacks_->modifyDecodingBuffer(
     //[](Buffer::Instance& data) { data.drain(data.length()); });
     // decoder_callbacks_->recreateStream(&headers);
+    restore_original_headers.cancel();
     decoder_callbacks_->recreateStream(nullptr);
-    (void)factory_context_;
 
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -110,7 +140,7 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
 
   const auto mutate_headers = [custom_response = custom_response,
                                this](Http::ResponseHeaderMap& headers) {
-    custom_response->evaluateHeaders(headers, encoder_callbacks_->streamInfo());
+    custom_response->mutateHeaders(headers, encoder_callbacks_->streamInfo());
   };
   encoder_callbacks_->sendLocalReply(code, body, mutate_headers, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;

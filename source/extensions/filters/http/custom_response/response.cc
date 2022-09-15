@@ -29,17 +29,7 @@ Response::Response(
       formatter_(config.has_local() && config.local().has_body_format()
                      ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                            config.local().body_format(), context)
-                     : nullptr),
-      content_type_(config.has_local() && config.local().has_body_format()
-                        ? absl::optional<std::string>(
-                              (!config.local().body_format().content_type().empty()
-                                   ? config.local().body_format().content_type()
-                                   : (config.local().body_format().format_case() ==
-                                              envoy::config::core::v3::SubstitutionFormatString::
-                                                  FormatCase::kJsonFormat
-                                          ? Http::Headers::get().ContentTypeValues.Json
-                                          : Http::Headers::get().ContentTypeValues.Text)))
-                        : absl::optional<std::string>()) {
+                     : nullptr) {
   if (config.has_status_code()) {
     status_code_ = static_cast<Http::Code>(config.status_code().value());
   }
@@ -56,8 +46,8 @@ Response::Response(
   header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
 }
 
-void Response::evaluateHeaders(Http::ResponseHeaderMap& response_headers,
-                               StreamInfo::StreamInfo& stream_info) const {
+void Response::mutateHeaders(Http::ResponseHeaderMap& response_headers,
+                             StreamInfo::StreamInfo& stream_info) const {
   header_parser_->evaluateHeaders(response_headers, stream_info);
 }
 

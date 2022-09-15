@@ -118,7 +118,7 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
                                                 0, 0, std::chrono::minutes(15));
   EXPECT_EQ("499", response->headers().getStatusValue());
-  EXPECT_EQ("not allowed", response->body()); // TODO
+  EXPECT_EQ("not allowed", response->body());
   EXPECT_EQ("x-bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
@@ -130,14 +130,13 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
   default_request_headers_.setHost("some.route");
   auto response = sendRequestAndWaitForResponse(
       default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(15));
-  EXPECT_EQ("221", response->headers().getStatusValue());
+  EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
   EXPECT_EQ(
       0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   EXPECT_EQ("x-bar2",
             response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
-  // TODO: add header and body modifications
 }
 
 TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
@@ -154,7 +153,6 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
   EXPECT_EQ(1,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
-  // TODO: add header and body modifications
 }
 
 TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
@@ -174,14 +172,15 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   default_request_headers_.setHost("some.other.host");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
-  EXPECT_EQ("221", response->headers().getStatusValue());
+  EXPECT_EQ("299", response->headers().getStatusValue());
+  EXPECT_EQ("x-bar2",
+            response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
 
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
   EXPECT_EQ(
       0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
-  //  TODO: add header and body modifications
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,

@@ -12,8 +12,8 @@ Http::FilterFactoryCb CustomResponseFilterFactory::createFilterFactoryFromProtoT
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   Stats::StatNameManagedStorage prefix(stats_prefix, context.scope().symbolTable());
   auto config_ptr = std::make_shared<FilterConfig>(config, prefix.statName(), context);
-  return [config_ptr, &context](Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
-    callbacks.addStreamFilter(std::make_shared<CustomResponseFilter>(config_ptr, context));
+  return [config_ptr](Http::FilterChainFactoryCallbacks& callbacks) mutable -> void {
+    callbacks.addStreamFilter(std::make_shared<CustomResponseFilter>(config_ptr));
   };
 }
 

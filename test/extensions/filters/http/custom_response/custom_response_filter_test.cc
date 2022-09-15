@@ -40,7 +40,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    filter_ = std::make_unique<CustomResponseFilter>(config_, context_);
+    filter_ = std::make_unique<CustomResponseFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 

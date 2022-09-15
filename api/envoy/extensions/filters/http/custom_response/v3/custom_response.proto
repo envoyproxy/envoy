@@ -33,10 +33,21 @@ message CustomResponse {
   // [#next-free-field: 6]
   message Response {
     message RemoteDataSource {
+      // The Http URI to fetch the custom response from.
+      // It should be a full FQDN with protocol, host and path.
+      //
+      // Example:
+      //
+      // .. code-block:: yaml
+      //
+      //    uri: https://www.googleapis.com/oauth2/v1/certs
+      //
       string uri = 1 [(validate.rules).string = {min_len: 1}];
     }
 
     message LocalDataSource {
+      // The new local reply body text if specified. It will be used
+      // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
       config.core.v3.DataSource body = 1;
 
       // Optional body format to be used for this response.
@@ -46,9 +57,7 @@ message CustomResponse {
     // The new response status code if specified.
     google.protobuf.UInt32Value status_code = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
-    // The new local reply body text if specified. It will be used
-    // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
-    // The custom response generated either locally or retrieved
+    // The custom response generated body either locally or retrieved
     // from a remote source.
     oneof body {
       LocalDataSource local = 2;
@@ -58,7 +67,8 @@ message CustomResponse {
 
     // HTTP headers to add to the response. This allows the
     // response policy to append, to add or to override headers of
-    // the response before it is sent to a downstream client.
+    // the original response for local body, or the custom response from the
+    // remote body, before it is sent to a downstream client.
     repeated config.core.v3.HeaderValueOption headers_to_add = 4
         [(validate.rules).repeated = {max_items: 1000}];
 

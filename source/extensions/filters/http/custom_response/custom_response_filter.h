@@ -32,9 +32,8 @@ public:
 
   ~CustomResponseFilter() override = default;
 
-  CustomResponseFilter(std::shared_ptr<FilterConfig> config,
-                       Server::Configuration::FactoryContext& context)
-      : config_{std::move(config)}, base_config_{config_.get()}, factory_context_(context) {}
+  CustomResponseFilter(std::shared_ptr<FilterConfig> config)
+      : config_{std::move(config)}, base_config_{config_.get()} {}
 
   void onRemoteResponse(Http::ResponseHeaderMap& headers, const ResponseSharedPtr& custom_response,
                         const Http::ResponseMessage* response);
@@ -42,7 +41,6 @@ public:
 private:
   std::shared_ptr<FilterConfig> config_;
   const FilterConfigBase* base_config_ = nullptr;
-  Server::Configuration::FactoryContext& factory_context_;
   Http::RequestHeaderMap* downstream_headers_ = nullptr;
 };
 

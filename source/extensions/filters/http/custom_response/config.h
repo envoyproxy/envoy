@@ -37,6 +37,11 @@ MAKE_STAT_NAMES_STRUCT(CustomResponseFilterStatNames, ALL_CUSTOM_RESPONSE_FILTER
 MAKE_STATS_STRUCT(CustomResponseFilterStats, CustomResponseFilterStatNames,
                   ALL_CUSTOM_RESPONSE_FILTER_STATS);
 
+/**
+ * Container class to store filter configuration, which includes custom
+ * responses, and matching tree/list to get custom response for a particular
+ * upstream response for both hcm and route specific configs.
+ */
 class FilterConfigBase {
 public:
   FilterConfigBase(
@@ -53,11 +58,6 @@ protected:
   Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
 };
 
-/**
- * Container class to store filter configuration, which includes custom
- * responses, and matching tree/list to get custom response for a particular
- * upstream response.
- */
 class FilterConfig : public FilterConfigBase {
 public:
   FilterConfig(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
