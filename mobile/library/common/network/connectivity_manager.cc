@@ -12,6 +12,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
+#include "fmt/ostream.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
@@ -437,3 +438,10 @@ ConnectivityManagerSharedPtr ConnectivityManagerHandle::get() {
 
 } // namespace Network
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to format InterfacePair::string_view
+template <>
+struct formatter<Envoy::Network::Address::InstanceConstSharedPtr> : ostream_formatter {};
+} // namespace fmt

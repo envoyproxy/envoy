@@ -36,6 +36,8 @@ protected:
   PlatformStoreTest() { createStore(); }
 
   void createStore() {
+    // Note that timer assignment (to ttl vs flush) is determined by their ordering here
+    ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     flush_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     store_ = std::make_unique<PlatformKeyValueStore>(dispatcher_, save_interval_, mock_platform_,
                                                      std::numeric_limits<uint64_t>::max(), key_);
@@ -45,27 +47,28 @@ protected:
   std::unique_ptr<PlatformKeyValueStore> store_{};
   std::chrono::seconds save_interval_{5};
   Event::MockTimer* flush_timer_ = nullptr;
+  Event::MockTimer* ttl_timer_ = nullptr;
   TestPlatformInterface mock_platform_;
 };
 
 TEST_F(PlatformStoreTest, Basic) {
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
-  store_->addOrUpdate("foo", "bar");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
   EXPECT_EQ("bar", store_->get("foo").value());
-  store_->addOrUpdate("foo", "eep");
+  store_->addOrUpdate("foo", "eep", absl::nullopt);
   EXPECT_EQ("eep", store_->get("foo").value());
   store_->remove("foo");
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
 }
 
 TEST_F(PlatformStoreTest, Persist) {
-  store_->addOrUpdate("foo", "bar");
-  store_->addOrUpdate("by\nz", "ee\np");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  store_->addOrUpdate("by\nz", "ee\np", absl::nullopt);
   ASSERT_TRUE(flush_timer_->enabled_);
   flush_timer_->invokeCallback(); // flush
   EXPECT_TRUE(flush_timer_->enabled_);
   // Not flushed as 5ms didn't pass.
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
 
   save_interval_ = std::chrono::seconds(0);
   createStore();
@@ -80,7 +83,7 @@ TEST_F(PlatformStoreTest, Persist) {
   store_->iterate(validate);
 
   // This will flush due to 0ms flush interval
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
   createStore();
   EXPECT_TRUE(store_->get("baz").has_value());
 
@@ -91,8 +94,8 @@ TEST_F(PlatformStoreTest, Persist) {
 }
 
 TEST_F(PlatformStoreTest, Iterate) {
-  store_->addOrUpdate("foo", "bar");
-  store_->addOrUpdate("baz", "eep");
+  store_->addOrUpdate("foo", "bar", absl::nullopt);
+  store_->addOrUpdate("baz", "eep", absl::nullopt);
 
   int full_counter = 0;
   KeyValueStore::ConstIterateCb validate = [&full_counter](const std::string& key,
