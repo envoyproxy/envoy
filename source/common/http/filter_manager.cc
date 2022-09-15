@@ -914,8 +914,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(
-                  headers, *getRequestHeaders(), streamInfo());
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -954,8 +953,7 @@ void DownstreamFilterManager::sendDirectLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
             if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(
-                  headers, *getRequestHeaders(), streamInfo());
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);

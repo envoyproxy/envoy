@@ -18,7 +18,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
@@ -1080,16 +1079,6 @@ public:
   }
 
 private:
-  // Helper method to get request headers.
-  const Http::RequestHeaderMap* getRequestHeaders() const {
-    const Http::RequestHeaderMap* request_headers =
-        filter_manager_callbacks_.requestHeaders().ptr();
-    if (request_headers == nullptr) {
-      request_headers = StaticEmptyHeaders::get().request_headers.get();
-    }
-    return request_headers;
-  }
-
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
 };

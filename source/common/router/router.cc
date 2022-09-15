@@ -426,8 +426,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_path.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
-          direct_response->finalizeResponseHeaders(response_headers, request_headers,
-                                                   callbacks_->streamInfo());
+          direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
@@ -1506,8 +1505,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
   // Router::Filter we'll need to find a better location for this work. One possibility is to
   // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
-  route_entry_->finalizeResponseHeaders(*headers, upstream_request.getRequestHeaders(),
-                                        callbacks_->streamInfo());
+  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
