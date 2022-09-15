@@ -69,6 +69,9 @@ void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockadd
 StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
                                                               socklen_t ss_len, bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >= sizeof(sa_family_t), "");
+  if (forceV6()) {
+    v6only = false;
+  }
   switch (ss.ss_family) {
   case AF_INET: {
     RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in), "");
