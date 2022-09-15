@@ -13,10 +13,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   absl::string_view input(reinterpret_cast<const char*>(buf), len);
 
   // test rewriter parser
-  absl::StatusOr<std::vector<Envoy::Extensions::UriTemplate::ParsedSegment>> rewrite = Envoy::Extensions::UriTemplate::parseRewritePattern(input);
+  absl::StatusOr<std::vector<Envoy::Extensions::UriTemplate::ParsedSegment>> rewrite =
+      Envoy::Extensions::UriTemplate::parseRewritePattern(input);
 
   // test matcher parser
-  absl::StatusOr<std::string_view> match = Envoy::Extensions::UriTemplate::convertPathPatternSyntaxToRegex(input);
+  absl::StatusOr<std::string_view> match =
+      Envoy::Extensions::UriTemplate::convertPathPatternSyntaxToRegex(input);
 }
 
 } // namespace Fuzz
