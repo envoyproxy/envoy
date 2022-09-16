@@ -224,28 +224,24 @@ TEST_P(DeterministicApertureLoadBalancerTest, RingPick2) {
   }
 
   auto scope = stats_store_.createScope("ring_hash.");
-  auto daperture_stats = DeterministicApertureLoadBalancer::generateStats(*scope);
   auto ring_hash_lb = std::make_shared<DeterministicApertureLoadBalancer::Ring>(
       peer_offset, peer_width, normalized_host_weights, 0.1, ring_size, ring_size, hash_function,
-      false, RingHashLoadBalancer::generateStats(*scope), daperture_stats);
+      false, scope, RingHashLoadBalancer::generateStats(*scope));
 
   absl::flat_hash_map<size_t, size_t> index_count;
   absl::flat_hash_map<size_t, double> index_weight;
 
   for (int i = 0; i < 100; ++i) {
     auto res = ring_hash_lb->pick2();
-    if (!res) {
-      continue;
-    }
 
-    absl::optional<double> wt1 = ring_hash_lb->weight(res->first, peer_offset, peer_width);
-    absl::optional<double> wt2 = ring_hash_lb->weight(res->second, peer_offset, peer_width);
+    absl::optional<double> wt1 = ring_hash_lb->weight(res.first, peer_offset, peer_width);
+    absl::optional<double> wt2 = ring_hash_lb->weight(res.second, peer_offset, peer_width);
 
-    index_count[res->first]++;
-    index_count[res->second]++;
+    index_count[res.first]++;
+    index_count[res.second]++;
 
-    index_weight[res->first] = *wt1;
-    index_weight[res->second] = *wt2;
+    index_weight[res.first] = *wt1;
+    index_weight[res.second] = *wt2;
   }
 
   size_t total_picks_non_fractional = 0;

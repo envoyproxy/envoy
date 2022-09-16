@@ -39,15 +39,15 @@ namespace Upstream {
  */
 
 /**
- * All DeterministicAperture load balancer stats. @see stats_macros.h
+ * All DeterministicAperture load balancer ring stats. @see stats_macros.h
  */
-#define ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(COUNTER) COUNTER(pick2_errors)
+#define ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(COUNTER) COUNTER(pick2_same)
 
 /**
- * Struct definition for all DeterministicAperture load balancer stats. @see stats_macros.h
+ * Struct definition for all DeterministicAperture load balancer ring stats. @see stats_macros.h
  */
-struct DeterministicApertureLoadBalancerStats {
-  ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(GENERATE_COUNTER_STRUCT)
+struct DeterministicApertureLoadBalancerRingStats {
+  ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -62,13 +62,9 @@ public:
           config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
-  const DeterministicApertureLoadBalancerStats& stats() const { return stats_; }
-  const RingHashLoadBalancerStats& ringStats() const { return ring_stats_; }
-
-  static DeterministicApertureLoadBalancerStats generateStats(Stats::Scope& scope);
-
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
+  const RingHashLoadBalancerStats& ringStats() const { return ring_stats_; }
   /*
    * Customization of the `RingHashLoadBalancer` ring to add functionality that allows calculating
    * the intersecting ring segments.
@@ -76,8 +72,8 @@ public:
   struct Ring : public RingHashLoadBalancer::Ring {
     Ring(double offset, double width, const NormalizedHostWeightVector& normalized_host_weights,
          double min_normalized_weight, uint64_t min_ring_size, uint64_t max_ring_size,
-         HashFunction hash_function, bool use_hostname_for_hashing,
-         RingHashLoadBalancerStats ring_hash_stats, DeterministicApertureLoadBalancerStats& stats);
+         HashFunction hash_function, bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
+         RingHashLoadBalancerStats ring_stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
@@ -90,43 +86,37 @@ public:
      * Gets the index of the Ring's entry at a given offset.
      * @param offset for which index is to be calculated.
      */
-    absl::optional<size_t> getIndex(double offset) const;
-
-    /*
-     * The ratio of intersection of the two rings.
-     * @param index Index of the inner ring
-     * @param offset Offset of the outer/peer ring
-     * @param width Width for which the overlap has to be calculated.
-     */
-    absl::optional<double> weight(size_t index, double offset, double width) const;
+    size_t getIndex(double offset) const;
 
     /*
      * Pick an index as part of the `p2c` algorithm.
      * Uses uniform random distribution within to pick a random index in the peer's `offset` and
      * `width`.
      */
-    absl::optional<size_t> pick() const;
+    size_t pick() const;
 
     /*
      * Pick another index in the peer's `offset` and `width` range.
      * @param first Index that was already picked. The new pick cannot overlap the first pick's
      * region.
      */
-    absl::optional<size_t> tryPickSecond(size_t first) const;
+    size_t tryPickSecond(size_t first) const;
 
     /*
      * Picks two indexes as per the `p2c` algorithm.
      */
-    absl::optional<std::pair<size_t, size_t>> pick2() const;
+    std::pair<size_t, size_t> pick2() const;
 
   private:
-    double offset_;
-    double width_;
-    double unit_width_;
+    static DeterministicApertureLoadBalancerRingStats generateStats(Stats::Scope& scope);
+
+    const double offset_;
+    const double width_;
+    const double unit_width_;
     std::random_device random_dev_;
     mutable std::mt19937 rng_;
     mutable std::uniform_real_distribution<double> random_distribution_;
-    DeterministicApertureLoadBalancerStats& stats_;
+    DeterministicApertureLoadBalancerRingStats stats_;
 
     double intersect(double b0, double e0, double b1, double e1) const;
     double nextRandom() const { return random_distribution_(rng_); }
@@ -141,7 +131,7 @@ private:
                      double min_normalized_weight, double /* max_normalized_weight */) override {
     HashingLoadBalancerSharedPtr deterministic_aperture_lb = std::make_shared<Ring>(
         offset_, width_, normalized_host_weights, min_normalized_weight, min_ring_size_,
-        max_ring_size_, hash_function_, use_hostname_for_hashing_, ring_stats_, stats_);
+        max_ring_size_, hash_function_, use_hostname_for_hashing_, scope_, ring_stats_);
     if (hash_balance_factor_ == 0) {
       return deterministic_aperture_lb;
     }
@@ -153,7 +143,6 @@ private:
   double width_;
   double offset_;
   Stats::ScopeSharedPtr scope_;
-  DeterministicApertureLoadBalancerStats stats_;
   RingHashLoadBalancerStats ring_stats_;
 };
 

@@ -34,12 +34,12 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
-        daperture_lb_config,
+        aperture_lb_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     TimeSource& time_source)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
-      least_request_config_(least_request_config), lb_daperture_config_(daperture_lb_config),
+      least_request_config_(least_request_config), lb_aperture_config_(aperture_lb_config),
       common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
       random_(random), fallback_policy_(subsets.fallbackPolicy()),
       metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
@@ -740,7 +740,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   case LoadBalancerType::DeterministicAperture:
     thread_aware_lb_ = std::make_unique<DeterministicApertureLoadBalancer>(
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.lb_daperture_config_, subset_lb.common_config_);
+        subset_lb.lb_aperture_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;

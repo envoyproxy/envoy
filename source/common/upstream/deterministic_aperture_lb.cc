@@ -21,12 +21,12 @@ DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
       width_((config.has_value() && config->total_peers() > 0) ? (1.0 / config->total_peers())
                                                                : 1.0),
       offset_((config.has_value() && width_ > 0.0) ? (width_ * config->peer_index()) : 0.0),
-      scope_(scope.createScope("deterministic_aperture_lb.")), stats_(generateStats(*scope_)),
+      scope_(scope.createScope("deterministic_aperture_lb.")),
       ring_stats_(RingHashLoadBalancer::generateStats(*scope_)) {}
 
-DeterministicApertureLoadBalancerStats
-DeterministicApertureLoadBalancer::generateStats(Stats::Scope& scope) {
-  return {ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(POOL_COUNTER(scope))};
+DeterministicApertureLoadBalancerRingStats
+DeterministicApertureLoadBalancer::Ring::generateStats(Stats::Scope& scope) {
+  return {ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(POOL_COUNTER(scope))};
 }
 
 /*
@@ -39,13 +39,10 @@ HostConstSharedPtr DeterministicApertureLoadBalancer::Ring::chooseHost(uint64_t,
     return nullptr;
   }
 
-  absl::optional<std::pair<size_t, size_t>> maybe_index_pair = pick2();
-  if (!maybe_index_pair) {
-    return nullptr;
-  }
+  const std::pair<size_t, size_t> index_pair = pick2();
 
-  const RingHashLoadBalancer::RingEntry& first = ring_[maybe_index_pair->first];
-  const RingHashLoadBalancer::RingEntry& second = ring_[maybe_index_pair->second];
+  const RingHashLoadBalancer::RingEntry& first = ring_[index_pair.first];
+  const RingHashLoadBalancer::RingEntry& second = ring_[index_pair.second];
 
   ENVOY_LOG(debug, "pick2 returned hosts: (hash1: {}, address1: {}, hash2: {}, address2: {})",
             first.hash_, first.host_->address()->asString(), second.hash_,
@@ -60,39 +57,22 @@ using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::Hash
 DeterministicApertureLoadBalancer::Ring::Ring(
     double offset, double width, const NormalizedHostWeightVector& normalized_host_weights,
     double min_normalized_weight, uint64_t min_ring_size, uint64_t max_ring_size,
-    HashFunction hash_function, bool use_hostname_for_hashing,
-    RingHashLoadBalancerStats ring_hash_stats, DeterministicApertureLoadBalancerStats& stats)
+    HashFunction hash_function, bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
+    RingHashLoadBalancerStats ring_stats)
     : RingHashLoadBalancer::Ring(normalized_host_weights, min_normalized_weight, min_ring_size,
                                  max_ring_size, hash_function, use_hostname_for_hashing,
-                                 ring_hash_stats),
-      offset_(offset), width_(width), rng_(random_dev_()), random_distribution_(0, 1),
-      stats_(stats) {
-  unit_width_ = (1.0 / ring_size_);
+                                 ring_stats),
+      offset_(offset), width_(width), unit_width_(1.0 / ring_size_), rng_(random_dev_()),
+      random_distribution_(0, 1), stats_(generateStats(*scope)) {
+  if (width_ > 1.0 || width_ < 0) {
+    throw EnvoyException(
+        fmt::format("Invalid width for the deterministic aperture ring{}", width_));
+  }
 }
 
-absl::optional<size_t> DeterministicApertureLoadBalancer::Ring::getIndex(double offset) const {
-  if (offset < 0 || (offset >= unit_width_ * ring_size_)) {
-    return absl::nullopt;
-  }
+size_t DeterministicApertureLoadBalancer::Ring::getIndex(double offset) const {
+  RELEASE_ASSERT(offset >= 0 && offset <= 1, "valid offset");
   return offset / unit_width_;
-}
-
-absl::optional<double> DeterministicApertureLoadBalancer::Ring::weight(size_t index, double offset,
-                                                                       double width) const {
-  if (index >= ring_size_ || width > 1 || offset > 1) {
-    return absl::nullopt;
-  }
-
-  double index_begin = index * unit_width_;
-  double index_end = index_begin + unit_width_;
-
-  if (offset + width > 1) {
-    double start = std::fmod((offset + width), 1.0);
-
-    return 1.0 - (intersect(index_begin, index_end, start, offset)) / unit_width_;
-  }
-
-  return intersect(index_begin, index_end, offset, offset + width) / unit_width_;
 }
 
 double DeterministicApertureLoadBalancer::Ring::intersect(double b0, double e0, double b1,
@@ -101,15 +81,11 @@ double DeterministicApertureLoadBalancer::Ring::intersect(double b0, double e0, 
   return std::max(0.0, std::min(e0, e1) - std::max(b0, b1));
 }
 
-absl::optional<size_t> DeterministicApertureLoadBalancer::Ring::pick() const {
-  if (width_ > 1.0 || width_ < 0) {
-    return absl::nullopt;
-  }
-
+size_t DeterministicApertureLoadBalancer::Ring::pick() const {
   return getIndex(std::fmod((offset_ + width_ * nextRandom()), 1.0));
 }
 
-absl::optional<size_t> DeterministicApertureLoadBalancer::Ring::tryPickSecond(size_t first) const {
+size_t DeterministicApertureLoadBalancer::Ring::tryPickSecond(size_t first) const {
   double f_begin = first * unit_width_;
   ENVOY_LOG(trace, "Pick second for (first: {}, offset: {}, width: {}, first begin: {})", first,
             offset_, width_, f_begin);
@@ -139,23 +115,17 @@ absl::optional<size_t> DeterministicApertureLoadBalancer::Ring::tryPickSecond(si
   return getIndex(std::fmod(pos, 1.0));
 }
 
-absl::optional<std::pair<size_t, size_t>> DeterministicApertureLoadBalancer::Ring::pick2() const {
+std::pair<size_t, size_t> DeterministicApertureLoadBalancer::Ring::pick2() const {
   ENVOY_LOG(trace, "pick2 for offset: {}, width: {}", offset_, width_);
-  absl::optional<size_t> first = pick();
+  const size_t first = pick();
+  const size_t second = tryPickSecond(first);
 
-  if (!first) {
-    stats_.pick2_errors_.inc();
-    return absl::nullopt;
+  if (first == second) {
+    stats_.pick2_same_.inc();
   }
 
-  absl::optional<size_t> second = tryPickSecond(first.value());
-  if (!second) {
-    stats_.pick2_errors_.inc();
-    return absl::nullopt;
-  }
-
-  ENVOY_LOG(trace, "Returning: ({}, {})", *first, *second);
-  return std::pair<size_t, size_t>(*first, *second);
+  ENVOY_LOG(trace, "Returning: ({}, {})", first, second);
+  return std::pair<size_t, size_t>(first, second);
 }
 
 } // namespace Upstream

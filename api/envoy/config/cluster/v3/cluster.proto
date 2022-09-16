@@ -44,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 61]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -118,7 +118,7 @@ message Cluster {
     // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
 
-    DETERMINISTIC_APERTURE = 9;
+    DETERMINISTIC_APERTURE = 8;
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
@@ -533,16 +533,15 @@ message Cluster {
   // uniform random distribution to select a backend from the range of overlapping backends. This
   // along with P2C ensures uniform load distribution.
 
-  // [#next-free-field: 6]
   message DeterministicApertureLbConfig {
     // Hash ring configuration for the internal ring for endpoints.
     RingHashLbConfig ring_config = 1;
 
     // Index of this peer (0 indexed).
-    uint32 peer_index = 3;
+    uint32 peer_index = 2;
 
     // Total number of peers participating in the algorithm (that share the outer ring).
-    uint32 total_peers = 5;
+    uint32 total_peers = 3;
   }
 
   // Specific configuration for the
@@ -1086,7 +1085,7 @@ message Cluster {
     RoundRobinLbConfig round_robin_lb_config = 56;
 
     // Optional configuration for the Deterministic Aperture load balancing policy.
-    DeterministicApertureLbConfig deterministic_aperture_lb_config = 60;
+    DeterministicApertureLbConfig deterministic_aperture_lb_config = 57;
   }
 
   // Common configuration for all load balancer implementations.
