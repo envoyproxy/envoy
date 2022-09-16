@@ -21,13 +21,9 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
 
-using ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
 using Server::Configuration::MockFactoryContext;
-using ::testing::_;
-using ::testing::Invoke;
 using ::testing::NiceMock;
-using Upstream::MockThreadLocalCluster;
 
 constexpr char MatcherConfig[] = R"EOF(
   matcher_list:
@@ -134,7 +130,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
   // Add custom_value_pairs to the request header for exact value_match in the predicate.
-  for (auto pair : custom_value_pairs) {
+  for (auto const& pair : custom_value_pairs) {
     headers.addCopy(pair.first, pair.second);
   }
 
@@ -161,7 +157,7 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
-  for (auto pair : custom_value_pairs) {
+  for (auto const& pair : custom_value_pairs) {
     headers.addCopy(pair.first, pair.second);
   }
 

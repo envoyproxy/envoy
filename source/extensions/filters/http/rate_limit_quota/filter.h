@@ -71,7 +71,7 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_;
   RateLimitQuotaValidationVisitor visitor_ = {};
-  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 

@@ -7,8 +7,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
-
 void RateLimitQuotaFilter::setDecoderFilterCallbacks(
     Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
@@ -30,7 +28,9 @@ void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMactchActionContext context;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMactchActionContext> factory(
       context, factory_context_.getServerFactoryContext(), visitor_);
-  matcher_ = factory.create(config_->bucket_matchers())();
+  if (config_->has_bucket_matchers()) {
+    matcher_ = factory.create(config_->bucket_matchers())();
+  }
 }
 
 // Perform the request matching.
@@ -82,7 +82,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
                                           RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
-  for (auto id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
+  for (const auto& id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
     std::string bucket_id_key = id_builder.first;
     auto builder_method = id_builder.second;
 
