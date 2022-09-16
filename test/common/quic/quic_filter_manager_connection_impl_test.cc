@@ -78,7 +78,8 @@ TEST_F(QuicFilterManagerConnectionImplTest, ReadDisable) {
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
-  EXPECT_ENVOY_BUG(impl_.detectEarlyCloseWhenReadDisabled(true), "Unexpected call to detectEarlyCloseWhenReadDisabled");
+  EXPECT_ENVOY_BUG(impl_.detectEarlyCloseWhenReadDisabled(true),
+                   "Unexpected call to detectEarlyCloseWhenReadDisabled");
 }
 
 TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoSetter) {
