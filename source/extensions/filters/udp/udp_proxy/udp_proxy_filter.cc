@@ -352,7 +352,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
   if (!connected_) {
-    Api::SysCallIntResult rc = socket_->connect(host_->address());
+    Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
     if (SOCKET_FAILURE(rc.return_value_)) {
       cluster_.cluster_stats_.sess_tx_errors_.inc();
       return;

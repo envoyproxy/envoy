@@ -75,8 +75,14 @@ public:
     }
 
     void expectWriteToUpstream(const std::string& data, int sys_errno = 0,
-                               const Network::Address::Ip* local_ip = nullptr) {
+                               const Network::Address::Ip* local_ip = nullptr,
+                               bool expect_connect = false) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
+      if (expect_connect) {
+        EXPECT_CALL(*socket_->io_handle_, connect(_)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+      } else {
+        EXPECT_CALL(*socket_->io_handle_, connect(_)).Times(0);
+      }
       EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
           .WillOnce(Invoke(
               [this, data, local_ip, sys_errno](
@@ -260,7 +266,7 @@ use_original_src_ip: true
 
     expectSessionCreate(upstream_address);
     test_sessions_[0].expectSetIpTransparentSocketOption();
-    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
+    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip(), true);
     recvDataFromDownstream(peer_address_->asString(), local_address, "hello");
 
     checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, ipv4_expect,
@@ -349,7 +355,7 @@ public:
 
   void ensureNoIpTransparentSocketOptions() {
     expectSessionCreate(upstream_address_v6_);
-    test_sessions_[0].expectWriteToUpstream("hello");
+    test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
     recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000",
                            "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
 
@@ -389,7 +395,7 @@ upstream_socket_config:
         true, false);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -436,7 +442,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -446,7 +452,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -472,7 +478,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -482,7 +488,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -516,7 +522,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -629,7 +635,7 @@ matcher:
   cluster_update_callbacks_->onClusterAddOrUpdate(
       factory_context_.cluster_manager_.thread_local_cluster_);
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -663,7 +669,7 @@ matcher:
       1, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -680,7 +686,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -702,7 +708,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -713,7 +719,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -736,7 +742,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -764,7 +770,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -776,7 +782,7 @@ matcher:
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -816,7 +822,7 @@ use_per_packet_load_balancing: true
       2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -829,7 +835,7 @@ use_per_packet_load_balancing: true
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
@@ -887,7 +893,7 @@ use_per_packet_load_balancing: true
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -920,7 +926,7 @@ use_per_packet_load_balancing: true
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -931,7 +937,7 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -958,7 +964,7 @@ use_per_packet_load_balancing: true
       2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -968,7 +974,7 @@ use_per_packet_load_balancing: true
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
@@ -1178,7 +1184,7 @@ hash_policies:
         return host;
       }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
@@ -1207,7 +1213,7 @@ matcher:
             return host;
           }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
@@ -1280,7 +1286,7 @@ hash_policies:
         return host;
       }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
