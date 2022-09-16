@@ -110,7 +110,7 @@ public:
   Config::GrpcMuxWatchPtr makeWatch(const std::string& type_url,
                                     const absl::flat_hash_set<std::string>& resources,
                                     NiceMock<MockSubscriptionCallbacks>& callbacks,
-                                    Config::OpaqueResourceDecoder& resource_decoder) {
+                                    Config::OpaqueResourceDecoderSharedPtr resource_decoder) {
     return grpc_mux_->addWatch(type_url, resources, callbacks, resource_decoder, {});
   }
 
@@ -122,8 +122,9 @@ public:
   CustomConfigValidatorsPtr config_validators_;
   std::unique_ptr<XdsMux::GrpcMuxSotw> grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_{
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")};
   Stats::TestUtil::TestStore stats_;
   ControlPlaneStats control_plane_stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
@@ -345,8 +346,9 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
 
   time_system_.setSystemTime(std::chrono::seconds(0));
 
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
@@ -913,6 +915,82 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       "--service-node and --service-cluster options.");
 }
 
+// Validate that a valid resource decoder is used after removing a subscription.
+TEST_F(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
+  setup();
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  {
+    // Subscribe to resource "x" with some callbacks and resource decoder.
+    NiceMock<MockSubscriptionCallbacks> foo_callbacks;
+    OpaqueResourceDecoderSharedPtr foo_decoder(
+        std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+            envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
+    auto foo_sub = makeWatch(type_url, {"x"}, foo_callbacks, foo_decoder);
+
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    expectSendMessage(type_url, {"x"}, "", true);
+    grpc_mux_->start();
+
+    // Send just x; only foo_callbacks should receive an onConfigUpdate(),
+    // and foo_decoder should be invoked.
+    {
+      auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+      response->set_type_url(type_url);
+      response->set_version_info("1");
+      envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+      load_assignment.set_cluster_name("x");
+      response->add_resources()->PackFrom(load_assignment);
+      EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
+          .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                              const std::string&) {
+            EXPECT_EQ(1, resources.size());
+            const auto& expected_assignment =
+                dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+                    resources[0].get().resource());
+            EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
+          }));
+      expectSendMessage(type_url, {"x"}, "1");
+      grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+    }
+
+    expectSendMessage(type_url, {}, "1");
+  }
+  // foo_sub no longer valid, watcher was removed, and foo_decoder no longer valid.
+
+  // Subscribe to resource "y" with other callbacks and resource decoder.
+  NiceMock<MockSubscriptionCallbacks> bar_callbacks;
+  OpaqueResourceDecoderSharedPtr bar_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
+  expectSendMessage(type_url, {"y"}, "1");
+  auto bar_sub = makeWatch(type_url, {"y"}, bar_callbacks, bar_decoder);
+
+  // Send y; only bar_callbacks should receive an onConfigUpdate(), and
+  // bar_decoder should be invoked (not foo_callbacks or foo_decoder).
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("2");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("y");
+    response->add_resources()->PackFrom(load_assignment);
+    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                            const std::string&) {
+          EXPECT_EQ(1, resources.size());
+          const auto& expected_assignment =
+              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
+                  resources[0].get().resource());
+          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
+        }));
+    expectSendMessage(type_url, {"y"}, "2");
+    grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+
+  expectSendMessage(type_url, {}, "2");
+}
+
 // Validate behavior when dynamic context parameters are updated.
 TEST_F(GrpcMuxImplTest, DynamicContextParameters) {
   setup();
@@ -956,8 +1034,6 @@ public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}
   Config::GrpcMuxPtr null_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
 };
 
 TEST_F(NullGrpcMuxImplTest, StartImplemented) { EXPECT_NO_THROW(null_mux_->start()); }
@@ -980,8 +1056,9 @@ TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
 
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+          envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
 
   EXPECT_THROW_WITH_REGEX(null_mux_->addWatch("type_url", {}, callbacks, resource_decoder, {}),
                           EnvoyException, "ADS must be configured to support an ADS config source");
