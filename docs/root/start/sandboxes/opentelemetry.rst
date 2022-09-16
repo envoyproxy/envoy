@@ -105,7 +105,12 @@ Point your browser to http://localhost:55679/debug/tracez .
 
 You should see the OpenTelemetry dashboard.
 
+.. image:: /start/sandboxes/_static/opentelemetry-ui.png
 
+In the ``Latency Samples`` of ``opentelemetry.proto.collector.trace.v1.TraceService/Export`` you can explore the traces by clicking any value of
+``[>0s][>10µs][>100µs][>1ms][>10ms][>100ms][>1s][>10s][>1m40s]``.
+
+.. image:: /start/sandboxes/_static/opentelemetry-ui-traces.png
 
 .. seealso::
 
