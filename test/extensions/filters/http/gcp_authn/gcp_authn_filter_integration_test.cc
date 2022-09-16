@@ -95,7 +95,7 @@ public:
                                          {":scheme", "http"},
                                          {":authority", "host"},
                                          // Add a pair with `Authorization` as the key for
-                                         // verification of header map overriden behavior.
+                                         // verification of header map overridden behavior.
                                          {"Authorization", "test"}});
     }
   }
@@ -153,7 +153,7 @@ public:
       std::string id_token = absl::StrCat("Bearer ", MockTokenString);
       // Verify the request header modification:
       // 1) Only one entry with authorization header key. i.e., Any existing values should be
-      // overriden by response from authentication server.
+      // overridden by response from authentication server.
       EXPECT_EQ(upstream_request_->headers().get(authorizationHeaderKey()).size(), 1);
       // 2) the token returned from authentication server has been added to the request header that
       // is sent to destination upstream.
