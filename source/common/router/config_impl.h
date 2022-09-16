@@ -69,8 +69,7 @@ public:
    */
   virtual RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      uint64_t random_value,
-                                      bool ignore_path_parameters_in_path_matching) const PURE;
+                                      uint64_t random_value) const PURE;
 
   // By default, matchers do not support null Path headers.
   virtual bool supportsPathlessHeaders() const { return false; }
@@ -1036,8 +1035,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1067,8 +1066,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1099,8 +1098,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1131,8 +1130,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1163,8 +1162,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
@@ -1193,8 +1192,8 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,

@@ -130,8 +130,8 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
-  MOCK_METHOD(void, setSanitizedPath, (const Http::RequestHeaderMap&));
-  MOCK_METHOD(const absl::string_view, getSanitizedPath, (), (const));
+  MOCK_METHOD(void, setPathWithoutQueryAndFragment, (const Http::RequestHeaderMap&));
+  MOCK_METHOD(const absl::string_view, getPathWithoutQueryAndFragment, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;

@@ -732,9 +732,9 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
-  virtual void setSanitizedPath(const Http::RequestHeaderMap& headers) PURE;
+  virtual void setPathWithoutQueryAndFragment(const Http::RequestHeaderMap& headers) PURE;
 
-  virtual const absl::string_view getSanitizedPath() const PURE;
+  virtual const absl::string_view getPathWithoutQueryAndFragment() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {

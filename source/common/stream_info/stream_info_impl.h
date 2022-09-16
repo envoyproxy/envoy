@@ -314,15 +314,13 @@ struct StreamInfoImpl : public StreamInfo {
     ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
-  void setSanitizedPath(const Http::RequestHeaderMap& headers) override {
+  void setPathWithoutQueryAndFragment(const Http::RequestHeaderMap& headers) override {
     sanitized_path_ = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    auto pos = sanitized_path_.find_first_of(";");
-    if (pos != absl::string_view::npos) {
-      sanitized_path_.remove_suffix(sanitized_path_.length() - pos);
-    }
   }
 
-  const absl::string_view getSanitizedPath() const override { return sanitized_path_; }
+  const absl::string_view getPathWithoutQueryAndFragment() const override {
+    return sanitized_path_;
+  }
 
   // This function is used to persist relevant information from the original
   // stream into to the new one, when recreating the stream. Generally this
@@ -336,7 +334,7 @@ struct StreamInfoImpl : public StreamInfo {
     // These two are set in the constructor, but to T(recreate), and should be T(create)
     start_time_ = info.startTime();
     start_time_monotonic_ = info.startTimeMonotonic();
-    sanitized_path_ = info.getSanitizedPath();
+    sanitized_path_ = info.getPathWithoutQueryAndFragment();
   }
 
   TimeSource& time_source_;

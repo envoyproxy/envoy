@@ -2097,16 +2097,16 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
-    stream_info.setSanitizedPath(headers);
+    stream_info.setPathWithoutQueryAndFragment(headers);
     TestConfigImpl config(route_configuration, factory_context_, true);
     EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
               "business-specific-route");
     headers = genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET");
-    stream_info.setSanitizedPath(headers);
+    stream_info.setPathWithoutQueryAndFragment(headers);
     EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
               "business-specific-route");
     headers = genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET");
-    stream_info.setSanitizedPath(headers);
+    stream_info.setPathWithoutQueryAndFragment(headers);
     EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
               "business-specific-route");
   }

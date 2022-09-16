@@ -250,7 +250,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
-  EXPECT_EQ(s1.getSanitizedPath(), s2.getSanitizedPath());
+  EXPECT_EQ(s1.getPathWithoutQueryAndFragment(), s2.getPathWithoutQueryAndFragment());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {

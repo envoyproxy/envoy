@@ -1349,7 +1349,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      filter_manager_.streamInfo().setSanitizedPath(*request_headers_);
+      filter_manager_.streamInfo().setPathWithoutQueryAndFragment(*request_headers_);
       route = snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
                                            stream_id_);
     }

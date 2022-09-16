@@ -180,15 +180,13 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
-  ON_CALL(*this, setSanitizedPath(_))
+  ON_CALL(*this, setPathWithoutQueryAndFragment(_))
       .WillByDefault(Invoke([this](const Http::RequestHeaderMap& headers) {
         sanitized_path_ = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-        auto pos = sanitized_path_.find_first_of(";");
-        if (pos != absl::string_view::npos) {
-          sanitized_path_.remove_suffix(sanitized_path_.length() - pos);
-        }
       }));
-  ON_CALL(*this, getSanitizedPath()).WillByDefault(Invoke([this]() { return sanitized_path_; }));
+  ON_CALL(*this, getPathWithoutQueryAndFragment()).WillByDefault(Invoke([this]() {
+    return sanitized_path_;
+  }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

@@ -1516,16 +1516,12 @@ PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
   return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
 }
 
-RouteConstSharedPtr
-PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                              const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                              bool ignore_path_parameters_in_path_matching) const {
-  absl::string_view sanitized_path;
-  if (ignore_path_parameters_in_path_matching) {
-    sanitized_path = stream_info.getSanitizedPath();
-  } else {
-    sanitized_path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  }
+RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                  const StreamInfo::StreamInfo& stream_info,
+                                                  uint64_t random_value) const {
+  absl::string_view sanitized_path =
+      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
+
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitized_path)) {
     return clusterEntry(headers, random_value);
@@ -1552,16 +1548,13 @@ PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& hea
   return currentUrlPathAfterRewriteWithMatchedPath(headers, path_);
 }
 
-RouteConstSharedPtr
-PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                            bool ignore_path_parameters_in_path_matching) const {
-  absl::string_view sanitized_path;
-  if (ignore_path_parameters_in_path_matching) {
-    sanitized_path = stream_info.getSanitizedPath();
-  } else {
-    sanitized_path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  }
+RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                const StreamInfo::StreamInfo& stream_info,
+                                                uint64_t random_value) const {
+
+  absl::string_view sanitized_path =
+      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
+
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitized_path)) {
     return clusterEntry(headers, random_value);
@@ -1597,16 +1590,12 @@ RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& he
   return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
 }
 
-RouteConstSharedPtr
-RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                             const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                             bool ignore_path_parameters_in_path_matching) const {
-  absl::string_view sanitized_path;
-  if (ignore_path_parameters_in_path_matching) {
-    sanitized_path = stream_info.getSanitizedPath();
-  } else {
-    sanitized_path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  }
+RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                 const StreamInfo::StreamInfo& stream_info,
+                                                 uint64_t random_value) const {
+  absl::string_view sanitized_path =
+      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
+
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     if (path_matcher_->match(sanitized_path)) {
       return clusterEntry(headers, random_value);
@@ -1636,7 +1625,7 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
 
 RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& stream_info,
-                                                   uint64_t random_value, bool) const {
+                                                   uint64_t random_value) const {
   if (Http::HeaderUtility::isConnect(headers) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
@@ -1663,19 +1652,16 @@ absl::optional<std::string> PathSeparatedPrefixRouteEntryImpl::currentUrlPathAft
   return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
 }
 
-RouteConstSharedPtr PathSeparatedPrefixRouteEntryImpl::matches(
-    const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
-    uint64_t random_value, bool ignore_path_parameters_in_path_matching) const {
+RouteConstSharedPtr
+PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t random_value) const {
   if (!RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return nullptr;
   }
 
-  absl::string_view sanitized_path;
-  if (ignore_path_parameters_in_path_matching) {
-    sanitized_path = stream_info.getSanitizedPath();
-  } else {
-    sanitized_path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-  }
+  absl::string_view sanitized_path =
+      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
 
   if (sanitized_path.size() >= prefix_.size() && path_matcher_->match(sanitized_path) &&
       (sanitized_path.size() == prefix_.size() || sanitized_path[prefix_.size()] == '/')) {
@@ -1884,11 +1870,6 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return SSL_REDIRECT_ROUTE;
   }
 
-  bool ignore_path_parameters_in_path_matching = false;
-  if (this->globalRouteConfig().ignorePathParametersInPathMatching()) {
-    ignore_path_parameters_in_path_matching = true;
-  }
-
   if (matcher_) {
     Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
@@ -1903,8 +1884,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       ASSERT(dynamic_cast<RouteMatchAction*>(result.get()));
       const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*result);
 
-      if (route_action.route()->matches(headers, stream_info, random_value,
-                                        ignore_path_parameters_in_path_matching)) {
+      if (route_action.route()->matches(headers, stream_info, random_value)) {
         return route_action.route();
       }
 
@@ -1922,8 +1902,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         continue;
       }
 
-      RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value,
-                                                          ignore_path_parameters_in_path_matching);
+      RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
       if (nullptr == route_entry) {
         continue;
       }
