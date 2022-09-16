@@ -101,7 +101,7 @@ This will be routed via all 3 of the Envoy proxies:
 Step 4: View the traces in OpenTelemetry UI
 *******************************************
 
-Point your browser to http://localhost:55679/debug/tracez .
+Point your browser to http://localhost:55679/debug/tracez.
 
 You should see the OpenTelemetry dashboard.
 
