@@ -16,11 +16,13 @@ namespace KeyValue {
 namespace {
 
 class TestPlatformInterface : public PlatformInterface {
-  virtual void save(const std::string& key, const std::string& contents) {
+public:
+  virtual void save(const std::string& key, const std::string& contents) override {
     store_.erase(key);
     store_.emplace(key, contents);
   }
-  virtual std::string read(const std::string& key) const {
+
+  virtual std::string read(const std::string& key) const override {
     auto it = store_.find(key);
     if (it == store_.end()) {
       return "";
@@ -28,6 +30,7 @@ class TestPlatformInterface : public PlatformInterface {
     return it->second;
   }
 
+private:
   absl::flat_hash_map<std::string, std::string> store_;
 };
 
