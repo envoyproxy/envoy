@@ -28,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
+        "//source/common/quic:spdy_server_push_utils_for_envoy_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
@@ -37,6 +38,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:epoll_server_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
+        "@com_github_google_quiche//:quic_core_http_spdy_server_push_utils_header",
         "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",

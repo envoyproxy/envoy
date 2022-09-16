@@ -58,8 +58,8 @@ public:
   }
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { ASSERT(false); }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
+  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled"); }
   bool readEnabled() const override { return true; }
   Network::ConnectionInfoSetter& connectionInfoSetter() override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),

@@ -28,6 +28,7 @@
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
+#include "quiche/quic/core/http/spdy_server_push_utils.h"
 #include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -628,6 +629,25 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(slice2.empty());
   EXPECT_EQ(nullptr, slice2.data());
   EXPECT_TRUE(fragment_releaser_called);
+}
+
+TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPromisedUrlFromHeaders) {
+  spdy::Http2HeaderBlock headers;
+  EXPECT_EQ("", SpdyServerPushUtils::GetPromisedUrlFromHeaders(headers));
+}
+
+TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPromisedHostNameFromHeaders) {
+  spdy::Http2HeaderBlock headers;
+  EXPECT_EQ("", SpdyServerPushUtils::GetPromisedHostNameFromHeaders(headers));
+}
+
+TEST(SpdyPlatformTest, SpdyServerPushUtils_PromisedUrlIsValid) {
+  spdy::Http2HeaderBlock headers;
+  EXPECT_FALSE(SpdyServerPushUtils::PromisedUrlIsValid(headers));
+}
+
+TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPushPromiseUrl) {
+  EXPECT_EQ("", SpdyServerPushUtils::GetPushPromiseUrl("https", "www.example.com", "/"));
 }
 
 } // namespace

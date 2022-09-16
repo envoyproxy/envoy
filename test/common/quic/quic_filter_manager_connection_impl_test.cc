@@ -63,5 +63,62 @@ TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoProviderSharedPtr) {
   EXPECT_TRUE(impl_.connectionInfoProviderSharedPtr() == nullptr);
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, AddBytesSentCallback) {
+  Network::Connection::BytesSentCb cb;
+  EXPECT_ENVOY_BUG(impl_.addBytesSentCallback(cb), "unexpected call to addBytesSentCallback");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, NoDelay) {
+  // This is a no-op, but call it for test coverage.
+  impl_.noDelay(false);
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, ReadDisable) {
+  EXPECT_ENVOY_BUG(impl_.readDisable(true), "Unexpected call to readDisable");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
+  EXPECT_ENVOY_BUG(impl_.detectEarlyCloseWhenReadDisabled(true), "Unexpected call to detectEarlyCloseWhenReadDisabled");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoSetter) {
+  impl_.connectionInfoSetter();
+  impl_.closeNow();
+  EXPECT_ENVOY_BUG(impl_.connectionInfoSetter(), "No connection socket.");
+  impl_.closeNow();
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, UnixSocketPeerCredentials) {
+  // This is a no-op, but call it for test coverage.
+  EXPECT_FALSE(impl_.unixSocketPeerCredentials().has_value());
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, Write) {
+  Buffer::OwnedImpl data;
+  EXPECT_ENVOY_BUG(impl_.write(data, true), "unexpected write call");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, RawWrite) {
+  Buffer::OwnedImpl data;
+  EXPECT_ENVOY_BUG(impl_.rawWrite(data, true), "unexpected call to rawWrite");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, BufferLimit) {
+  EXPECT_DEATH(impl_.bufferLimit(), "not implemented");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, SetBufferLimits) {
+  EXPECT_ENVOY_BUG(impl_.setBufferLimits(1), "unexpected call to setBufferLimits");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
+  EXPECT_DEATH(impl_.getWriteBuffer(), "not implemented");
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, EnableHalfClose) {
+  impl_.enableHalfClose(false); // No-op
+  EXPECT_DEATH(impl_.enableHalfClose(true), "Quic connection doesn't support half close.");
+}
+
 } // namespace Quic
 } // namespace Envoy
