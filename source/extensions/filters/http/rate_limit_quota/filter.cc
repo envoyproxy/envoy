@@ -42,18 +42,18 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
       data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(
           callbacks_->streamInfo().downstreamAddressProvider());
     } else {
-      ENVOY_LOG(error, "Filter callback has not been initialized yet.");
+      // ENVOY_LOG(error, "Filter callback has not been initialized yet.");
     }
   }
 
   BucketId id;
   if (data_ptr_ == nullptr || matcher_ == nullptr) {
     if (data_ptr_ == nullptr) {
-      ENVOY_LOG(error, "Matching data object has not been initialized yet.");
+      // ENVOY_LOG(error, "Matching data object has not been initialized yet.");
     }
 
     if (matcher_ == nullptr) {
-      ENVOY_LOG(error, "Matcher has not been initialized yet.");
+      // ENVOY_LOG(error, "Matcher has not been initialized yet.");
     }
   } else {
     data_ptr_->onRequestHeaders(headers);
@@ -111,10 +111,10 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           // Build the bucket id from the matched result.
           bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
         } else {
-          ENVOY_LOG(debug, "Empty matched result.");
+          // ENVOY_LOG(debug, "Empty matched result.");
         }
       } else {
-        ENVOY_LOG(debug, "Failed to retrive the result from custom value");
+        // ENVOY_LOG(debug, "Failed to retrive the result from custom value");
       }
       break;
     }
