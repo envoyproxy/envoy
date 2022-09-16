@@ -48,8 +48,6 @@ public:
            message_type_ == MessageType::HeartbeatResponse;
   }
 
-  ProtocolType protocolType() const { return ProtocolType::Dubbo; }
-
 private:
   SerializeType serialize_type_{SerializeType::Hessian2};
   MessageType message_type_{MessageType::Request};
@@ -72,7 +70,7 @@ public:
   const MessageContext& messageContextInfo() const { return *message_context_info_; }
   MessageContext& mutableMessageContextInfo() { return *message_context_info_; }
 
-  // Helper method to access attributes of common context.
+  // Helper methods to access attributes of common context.
   MessageType messageType() const {
     ASSERT(hasMessageContextInfo());
     return message_context_info_->messageType();

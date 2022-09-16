@@ -35,14 +35,6 @@ enum class StreamResetReason : uint8_t {
   Overflow
 };
 
-// Supported protocol type
-enum class ProtocolType : uint8_t {
-  Dubbo = 1,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
-  LastProtocolType = Dubbo,
-};
-
 // Supported serialize type
 enum class SerializeType : uint8_t {
   Hessian2 = 2,

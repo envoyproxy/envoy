@@ -20,10 +20,7 @@ using DubboCodecPtr = std::unique_ptr<DubboCodec>;
 
 class DubboCodec {
 public:
-
   static DubboCodecPtr codecFromSerializeType(SerializeType type);
-
-  ProtocolType type() { return ProtocolType::Dubbo; }
 
   DecodeStatus decodeHeader(Buffer::Instance& buffer, MessageMetadata& metadata);
 
