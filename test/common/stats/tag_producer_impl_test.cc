@@ -3,6 +3,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/stats/tag_producer_impl.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -80,11 +81,13 @@ TEST_F(TagProducerTest, DuplicateConfigTagBehavior) {
   {
     TagProducerImpl producer{stats_config_};
     TagVector tags;
-    const std::string extracted_tag =
-        producer.produceTags("cluster.xds-grpc.response_code=300;upstream_rq_200", tags);
-    EXPECT_TRUE(extracted_tag == "cluster.;upstream_rq_200" ||
-                extracted_tag == "cluster.response_code=300;upstream_rq")
-        << "extracted_tag=" << extracted_tag;
+    std::string extracted_name;
+    EXPECT_LOG_CONTAINS("warn", "Skipping duplicate tag",
+                        extracted_name = producer.produceTags(
+                            "cluster.xds-grpc.response_code=300;upstream_rq_200", tags));
+    EXPECT_TRUE(extracted_name == "cluster.;upstream_rq_200" ||
+                extracted_name == "cluster.response_code=300;upstream_rq")
+        << "extracted_name=" << extracted_name;
     checkTags(
         TagVector{
             {tag_name_values_.RESPONSE_CODE, "*"},
@@ -100,11 +103,13 @@ TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
     TagProducerImpl producer{stats_config_, {{tag_name_values_.RESPONSE_CODE, "fixed"}}};
     TagVector tags;
     const std::string stat_name = "cluster.xds-grpc.response_code=300;upstream_rq_200";
-    const std::string extracted_tag = producer.produceTags(stat_name, tags);
-    EXPECT_TRUE(extracted_tag == "cluster.;upstream_rq_200" ||
-                extracted_tag == "cluster.response_code=300;upstream_rq" ||
-                extracted_tag == stat_name)
-        << "extracted_tag=" << extracted_tag;
+    std::string extracted_name;
+    EXPECT_LOG_CONTAINS("warn", "Skipping duplicate tag",
+                        extracted_name = producer.produceTags(stat_name, tags));
+    EXPECT_TRUE(extracted_name == "cluster.;upstream_rq_200" ||
+                extracted_name == "cluster.response_code=300;upstream_rq" ||
+                extracted_name == stat_name)
+        << "extracted_name=" << extracted_name;
     checkTags(
         TagVector{
             {tag_name_values_.RESPONSE_CODE, "*"},
@@ -112,6 +117,14 @@ TEST_F(TagProducerTest, DuplicateConfigCliTagBehavior) {
         },
         tags);
   }
+}
+
+TEST_F(TagProducerTest, Fixed) {
+  const TagVector tag_config{{"my-tag", "fixed"}};
+  TagProducerImpl producer{stats_config_, tag_config};
+  TagVector tags;
+  EXPECT_EQ("stat-name", producer.produceTags("stat-name", tags));
+  checkTags(tag_config, tags);
 }
 
 } // namespace Stats
