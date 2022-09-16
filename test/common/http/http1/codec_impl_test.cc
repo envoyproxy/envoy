@@ -371,9 +371,9 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
       }));
 
   TestRequestHeaderMapImpl expected_headers{
+      {":authority", "foo"},
       {":path", "/"},
       {":method", "POST"},
-      {":authority", "foo"},
       {"transfer-encoding", "chunked"},
   };
   Buffer::OwnedImpl expected_data("Hello World");

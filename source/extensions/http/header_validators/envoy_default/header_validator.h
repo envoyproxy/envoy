@@ -77,6 +77,11 @@ public:
   virtual HeaderValueValidationResult
   validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
+  /*
+   * Check if the Transfer-Encoding header contains the "chunked" transfer encoding.
+   */
+  bool hasChunkedTransferEncoding(const ::Envoy::Http::HeaderString& value);
+
 protected:
   /*
    * An internal class that stores the result of validating syntax-specific URI hosts.

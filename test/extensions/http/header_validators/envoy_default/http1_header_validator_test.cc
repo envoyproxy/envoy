@@ -25,10 +25,12 @@ protected:
 
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
   HeaderString valid{"chunked"};
+  HeaderString valid_mixed_case{"ChuNKeD"};
   HeaderString invalid{"gzip"};
   auto uhv = createH1(empty_config);
 
   EXPECT_ACCEPT(uhv->validateTransferEncodingHeader(valid));
+  EXPECT_ACCEPT(uhv->validateTransferEncodingHeader(valid_mixed_case));
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateTransferEncodingHeader(invalid),
                              "uhv.http1.invalid_transfer_encoding");

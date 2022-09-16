@@ -216,7 +216,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     }
 
     if (header_map.ContentLength() &&
-        header_map.TransferEncoding()->value() == header_values_.TransferEncodingValues.Chunked) {
+        hasChunkedTransferEncoding(header_map.TransferEncoding()->value())) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
         return {RequestHeaderMapValidationResult::Action::Reject,
@@ -405,7 +405,8 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   // Transfer-Encoding.
   const auto encoding = value.getStringView();
 
-  if (!encoding.empty() && encoding != header_values_.TransferEncodingValues.Chunked) {
+  if (!encoding.empty() &&
+      !absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
     return {HeaderValueValidationResult::Action::Reject,
             Http1ResponseCodeDetail::get().InvalidTransferEncoding};
   }
