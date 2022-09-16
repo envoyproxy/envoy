@@ -266,7 +266,7 @@ use_original_src_ip: true
 
     expectSessionCreate(upstream_address);
     test_sessions_[0].expectSetIpTransparentSocketOption();
-    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip(), true);
+    test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
     recvDataFromDownstream(peer_address_->asString(), local_address, "hello");
 
     checkSocketOptions(test_sessions_[0], ENVOY_SOCKET_IP_TRANSPARENT, ipv4_expect,
