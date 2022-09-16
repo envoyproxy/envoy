@@ -74,7 +74,7 @@ xDS driven mobile client policy
 
 One of the reasons that Envoy has become so popular as a platform is its rich configuration
 discovery APIs which are collectively known as `xDS
-<https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/dynamic_configuration>`_. These
+<https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration>`_. These
 APIs allow a distributed set of Envoys to be managed by an eventually consistent control plane. One
 of the long term goals of Envoy Mobile is to bring xDS configuration all the way to mobile clients,
 in the form of routing, authentication, failover, load balancing, and other policies driven by a
