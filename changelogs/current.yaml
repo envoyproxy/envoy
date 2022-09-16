@@ -55,7 +55,7 @@ minor_behavior_changes:
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
 - area: local_ratelimit
   change: |
-    ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
+    added :ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
 - area: health_check
   change: |
     support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
