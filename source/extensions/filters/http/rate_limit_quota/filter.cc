@@ -114,7 +114,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           // ENVOY_LOG(debug, "Empty matched result.");
         }
       } else {
-        // ENVOY_LOG(debug, "Failed to retrive the result from custom value");
+        // ENVOY_LOG(debug, "Failed to retrieve the result from custom value");
       }
       break;
     }
