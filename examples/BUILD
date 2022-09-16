@@ -17,7 +17,7 @@ filegroup(
             "cache/responses.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
-            "opentelemetry-tracing/otel-collector-config.yaml",
+            "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
             "mysql/*",
