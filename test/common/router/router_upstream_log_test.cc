@@ -8,6 +8,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
