@@ -122,6 +122,9 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
+      - name: 'Install dependencies'
+        if: steps.check_context.outputs.run_tests == 'true'
+        run: ./ci/linux_ci_setup.sh
       - name: 'Run Kotlin library integration tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:
