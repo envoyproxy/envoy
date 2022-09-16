@@ -68,7 +68,6 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
 void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
   auto insertion = extractor_map_.insert(std::make_pair(extractor->name(), std::ref(*extractor)));
   if (!insertion.second) {
-    ENVOY_LOG_MISC(error, "found duplicate name: {}", extractor->name());
     extractor->setOtherExtractorWithSameNameExists(true);
     std::reference_wrapper<TagExtractor> other = insertion.first->second;
     other.get().setOtherExtractorWithSameNameExists(true);
@@ -112,12 +111,11 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
     bool other_extractor_with_same_name_exists = tag_extractor->otherExtractorWithSameNameExists();
     if (other_extractor_with_same_name_exists &&
         dup_set.find(tag_extractor->name()) != dup_set.end()) {
-      ENVOY_LOG_MISC(error, "skipping dup tag for ", tag_extractor->name());
+      ENVOY_LOG_MISC(error, "Skipping duplicate tag for ", tag_extractor->name());
       return;
     }
     if (tag_extractor->extractTag(tag_extraction_context, tags, remove_characters) &&
         other_extractor_with_same_name_exists) {
-      ENVOY_LOG_MISC(error, "insert dup tag ", tag_extractor->name());
       dup_set.insert(tag_extractor->name());
     }
   });

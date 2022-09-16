@@ -295,7 +295,7 @@ bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& in
 }
 
 TagExtractorFixedImpl::TagExtractorFixedImpl(absl::string_view name, absl::string_view value)
-    : TagExtractorImplBase(name, value) {}
+    : TagExtractorImplBase(name, value), value_(std::string(value)) {}
 
 bool TagExtractorFixedImpl::extractTag(TagExtractionContext&, std::vector<Tag>& tags,
                                        IntervalSet<size_t>&) const {
