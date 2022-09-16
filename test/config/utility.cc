@@ -495,6 +495,11 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                 socket_address:
                   address: {}
                   port_value: {}
+              health_check_config:
+                address:
+                  socket_address:
+                    address: {}
+                    port_value: {}
       lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -502,7 +507,7 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                  name, name, address, port, lb_policy));
+                  name, name, address, port, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
