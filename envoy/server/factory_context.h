@@ -134,7 +134,7 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return the init manager of the particular context. This can be used for extensions that need
+   * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
    *         will be called on  each registered target after cluster manager init but before the
@@ -327,6 +327,11 @@ public:
    *         the server will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /*
+   * @return the stats scope of the cluster. This will last as long as the cluster is valid
+   * */
+  virtual Stats::Scope& scope() PURE;
 };
 
 } // namespace Configuration
