@@ -354,6 +354,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   if (!connected_) {
     Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
     if (SOCKET_FAILURE(rc.return_value_)) {
+      ENVOY_LOG(error, "cannot connect: ({}) {}", rc.errno_, errorDetails(rc.errno_));
       cluster_.cluster_stats_.sess_tx_errors_.inc();
       return;
     }
