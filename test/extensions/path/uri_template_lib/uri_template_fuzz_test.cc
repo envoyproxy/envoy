@@ -12,11 +12,11 @@ namespace Fuzz {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   absl::string_view input(reinterpret_cast<const char*>(buf), len);
 
-  // test rewriter parser
+  // Test rewriter parser.
   absl::StatusOr<std::vector<Envoy::Extensions::UriTemplate::ParsedSegment>> rewrite =
       Envoy::Extensions::UriTemplate::parseRewritePattern(input);
 
-  // test matcher parser
+  // Test matcher parser.
   absl::StatusOr<absl::string_view> match =
       Envoy::Extensions::UriTemplate::convertPathPatternSyntaxToRegex(input);
 }
