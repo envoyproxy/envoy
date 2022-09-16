@@ -58,12 +58,12 @@ To build this sandbox example, and start the example services run the following 
     $ docker-compose up --build -d
     $ docker-compose ps
 
-                Name                                 Command                State                                  Ports
-    -------------------------------------------------------------------------------------------------------------------------------------------------------
+                  Name                            Command                State                                               Ports
+    --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     opentelemetry_envoy-1_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
     opentelemetry_envoy-2_1             /docker-entrypoint.sh /usr ... Up             10000/tcp
-    opentelemetry_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:10000->10000/tcp
-    opentelemetry_opentelemetry_1       /otelcol --config=/etc/ote ... Up             0.0.0.0:4317->4317/tcp, 55678/tcp, 0.0.0.0:55679->55679/tcp
+    opentelemetry_envoy-front-proxy_1   /docker-entrypoint.sh /usr ... Up             0.0.0.0:12000->10000/tcp
+    opentelemetry_opentelemetry_1       /otelcol --config=/etc/ote ... Up (healthy)   0.0.0.0:12003->13133/tcp, 0.0.0.0:12001->4317/tcp, 55678/tcp, 0.0.0.0:12002->55679/tcp
     opentelemetry_service-1_1           python3 /code/service.py       Up (healthy)
     opentelemetry_service-2_1           python3 /code/service.py       Up (healthy)
 
