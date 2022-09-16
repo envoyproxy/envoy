@@ -8,6 +8,8 @@ services:
       args:
         ENVOY_CONFIG: envoy-front-proxy.yaml
     depends_on:
+      opentelemetry:
+        condition: service_healthy
       envoy-1:
         condition: service_started
       envoy-2:
@@ -22,6 +24,8 @@ services:
       args:
         ENVOY_CONFIG: envoy-1.yaml
     depends_on:
+      opentelemetry:
+        condition: service_healthy
       service-1:
         condition: service_healthy
       envoy-2:
@@ -34,6 +38,8 @@ services:
       args:
         ENVOY_CONFIG: envoy-2.yaml
     depends_on:
+      opentelemetry:
+        condition: service_healthy
       service-2:
         condition: service_healthy
 
@@ -57,6 +63,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-opentelemetry
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sf http://localhost:13133 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
     - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
