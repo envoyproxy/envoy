@@ -1404,12 +1404,14 @@ absl::optional<std::string> PathTemplateRouteEntryImpl::currentUrlPathAfterRewri
   return currentUrlPathAfterRewriteWithMatchedPath(headers, "");
 }
 
-RouteConstSharedPtr PathTemplateRouteEntryImpl::matches(
-    const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
-    uint64_t random_value, bool ignore_path_parameters_in_path_matching) const {
-  throw absl::UnimplementedError("Path template matcher not implemented");
-  (void)ignore_path_parameters_in_path_matching;
-  RouteEntryImplBase::matchRoute(headers, stream_info, random_value);
+RouteConstSharedPtr
+UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                          const StreamInfo::StreamInfo& stream_info,
+                                          uint64_t random_value, bool) const {
+  if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
+      path_matcher_->match(headers.getPathValue())) {
+    return clusterEntry(headers, random_value);
+  }
   return nullptr;
 }
 
@@ -1550,11 +1552,9 @@ ConnectRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& 
   return currentUrlPathAfterRewriteWithMatchedPath(headers, path);
 }
 
-RouteConstSharedPtr
-ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
-                               const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
-                               bool ignore_path_parameters_in_path_matching) const {
-  (void)ignore_path_parameters_in_path_matching;
+RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
+                                                   const StreamInfo::StreamInfo& stream_info,
+                                                   uint64_t random_value, bool) const {
   if (Http::HeaderUtility::isConnect(headers) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     return clusterEntry(headers, random_value);
