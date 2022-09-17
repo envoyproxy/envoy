@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -96,7 +97,7 @@ public:
   virtual absl::optional<absl::string_view> serviceGroup() const PURE;
 };
 
-using RpcRequestSharedPtr = std::shared_ptr<RpcRequest>;
+using RpcRequestPtr = std::unique_ptr<RpcRequest>;
 
 /**
  * RpcResponse represent the result of an rpc call.
@@ -108,7 +109,7 @@ public:
   virtual absl::optional<RpcResponseType> responseType() const PURE;
 };
 
-using RpcResponseSharedPtr = std::shared_ptr<RpcResponse>;
+using RpcResponsePtr = std::unique_ptr<RpcResponse>;
 
 } // namespace Dubbo
 } // namespace Common

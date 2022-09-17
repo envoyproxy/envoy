@@ -29,7 +29,7 @@ constexpr uint64_t StatusOffset = 3;
 constexpr uint64_t RequestIDOffset = 4;
 constexpr uint64_t BodySizeOffset = 12;
 
-void encodeHeader(Buffer::Instance& buffer, MessageContext& context, uint32_t body_size) {
+void encodeHeader(Buffer::Instance& buffer, Context& context, uint32_t body_size) {
   // Magic number.
   buffer.writeBEInt<uint16_t>(MagicNumber);
 
@@ -110,7 +110,7 @@ bool isValidResponseStatus(ResponseStatus status) {
   return true;
 }
 
-void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageContext& context) {
+void parseRequestInfoFromBuffer(Buffer::Instance& data, Context& context) {
   ASSERT(data.length() >= DubboCodec::HeadersSize);
   uint8_t flag = data.peekInt<uint8_t>(FlagOffset);
   bool is_two_way = (flag & TwoWayMask) == TwoWayMask ? true : false;
@@ -121,7 +121,7 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageContext& context)
   }
 }
 
-void parseResponseInfoFromBuffer(Buffer::Instance& buffer, MessageContext& context) {
+void parseResponseInfoFromBuffer(Buffer::Instance& buffer, Context& context) {
   ASSERT(buffer.length() >= DubboCodec::HeadersSize);
   ResponseStatus status = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
   if (!isValidResponseStatus(status)) {
@@ -146,7 +146,7 @@ DubboCodecPtr DubboCodec::codecFromSerializeType(SerializeType type) {
 
 DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata& metadata) {
   // Empty metadata.
-  ASSERT(!metadata.hasMessageContextInfo());
+  ASSERT(!metadata.hasContext());
 
   if (buffer.length() < DubboCodec::HeadersSize) {
     return DecodeStatus::Waiting;
@@ -157,7 +157,7 @@ DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata&
     throw EnvoyException(absl::StrCat("invalid dubbo message magic number ", magic_number));
   }
 
-  auto context = std::make_shared<MessageContext>();
+  auto context = std::make_unique<Context>();
 
   uint8_t flag = buffer.peekInt<uint8_t>(FlagOffset);
 
@@ -203,7 +203,7 @@ DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata&
 
   context->setBodySize(body_size);
 
-  metadata.setMessageContextInfo(std::move(context));
+  metadata.setContext(std::move(context));
 
   // Drain headers bytes.
   buffer.drain(DubboCodec::HeadersSize);
@@ -211,10 +211,10 @@ DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata&
 }
 
 DecodeStatus DubboCodec::decodeData(Buffer::Instance& buffer, MessageMetadata& metadata) {
-  ASSERT(metadata.hasMessageContextInfo());
+  ASSERT(metadata.hasContext());
   ASSERT(serializer_ != nullptr);
 
-  auto& context = metadata.mutableMessageContextInfo();
+  auto& context = metadata.mutableContext();
 
   if (buffer.length() < context.bodySize()) {
     return DecodeStatus::Waiting;
@@ -225,13 +225,13 @@ DecodeStatus DubboCodec::decodeData(Buffer::Instance& buffer, MessageMetadata& m
   case MessageType::Exception:
   case MessageType::HeartbeatResponse:
     // Handle response.
-    metadata.setResponseInfo(serializer_->deserializeRpcResponse(buffer, context));
+    metadata.setResponse(serializer_->deserializeRpcResponse(buffer, context));
     break;
   case MessageType::Request:
   case MessageType::Oneway:
   case MessageType::HeartbeatRequest:
     // Handle request.
-    metadata.setRequestInfo(serializer_->deserializeRpcRequest(buffer, context));
+    metadata.setRequest(serializer_->deserializeRpcRequest(buffer, context));
     break;
   default:
     PANIC_DUE_TO_CORRUPT_ENUM;
@@ -241,10 +241,10 @@ DecodeStatus DubboCodec::decodeData(Buffer::Instance& buffer, MessageMetadata& m
 }
 
 void DubboCodec::encode(Buffer::Instance& buffer, MessageMetadata& metadata) {
-  ASSERT(metadata.hasMessageContextInfo());
+  ASSERT(metadata.hasContext());
   ASSERT(serializer_);
 
-  auto& context = metadata.mutableMessageContextInfo();
+  auto& context = metadata.mutableContext();
 
   Buffer::OwnedImpl body_buffer;
 
@@ -268,9 +268,9 @@ void DubboCodec::encode(Buffer::Instance& buffer, MessageMetadata& metadata) {
 }
 
 MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& heartbeat_request) {
-  ASSERT(heartbeat_request.hasMessageContextInfo());
-  const auto& request_context = heartbeat_request.messageContextInfo();
-  auto context = std::make_shared<MessageContext>();
+  ASSERT(heartbeat_request.hasContext());
+  const auto& request_context = heartbeat_request.context();
+  auto context = std::make_unique<Context>();
 
   // Set context.
   context->setSerializeType(request_context.serializeType());
@@ -279,7 +279,7 @@ MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& 
   context->setRequestId(request_context.requestId());
 
   auto metadata = std::make_shared<MessageMetadata>();
-  metadata->setMessageContextInfo(std::move(context));
+  metadata->setContext(std::move(context));
   return metadata;
 }
 
@@ -287,12 +287,12 @@ MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& requ
                                                            ResponseStatus status,
                                                            absl::optional<RpcResponseType> type,
                                                            absl::string_view content) {
-  if (!request.hasMessageContextInfo()) {
-    request.setMessageContextInfo(std::make_shared<MessageContext>());
+  if (!request.hasContext()) {
+    request.setContext(std::make_unique<Context>());
   }
 
-  const auto& request_context = request.messageContextInfo();
-  auto context = std::make_shared<MessageContext>();
+  const auto& request_context = request.context();
+  auto context = std::make_unique<Context>();
 
   // Set context.
   context->setSerializeType(request_context.serializeType());
@@ -317,8 +317,8 @@ MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& requ
   response->setLocalRawMessage(content);
 
   auto metadata = std::make_shared<MessageMetadata>();
-  metadata->setMessageContextInfo(std::move(context));
-  metadata->setResponseInfo(std::move(response));
+  metadata->setContext(std::move(context));
+  metadata->setResponse(std::move(response));
 
   return metadata;
 }

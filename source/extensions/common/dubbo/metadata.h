@@ -18,7 +18,7 @@ namespace Dubbo {
 /**
  * Context of dubbo request/response.
  */
-class MessageContext {
+class Context {
 public:
   void setSerializeType(SerializeType type) { serialize_type_ = type; }
   SerializeType serializeType() const { return serialize_type_; }
@@ -58,63 +58,57 @@ private:
   size_t body_size_{};
 };
 
-using MessageContextSharedPtr = std::shared_ptr<MessageContext>;
+using ContextPtr = std::unique_ptr<Context>;
 
 class MessageMetadata {
 public:
   // Common message context.
-  void setMessageContextInfo(MessageContextSharedPtr context) {
-    message_context_info_ = std::move(context);
-  }
-  bool hasMessageContextInfo() const { return message_context_info_ != nullptr; }
-  const MessageContext& messageContextInfo() const { return *message_context_info_; }
-  MessageContext& mutableMessageContextInfo() { return *message_context_info_; }
+  void setContext(ContextPtr context) { message_context_ = std::move(context); }
+  bool hasContext() const { return message_context_ != nullptr; }
+  const Context& context() const { return *message_context_; }
+  Context& mutableContext() { return *message_context_; }
 
   // Helper methods to access attributes of common context.
   MessageType messageType() const {
-    ASSERT(hasMessageContextInfo());
-    return message_context_info_->messageType();
+    ASSERT(hasContext());
+    return message_context_->messageType();
   }
   bool hasResponseStatus() const {
-    ASSERT(hasMessageContextInfo());
-    return message_context_info_->hasResponseStatus();
+    ASSERT(hasContext());
+    return message_context_->hasResponseStatus();
   }
   ResponseStatus responseStatus() const {
-    ASSERT(hasMessageContextInfo());
-    return message_context_info_->responseStatus();
+    ASSERT(hasContext());
+    return message_context_->responseStatus();
   }
   bool heartbeat() const {
-    ASSERT(hasMessageContextInfo());
-    return message_context_info_->heartbeat();
+    ASSERT(hasContext());
+    return message_context_->heartbeat();
   }
   int64_t requestId() const {
-    ASSERT(hasMessageContextInfo());
-    return message_context_info_->requestId();
+    ASSERT(hasContext());
+    return message_context_->requestId();
   }
 
   // Request info.
-  void setRequestInfo(RpcRequestSharedPtr request_info) {
-    rpc_request_info_ = std::move(request_info);
-  }
-  bool hasRequestInfo() const { return rpc_request_info_ != nullptr; }
-  const RpcRequest& requestInfo() const { return *rpc_request_info_; }
-  RpcRequest& mutableRequestInfo() { return *rpc_request_info_; }
+  void setRequest(RpcRequestPtr request) { rpc_request_ = std::move(request); }
+  bool hasRequest() const { return rpc_request_ != nullptr; }
+  const RpcRequest& request() const { return *rpc_request_; }
+  RpcRequest& mutableRequest() { return *rpc_request_; }
 
   // Response info.
-  void setResponseInfo(RpcResponseSharedPtr response_info) {
-    rpc_response_info_ = std::move(response_info);
-  }
-  bool hasResponseInfo() const { return rpc_response_info_ != nullptr; }
-  const RpcResponse& responseInfo() const { return *rpc_response_info_; }
-  RpcResponse& mutableResponseInfo() { return *rpc_response_info_; }
+  void setResponse(RpcResponsePtr response) { rpc_response_ = std::move(response); }
+  bool hasResponse() const { return rpc_response_ != nullptr; }
+  const RpcResponse& response() const { return *rpc_response_; }
+  RpcResponse& mutableResponse() { return *rpc_response_; }
 
 private:
   // Common message context for dubbo request and dubbo response.
-  MessageContextSharedPtr message_context_info_;
+  ContextPtr message_context_;
 
-  RpcRequestSharedPtr rpc_request_info_;
+  RpcRequestPtr rpc_request_;
 
-  RpcResponseSharedPtr rpc_response_info_;
+  RpcResponsePtr rpc_response_;
 };
 
 using MessageMetadataSharedPtr = std::shared_ptr<MessageMetadata>;

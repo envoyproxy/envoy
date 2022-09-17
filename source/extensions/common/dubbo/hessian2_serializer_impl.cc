@@ -17,8 +17,8 @@ namespace Extensions {
 namespace Common {
 namespace Dubbo {
 
-RpcRequestSharedPtr Hessian2SerializerImpl::deserializeRpcRequest(Buffer::Instance& buffer,
-                                                                  MessageContext& context) {
+RpcRequestPtr Hessian2SerializerImpl::deserializeRpcRequest(Buffer::Instance& buffer,
+                                                            Context& context) {
   ASSERT(context.bodySize() <= buffer.length());
 
   // Handle heartbeat.
@@ -31,7 +31,7 @@ RpcRequestSharedPtr Hessian2SerializerImpl::deserializeRpcRequest(Buffer::Instan
   ASSERT(context.messageType() == MessageType::Request ||
          context.messageType() == MessageType::Oneway);
   ASSERT(context.bodySize() <= buffer.length());
-  auto request = std::make_shared<RpcRequestImpl>();
+  auto request = std::make_unique<RpcRequestImpl>();
 
   Hessian2::Decoder decoder(std::make_unique<BufferReader>(buffer));
 
@@ -95,8 +95,8 @@ RpcRequestSharedPtr Hessian2SerializerImpl::deserializeRpcRequest(Buffer::Instan
   return request;
 }
 
-RpcResponseSharedPtr Hessian2SerializerImpl::deserializeRpcResponse(Buffer::Instance& buffer,
-                                                                    MessageContext& context) {
+RpcResponsePtr Hessian2SerializerImpl::deserializeRpcResponse(Buffer::Instance& buffer,
+                                                              Context& context) {
   ASSERT(context.bodySize() <= buffer.length());
 
   // Handle heartbeat.
@@ -108,7 +108,7 @@ RpcResponseSharedPtr Hessian2SerializerImpl::deserializeRpcResponse(Buffer::Inst
   // Handle normal response or exception response.
   ASSERT(context.messageType() == MessageType::Response ||
          context.messageType() == MessageType::Exception);
-  auto response = std::make_shared<RpcResponseImpl>();
+  auto response = std::make_unique<RpcResponseImpl>();
 
   // Non `Ok` response body has no response type info and skip deserialization.
   if (context.messageType() == MessageType::Exception) {
@@ -164,16 +164,16 @@ RpcResponseSharedPtr Hessian2SerializerImpl::deserializeRpcResponse(Buffer::Inst
 
 void Hessian2SerializerImpl::serializeRpcResponse(Buffer::Instance& buffer,
                                                   MessageMetadata& metadata) {
-  ASSERT(metadata.hasMessageContextInfo());
-  const auto& context = metadata.messageContextInfo();
+  ASSERT(metadata.hasContext());
+  const auto& context = metadata.context();
 
   if (context.heartbeat()) {
     buffer.writeByte('N');
     return;
   }
 
-  ASSERT(dynamic_cast<RpcResponseImpl*>(&metadata.mutableResponseInfo()) != nullptr);
-  auto* typed_response_info = dynamic_cast<RpcResponseImpl*>(&metadata.mutableResponseInfo());
+  ASSERT(dynamic_cast<RpcResponseImpl*>(&metadata.mutableResponse()) != nullptr);
+  auto* typed_response_info = dynamic_cast<RpcResponseImpl*>(&metadata.mutableResponse());
 
   if (typed_response_info->localRawMessage().has_value()) {
     // Local direct response.
@@ -193,20 +193,20 @@ void Hessian2SerializerImpl::serializeRpcResponse(Buffer::Instance& buffer,
 void Hessian2SerializerImpl::serializeRpcRequest(Buffer::Instance& buffer,
                                                  MessageMetadata& metadata) {
 
-  ASSERT(metadata.hasMessageContextInfo());
-  const auto& context = metadata.messageContextInfo();
+  ASSERT(metadata.hasContext());
+  const auto& context = metadata.context();
 
   if (context.heartbeat()) {
     buffer.writeByte('N');
     return;
   }
 
-  ASSERT(metadata.hasRequestInfo());
-  ASSERT(metadata.messageContextInfo().messageType() == MessageType::Request ||
-         metadata.messageContextInfo().messageType() == MessageType::Oneway);
+  ASSERT(metadata.hasRequest());
+  ASSERT(metadata.context().messageType() == MessageType::Request ||
+         metadata.context().messageType() == MessageType::Oneway);
 
-  ASSERT(dynamic_cast<RpcRequestImpl*>(&metadata.mutableRequestInfo()) != nullptr);
-  auto* typed_request_info = dynamic_cast<RpcRequestImpl*>(&metadata.mutableRequestInfo());
+  ASSERT(dynamic_cast<RpcRequestImpl*>(&metadata.mutableRequest()) != nullptr);
+  auto* typed_request_info = dynamic_cast<RpcRequestImpl*>(&metadata.mutableRequest());
 
   // Create a copy for possible retry.
   Buffer::OwnedImpl copy_of_message = typed_request_info->messageBuffer();

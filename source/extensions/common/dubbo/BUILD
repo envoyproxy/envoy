@@ -31,6 +31,7 @@ envoy_cc_library(
         ":message_lib",
         ":metadata_lib",
         ":serializer_interface",
+        "hessian2_serializer_lib",
     ],
 )
 
