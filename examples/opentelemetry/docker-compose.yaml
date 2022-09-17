@@ -64,7 +64,7 @@ services:
       context: .
       dockerfile: Dockerfile-opentelemetry
     healthcheck:
-      test: ["CMD", "sh", "-c", "curl -sf http://localhost:13133 || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:13133 || exit 1"]
       interval: 5s
       timeout: 10s
       retries: 10
