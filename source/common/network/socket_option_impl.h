@@ -59,6 +59,19 @@ namespace Network {
 #define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
 #endif
 
+#ifdef SO_ORIGINAL_DST
+#define ENVOY_SOCKET_SO_ORIGINAL_DST ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IP, SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
+#ifdef IP6T_SO_ORIGINAL_DST
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST                                                          \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_IPV6, IP6T_SO_ORIGINAL_DST)
+#else
+#define ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST Network::SocketOptionName()
+#endif
+
 #ifdef UDP_GRO
 #define ENVOY_SOCKET_UDP_GRO ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_UDP, UDP_GRO)
 #else
@@ -121,13 +134,17 @@ class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::con
 public:
   SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname,
-                   int value) // Yup, int. See setsockopt(2).
+                   int value, // Yup, int. See setsockopt(2).
+                   absl::optional<Network::Socket::Type> socket_type = absl::nullopt)
       : SocketOptionImpl(in_state, optname,
-                         absl::string_view(reinterpret_cast<char*>(&value), sizeof(value))) {}
+                         absl::string_view(reinterpret_cast<char*>(&value), sizeof(value)),
+                         socket_type) {}
 
   SocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
-                   Network::SocketOptionName optname, absl::string_view value)
-      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {
+                   Network::SocketOptionName optname, absl::string_view value,
+                   absl::optional<Network::Socket::Type> socket_type = absl::nullopt)
+      : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()),
+        socket_type_(socket_type) {
     ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
   }
 
@@ -159,6 +176,9 @@ private:
   // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
   // the buffer so its data() is not aligned in to alignof(void*).
   const std::vector<uint8_t> value_;
+  // If present, specifies the socket type that this option applies to. Attempting to set this
+  // option on a socket of a different type will be a no-op.
+  absl::optional<Network::Socket::Type> socket_type_;
 };
 
 } // namespace Network

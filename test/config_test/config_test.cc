@@ -57,6 +57,7 @@ class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
       : api_(Api::createApiForTest(time_system_)), options_(options) {
+    ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -89,6 +90,19 @@ public:
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
+
+    // Emulate main implementation of initializing bootstrap extensions.
+    std::vector<Server::BootstrapExtensionPtr> bootstrap_extensions;
+    for (const auto& bootstrap_extension : bootstrap.bootstrap_extensions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::BootstrapExtensionFactory>(
+              bootstrap_extension);
+      auto config = Config::Utility::translateAnyToFactoryConfig(
+          bootstrap_extension.typed_config(),
+          server_.messageValidationContext().staticValidationVisitor(), factory);
+      bootstrap_extensions.push_back(
+          factory.createBootstrapExtension(*config, server_factory_context_));
+    }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),

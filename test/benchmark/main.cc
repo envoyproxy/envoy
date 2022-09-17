@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
   }
 
   // Reduce logs so benchmark output is readable.
-  Thread::MutexBasicLockable lock;
+  Envoy::Thread::MutexBasicLockable lock;
   Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
                                   lock, false};
 

@@ -16,10 +16,8 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
-#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/printf.h"
@@ -462,6 +460,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
+  quiche::FlagRegistry::getInstance();
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
@@ -475,9 +474,11 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  quiche::FlagRegistry::getInstance();
+  // Test that the flags which envoy explicitly overrides have the right value.
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_disable_version_draft_29));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-
+  EXPECT_FALSE(GetQuicFlag(quic_header_size_limit_includes_overhead));
+  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(quic_buffered_data_threshold));
   {
     quiche::test::QuicheFlagSaver saver;
     EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -490,15 +491,20 @@ TEST_F(QuicPlatformTest, QuicFlags) {
     SetQuicRestartFlag(quic_testonly_default_false, true);
     EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-    EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-    SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-    EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
+    SetQuicheFlag(quiche_oghttp2_debug_trace, true);
+    EXPECT_TRUE(GetQuicheFlag(quiche_oghttp2_debug_trace));
+
+    EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+    SetQuicFlag(quic_time_wait_list_seconds, 100);
+    EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
   }
 
   // Verify that the saver reset all the flags to their previous values.
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 }
 
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {

@@ -76,6 +76,15 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
 }
 
+namespace {
+// Prepends an element to an array, modifying it as passed in.
+std::vector<absl::string_view> prepend(const absl::string_view first,
+                                       std::vector<absl::string_view> strings) {
+  strings.insert(strings.begin(), first);
+  return strings;
+}
+} // namespace
+
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                      bool ignore_global_conn_limit)
     : server_(server),
@@ -122,9 +131,20 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),
           makeHandler("/cpuprofiler", "enable/disable the CPU profiler",
-                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true),
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true,
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "enable",
+                        "enables the CPU profiler",
+                        {"y", "n"}}}),
           makeHandler("/heapprofiler", "enable/disable the heap profiler",
-                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true),
+                      MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true,
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "enable",
+                        "enable/disable the heap profiler",
+                        {"y", "n"}}}),
+          makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
+                      MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
+                      false),
           makeHandler("/healthcheck/fail", "cause the server to fail health checks",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true),
           makeHandler("/healthcheck/ok", "cause the server to pass health checks",
@@ -135,20 +155,34 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false,
                       false),
 
-          // TODO(jmarantz): add support for param-passing through a POST. Browsers send
-          // those params as the post-body rather than query-params and that requires some
-          // re-plumbing through the admin callback API. See also drain_listeners.
+          // The logging "level" parameter, if specified as a non-blank entry,
+          // changes all the logging-paths to that level. So the enum parameter
+          // needs to include a an empty string as the default (first) option.
+          // Thus we prepend an empty string to the logging-levels list.
           makeHandler("/logging", "query/change logging levels",
-                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true),
-
+                      MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true,
+                      {{Admin::ParamDescriptor::Type::String, "paths",
+                        "Change multiple logging levels by setting to "
+                        "<logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>."},
+                       {Admin::ParamDescriptor::Type::Enum, "level", "desired logging level",
+                        prepend("", LogsHandler::levelStrings())}}),
           makeHandler("/memory", "print current allocation/heap usage",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false),
           makeHandler("/quitquitquit", "exit the server",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true),
           makeHandler("/reset_counters", "reset all counters to zero",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true),
-          makeHandler("/drain_listeners", "drain listeners",
-                      MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true),
+          makeHandler(
+              "/drain_listeners", "drain listeners",
+              MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true,
+              {{ParamDescriptor::Type::Boolean, "graceful",
+                "When draining listeners, enter a graceful drain period prior to closing "
+                "listeners. This behaviour and duration is configurable via server options "
+                "or CLI"},
+               {ParamDescriptor::Type::Boolean, "inboundonly",
+                "Drains all inbound listeners. traffic_direction field in "
+                "envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a "
+                "listener is inbound or outbound."}}),
           makeHandler("/server_info", "print server version/status information",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false),
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
@@ -227,7 +261,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) {
+void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
@@ -261,20 +295,17 @@ private:
 // generates the entire admin output in one shot.
 class RequestGasket : public Admin::Request {
 public:
-  RequestGasket(Admin::HandlerCb handler_cb, absl::string_view path_and_query,
-                AdminStream& admin_stream)
-      : path_and_query_(std::string(path_and_query)), handler_cb_(handler_cb),
-        admin_stream_(admin_stream) {}
+  RequestGasket(Admin::HandlerCb handler_cb, AdminStream& admin_stream)
+      : handler_cb_(handler_cb), admin_stream_(admin_stream) {}
 
   static Admin::GenRequestFn makeGen(Admin::HandlerCb callback) {
-    return [callback](absl::string_view path_and_query,
-                      AdminStream& admin_stream) -> Server::Admin::RequestPtr {
-      return std::make_unique<RequestGasket>(callback, path_and_query, admin_stream);
+    return [callback](AdminStream& admin_stream) -> Server::Admin::RequestPtr {
+      return std::make_unique<RequestGasket>(callback, admin_stream);
     };
   }
 
   Http::Code start(Http::ResponseHeaderMap& response_headers) override {
-    return handler_cb_(path_and_query_, response_headers, response_, admin_stream_);
+    return handler_cb_(response_headers, response_, admin_stream_);
   }
 
   bool nextChunk(Buffer::Instance& response) override {
@@ -283,7 +314,6 @@ public:
   }
 
 private:
-  std::string path_and_query_;
   Admin::HandlerCb handler_cb_;
   AdminStream& admin_stream_;
   Buffer::OwnedImpl response_;
@@ -299,10 +329,9 @@ Admin::RequestPtr Admin::makeStaticTextRequest(Buffer::Instance& response, Http:
   return std::make_unique<StaticTextRequest>(response, code);
 }
 
-Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+Http::Code AdminImpl::runCallback(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream& admin_stream) {
-  RequestPtr request = makeRequest(path_and_query, admin_stream);
+  RequestPtr request = makeRequest(admin_stream);
   Http::Code code = request->start(response_headers);
   bool more_data;
   do {
@@ -312,8 +341,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   return code;
 }
 
-Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
-                                         AdminStream& admin_stream) {
+Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
+  absl::string_view path_and_query = admin_stream.getRequestHeaders().getPathValue();
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
@@ -332,7 +361,8 @@ Admin::RequestPtr AdminImpl::makeRequest(absl::string_view path_and_query,
         }
       }
 
-      return handler.handler_(path_and_query, admin_stream);
+      ASSERT(admin_stream.getRequestHeaders().getPathValue() == path_and_query);
+      return handler.handler_(admin_stream);
     }
   }
 
@@ -355,18 +385,19 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   return sorted_handlers;
 }
 
-Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
-                                  Buffer::Instance& response, AdminStream&) {
+Http::Code AdminImpl::handlerHelp(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                  AdminStream&) {
   getHelp(response);
   return Http::Code::OK;
 }
 
-void AdminImpl::getHelp(Buffer::Instance& response) {
+void AdminImpl::getHelp(Buffer::Instance& response) const {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
-    response.add(fmt::format("  {}: {}\n", handler->prefix_, handler->help_text_));
+    const absl::string_view method = handler->mutates_server_state_ ? " (POST)" : "";
+    response.add(fmt::format("  {}{}: {}\n", handler->prefix_, method, handler->help_text_));
     for (const ParamDescriptor& param : handler->params_) {
       response.add(fmt::format("      {}: {}", param.id_, param.help_));
       if (param.type_ == ParamDescriptor::Type::Enum) {
@@ -437,10 +468,11 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
+  request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
   Buffer::OwnedImpl response;
 
-  Http::Code code = runCallback(path_and_query, response_headers, response, filter);
+  Http::Code code = runCallback(response_headers, response, filter);
   Utility::populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;

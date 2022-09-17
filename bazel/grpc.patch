@@ -1,0 +1,11 @@
+--- a/BUILD	2021-09-03 23:20:52.000000000 +0000
++++ b/BUILD	2022-08-15 18:03:01.635257570 +0000
+@@ -28,7 +28,7 @@
+ package(
+     default_visibility = ["//visibility:public"],
+     features = [
+-        "layering_check",
++        "-layering_check",
+         "-parse_headers",
+     ],
+ )

@@ -93,6 +93,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
+  ~AsyncStreamImpl() override { router_.onDestroy(); }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -231,6 +232,8 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
+    const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
+    const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -294,6 +297,8 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
+    static const Router::PathMatcherSharedPtr path_matcher_;
+    static const Router::PathRewriterSharedPtr path_rewriter_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
@@ -341,14 +346,12 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  const Network::Connection* connection() override { return nullptr; }
+  OptRef<const Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                   absl::string_view transport_failure_reason = "") override;
   Router::RouteConstSharedPtr route() override { return route_; }
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
-  void setRoute(Router::RouteConstSharedPtr) override {}
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
-  void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
@@ -420,7 +423,9 @@ private:
   }
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }

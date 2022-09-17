@@ -20,6 +20,8 @@ public:
   virtual uint64_t reservedHeapBytes();
   // Memory in free, unmapped pages in the page heap.
   virtual uint64_t unmappedHeapBytes();
+  // Memory in free, mapped pages in the page heap.
+  virtual uint64_t freeMappedHeapBytes();
 };
 
 /**

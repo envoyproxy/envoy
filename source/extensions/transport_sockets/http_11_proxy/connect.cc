@@ -76,6 +76,7 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
                      callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
+    ENVOY_CONN_LOG(trace, "Successfully stripped CONNECT header", callbacks_->connection());
     buffer.drain(buffer.length());
     need_to_strip_connect_response_ = false;
   }
@@ -93,14 +94,15 @@ Network::IoResult UpstreamHttp11ConnectSocket::writeHeader() {
     Api::IoCallUint64Result result = callbacks_->ioHandle().write(header_buffer_);
 
     if (!result.ok()) {
-      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
-                     result.err_->getErrorDetails());
+      ENVOY_CONN_LOG(trace, "Failed writing CONNECT header. write error: {}",
+                     callbacks_->connection(), result.err_->getErrorDetails());
       if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
         action = Network::PostIoAction::Close;
       }
       break;
     }
-    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
+    ENVOY_CONN_LOG(trace, "Writing CONNECT header. write returned: {}", callbacks_->connection(),
+                   result.return_value_);
     bytes_written += result.return_value_;
   } while (true);
 

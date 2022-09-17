@@ -234,6 +234,7 @@ void UpstreamRequest::onEvent(Network::ConnectionEvent event) {
 
   releaseConnection(false);
   if (!end_downstream && request_complete_) {
+    ENVOY_LOG(debug, "reset parent callbacks");
     parent_.onReset();
   }
 }
@@ -317,17 +318,21 @@ bool UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
   case ConnectionPool::PoolFailureReason::Timeout:
     upstream_host_->outlierDetector().putResult(poolFailureReasonToResult(reason));
 
-    // Error occurred after a partial or underflow response, propagate the reset to the
-    // downstream.
-    if (response_underflow_ || response_state_ == ResponseState::Started) {
-      ENVOY_LOG(debug, "reset downstream connection for a partial or underflow response");
+    // Error occurred after an underflow response, propagate the reset to the downstream.
+    if (response_underflow_) {
+      ENVOY_LOG(debug, "reset downstream connection for an underflow response");
+      stats_.incCloseUnderflowResponse(parent_.cluster());
       parent_.resetDownstreamConnection();
-    } else if (response_state_ == ResponseState::None) {
+    } else if (response_state_ <= ResponseState::Started) {
       close_downstream = close_downstream_on_error_;
+      if (response_state_ == ResponseState::Started) {
+        stats_.incClosePartialResponse(parent_.cluster());
+      }
       stats_.incResponseLocalException(parent_.cluster());
       parent_.sendLocalReply(
           AppException(AppExceptionType::InternalError,
-                       fmt::format("connection failure: {} '{}'",
+                       fmt::format("connection failure before response {}: {} '{}'",
+                                   response_state_ == ResponseState::None ? "start" : "complete",
                                    PoolFailureReasonNames::get().fromReason(reason),
                                    (upstream_host_ && upstream_host_->address())
                                        ? upstream_host_->address()->asString()

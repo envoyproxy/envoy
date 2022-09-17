@@ -124,16 +124,18 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address = host()->cluster().sourceAddress();
+  auto source_address_fn = host()->cluster().sourceAddressFn();
+  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
   if (!source_address.get()) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
   Network::ConnectionSocket::OptionsSharedPtr socket_options =
       Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
-  return Quic::createQuicNetworkConnection(
-      quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, socket_options, transportSocketOptions());
+  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
+                                           dispatcher(), host()->address(), source_address,
+                                           quic_stat_names, rtt_cache, scope, socket_options,
+                                           transportSocketOptions(), connection_id_generator_);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

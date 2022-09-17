@@ -41,6 +41,7 @@
 #include "eval/public/containers/field_backed_list_impl.h"
 #include "eval/public/containers/field_backed_map_impl.h"
 #include "eval/public/structs/cel_proto_wrapper.h"
+#include "include/proxy-wasm/pairs_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
@@ -375,7 +376,11 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     return WasmResult::SerializationFailure;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
-    const auto& keys = *map.ListKeys();
+    auto keys_list = map.ListKeys();
+    if (!keys_list.ok()) {
+      return WasmResult::SerializationFailure;
+    }
+    const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
       if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
@@ -385,10 +390,12 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
         return WasmResult::SerializationFailure;
       }
     }
-    auto size = proxy_wasm::exports::pairsSize(pairs);
+    auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     result->resize(std::max(size, static_cast<size_t>(30)));
-    proxy_wasm::exports::marshalPairs(pairs, result->data());
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
     result->resize(size);
     return WasmResult::Ok;
   }
@@ -400,13 +407,15 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
         return WasmResult::SerializationFailure;
       }
     }
-    auto size = proxy_wasm::exports::pairsSize(pairs);
+    auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     if (size < 30) {
       result->reserve(30);
     }
     result->resize(size);
-    proxy_wasm::exports::marshalPairs(pairs, result->data());
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
     return WasmResult::Ok;
   }
   default:
@@ -740,7 +749,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -815,7 +824,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     map->addCopy(lower_key, std::string(p.second));
   }
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -828,7 +837,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -842,7 +851,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -970,6 +979,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -1011,6 +1021,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_request =
       grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
@@ -1054,6 +1065,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_stream = grpc_client->startRaw(toAbslStringView(service_name),
                                            toAbslStringView(method_name), handler, options);
@@ -1108,9 +1120,9 @@ StreamInfo::StreamInfo* Context::getRequestStreamInfo() const {
 
 const Network::Connection* Context::getConnection() const {
   if (encoder_callbacks_) {
-    return encoder_callbacks_->connection();
+    return encoder_callbacks_->connection().ptr();
   } else if (decoder_callbacks_) {
-    return decoder_callbacks_->connection();
+    return decoder_callbacks_->connection().ptr();
   } else if (network_read_filter_callbacks_) {
     return &network_read_filter_callbacks_->connection();
   } else if (network_write_filter_callbacks_) {

@@ -20,6 +20,8 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
+const Router::PathMatcherSharedPtr AsyncStreamImpl::RouteEntryImpl::path_matcher_;
+const Router::PathRewriterSharedPtr AsyncStreamImpl::RouteEntryImpl::path_rewriter_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
@@ -243,7 +245,7 @@ void AsyncStreamImpl::cleanup() {
   }
 }
 
-void AsyncStreamImpl::resetStream() {
+void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
   stream_callbacks_.onReset();
   cleanup();
 }
@@ -283,8 +285,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() {
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
-                                                   response_->trailers(), streamInfo(),
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
                                                    Tracing::EgressConfig::get());
 
   callbacks_.onSuccess(*this, std::move(response_));
@@ -316,9 +317,8 @@ void AsyncRequestImpl::onReset() {
                                           remoteClosed() ? &response_->headers() : nullptr);
 
   // Finalize the span based on whether we received a response or not.
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
-      remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
+                                                   Tracing::EgressConfig::get());
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.

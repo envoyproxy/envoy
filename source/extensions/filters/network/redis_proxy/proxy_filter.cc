@@ -58,6 +58,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
       config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty();
+  connection_quit_ = false;
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -97,6 +98,14 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       pending_requests_.pop_front();
     }
   }
+}
+
+void ProxyFilter::onQuit(PendingRequest& request) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  response->type(Common::Redis::RespType::SimpleString);
+  response->asString() = "OK";
+  connection_quit_ = true;
+  request.onResponse(std::move(response));
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
@@ -163,6 +172,12 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
 
   if (encoder_buffer_.length() > 0) {
     callbacks_->connection().write(encoder_buffer_, false);
+  }
+
+  if (pending_requests_.empty() && connection_quit_) {
+    callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    connection_quit_ = false;
+    return;
   }
 
   // Check for drain close only if there are no pending responses.

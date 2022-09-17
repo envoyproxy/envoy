@@ -70,8 +70,8 @@ So let's take this as an example.
     :caption: :download:`stateful-cookie-session.yaml <_include/stateful-cookie-session.yaml>`
 
 In the above configuration, the cookie-based session state obtains the overridden host of the current session
-from the cookie named `global-session-cookie` and if the corresponding host exists in the upstream cluster, the
+from the cookie named ``global-session-cookie`` and if the corresponding host exists in the upstream cluster, the
 request will be routed to that host.
 
 If there is no valid cookie, the load balancer will choose a new upstream host. When responding, the address
-of the selected upstream host will be stored in the cookie named `global-session-cookie`.
+of the selected upstream host will be stored in the cookie named ``global-session-cookie``.

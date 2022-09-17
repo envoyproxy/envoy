@@ -3,12 +3,6 @@
 Lua
 ===
 
-.. attention::
-
-  By default Envoy is built without exporting symbols that you may need when interacting with Lua
-  modules installed as shared objects. Envoy may need to be built with support for exported symbols.
-  Please see the :repo:`Bazel docs <bazel/README.md>` for more information.
-
 Overview
 --------
 
@@ -155,6 +149,21 @@ Lua script as follows:
             response_handle:logInfo("Goodbye.")
           end
 
+Statistics
+----------
+.. _config_http_filters_lua_stats:
+
+The lua filter outputs statistics in the *.lua.* namespace by default. When
+there are multiple lua filters configured in a filter chain, stats from
+individual filter instance/script can be tracked by providing a per filter
+:ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix>`.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  error, Counter, Total script execution errors.
 
 Script examples
 ---------------
@@ -384,19 +393,89 @@ httpCall()
 
 .. code-block:: lua
 
-  local headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout_ms, asynchronous)
+
+  -- Alternative function signature.
+  local headers, body = handle:httpCall(cluster, headers, body, options)
 
 Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
-data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+data to send. *timeout_ms* is an integer that specifies the call timeout in milliseconds.
 
-*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+*asynchronous* is a boolean flag. If async is set to true, Envoy will make the HTTP request and continue,
 regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
+
+
+The alternative function signature allows caller to specify *options* as a table. Currently,
+the supported keys are:
+
+- *asynchronous* is a boolean flag that controls the asynchronicity of the HTTP call.
+  It refers to the same *asynchronous* flag as the first function signature.
+- *timeout_ms* is an integer that specifies the call timeout in milliseconds.
+  It refers to the same *timeout_ms* argument as the first function signature.
+- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
+- *return_duplicate_headers* is boolean flag that decides whether the repeated headers are allowed in response headers.
+  If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
+  If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
+  of table.
+
+  For example, the following upstream response headers have repeated headers.
+
+  .. code-block:: none
+
+    {
+      { ":status", "200" },
+      { "foo", "bar" },
+      { "key", "value_0" },
+      { "key", "value_1" },
+      { "key", "value_2" },
+    }
+
+  Then if *return_duplicate_headers* is set to false, the returned headers will be:
+
+  .. code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = "value_2",
+    }
+
+  If *return_duplicate_headers* is set to true, the returned *headers* will be:
+
+  .. code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = { "value_0", "value_1", "value_2" },
+    }
+
+
+Some examples of specifying *options* are shown below:
+
+.. code-block:: lua
+
+  -- Create a fire-and-forget HTTP call.
+  local request_options = {["asynchronous"] = true}
+
+  -- Create a synchronous HTTP call with 1000 ms timeout.
+  local request_options = {["timeout_ms"] = 1000}
+
+  -- Create a synchronous HTTP call, but do not sample the trace span.
+  local request_options = {["trace_sampled"] = false}
+
+  -- The same as above, but explicitly set the "asynchronous" flag to false.
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false }
+
+  -- The same as above, but with 1000 ms timeout.
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false, ["timeout_ms"] = 1000 }
+
 
 respond()
 ^^^^^^^^^^
@@ -612,6 +691,17 @@ replace()
 
 Replaces a header. *key* is a string that supplies the header key. *value* is a string that supplies
 the header value. If the header does not exist, it is added as per the *add()* function.
+
+setHttp1ReasonPhrase()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:setHttp1ReasonPhrase(reasonPhrase)
+
+Sets a custom HTTP/1 response reason phrase. This call is *only valid in the response flow*.
+*reasonPhrase* is a string that supplies the reason phrase value. Additionally this call only
+effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HTTP/3.
 
 .. _config_http_filters_lua_buffer_wrapper:
 
