@@ -332,6 +332,9 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe("runtime.load_success", 2);
 
   // Verify that the latest resource values are used by Envoy.
+  EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
+  EXPECT_EQ(0, test_server_->counter("xds.kv_store.resources_not_found")->value());
+  EXPECT_EQ(0, test_server_->counter("xds.kv_store.resource_missing")->value());
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
@@ -354,6 +357,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 
   test_server_->waitForCounterGe("runtime.load_success", 3);
 
+  std::cout << "==> AAB 2: " << test_server_->counter("xds.kv_store.load_success")->value() << "\n";
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.
   EXPECT_EQ("zoo", getRuntimeKey("foo"));

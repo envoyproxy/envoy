@@ -17,6 +17,8 @@ envoy_cc_contrib_extension(
         "//envoy/common:key_value_store_interface",
         "//envoy/common:time_interface",
         "//envoy/config:xds_resources_delegate_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//contrib/envoy/extensions/config/v3alpha:pkg_cc_proto",

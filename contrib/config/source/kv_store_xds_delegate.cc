@@ -29,25 +29,40 @@ std::string constructKey(const XdsSourceId& source_id, const std::string& resour
 
 } // namespace
 
-KeyValueStoreXdsDelegate::KeyValueStoreXdsDelegate(KeyValueStorePtr&& xds_config_store)
-    : xds_config_store_(std::move(xds_config_store)) {}
+XdsKeyValueStoreStats KeyValueStoreXdsDelegate::generateStats(Stats::Scope& scope) {
+  return {ALL_XDS_KV_STORE_STATS(POOL_COUNTER(scope))};
+}
+
+KeyValueStoreXdsDelegate::KeyValueStoreXdsDelegate(KeyValueStorePtr&& xds_config_store,
+                                                   Stats::Scope& root_scope)
+    : xds_config_store_(std::move(xds_config_store)),
+      scope_(root_scope.createScope("xds.kv_store.")), stats_(generateStats(*scope_)) {}
 
 std::vector<envoy::service::discovery::v3::Resource>
 KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
                                        const std::vector<std::string>& resource_names) const {
+  std::vector<envoy::service::discovery::v3::Resource> resources;
   if (resource_names.empty() || (resource_names.size() == 1 && resource_names[0] == "*")) {
     // Empty names or one entry with "*" means wildcard.
-    return getAllResources(source_id);
-  }
-
-  std::vector<envoy::service::discovery::v3::Resource> resources;
-  for (const std::string& resource_name : resource_names) {
-    if (auto existing_resource = xds_config_store_->get(constructKey(source_id, resource_name))) {
-      envoy::service::discovery::v3::Resource r;
-      r.ParseFromString(std::string(*existing_resource));
-      resources.push_back(std::move(r));
+    resources = getAllResources(source_id);
+  } else {
+    for (const std::string& resource_name : resource_names) {
+      if (auto existing_resource = xds_config_store_->get(constructKey(source_id, resource_name))) {
+        envoy::service::discovery::v3::Resource r;
+        r.ParseFromString(std::string(*existing_resource));
+        resources.push_back(std::move(r));
+      } else {
+        stats_.resource_missing_.inc();
+      }
     }
   }
+
+  if (resources.empty()) {
+    stats_.resources_not_found_.inc();
+  } else {
+    stats_.load_success_.inc();
+  }
+
   return resources;
 }
 
@@ -114,7 +129,7 @@ Envoy::Config::XdsResourcesDelegatePtr KeyValueStoreXdsDelegateFactory::createXd
       validator_config.key_value_store_config().config());
   KeyValueStorePtr xds_config_store = kv_store_factory.createStore(
       validator_config.key_value_store_config(), validation_visitor, dispatcher, api.fileSystem());
-  return std::make_unique<KeyValueStoreXdsDelegate>(std::move(xds_config_store));
+  return std::make_unique<KeyValueStoreXdsDelegate>(std::move(xds_config_store), api.rootScope());
 }
 
 REGISTER_FACTORY(KeyValueStoreXdsDelegateFactory, Envoy::Config::XdsResourcesDelegateFactory);

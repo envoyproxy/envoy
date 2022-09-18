@@ -5,6 +5,7 @@
 
 #include "source/common/config/xds_source_id.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -46,11 +47,11 @@ envoy::config::core::v3::TypedExtensionConfig kvStoreDelegateConfig() {
 
 class KeyValueStoreXdsDelegateTest : public testing::Test {
 public:
-  KeyValueStoreXdsDelegateTest() {
+  KeyValueStoreXdsDelegateTest() : api_(Api::createApiForTest(store_)) {
     auto config = kvStoreDelegateConfig();
     Extensions::Config::KeyValueStoreXdsDelegateFactory delegate_factory;
     xds_delegate_ = delegate_factory.createXdsResourcesDelegate(
-        config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), api_, dispatcher_);
+        config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *api_, dispatcher_);
   }
 
 protected:
@@ -81,7 +82,8 @@ protected:
     }
   }
 
-  testing::NiceMock<Api::MockApi> api_;
+  Stats::TestUtil::TestStore store_;
+  Api::ApiPtr api_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Config::XdsResourcesDelegatePtr xds_delegate_;
 };
@@ -108,6 +110,9 @@ TEST_F(KeyValueStoreXdsDelegateTest, SaveAndRetrieve) {
   checkSavedResources<envoy::service::runtime::v3::Runtime>(
       source_id, /*resource_names=*/{"some_resource_1", "some_resource_2"},
       saved_resources.refvec_);
+  EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
@@ -146,11 +151,16 @@ TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
 
   checkSavedResources<envoy::service::runtime::v3::Runtime>(
       source_id_1, /*resource_names=*/{"some_resource_1"}, authority_1_runtime_resources.refvec_);
+  EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
   checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id_2_runtime,
                                                             /*resource_names=*/{"some_resource_2"},
                                                             authority_2_runtime_resources.refvec_);
+  EXPECT_EQ(2, store_.counter("xds.kv_store.load_success").value());
   checkSavedResources<envoy::config::cluster::v3::Cluster>(
       source_id_2_cluster, /*resource_names=*/{"cluster_1"}, authority_2_cluster_resources.refvec_);
+  EXPECT_EQ(3, store_.counter("xds.kv_store.load_success").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
@@ -194,6 +204,9 @@ TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
   checkSavedResources<envoy::service::runtime::v3::Runtime>(
       source_id, /*resource_names=*/{"some_resource_1", "some_resource_2", "some_resource_3"},
       all_resources.refvec_);
+  EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
@@ -218,8 +231,33 @@ TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
   // Empty resource names, or just one entry with "*" means wildcard.
   checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, /*resource_names=*/{},
                                                             saved_resources.refvec_);
+  EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
   checkSavedResources<envoy::service::runtime::v3::Runtime>(source_id, /*resource_names=*/{"*"},
                                                             saved_resources.refvec_);
+  EXPECT_EQ(2, store_.counter("xds.kv_store.load_success").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
+}
+
+TEST_F(KeyValueStoreXdsDelegateTest, ResourceNotFound) {
+  const std::string authority_1 = "rtds_cluster";
+  auto runtime_resource_1 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_1
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  const auto saved_resources = TestUtility::decodeResources({runtime_resource_1});
+  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  // Save xDS resources.
+  xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
+
+  // Empty resource names, or just one entry with "*" means wildcard.
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"non_existent"}, /*expected_resources=*/{});
+  EXPECT_EQ(0, store_.counter("xds.kv_store.load_success").value());
+  EXPECT_EQ(1, store_.counter("xds.kv_store.resources_not_found").value());
+  EXPECT_EQ(1, store_.counter("xds.kv_store.resource_missing").value());
 }
 
 // TODO(abeyad): add test for resource eviction.
