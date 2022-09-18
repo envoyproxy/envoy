@@ -442,7 +442,7 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
 
     EXPECT_EQ(RpcResponseType::ResponseWithExceptionWithAttachments,
               result->responseType().value());
-    // The message type will be set to exception.
+    // The message type will be set to exception if there is response with exception.
     EXPECT_EQ(MessageType::Exception, context->messageType());
   }
 
