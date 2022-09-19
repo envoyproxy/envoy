@@ -1402,13 +1402,13 @@ public:
    * @param upstream supplies the generic upstream for the stream.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
-   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param connection_info_provider, supplies the address provider of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
    * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
-                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const Network::ConnectionInfoProvider& connection_info_provider,
                            StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 
