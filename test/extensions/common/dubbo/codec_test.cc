@@ -32,6 +32,22 @@ inline void addInt64(Buffer::Instance& buffer, uint64_t value) {
   buffer.add(&value, 8);
 }
 
+TEST(DubboCodecTest, GetSerializer) {
+  DubboCodec codec;
+
+  auto serializer = std::make_unique<MockSerializer>();
+  // Keep this for mock.
+  auto raw_serializer = serializer.get();
+  codec.initilize(std::move(serializer));
+
+  EXPECT_EQ(raw_serializer, codec.serializer().get());
+}
+
+TEST(DubboCodecTest, CodecWithSerializer) {
+  auto codec = DubboCodec::codecFromSerializeType(SerializeType::Hessian2);
+  EXPECT_EQ(SerializeType::Hessian2, codec->serializer()->type());
+}
+
 TEST(DubboCodecTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   DubboCodec codec;
@@ -307,6 +323,25 @@ TEST(DubboCodecTest, DecodeDataTest) {
     EXPECT_EQ(DecodeStatus::Success, codec.decodeData(buffer, metadata));
     EXPECT_EQ(false, metadata.hasResponse());
   }
+
+  // Encode unexpected message type will cause exit.
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add("anything");
+
+    MessageMetadata metadata;
+    auto context = std::make_unique<Context>();
+
+    context->setMessageType(static_cast<MessageType>(6));
+    context->setRequestId(1);
+    context->setBodySize(buffer.length());
+    context->setResponseStatus(ResponseStatus::Ok);
+    context->setSerializeType(SerializeType::Hessian2);
+
+    metadata.setContext(std::move(context));
+
+    EXPECT_DEATH(codec.decodeData(buffer, metadata), ".*panic: corrupted enum.*");
+  }
 }
 
 TEST(DubboCodecTest, EncodeTest) {
@@ -469,7 +504,7 @@ TEST(DubboCodecTest, EncodeTest) {
     MessageMetadata metadata;
 
     auto context = std::make_unique<Context>();
-    context->setMessageType(MessageType::Response);
+    context->setMessageType(MessageType::Exception);
     context->setResponseStatus(ResponseStatus::BadRequest);
     context->setRequestId(12345);
     context->setSerializeType(SerializeType::Hessian2);
@@ -535,6 +570,39 @@ TEST(DubboCodecTest, EncodeTest) {
 
     // Check body size.
     EXPECT_EQ(1, buffer.peekBEInt<int32_t>(BodySizeOffset));
+  }
+
+  // Encode unexpected message type will cause exit.
+  {
+    Buffer::OwnedImpl buffer;
+    MessageMetadata metadata;
+
+    auto context = std::make_unique<Context>();
+    context->setMessageType(static_cast<MessageType>(6));
+    context->setResponseStatus(ResponseStatus::Ok);
+    context->setRequestId(12345);
+    context->setSerializeType(SerializeType::Hessian2);
+
+    metadata.setContext(std::move(context));
+
+    EXPECT_DEATH(codec.encode(buffer, metadata), ".*panic: corrupted enum.*");
+  }
+}
+
+TEST(DubboCodecTest, EncodeHeaderForTestTest) {
+  DubboCodec codec;
+
+  // Encode unexpected message type will cause exit.
+  {
+    Buffer::OwnedImpl buffer;
+
+    auto context = std::make_unique<Context>();
+    context->setMessageType(static_cast<MessageType>(6));
+    context->setResponseStatus(ResponseStatus::Ok);
+    context->setRequestId(12345);
+    context->setSerializeType(SerializeType::Hessian2);
+
+    EXPECT_DEATH(codec.encodeHeaderForTest(buffer, *context), ".*panic: corrupted enum.*");
   }
 }
 

@@ -33,6 +33,10 @@ public:
 
   const SerializerPtr& serializer() const { return serializer_; }
 
+  // Encode header only. In most cases, the 'encode' should be used and this method
+  // just used for test.
+  void encodeHeaderForTest(Buffer::Instance& buffer, Context& context);
+
   static constexpr uint8_t HeadersSize = 16;
   static constexpr int32_t MaxBodySize = 16 * 1024 * 1024;
 

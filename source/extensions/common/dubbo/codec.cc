@@ -268,6 +268,10 @@ void DubboCodec::encode(Buffer::Instance& buffer, MessageMetadata& metadata) {
   buffer.move(body_buffer);
 }
 
+void DubboCodec::encodeHeaderForTest(Buffer::Instance& buffer, Context& context) {
+  encodeHeader(buffer, context, context.bodySize());
+}
+
 MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& heartbeat_request) {
   ASSERT(heartbeat_request.hasContext());
   ASSERT(heartbeat_request.messageType() == MessageType::HeartbeatRequest);
