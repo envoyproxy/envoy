@@ -36,6 +36,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: udp_proxy
+  change: |
+    changed behavior of UDP proxy to connect UDP sockets unless ``use_original_src_ip`` is set. This change can be reverted by setting runtime guard ``envoy.reloadable_features.udp_proxy_connect`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
