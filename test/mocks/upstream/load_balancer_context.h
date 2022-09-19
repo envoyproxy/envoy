@@ -14,7 +14,6 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
   MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
   MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo*, downstreamInfo, (), (const));
   MOCK_METHOD(const Http::RequestHeaderMap*, downstreamHeaders, (), (const));
   MOCK_METHOD(const HealthyAndDegradedLoad&, determinePriorityLoad,
               (const PrioritySet&, const HealthyAndDegradedLoad&,

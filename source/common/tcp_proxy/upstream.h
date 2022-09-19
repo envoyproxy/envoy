@@ -47,7 +47,8 @@ class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callba
 public:
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfigHelper& config,
-               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type,
+               StreamInfo::StreamInfo& downstream_info);
   ~HttpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value(); }

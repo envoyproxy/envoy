@@ -197,9 +197,9 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                           Http::CodecType type)
+                           Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
-      downstream_info_(*context->downstreamInfo()) {
+      downstream_info_(downstream_info) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;

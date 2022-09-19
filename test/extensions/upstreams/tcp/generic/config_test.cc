@@ -24,7 +24,6 @@ class TcpConnPoolTest : public ::testing::Test {
 public:
   TcpConnPoolTest() {
     EXPECT_CALL(lb_context_, downstreamConnection()).WillRepeatedly(Return(&connection_));
-    EXPECT_CALL(lb_context_, downstreamInfo()).WillRepeatedly(Return(&downstream_stream_info_));
   }
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   GenericConnPoolFactory factory_;
@@ -42,7 +41,7 @@ TEST_F(TcpConnPoolTest, TestNoConnPool) {
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
-                         &lb_context_, callbacks_));
+                         &lb_context_, callbacks_, downstream_stream_info_));
 }
 
 TEST_F(TcpConnPoolTest, Http2Config) {
@@ -56,7 +55,7 @@ TEST_F(TcpConnPoolTest, Http2Config) {
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
-                         &lb_context_, callbacks_));
+                         &lb_context_, callbacks_, downstream_stream_info_));
 }
 
 TEST_F(TcpConnPoolTest, Http3Config) {
@@ -71,7 +70,7 @@ TEST_F(TcpConnPoolTest, Http3Config) {
   EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr, factory_.createGenericConnPool(
                          thread_local_cluster_, TcpProxy::TunnelingConfigHelperOptConstRef(config),
-                         &lb_context_, callbacks_));
+                         &lb_context_, callbacks_, downstream_stream_info_));
 }
 
 } // namespace Generic

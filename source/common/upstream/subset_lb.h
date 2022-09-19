@@ -164,7 +164,6 @@ private:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
-    StreamInfo::StreamInfo* downstreamInfo() const override { return wrapped_->downstreamInfo(); }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
       return wrapped_->downstreamHeaders();
     }

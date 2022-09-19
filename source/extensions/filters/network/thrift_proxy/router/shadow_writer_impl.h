@@ -175,7 +175,6 @@ public:
 
   // Upstream::LoadBalancerContextBase
   const Network::Connection* downstreamConnection() const override { return nullptr; }
-  StreamInfo::StreamInfo* downstreamInfo() const override { return nullptr; }
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
 
   // Event::DeferredDeletable

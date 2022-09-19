@@ -238,7 +238,6 @@ public:
     router_ = std::make_unique<Router>(context_.clusterManager());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
-    EXPECT_EQ(nullptr, router_->downstreamInfo());
 
     router_->setDecoderFilterCallbacks(callbacks_);
     router_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -276,7 +275,6 @@ public:
 
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_EQ(&connection_, router_->downstreamConnection());
-    EXPECT_EQ(&callbacks_.stream_info_, router_->downstreamInfo());
 
     // Not yet implemented:
     EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());

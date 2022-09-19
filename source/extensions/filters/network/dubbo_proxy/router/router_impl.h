@@ -40,7 +40,6 @@ public:
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override;
   const Network::Connection* downstreamConnection() const override;
-  StreamInfo::StreamInfo* downstreamInfo() const override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
