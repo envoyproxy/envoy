@@ -53,6 +53,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl_connection_info_;
   UpstreamTiming upstream_timing_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   std::string failure_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;

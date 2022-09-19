@@ -38,6 +38,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: logging
+  change: |
+    changed the ``UPSTREAM_REMOTE_ADDRESS``, ``UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, and ``UPSTREAM_REMOTE_PORT`` fields to log based on the actual upstream connection rather than the upstream host. This fixes a bug where the address components were not consistently correct for Happy Eyeballs connections and proxied connections, but also means in cases where the host was selected but a connection was not established, the fields will be absent. This change can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.correct_upstream_address`` to false.
 - area: resource_monitors
   change: |
     changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
