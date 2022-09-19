@@ -115,6 +115,8 @@ public:
    * used to set TLS.
    */
   virtual void onServerInitialized() PURE;
+
+  virtual bool currentThreadRegistered() PURE;
 };
 
 } // namespace Io

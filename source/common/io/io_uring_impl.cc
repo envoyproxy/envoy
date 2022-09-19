@@ -33,6 +33,8 @@ void IoUringFactoryImpl::onServerInitialized() {
   });
 }
 
+bool IoUringFactoryImpl::currentThreadRegistered() { return tls_.currentThreadRegistered(); }
+
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), cqes_(io_uring_size_, nullptr) {
   struct io_uring_params p {};

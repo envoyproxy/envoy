@@ -97,8 +97,8 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
-                         absl::optional<int> domain, const Io::IoUringFactory*) const override;
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, absl::optional<int> domain,
+                         Io::IoUringFactory*) const override;
 
   const TestIoSocketHandle::WriteOverrideProc write_override_proc_;
 };

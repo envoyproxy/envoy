@@ -29,15 +29,14 @@ void DefaultSocketInterfaceExtension::onServerInitialized() {
   }
 }
 
-IoHandlePtr
-SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                absl::optional<int> domain,
-                                                const Io::IoUringFactory* io_uring_factory) {
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                            absl::optional<int> domain,
+                                                            Io::IoUringFactory* io_uring_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
 
-  if (io_uring_factory == nullptr) {
+  if (io_uring_factory == nullptr || !io_uring_factory->currentThreadRegistered()) {
     return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
   } else {
     return std::make_unique<IoUringSocketHandleImpl>(DefaultReadBufferSize, *io_uring_factory,
@@ -47,7 +46,7 @@ SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6onl
 
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                             absl::optional<int> domain,
-                                            const Io::IoUringFactory* io_uring_factory) const {
+                                            Io::IoUringFactory* io_uring_factory) const {
   return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, io_uring_factory);
 }
 
