@@ -186,6 +186,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_deterministic_connection_id_generator_lib",
+    srcs = ["envoy_deterministic_connection_id_generator.cc"],
+    hdrs = ["envoy_deterministic_connection_id_generator.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_utils_lib",
+        "@com_github_google_quiche//:quic_core_deterministic_connection_id_generator_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -370,6 +381,7 @@ envoy_cc_library(
     hdrs = ["active_quic_listener.h"],
     tags = ["nofips"],
     deps = [
+        ":envoy_deterministic_connection_id_generator_lib",
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_dispatcher_lib",

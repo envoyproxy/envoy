@@ -495,6 +495,11 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                 socket_address:
                   address: {}
                   port_value: {}
+              health_check_config:
+                address:
+                  socket_address:
+                    address: {}
+                    port_value: {}
       lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -502,7 +507,7 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                  name, name, address, port, lb_policy));
+                  name, name, address, port, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
@@ -1198,6 +1203,9 @@ void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
       old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    if (old_protocol_options.http_filters().empty()) {
+      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
     }
     auto* filter_list_back = old_protocol_options.add_http_filters();
     TestUtility::loadFromYaml(config, *filter_list_back);

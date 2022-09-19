@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.validate.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
@@ -23,6 +25,7 @@
 #include "source/common/http/filter_manager.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/null_span_impl.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Router {
@@ -33,7 +36,7 @@ class RouterFilterInterface;
 class UpstreamRequest;
 class UpstreamRequestFilterManagerCallbacks;
 class UpstreamFilterManager;
-class CodecFilter;
+class UpstreamCodecFilter;
 
 /* The Upstream request is the base class for forwarding HTTP upstream.
  *
@@ -55,13 +58,13 @@ class CodecFilter;
  * On the new request path, payload (headers/body/metadata/data) still arrives via
  * the accept[X]fromRouter functions. Said data is immediately passed off to the
  * UpstreamFilterManager, which passes each item through the filter chain until
- * it arrives at the last filter in the chain, the CodecFilter. If the upstream
- * stream is not established, the CodecFilter returns StopAllIteration, and the
+ * it arrives at the last filter in the chain, the UpstreamCodecFilter. If the upstream
+ * stream is not established, the UpstreamCodecFilter returns StopAllIteration, and the
  * FilterManager will buffer data, using watermarks to push back to the router
  * filter if buffers become overrun. When an upstream connection is established,
- * the CodecFilter will send data upstream.
+ * the UpstreamCodecFilter will send data upstream.
  *
- * On the new response path, payload arrives from upstream via the CodecFilter's
+ * On the new response path, payload arrives from upstream via the UpstreamCodecFilter's
  * CodecBridge. It is passed off directly to the FilterManager, traverses the
  * filter chain, and completion is signaled via the
  * UpstreamRequestFilterManagerCallbacks's encode[X] functions. These somewhat
@@ -70,12 +73,9 @@ class CodecFilter;
  * the classic mode is deprecated), and are finally passed to the router via the
  * RouterFilterInterface onUpstream[X] functions.
  *
- * Right now there is VERY tight coupling between the UpstreamRequest,
- * CodecFilter, and UpstreamRequestFilterManagerCallbacks. This will be cleaned
- * up as the FilterManager exposes upstream interfaces. Once this coupling is
- * addressed, the CodecFilter can be created via factory, and the custom code to
- * manually create it can hopefully be removed.
- * TODO(alyssawilk) clean this up.
+ * There is some required communication between the UpstreamRequest and
+ * UpstreamCodecFilter. This is accomplished via the UpstreamStreamFilterCallbacks
+ * interface, with the UpstreamFilterManager acting as intermediary.
  */
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
@@ -181,7 +181,7 @@ public:
 
 private:
   friend class UpstreamFilterManager;
-  friend class CodecFilter;
+  friend class UpstreamCodecFilter;
   friend class UpstreamRequestFilterManagerCallbacks;
   StreamInfo::UpstreamTiming& upstreamTiming() {
     return stream_info_.upstreamInfo()->upstreamTiming();
@@ -219,7 +219,8 @@ private:
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
   Http::ResponseTrailerMapPtr upstream_trailers_;
-  std::shared_ptr<CodecFilter> codec_filter_;
+  OptRef<UpstreamToDownstream> upstream_interface_;
+  std::list<Http::UpstreamCallbacks*> upstream_callbacks_;
 
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
@@ -257,7 +258,8 @@ private:
 };
 
 class UpstreamRequestFilterManagerCallbacks : public Http::FilterManagerCallbacks,
-                                              public Event::DeferredDeletable {
+                                              public Event::DeferredDeletable,
+                                              public Http::UpstreamStreamFilterCallbacks {
 public:
   UpstreamRequestFilterManagerCallbacks(UpstreamRequest& upstream_request)
       : upstream_request_(upstream_request) {}
@@ -326,7 +328,6 @@ public:
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   // Intentional no-op functions.
@@ -340,18 +341,32 @@ public:
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
   // Unsupported functions.
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    IS_ENVOY_BUG("requestRouteConfigUpdate called from upstream filter");
-  }
-  void setRoute(Router::RouteConstSharedPtr) override {
-    IS_ENVOY_BUG("set route cache called from upstream filter");
-  }
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream filter");
   }
-  void clearRouteCache() override { IS_ENVOY_BUG("clear route cache called from upstream filter"); }
   void upgradeFilterChainCreated() override {
     IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream filter");
+  }
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
+
+  // Http::UpstreamStreamFilterCallbacks
+  StreamInfo::StreamInfo& upstreamStreamInfo() override { return upstream_request_.streamInfo(); }
+  OptRef<GenericUpstream> upstream() override {
+    return makeOptRefFromPtr(upstream_request_.upstream_.get());
+  }
+  void dumpState(std::ostream& os, int indent_level = 0) const override {
+    upstream_request_.dumpState(os, indent_level);
+  }
+  bool pausedForConnect() const override { return upstream_request_.paused_for_connect_; }
+  void setPausedForConnect(bool value) override { upstream_request_.paused_for_connect_ = value; }
+  const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
+    return upstream_request_.upstreamStreamOptions();
+  }
+  void addUpstreamCallbacks(Http::UpstreamCallbacks& callbacks) override {
+    upstream_request_.upstream_callbacks_.push_back(&callbacks);
+  }
+  void setUpstreamToDownstream(UpstreamToDownstream& upstream_to_downstream_interface) override {
+    upstream_request_.upstream_interface_ = upstream_to_downstream_interface;
   }
 
   Http::RequestTrailerMapPtr trailers_;
@@ -359,71 +374,6 @@ public:
   Http::ResponseHeaderMapPtr response_headers_;
   Http::ResponseTrailerMapPtr response_trailers_;
   UpstreamRequest& upstream_request_;
-};
-
-// This is the last filter in the upstream filter chain.
-// It takes request headers/body/data from the filter manager and encodes them to the upstream
-// codec. It also registers the CodecBridge with the upstream stream, and takes response
-// headers/body/data from the upstream stream and sends them to the filter manager.
-//
-// Right now, the CodecFilter is implicitly configured as the last filter in the
-// chain and manually created. TODO(alyssawilk) fix this before removing alpha
-// on upstream filters.
-class CodecFilter : public Http::StreamDecoderFilter, public Logger::Loggable<Logger::Id::router> {
-public:
-  CodecFilter(UpstreamRequest& request) : request_(request), bridge_(*this) {}
-
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-
-  // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
-  Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-
-  void shipHeadersIfPaused(Http::RequestHeaderMap& headers);
-
-  // This bridge connects the upstream stream to the filter manager.
-  class CodecBridge : public UpstreamToDownstream {
-  public:
-    CodecBridge(CodecFilter& filter) : filter_(filter) {}
-    void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
-    void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
-    void decodeData(Buffer::Instance& data, bool end_stream) override;
-    void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-    void decodeMetadata(Http::MetadataMapPtr&&) override;
-    void dumpState(std::ostream& os, int indent_level) const override;
-
-    void onResetStream(Http::StreamResetReason reason,
-                       absl::string_view transport_failure_reason) override {
-      filter_.request_.onResetStream(reason, transport_failure_reason);
-    }
-    void onAboveWriteBufferHighWatermark() override {
-      filter_.request_.onAboveWriteBufferHighWatermark();
-    }
-    void onBelowWriteBufferLowWatermark() override {
-      filter_.request_.onBelowWriteBufferLowWatermark();
-    }
-    // UpstreamToDownstream
-    const Route& route() const override { return filter_.request_.route(); }
-    OptRef<const Network::Connection> connection() const override {
-      return filter_.request_.connection();
-    }
-    const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
-      return filter_.request_.upstreamStreamOptions();
-    }
-
-  private:
-    bool seen_1xx_headers_{};
-    CodecFilter& filter_;
-  };
-  Http::StreamDecoderFilterCallbacks* callbacks_;
-  UpstreamRequest& request_;
-  CodecBridge bridge_;
-  absl::optional<bool> latched_end_stream_;
 };
 
 } // namespace Router

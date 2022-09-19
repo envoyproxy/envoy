@@ -8,6 +8,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -120,6 +121,14 @@ public:
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
+        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
+          Http::FilterFactoryCb factory_cb =
+              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
   }
 
   void expectResponseTimerCreate() {
