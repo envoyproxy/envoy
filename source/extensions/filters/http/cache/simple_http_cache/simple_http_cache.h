@@ -47,12 +47,12 @@ public:
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);
-  void insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
+  bool insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
               ResponseMetadata&& metadata, std::string&& body,
               Http::ResponseTrailerMapPtr&& trailers);
 
   // Inserts a response that has been varied on certain headers.
-  void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
+  bool varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
                   ResponseMetadata&& metadata, std::string&& body,
                   const Http::RequestHeaderMap& request_headers,
                   const VaryAllowList& vary_allow_list, Http::ResponseTrailerMapPtr&& trailers);
