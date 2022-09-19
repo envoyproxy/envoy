@@ -807,18 +807,18 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
 
   // ONLY used in case of requests to upstream initiated transactions
   if (metadata->msgType() == MsgType::Request) {
+    if (!settings()->UpstreamTransactionsEnabled()) {
+      ENVOY_LOG(
+          error,
+          "Upstream transaction support disabled. Dropping the received upstream request.");
+      return FilterStatus::StopIteration;
+    }
+
     if (!metadata->validate(false)) {
       ENVOY_LOG(
           error,
           "Dropping upstream request with no well formatted header. Error: {}", metadata->errorMessage());
       parent_.onError(metadata, ErrorCode::BadRequest, metadata->errorMessage());
-      return FilterStatus::StopIteration;
-    }
-
-    if (!settings()->UpstreamTransactionsEnabled()) {
-      ENVOY_LOG(
-          error,
-          "Upstream transaction support disabled. Dropping the received upstream request.");
       return FilterStatus::StopIteration;
     }
 
