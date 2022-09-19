@@ -140,6 +140,12 @@ public:
   }
 
   void initialize() {
+    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    if (multiplex_eds) {
+      EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
+    } else {
+      EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    }
     cluster_->initialize([this] { initialized_ = true; });
   }
 

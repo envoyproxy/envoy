@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
