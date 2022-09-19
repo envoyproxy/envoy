@@ -477,8 +477,8 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   // Test that the flags which envoy explicitly overrides have the right value.
   EXPECT_TRUE(GetQuicReloadableFlag(quic_disable_version_draft_29));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-  EXPECT_FALSE(GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
-  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(FLAGS_quic_buffered_data_threshold));
+  EXPECT_FALSE(GetQuicFlag(quic_header_size_limit_includes_overhead));
+  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(quic_buffered_data_threshold));
   {
     quiche::test::QuicheFlagSaver saver;
     EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -491,20 +491,20 @@ TEST_F(QuicPlatformTest, QuicFlags) {
     SetQuicRestartFlag(quic_testonly_default_false, true);
     EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-    EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
-    SetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace, true);
-    EXPECT_TRUE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+    EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
+    SetQuicheFlag(quiche_oghttp2_debug_trace, true);
+    EXPECT_TRUE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 
-    EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-    SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-    EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+    SetQuicFlag(quic_time_wait_list_seconds, 100);
+    EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
   }
 
   // Verify that the saver reset all the flags to their previous values.
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 }
 
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
