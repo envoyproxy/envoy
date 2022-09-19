@@ -407,7 +407,7 @@ HeaderValidator::validatePathHeaderCharacters(const HeaderString& value) {
 bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   const auto encoding = value.getStringView();
   for (const auto token : StringUtil::splitToken(encoding, ",", true, true)) {
-    if (token == header_values_.TransferEncodingValues.Chunked) {
+    if (absl::EqualsIgnoreCase(token, header_values_.TransferEncodingValues.Chunked)) {
       return true;
     }
   }

@@ -24,7 +24,7 @@ struct Http1ResponseCodeDetailValues {
   const std::string InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
   const std::string TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
   const std::string ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
-  const std::string ChunkedContentLength = "uhv.http1.content_length_and_chunked_not_allowed";
+  const std::string ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
 };
 
 using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
@@ -413,19 +413,14 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   // A server that receives a request message with a transfer coding it does not understand SHOULD
   // respond with 501 (Not Implemented).
   //
-  // This method validates that the transfer encoding syntax is correct but does not validate the
-  // actual context of the header.
+  // This method implements the existing (pre-UHV) Envoy behavior of only allowing a "chunked"
+  // Transfer-Encoding.
   const auto encoding = value.getStringView();
-  bool is_valid = true;
-  for (absl::string_view header_value : StringUtil::splitToken(encoding, ",", true)) {
-    for (auto iter = header_value.begin(); iter != header_value.end() && is_valid; ++iter) {
-      is_valid &= testChar(kTransferEncodingHeaderCharTable, *iter);
-    }
 
-    if (!is_valid) {
-      return {HeaderValueValidationResult::Action::Reject,
-              Http1ResponseCodeDetail::get().InvalidTransferEncoding};
-    }
+  if (!encoding.empty() &&
+      !absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
+    return {HeaderValueValidationResult::Action::Reject,
+            Http1ResponseCodeDetail::get().InvalidTransferEncoding};
   }
 
   return HeaderValueValidationResult::success();

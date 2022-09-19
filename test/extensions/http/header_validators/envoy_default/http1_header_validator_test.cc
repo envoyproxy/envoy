@@ -24,11 +24,13 @@ protected:
 };
 
 TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
-  HeaderString valid{"gzip, chunked"};
-  HeaderString invalid{"{deflate}"};
+  HeaderString valid{"chunked"};
+  HeaderString valid_mixed_case{"ChuNKeD"};
+  HeaderString invalid{"gzip"};
   auto uhv = createH1(empty_config);
 
   EXPECT_ACCEPT(uhv->validateTransferEncodingHeader(valid));
+  EXPECT_ACCEPT(uhv->validateTransferEncodingHeader(valid_mixed_case));
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateTransferEncodingHeader(invalid),
                              "uhv.http1.invalid_transfer_encoding");
@@ -291,7 +293,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
   auto uhv = createH1(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             "uhv.http1.content_length_and_chunked_not_allowed");
+                             "http1.content_length_and_chunked_not_allowed");
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContentLengthAllow) {
@@ -299,7 +301,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
                                                   {":method", "GET"},
                                                   {":path", "/"},
                                                   {":authority", "envoy.com"},
-                                                  {"transfer-encoding", "gzip, other, chunked"},
+                                                  {"transfer-encoding", "chunked"},
                                                   {"content-length", "10"}};
   auto uhv = createH1(allow_chunked_length_config);
 
@@ -307,12 +309,11 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContent
   EXPECT_EQ(headers.ContentLength(), nullptr);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapTransferEncodingContentLengthNotChunked) {
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapContentLengthNoTransferEncoding) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "GET"},
                                                   {":path", "/"},
                                                   {":authority", "envoy.com"},
-                                                  {"transfer-encoding", "gzip"},
                                                   {"content-length", "10"}};
   auto uhv = createH1(allow_chunked_length_config);
 

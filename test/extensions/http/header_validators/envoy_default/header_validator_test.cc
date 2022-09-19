@@ -319,15 +319,6 @@ TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
                              UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(BaseHeaderValidatorTest, HasChunkedTransferEncoding) {
-  HeaderString is_chunked{"gzip, other, chunked , other2"};
-  HeaderString not_chunked{"gzip, x=1"};
-  auto uhv = createBase(empty_config);
-
-  EXPECT_TRUE(uhv->hasChunkedTransferEncoding(is_chunked));
-  EXPECT_FALSE(uhv->hasChunkedTransferEncoding(not_chunked));
-}
-
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
