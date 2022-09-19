@@ -859,7 +859,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
                         "host {} in cluster {} was ejected by the outlier detector",
-                        host->address(), host->cluster().name());
+                        host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -1136,10 +1136,17 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     if ((cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
-      auto& conn_map = parent_.host_tcp_conn_map_[logical_host];
-      conn_map.emplace(conn_info.connection_.get(),
-                       std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
-                           parent_, logical_host, *conn_info.connection_));
+      auto conn_map_iter = parent_.host_tcp_conn_map_.find(logical_host);
+      if (conn_map_iter == parent_.host_tcp_conn_map_.end()) {
+        conn_map_iter =
+            parent_.host_tcp_conn_map_.try_emplace(logical_host, logical_host->acquireHandle())
+                .first;
+      }
+      auto& conn_map = conn_map_iter->second;
+      conn_map.connections_.emplace(
+          conn_info.connection_.get(),
+          std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
+              parent_, logical_host, *conn_info.connection_));
     }
     return conn_info;
   } else {
@@ -1442,7 +1449,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
     const HostConstSharedPtr& host, Network::ClientConnection& connection) {
   auto host_tcp_conn_map_it = host_tcp_conn_map_.find(host);
   ASSERT(host_tcp_conn_map_it != host_tcp_conn_map_.end());
-  TcpConnectionsMap& connections_map = host_tcp_conn_map_it->second;
+  auto& connections_map = host_tcp_conn_map_it->second.connections_;
   auto it = connections_map.find(&connection);
   ASSERT(it != connections_map.end());
   connection.dispatcher().deferredDelete(std::move(it->second));
@@ -1508,7 +1515,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
   }
 }
@@ -1521,8 +1528,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_, host};
-    container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
+    container_iter =
+        host_http_conn_pool_map_.try_emplace(host, thread_local_dispatcher_, host).first;
   }
 
   return &container_iter->second;
@@ -1756,14 +1763,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
   container->pools_->erasePool(priority, hash_key);
 
   // Guard deletion of the container with `do_not_delete_` to avoid deletion while
   // iterating through the container in `container->pools_->startDrain()`. See
   // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
   if (!container->do_not_delete_ && container->pools_->empty()) {
-    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
     host_http_conn_pool_map_.erase(
         host); // NOTE: `container` is erased after this point in the lambda.
   }
@@ -1805,7 +1812,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
   }
 
-  TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
+  auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
+  if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
+    container_iter = parent_.host_tcp_conn_pool_map_.try_emplace(host, host->acquireHandle()).first;
+  }
+  TcpConnPoolsContainer& container = container_iter->second;
   auto pool_iter = container.pools_.find(hash_key);
   if (pool_iter == container.pools_.end()) {
     bool inserted;
@@ -1837,7 +1848,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
       thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
       container.pools_.erase(erase_iter);
     }
@@ -1964,13 +1975,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(
-      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
-      admin_, singleton_manager_, outlier_event_logger, added_via_api,
-      added_via_api ? validation_context_.dynamicValidationVisitor()
-                    : validation_context_.staticValidationVisitor(),
-      context_.api(), context_.options());
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+                                        ssl_context_manager_, outlier_event_logger, added_via_api,
+                                        added_via_api
+                                            ? validation_context_.dynamicValidationVisitor()
+                                            : validation_context_.staticValidationVisitor());
 }
 
 CdsApiPtr
