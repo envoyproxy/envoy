@@ -1,5 +1,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"

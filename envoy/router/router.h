@@ -20,6 +20,8 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/router/path_matcher.h"
+#include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -768,7 +770,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern,
+  Template,
 };
 
 /**
@@ -919,6 +921,16 @@ public:
    *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  /**
+   * @return const PathMatcherSharedPtr& the path match policy for the route.
+   */
+  virtual const PathMatcherSharedPtr& pathMatcher() const PURE;
+
+  /**
+   * @return const PathRewriterSharedPtr& the path match rewrite for the route.
+   */
+  virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.

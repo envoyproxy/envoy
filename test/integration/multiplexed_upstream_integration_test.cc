@@ -84,6 +84,19 @@ TEST_P(MultiplexedUpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithTcpKeepalive) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto keepalive = bootstrap.mutable_static_resources()
+                         ->mutable_clusters(0)
+                         ->mutable_upstream_connection_options()
+                         ->mutable_tcp_keepalive();
+    keepalive->mutable_keepalive_probes()->set_value(4);
+    keepalive->mutable_keepalive_time()->set_value(7);
+    keepalive->mutable_keepalive_interval()->set_value(1);
+  });
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
 TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
   autonomous_upstream_ = true;
   initialize();

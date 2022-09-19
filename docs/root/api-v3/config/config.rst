@@ -38,3 +38,6 @@ Extensions
   contrib/contrib
   rbac/matchers
   config_validators/config_validators
+  path/match/path_matcher
+  path/rewrite/path_rewriter
+

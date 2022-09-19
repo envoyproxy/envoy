@@ -24,10 +24,14 @@ public:
 
   void initialize() override {
     config_helper_.addFilter("{ name: header-to-proxy-filter }");
-    if (upstream_tls_) {
-      config_helper_.configureUpstreamTls(use_alpn_, false);
+    if (use_http3_) {
+      envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
+      alt_cache.set_name("default_alternate_protocols_cache");
+      config_helper_.configureUpstreamTls(use_alpn_, use_http3_, alt_cache);
+    } else if (upstream_tls_) {
+      config_helper_.configureUpstreamTls(use_alpn_, use_http3_);
     }
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       envoy::config::core::v3::TransportSocket inner_socket;
@@ -45,7 +49,11 @@ public:
 
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      if (upstream_tls_) {
+        protocol_options.mutable_auto_config();
+      } else {
+        protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+      }
       ConfigHelper::setProtocolOptions(*cluster, protocol_options);
     });
     BaseIntegrationTest::initialize();
@@ -71,6 +79,7 @@ public:
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
   }
   bool use_alpn_ = false;
+  bool use_http3_ = false;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -317,6 +326,38 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp2) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+// Test Http3 failing to HTTP/2
+TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  use_alpn_ = true;
+  use_http3_ = true;
+  initialize();
+
+  // Point at the second fake upstream. Envoy doesn't actually know about this one.
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 1, due to the connect-proxy header.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  stripConnectUpgradeAndRespond();
+
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+#endif
 
 // TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in
 // case DNS to those endpoints is disallowed.
