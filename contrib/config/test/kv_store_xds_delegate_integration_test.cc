@@ -357,7 +357,6 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
 
   test_server_->waitForCounterGe("runtime.load_success", 3);
 
-  std::cout << "==> AAB 2: " << test_server_->counter("xds.kv_store.load_success")->value() << "\n";
   // Verify that the values from the xDS response are used instead of from the persisted xDS once
   // connectivity is re-established.
   EXPECT_EQ("zoo", getRuntimeKey("foo"));
