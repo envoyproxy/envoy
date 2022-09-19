@@ -53,6 +53,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: local_ratelimit
+  change: |
+    added :ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
 - area: health_check
   change: |
     support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
@@ -116,9 +119,14 @@ removed_config_or_runtime:
 - area: router
   change: |
     removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+- area: tracing
+  change: |
+    removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
 - area: http
+  change: |
+    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
   change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
   change: |
