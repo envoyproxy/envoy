@@ -669,6 +669,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
+  if (!route.route().prefix_rewrite().empty() && path_matcher_ != nullptr) {
+    throw EnvoyException("Cannot use prefix_rewrite with matcher extension");
+  }
+
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());

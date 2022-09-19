@@ -8840,6 +8840,30 @@ virtual_hosts:
   EXPECT_TRUE(pattern_template_policy == nullptr);
 }
 
+TEST_F(RouteConfigurationV2, RouteMatcherExtensionAndPrefixRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template:  "/bar/{country}/{hang}"
+        route:
+          cluster: some-cluster
+          prefix_rewrite: "!"
+
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot use prefix_rewrite with matcher extension");
+}
+
 TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
   const std::string yaml = R"EOF(
 virtual_hosts:
