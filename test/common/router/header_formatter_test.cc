@@ -1127,7 +1127,9 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
         "...]), actual format UPSTREAM_METADATA([\"ns\"])"}},
       {"%START_TIME(%85n)%", {}, {"Invalid header configuration. Format string contains newline."}},
+
   };
+
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   const std::string requested_server_name = "foo.bar";
   stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
@@ -1136,10 +1138,9 @@ TEST(HeaderParserTest, TestParseInternal) {
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
-  // Get the pointer to MockHostDescription.
-  std::shared_ptr<const Upstream::MockHostDescription> hd =
-      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
-          stream_info.upstreamInfo()->upstreamHost());
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  stream_info.upstreamInfo()->setUpstreamHost(host);
   auto local_address = Network::Address::InstanceConstSharedPtr{
       new Network::Address::Ipv4Instance("127.0.0.3", 8443)};
   stream_info.upstreamInfo()->setUpstreamLocalAddress(local_address);
@@ -1158,7 +1159,7 @@ TEST(HeaderParserTest, TestParseInternal) {
           '"quoted"':
             '"key"': value
       )EOF"));
-  EXPECT_CALL(*hd, metadata()).WillRepeatedly(Return(metadata));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
@@ -1203,9 +1204,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
       Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
-      req_header_parser->evaluateHeaders(header_map, request_headers,
-                                         *Http::StaticEmptyHeaders::get().response_headers,
-                                         stream_info);
+      req_header_parser->evaluateHeaders(header_map, stream_info);
 
       std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
@@ -1309,8 +1308,7 @@ request_headers_to_add:
       HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
   EXPECT_TRUE(header_map.has("x-client-port"));
@@ -1340,8 +1338,7 @@ request_headers_to_add:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   stream_info.upstreamInfo()->setUpstreamLocalAddress(nullptr);
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_FALSE(header_map.has("x-upstream-local-port"));
   EXPECT_TRUE(header_map.has("x-upstream-remote-address"));
 }
@@ -1369,8 +1366,7 @@ request_headers_to_add:
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
-  req_header_parser->evaluateHeaders(header_map, header_map,
-                                     *Http::StaticEmptyHeaders::get().response_headers, nullptr);
+  req_header_parser->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("x-client-ip"));
   EXPECT_TRUE(header_map.has("x-client-ip-port"));
   EXPECT_TRUE(header_map.has("x-client-port"));
@@ -1391,8 +1387,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
 
   HeaderParserPtr req_header_parser_add =
       HeaderParser::configure(headers_values, HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
-  req_header_parser_add->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, nullptr);
+  req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
 
@@ -1403,8 +1398,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
 
   HeaderParserPtr req_header_parser_set =
       HeaderParser::configure(headers_values, HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  req_header_parser_set->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, nullptr);
+  req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
 
@@ -1415,8 +1409,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
 
   HeaderParserPtr req_header_parser_empty =
       HeaderParser::configure(headers_values, HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
-  req_header_parser_empty->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, nullptr);
+  req_header_parser_empty->evaluateHeaders(header_map, nullptr);
   EXPECT_FALSE(header_map.has("empty"));
 }
 
@@ -1436,15 +1429,13 @@ request_headers_to_add:
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  // Get the pointer to MockHostDescription.
-  std::shared_ptr<const Upstream::MockHostDescription> hd =
-      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
-          stream_info.upstreamInfo()->upstreamHost());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ON_CALL(*hd, metadata()).WillByDefault(Return(metadata));
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  stream_info.upstreamInfo()->setUpstreamHost(host);
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_FALSE(header_map.has("x-key"));
 }
 
@@ -1465,8 +1456,7 @@ request_headers_to_add:
       HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
   Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
   EXPECT_EQ("static-value", header_map.get_("static-header"));
 }
@@ -1539,8 +1529,7 @@ request_headers_to_remove: ["x-nope"]
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
 
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
 
   EXPECT_TRUE(header_map.has("x-prefix"));
   EXPECT_EQ("prefix-127.0.0.1", header_map.get_("x-prefix"));
@@ -1620,8 +1609,7 @@ request_headers_to_add:
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(stream_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
 
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_TRUE(header_map.has("static-header"));
   EXPECT_EQ("static-value", header_map.get_("static-header"));
   EXPECT_TRUE(header_map.has("x-client-ip"));
@@ -1693,6 +1681,14 @@ response_headers_to_add:
       key: "set-cookie"
       value: "bar"
     append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-upstream-req-id"
+      value: "%RESP(x-resp-id)%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "x-downstream-req-id"
+      value: "%REQ(x-req-id)%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
 
 response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -1700,37 +1696,40 @@ response_headers_to_remove: ["x-nope"]
   const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestRequestHeaderMapImpl header_map{
-      {":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestRequestHeaderMapImpl request_header_map{{":method", "POST"}, {"x-req-id", "543"}};
+  Http::TestResponseHeaderMapImpl response_header_map{
+      {"x-safe", "safe"}, {"x-nope", "nope"}, {"x-resp-id", "321"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(stream_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
-  EXPECT_TRUE(header_map.has("x-client-ip"));
-  EXPECT_TRUE(header_map.has("x-client-ip-port"));
-  EXPECT_TRUE(header_map.has("x-request-start-multiple"));
-  EXPECT_TRUE(header_map.has("x-safe"));
-  EXPECT_FALSE(header_map.has("x-nope"));
-  EXPECT_TRUE(header_map.has("x-request-start"));
-  EXPECT_EQ("1522796769.123", header_map.get_("x-request-start"));
+  resp_header_parser->evaluateHeaders(response_header_map, request_header_map, response_header_map,
+                                      stream_info);
+  EXPECT_TRUE(response_header_map.has("x-client-ip"));
+  EXPECT_TRUE(response_header_map.has("x-client-ip-port"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-multiple"));
+  EXPECT_TRUE(response_header_map.has("x-safe"));
+  EXPECT_FALSE(response_header_map.has("x-nope"));
+  EXPECT_TRUE(response_header_map.has("x-request-start"));
+  EXPECT_EQ("1522796769.123", response_header_map.get_("x-request-start"));
   EXPECT_EQ("1522796769.123 2018-04-03T23:06:09.123Z 1522796769",
-            header_map.get_("x-request-start-multiple"));
-  EXPECT_TRUE(header_map.has("x-request-start-f"));
-  EXPECT_EQ("f", header_map.get_("x-request-start-f"));
-  EXPECT_TRUE(header_map.has("x-request-start-default"));
-  EXPECT_EQ("2018-04-03T23:06:09.123Z", header_map.get_("x-request-start-default"));
-  EXPECT_TRUE(header_map.has("x-request-start-range"));
+            response_header_map.get_("x-request-start-multiple"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-f"));
+  EXPECT_EQ("f", response_header_map.get_("x-request-start-f"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", response_header_map.get_("x-request-start-default"));
+  EXPECT_TRUE(response_header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
-            header_map.get_("x-request-start-range"));
-  EXPECT_EQ("foo", header_map.get_("set-cookie"));
+            response_header_map.get_("x-request-start-range"));
+  EXPECT_EQ("foo", response_header_map.get_("set-cookie"));
+  EXPECT_EQ("321", response_header_map.get_("x-upstream-req-id"));
+  EXPECT_EQ("543", response_header_map.get_("x-downstream-req-id"));
 
   // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
   // combine set-cookie headers
-  const auto out = header_map.get(Http::LowerCaseString("set-cookie"));
+  const auto out = response_header_map.get(Http::LowerCaseString("set-cookie"));
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0]->value().getStringView(), "foo");
   ASSERT_EQ(out[1]->value().getStringView(), "bar");
@@ -1754,8 +1753,7 @@ request_headers_to_remove: ["x-foo-header"]
   Http::TestRequestHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  req_header_parser->evaluateHeaders(
-      header_map, header_map, *Http::StaticEmptyHeaders::get().response_headers, stream_info);
+  req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
@@ -1785,8 +1783,7 @@ response_headers_to_add:
 
   {
     Http::TestResponseHeaderMapImpl header_map;
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
@@ -1794,8 +1791,7 @@ response_headers_to_add:
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "exist-foo"}};
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("per", header_map.get_("x-per-header"));
@@ -1803,8 +1799,7 @@ response_headers_to_add:
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-bar-header", "exist-bar"}};
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
@@ -1813,8 +1808,7 @@ response_headers_to_add:
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-per-header", "exist-per"}};
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ("exist-per", header_map.get_("x-per-header"));
@@ -1843,24 +1837,21 @@ response_headers_to_add:
 
   {
     Http::TestResponseHeaderMapImpl header_map;
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
   }
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "exist-foo"}};
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ(2, header_map.get(Http::LowerCaseString("x-foo-header")).size());
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
   }
 
   {
     Http::TestResponseHeaderMapImpl header_map{{"x-bar-header", "exist-bar"}};
-    resp_header_parser->evaluateHeaders(
-        header_map, *Http::StaticEmptyHeaders::get().request_headers, header_map, stream_info);
+    resp_header_parser->evaluateHeaders(header_map, stream_info);
     EXPECT_EQ("foo", header_map.get_("x-foo-header"));
     EXPECT_EQ("bar", header_map.get_("x-bar-header"));
     EXPECT_EQ(1, header_map.get(Http::LowerCaseString("x-bar-header")).size());
@@ -1907,13 +1898,11 @@ response_headers_to_remove: ["x-foo-header"]
   const auto route = parseRouteFromV3Yaml(yaml);
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestRequestHeaderMapImpl request_header_map{};
-  Http::TestResponseHeaderMapImpl response_header_map{{"x-foo-header", "foo"}};
+  Http::TestResponseHeaderMapImpl header_map{{"x-foo-header", "foo"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  resp_header_parser->evaluateHeaders(response_header_map, request_header_map, response_header_map,
-                                      stream_info);
-  EXPECT_EQ("bar", response_header_map.get_("x-foo-header"));
+  resp_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
 TEST(HeaderParserTest, GetHeaderTransformsWithFormatting) {
