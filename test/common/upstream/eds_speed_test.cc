@@ -76,8 +76,12 @@ public:
             refresh_delay: 1s
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
-
-    EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
+    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    if (multiplex_eds) {
+      EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
+    } else {
+      EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    }
     cluster_->initialize([this] { initialized_ = true; });
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(&async_stream_));
     subscription_->start({"fare"});
@@ -95,7 +99,9 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ = cm_.multiplexed_subscription_factory_.callbacks_;
+    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    eds_callbacks_ = multiplex_eds ? cm_.multiplexed_subscription_factory_.callbacks_
+                                   : cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(
         grpc_mux_, *eds_callbacks_, resource_decoder_, subscription_stats_, type_url_, dispatcher_,
         std::chrono::milliseconds(), false, Config::SubscriptionOptions());
