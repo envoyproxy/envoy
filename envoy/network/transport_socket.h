@@ -10,14 +10,22 @@
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/ssl/context.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
+
+namespace quic {
+class QuicCryptoClientConfig;
+}
 
 namespace Envoy {
 
 namespace Upstream {
 class HostDescription;
+}
+namespace Ssl {
+class ClientContextConfig;
 }
 
 namespace Network {
@@ -310,6 +318,13 @@ public:
    */
   virtual void hashKey(std::vector<uint8_t>& key,
                        TransportSocketOptionsConstSharedPtr options) const PURE;
+
+  /* Return the pointer to the SSL context, or nullptr if there is no SSL context */
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() PURE;
+
+  virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
+
+  virtual std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() { return nullptr; }
 };
 
 /**

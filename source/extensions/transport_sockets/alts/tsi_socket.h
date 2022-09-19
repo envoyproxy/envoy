@@ -137,6 +137,7 @@ public:
 
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override { return ""; }
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return nullptr; }
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
