@@ -55,7 +55,8 @@ class MultiplexedSubscriptionFactoryTest
     : public ::testing::TestWithParam<envoy::config::core::v3::ApiConfigSource::ApiType> {
 public:
   MultiplexedSubscriptionFactoryTest()
-      : type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"){};
+      : type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
+        resource_decoder_(std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>()){};
 
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
@@ -69,7 +70,7 @@ public:
   Config::RateLimitSettings rate_limit_settings_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder_;
+  Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Config::XdsResourcesDelegateOptRef> xds_resources_delegate_;
 };
 
