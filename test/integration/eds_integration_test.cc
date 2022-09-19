@@ -540,33 +540,36 @@ protected:
     setUpstreamCount(4);
     setUpstreamProtocol(Http::CodecType::HTTP2);
 
-    config_helper_.addConfigModifier([this, http_active_hc, num_clusters_to_add,
-                                      ignore_new_hosts_until_first_hc](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add a static EDS cluster.
-      auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      eds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      eds_cluster->set_name("eds_cluster");
-      eds_cluster->mutable_load_assignment()->set_cluster_name("eds_cluster");
-      ConfigHelper::setHttp2(*eds_cluster);
-      // Remove the static cluster (cluster_0) and set up CDS.
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
-      bootstrap.mutable_static_resources()->mutable_clusters()->erase(
-          bootstrap.mutable_static_resources()->mutable_clusters()->begin());
-      for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
-        auto cluster_name = "cluster_" + std::to_string(i);
-        auto cluster_to_add =
-            buildCluster(cluster_name, http_active_hc, ignore_new_hosts_until_first_hc);
-        envoy::config::endpoint::v3::ClusterLoadAssignment cla_to_add;
-        cla_to_add.set_cluster_name(cluster_name);
-        clas_to_add_.push_back(cla_to_add);
-        clusters_to_add_.push_back(cluster_to_add);
-        resource_names_.push_back(cluster_name);
-      }
-      cds_helper_.setCds(clusters_to_add_);
-    });
+    config_helper_.addConfigModifier(
+        [this, http_active_hc, num_clusters_to_add,
+         ignore_new_hosts_until_first_hc](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          // Add a static EDS cluster.
+          auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          eds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          eds_cluster->set_name("eds_cluster");
+          eds_cluster->mutable_load_assignment()->set_cluster_name("eds_cluster");
+          ConfigHelper::setHttp2(*eds_cluster);
+          // Remove the static cluster (cluster_0) and set up CDS.
+          bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          bootstrap.mutable_dynamic_resources()
+              ->mutable_cds_config()
+              ->mutable_path_config_source()
+              ->set_path(cds_helper_.cds_path());
+          bootstrap.mutable_static_resources()->mutable_clusters()->erase(
+              bootstrap.mutable_static_resources()->mutable_clusters()->begin());
+          for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
+            auto cluster_name = "cluster_" + std::to_string(i);
+            auto cluster_to_add =
+                buildCluster(cluster_name, http_active_hc, ignore_new_hosts_until_first_hc);
+            envoy::config::endpoint::v3::ClusterLoadAssignment cla_to_add;
+            cla_to_add.set_cluster_name(cluster_name);
+            clas_to_add_.push_back(cla_to_add);
+            clusters_to_add_.push_back(cluster_to_add);
+            resource_names_.push_back(cluster_name);
+          }
+          cds_helper_.setCds(clusters_to_add_);
+        });
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
