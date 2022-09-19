@@ -20,8 +20,8 @@ Config::GrpcMuxSharedPtr MultiplexedSubscriptionFactory::getOrCreateMux(
   if (config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
       config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
     const uint64_t xds_server_hash = MessageUtil::hash(config_source.grpc_services(0));
-    const uint64_t xds_method_hash = HashUtil::xxHash64(type_url);
-    const uint64_t mux_key = xds_server_hash ^ xds_method_hash;
+    const uint64_t xds_type_hash = HashUtil::xxHash64(type_url);
+    const uint64_t mux_key = xds_server_hash ^ xds_type_hash;
     if (muxes_.find(mux_key) == muxes_.end()) {
       muxes_.emplace(
           std::make_pair(mux_key, Config::SubscriptionFactoryImpl::getOrCreateMux(
