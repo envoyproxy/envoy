@@ -6285,6 +6285,53 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, TestWeightedClusterClusterHeaderHeaderManipulation) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            total_weight: 50
+            clusters:
+              - cluster_header: x-route-to-this-cluster
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster-adding-this-value
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster-adding-this-value
+                response_headers_to_remove: [ "x-header-to-remove-cluster" ]
+                host_rewrite_literal: "new_host1"
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("x-route-to-this-cluster", "cluster1");
+    Http::TestResponseHeaderMapImpl resp_headers({{"x-header-to-remove-cluster", "value"}});
+    auto dynamic_route = config.route(headers, 0);
+    const RouteEntry* route = dynamic_route->routeEntry();
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("cluster-adding-this-value", headers.get_("x-req-cluster"));
+    EXPECT_EQ("new_host1", headers.getHostValue());
+
+    route->finalizeResponseHeaders(resp_headers, stream_info);
+    EXPECT_EQ("cluster-adding-this-value", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
+  }
+}
+
 TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeader) {
   const std::string yaml = R"EOF(
       virtual_hosts:
