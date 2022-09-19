@@ -172,6 +172,7 @@ class UdpProxyFilter : public Network::UdpListenerReadFilter,
 public:
   UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                  const UdpProxyFilterConfigSharedPtr& config);
+  ~UdpProxyFilter() override;
 
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
@@ -200,7 +201,7 @@ private:
   private:
     void onIdleTimer();
     void onReadReady();
-    void fillStreamInfo();
+    void fillSessionStreamInfo();
 
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -383,15 +384,7 @@ private:
                                                  nullptr, Network::SocketCreationOptions{});
   }
 
-  /**
-  * Struct definition for proxy access logging.
-  */
-  struct UdpProxyStats {
-    uint64_t downstream_proxy_no_route_;
-    uint64_t downstream_proxy_total_;
-    uint64_t downstream_proxy_idle_timeout_;
-    uint64_t downstream_sess_rx_errors_;
-  };
+  void fillProxyStreamInfo();
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
@@ -401,6 +394,8 @@ private:
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
   // Map for looking up cluster info with its name.
   absl::flat_hash_map<std::string, ClusterInfoPtr> cluster_infos_;
+
+  absl::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
 };
 
 } // namespace UdpProxy

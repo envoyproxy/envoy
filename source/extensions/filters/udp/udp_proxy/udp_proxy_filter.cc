@@ -20,8 +20,21 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
       onClusterAddOrUpdate(*cluster);
     }
   }
+
+  if (!config_->proxyAccessLogs().empty()) {
+    udp_proxy_stats_.emplace(
+        StreamInfo::StreamInfoImpl(config_->timeSource(), nullptr));
+  }
 }
 
+UdpProxyFilter::~UdpProxyFilter(){
+  if (!config_->proxyAccessLogs().empty()) {
+    fillProxyStreamInfo();
+    for (const auto& access_log : config_->proxyAccessLogs()) {
+      access_log->log(nullptr, nullptr, nullptr, udp_proxy_stats_.value());
+    }
+  }
+}
 void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
   auto cluster_name = cluster.info()->name();
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster_name);
@@ -234,7 +247,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       // NOTE: The socket call can only fail due to memory/fd exhaustion. No local ephemeral port
       //       is bound until the first packet is sent to the upstream host.
       socket_(cluster.filter_.createSocket(host)) {
-  if (!cluster_.filter_.config_->accessLogs().empty()) {
+  if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     udp_sess_stats_.emplace(
         StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
   }
@@ -281,15 +294,15 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
       .connections()
       .dec();
 
-  if (!cluster_.filter_.config_->accessLogs().empty()) {
-    fillStreamInfo();
-    for (const auto& access_log : cluster_.filter_.config_->accessLogs()) {
+  if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
+    fillSessionStreamInfo();
+    for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
       access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
     }
   }
 }
 
-void UdpProxyFilter::ActiveSession::fillStreamInfo() {
+void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["cluster_name"] = ValueUtil::stringValue(cluster_.cluster_.info()->name());
@@ -303,7 +316,20 @@ void UdpProxyFilter::ActiveSession::fillStreamInfo() {
   fields_map["datagrams_received"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_rx_datagrams_);
 
-  udp_sess_stats_.value().setDynamicMetadata("udp.proxy", stats_obj);
+  udp_sess_stats_.value().setDynamicMetadata("udp.proxy.session", stats_obj);
+}
+
+void UdpProxyFilter::fillProxyStreamInfo() {
+  ProtobufWkt::Struct stats_obj;
+  auto& fields_map = *stats_obj.mutable_fields();
+  fields_map["no_route"] =
+      ValueUtil::numberValue(config_->stats().downstream_sess_no_route_.value());
+  fields_map["sess_total"] =
+    ValueUtil::numberValue(config_->stats().downstream_sess_total_.value());
+  fields_map["idle_timeout"] =
+    ValueUtil::numberValue(config_->stats().idle_timeout_.value());
+
+  udp_proxy_stats_.value().setDynamicMetadata("udp.proxy.proxy", stats_obj);
 }
 
 void UdpProxyFilter::ActiveSession::onIdleTimer() {

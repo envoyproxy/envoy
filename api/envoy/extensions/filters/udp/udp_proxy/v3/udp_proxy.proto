@@ -108,5 +108,5 @@ message UdpProxyConfig {
   // Configuration for access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog sess_access_log = 8;
 
-  repeated config.accesslog.v3.AccessLog proxy_access_log = 9;
+  repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
 }
