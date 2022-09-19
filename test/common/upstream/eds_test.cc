@@ -134,11 +134,12 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ = cm_.multiplexed_subscription_factory_.callbacks_;
+    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    eds_callbacks_ = multiplex_eds ? cm_.multiplexed_subscription_factory_.callbacks_
+                                   : cm_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
@@ -2444,6 +2445,91 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
                             EnvoyException,
                             "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
                             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
+}
+
+TEST_F(EdsTest, MultiplexEdsEnabledInApi) {
+  EXPECT_CALL(cm_.multiplexed_subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _));
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _)).Times(0);
+  resetCluster(R"EOF(
+      name: some_cluster
+      connect_timeout: 0.25s
+      type: EDS
+      eds_cluster_config:
+        multiplex_eds: true
+        eds_config:
+          resource_api_version: V3
+          api_config_source:
+            api_type: GRPC
+            transport_api_version: V3
+            grpc_services:
+              envoy_grpc:
+                cluster_name: eds_cluster
+    )EOF",
+               Cluster::InitializePhase::Secondary);
+}
+
+TEST_F(EdsTest, MultiplexEdsDisabledInApi) {
+  EXPECT_CALL(cm_.multiplexed_subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _));
+  resetCluster(R"EOF(
+      name: some_cluster
+      connect_timeout: 0.25s
+      type: EDS
+      eds_cluster_config:
+        multiplex_eds: false
+        eds_config:
+          resource_api_version: V3
+          api_config_source:
+            api_type: GRPC
+            transport_api_version: V3
+            grpc_services:
+              envoy_grpc:
+                cluster_name: eds_cluster
+    )EOF",
+               Cluster::InitializePhase::Secondary);
+}
+
+TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiType) {
+  EXPECT_THROW_WITH_MESSAGE(
+      resetCluster(R"EOF(
+      name: some_cluster
+      connect_timeout: 0.25s
+      type: EDS
+      eds_cluster_config:
+        multiplex_eds: true
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+    )EOF",
+                   Cluster::InitializePhase::Secondary),
+      EnvoyException,
+      "EDS multiplexing can only be configured for GRPC and DELTA_GRPC type of api config source.");
+}
+
+TEST_F(EdsTest, MultiplexEdsDisabledByDefault) {
+  EXPECT_CALL(cm_.multiplexed_subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _));
+  resetCluster(R"EOF(
+      name: some_cluster
+      connect_timeout: 0.25s
+      type: EDS
+      eds_cluster_config:
+        eds_config:
+          resource_api_version: V3
+          api_config_source:
+            api_type: GRPC
+            transport_api_version: V3
+            grpc_services:
+              envoy_grpc:
+                cluster_name: eds_cluster
+    )EOF",
+               Cluster::InitializePhase::Secondary);
 }
 
 } // namespace

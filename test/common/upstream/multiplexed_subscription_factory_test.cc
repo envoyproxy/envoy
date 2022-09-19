@@ -20,7 +20,6 @@
 
 using ::testing::_;
 using ::testing::Invoke;
-using ::testing::Return;
 using ::testing::ReturnRef;
 
 namespace Envoy {
@@ -155,7 +154,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXd
 }
 
 // Verify that a new mux instance is created if a different xds method is used.
-TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXdsMethods) {
+TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXdsTypes) {
   envoy::config::core::v3::ConfigSource config;
   auto config_source = config.mutable_api_config_source();
   config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
