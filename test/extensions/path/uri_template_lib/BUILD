@@ -35,14 +35,3 @@ envoy_cc_test(
         "@com_googlesource_code_re2//:re2",
     ],
 )
-
-envoy_cc_fuzz_test(
-    name = "uri_template_fuzz_test",
-    srcs = ["uri_template_fuzz_test.cc"],
-    corpus = "uri_template_corpus",
-    deps = [
-        "//source/common/common:statusor_lib",
-        "//source/extensions/path/uri_template_lib",
-        "//test/fuzz:utility_lib",
-    ],
-)
