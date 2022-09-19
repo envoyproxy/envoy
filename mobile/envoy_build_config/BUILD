@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "extension_registry_platform_additions",
         "@envoy//source/common/network:socket_lib",
+        "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/upstream:logical_dns_cluster_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
