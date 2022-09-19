@@ -51,7 +51,7 @@ enum class MessageType : uint8_t {
   Exception = 3,
   // Special request with event flag.
   HeartbeatRequest = 4,
-  // Speical response with event flag.
+  // Special response with event flag.
   HeartbeatResponse = 5,
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE

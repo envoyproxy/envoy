@@ -31,8 +31,7 @@ public:
    *         invocation information.
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual RpcRequestPtr deserializeRpcRequest(Buffer::Instance& buffer,
-                                              Context& context) PURE;
+  virtual RpcRequestPtr deserializeRpcRequest(Buffer::Instance& buffer, Context& context) PURE;
 
   /**
    * deserialize result of an rpc call
@@ -43,8 +42,7 @@ public:
    *         result information.
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual RpcResponsePtr deserializeRpcResponse(Buffer::Instance& buffer,
-                                                Context& context) PURE;
+  virtual RpcResponsePtr deserializeRpcResponse(Buffer::Instance& buffer, Context& context) PURE;
 
   /**
    * Serialize response of an rpc call

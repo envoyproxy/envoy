@@ -1,16 +1,17 @@
 #include "codec.h"
-#include "message.h"
-#include "metadata.h"
 #include "source/extensions/common/dubbo/codec.h"
+
+#include <cstdint>
+#include <memory>
 
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
-#include "source/extensions/common/dubbo/message_impl.h"
 #include "source/extensions/common/dubbo/hessian2_serializer_impl.h"
+#include "source/extensions/common/dubbo/message_impl.h"
 
-#include <cstdint>
-#include <memory>
+#include "message.h"
+#include "metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,7 +66,7 @@ void encodeHeader(Buffer::Instance& buffer, Context& context, uint32_t body_size
   }
   buffer.writeByte(flag);
 
-  // Optional respnose status.
+  // Optional response status.
   buffer.writeByte(context.hasResponseStatus() ? static_cast<uint8_t>(context.responseStatus())
                                                : 0x00);
 
@@ -73,7 +74,7 @@ void encodeHeader(Buffer::Instance& buffer, Context& context, uint32_t body_size
   buffer.writeBEInt<uint64_t>(context.requestId());
 
   // Because the body size in the context is the size of original request or response.
-  // It may be changed after the processing of filters. So write the explict specified
+  // It may be changed after the processing of filters. So write the explicit specified
   // body size here.
   buffer.writeBEInt<uint32_t>(body_size);
 }
@@ -170,7 +171,7 @@ DecodeStatus DubboCodec::decodeHeader(Buffer::Instance& buffer, MessageMetadata&
   }
   context->setSerializeType(serialize_type);
 
-  // Intial basic type of message.
+  // Initial basic type of message.
   MessageType type =
       (flag & MessageTypeMask) == MessageTypeMask ? MessageType::Request : MessageType::Response;
 
@@ -269,6 +270,7 @@ void DubboCodec::encode(Buffer::Instance& buffer, MessageMetadata& metadata) {
 
 MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& heartbeat_request) {
   ASSERT(heartbeat_request.hasContext());
+  ASSERT(heartbeat_request.messageType() == MessageType::HeartbeatRequest);
   const auto& request_context = heartbeat_request.context();
   auto context = std::make_unique<Context>();
 
@@ -321,17 +323,6 @@ MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& requ
   metadata->setResponse(std::move(response));
 
   return metadata;
-}
-
-absl::string_view Utility::serializeTypeToString(SerializeType type) {
-  static constexpr absl::string_view Hessian2Type = "hessian2";
-  switch (type) {
-  case SerializeType::Hessian2:
-    return Hessian2Type;
-  default:
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
-  return "";
 }
 
 } // namespace Dubbo

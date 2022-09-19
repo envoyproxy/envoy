@@ -1,8 +1,9 @@
 #pragma once
 
+#include "source/extensions/common/dubbo/serializer.h"
+
 #include "message.h"
 #include "metadata.h"
-#include "source/extensions/common/dubbo/serializer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,11 +46,6 @@ public:
   static MessageMetadataSharedPtr localResponse(MessageMetadata& request, ResponseStatus status,
                                                 absl::optional<RpcResponseType> type,
                                                 absl::string_view content);
-};
-
-class Utility {
-public:
-  static absl::string_view serializeTypeToString(SerializeType type);
 };
 
 } // namespace Dubbo

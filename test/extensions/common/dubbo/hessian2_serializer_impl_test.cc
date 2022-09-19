@@ -1,10 +1,11 @@
+#include <memory>
+
 #include "source/extensions/common/dubbo/hessian2_serializer_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 #include "hessian2/object.hpp"
 
 namespace Envoy {

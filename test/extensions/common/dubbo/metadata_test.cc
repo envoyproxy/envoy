@@ -1,8 +1,9 @@
+#include <memory>
+
 #include "source/extensions/common/dubbo/message_impl.h"
 #include "source/extensions/common/dubbo/metadata.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {

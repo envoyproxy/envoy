@@ -64,7 +64,7 @@ void BufferReader::rawReadNBytes(void* data, size_t len, size_t peek_offset) {
   buffer_.copyOut(offset() + peek_offset, len, data);
 }
 
-} // namespace DubboProxy
-} // namespace NetworkFilters
+} // namespace Dubbo
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

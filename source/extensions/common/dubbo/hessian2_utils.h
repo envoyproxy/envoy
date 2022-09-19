@@ -47,7 +47,7 @@ private:
   Envoy::Buffer::Instance& buffer_;
 };
 
-} // namespace DubboProxy
-} // namespace NetworkFilters
+} // namespace Dubbo
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

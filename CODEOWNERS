@@ -265,6 +265,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
+# Dubbo codec
+/*/extensions/common/dubbo @wbpcode @lizan
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

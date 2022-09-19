@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_package",
+    "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_cc_library(
     name = "hessian2_utils_lib",
@@ -27,11 +27,11 @@ envoy_cc_library(
     srcs = ["codec.cc"],
     hdrs = ["codec.h"],
     deps = [
+        "hessian2_serializer_lib",
         ":hessian2_utils_lib",
         ":message_lib",
         ":metadata_lib",
         ":serializer_interface",
-        "hessian2_serializer_lib",
     ],
 )
 
