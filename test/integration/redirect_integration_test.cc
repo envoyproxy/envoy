@@ -159,12 +159,18 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.set_via("via_value"); });
+             hcm) {
+          hcm.mutable_delayed_close_timeout()->set_seconds(0);
+        hcm.set_via("via_value");
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setHost("handle.internal.redirect");
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    default_request_headers_.setConnection("close");
+  }
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 

@@ -182,6 +182,9 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 }
 
 void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
+  if (under_recreate_stream_) {
+//    return;
+  }
   Network::ConnectionCloseType close = Network::ConnectionCloseType::FlushWriteAndDelay;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_delay_close") &&
       skip_delay_close) {
@@ -1745,6 +1748,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
+  connection_manager_.under_recreate_stream_ = true;
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
@@ -1789,6 +1793,7 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
     // case of upstream sending an early response mid-request.
     new_stream.decodeData(*request_data, true);
   }
+  connection_manager_.under_recreate_stream_ = false;
 }
 
 Http1StreamEncoderOptionsOptRef ConnectionManagerImpl::ActiveStream::http1StreamEncoderOptions() {
