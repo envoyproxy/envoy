@@ -102,3 +102,13 @@ envoy_cc_test_library(
         "//source/extensions/wasm_runtime/wavm:config",
     ],
 )
+
+envoy_cc_test(
+    name = "wasm_runtime_factory_test",
+    srcs = ["wasm_runtime_factory_test.cc"],
+    deps = [
+        "//envoy/registry",
+        "//source/extensions/common/wasm:wasm_runtime_factory_interface",
+        "//test/test_common:environment_lib",
+    ],
+)
