@@ -63,6 +63,13 @@ using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
 using CelStatePrototype = Filters::Common::Expr::CelStatePrototype;
 
+#define RETURN_IF_FALSE(b, r)                                                                      \
+  if (!(b)) {                                                                                      \
+    return r;                                                                                      \
+  }
+
+#define RETURN_IF_NOT_OK(code, r) RETURN_IF_FALSE((code) == WasmResult::Ok, r)
+
 Http::RequestTrailerMapPtr buildRequestTrailerMapFromPairs(const Pairs& pairs) {
   auto map = Http::RequestTrailerMapImpl::create();
   for (auto& p : pairs) {
@@ -370,32 +377,25 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
   case CelValue::Type::kMessage:
     out_message = value.MessageOrDie();
     result->clear();
-    if (!out_message || out_message->SerializeToString(result)) {
-      return WasmResult::Ok;
-    }
-    return WasmResult::SerializationFailure;
+    RETURN_IF_FALSE(!out_message || out_message->SerializeToString(result),
+                    WasmResult::SerializationFailure);
+    return WasmResult::Ok;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
     auto keys_list = map.ListKeys();
-    if (!keys_list.ok()) {
-      return WasmResult::SerializationFailure;
-    }
+    RETURN_IF_FALSE(keys_list.ok(), WasmResult::SerializationFailure);
     const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
-      if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
-        return WasmResult::SerializationFailure;
-      }
-      if (serializeValue(map[keys[i]].value(), &pairs[i].second) != WasmResult::Ok) {
-        return WasmResult::SerializationFailure;
-      }
+      RETURN_IF_NOT_OK(serializeValue(keys[i], &pairs[i].first), WasmResult::SerializationFailure);
+      RETURN_IF_NOT_OK(serializeValue(map[keys[i]].value(), &pairs[i].second),
+                       WasmResult::SerializationFailure);
     }
     auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     result->resize(std::max(size, static_cast<size_t>(30)));
-    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
-      return WasmResult::SerializationFailure;
-    }
+    RETURN_IF_FALSE(proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size),
+                    WasmResult::SerializationFailure);
     result->resize(size);
     return WasmResult::Ok;
   }
@@ -403,9 +403,7 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     const auto& list = *value.ListOrDie();
     std::vector<std::pair<std::string, std::string>> pairs(list.size(), std::make_pair("", ""));
     for (auto i = 0; i < list.size(); i++) {
-      if (serializeValue(list[i], &pairs[i].first) != WasmResult::Ok) {
-        return WasmResult::SerializationFailure;
-      }
+      RETURN_IF_NOT_OK(serializeValue(list[i], &pairs[i].first), WasmResult::SerializationFailure);
     }
     auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
@@ -413,9 +411,8 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
       result->reserve(30);
     }
     result->resize(size);
-    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
-      return WasmResult::SerializationFailure;
-    }
+    RETURN_IF_FALSE(proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size),
+                    WasmResult::SerializationFailure);
     return WasmResult::Ok;
   }
   default:
