@@ -162,7 +162,7 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
       "1",
       response->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView());
   EXPECT_EQ(
-      fake_upstreams_[0]->localAddress()->ip()->addressAsString(),
+      fake_upstreams_[0]->localAddress()->asString(),
       response->headers().get(Http::LowerCaseString("remote_address"))[0]->value().getStringView());
 }
 

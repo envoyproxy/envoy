@@ -263,10 +263,10 @@ public:
       Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
   Network::Address::InstanceConstSharedPtr upstream_local_address2_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:10212")};
-  Network::ConnectionInfoSetterImpl connection_info1_{*upstream_local_address2_,
-                                                      *upstream_local_address1_};
-  Network::ConnectionInfoSetterImpl connection_info2_{*upstream_local_address2_,
-                                                      *upstream_local_address2_};
+  Network::ConnectionInfoSetterImpl connection_info1_{upstream_local_address1_,
+                                                      upstream_local_address1_};
+  Network::ConnectionInfoSetterImpl connection_info2_{upstream_local_address2_,
+                                                      upstream_local_address2_};
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
 

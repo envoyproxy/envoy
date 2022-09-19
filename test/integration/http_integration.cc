@@ -314,7 +314,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
           downstream_protocol,
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 
