@@ -182,9 +182,6 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 }
 
 void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
-  if (under_recreate_stream_) {
-//    return;
-  }
   Network::ConnectionCloseType close = Network::ConnectionCloseType::FlushWriteAndDelay;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_delay_close") &&
       skip_delay_close) {
@@ -196,7 +193,7 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   }
 }
 
-void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
+void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_deferred_close) {
   // The order of what happens in this routine is important and a little complicated. We first see
   // if the stream needs to be reset. If it needs to be, this will end up invoking reset callbacks
   // and then moving the stream to the deferred destruction list. If the stream has not been reset,
@@ -254,12 +251,14 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   bool connection_close = stream.state_.saw_connection_close_;
   bool request_complete = stream.filter_manager_.remoteDecodeComplete();
 
-  // Don't do delay close for responses which are framed by connection close:
-  // HTTP/1.0 and below, upgrades, and CONNECT responses.
-  checkForDeferredClose(
-      (connection_close && (request_complete || http_10_sans_cl)) ||
-      (stream.state_.is_tunneling_ &&
-       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades")));
+  if (check_for_deferred_close) {
+    // Don't do delay close for responses which are framed by connection close:
+    // HTTP/1.0 and below, upgrades, and CONNECT responses.
+    checkForDeferredClose(
+        (connection_close && (request_complete || http_10_sans_cl)) ||
+        (stream.state_.is_tunneling_ &&
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades")));
+  }
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
@@ -1748,7 +1747,6 @@ void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
-  connection_manager_.under_recreate_stream_ = true;
   // n.b. we do not currently change the codecs to point at the new stream
   // decoder because the decoder callbacks are complete. It would be good to
   // null out that pointer but should not be necessary.
@@ -1765,7 +1763,8 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   response_encoder->getStream().removeCallbacks(*this);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
-  connection_manager_.doEndStream(*this);
+  // Make sure to not check for deferred close as we'll be immediately creating a new stream.
+  connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
@@ -1793,7 +1792,6 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
     // case of upstream sending an early response mid-request.
     new_stream.decodeData(*request_data, true);
   }
-  connection_manager_.under_recreate_stream_ = false;
 }
 
 Http1StreamEncoderOptionsOptRef ConnectionManagerImpl::ActiveStream::http1StreamEncoderOptions() {
