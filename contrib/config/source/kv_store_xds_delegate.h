@@ -1,4 +1,4 @@
- t#pragma once
+#pragma once
 
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/xds_resources_delegate.h"
