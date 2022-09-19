@@ -343,7 +343,7 @@ def normalize_field_type_name(type_context, field_fqn):
     """
     if field_fqn.startswith('.'):
         # If there's a [#allow-fully-qualified-name] annotation, return the FQN
-        # field types without attempting to normalize.
+        # field type without attempting to normalize.
         if annotations.ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION in type_context.leading_comment.annotations:
             return field_fqn
 
