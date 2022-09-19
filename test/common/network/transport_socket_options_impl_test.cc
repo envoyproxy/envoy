@@ -96,7 +96,6 @@ public:
     return nullptr;
   }
   absl::string_view defaultServerNameIndication() const override { return ""; }
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return nullptr; }
   bool implementsSecureTransport() const override { return false; }
 };
 

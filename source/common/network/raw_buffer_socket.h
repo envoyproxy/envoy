@@ -41,7 +41,6 @@ public:
                                            Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override { return ""; }
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return nullptr; }
   // Network::DownstreamTransportSocketFactory
   TransportSocketPtr createDownstreamTransportSocket() const override;
 };

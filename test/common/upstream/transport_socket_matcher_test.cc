@@ -33,9 +33,6 @@ public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
-  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
-  MOCK_METHOD(OptRef<const Ssl::ClientContextConfig>, clientContextConfig, (), (const));
-  MOCK_METHOD(std::shared_ptr<quic::QuicCryptoClientConfig>, getCryptoConfig, ());
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsConstSharedPtr,
                Upstream::HostDescriptionConstSharedPtr),
@@ -66,9 +63,6 @@ public:
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
   MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
-  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
-  MOCK_METHOD(OptRef<const Ssl::ClientContextConfig>, clientContextConfig, (), (const));
-  MOCK_METHOD(std::shared_ptr<quic::QuicCryptoClientConfig>, getCryptoConfig, ());
 
   Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,

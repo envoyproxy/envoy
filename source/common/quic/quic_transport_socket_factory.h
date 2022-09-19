@@ -122,9 +122,7 @@ public:
     return fallback_factory_->createTransportSocket(options, host);
   }
 
-  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() override {
-    return fallback_factory_->sslCtx();
-  }
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return fallback_factory_->sslCtx(); }
 
   OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override {
     return fallback_factory_->clientContextConfig();

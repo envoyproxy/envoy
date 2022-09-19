@@ -319,11 +319,19 @@ public:
   virtual void hashKey(std::vector<uint8_t>& key,
                        TransportSocketOptionsConstSharedPtr options) const PURE;
 
-  /* Return the pointer to the SSL context, or nullptr if there is no SSL context */
-  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() PURE;
+  /*
+   * @return the pointer to the SSL context, or nullptr for non-TLS factories.
+   */
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return nullptr; }
 
+  /*
+   * @return the ClientContextConfig, or absl::nullopt for non-TLS factories.
+   */
   virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
 
+  /*
+   * @return the QuicCryptoClientConfig or nullptr for non-QUIC factories.
+   */
   virtual std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() { return nullptr; }
 };
 
