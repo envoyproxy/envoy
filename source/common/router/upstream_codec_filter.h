@@ -126,5 +126,7 @@ public:
   }
 };
 
+DECLARE_FACTORY(UpstreamCodecFilterFactory);
+
 } // namespace Router
 } // namespace Envoy

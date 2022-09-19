@@ -89,6 +89,9 @@ bug_fixes:
 - area: logger
   change: |
     added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
+- area: router
+  change: |
+    fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

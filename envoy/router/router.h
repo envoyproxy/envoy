@@ -1207,6 +1207,8 @@ public:
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
+class RouteEntryAndRoute : public RouteEntry, public Route {};
+
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
  * if the matched route has been accepted or it wants the route matching to
