@@ -63,13 +63,6 @@ using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
 using CelStatePrototype = Filters::Common::Expr::CelStatePrototype;
 
-#define RETURN_IF_FALSE(b, r)                                                                      \
-  if (!(b)) {                                                                                      \
-    return r;                                                                                      \
-  }
-
-#define RETURN_IF_NOT_OK(code, r) RETURN_IF_FALSE((code) == WasmResult::Ok, r)
-
 Http::RequestTrailerMapPtr buildRequestTrailerMapFromPairs(const Pairs& pairs) {
   auto map = Http::RequestTrailerMapImpl::create();
   for (auto& p : pairs) {

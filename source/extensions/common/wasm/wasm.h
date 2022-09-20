@@ -27,6 +27,16 @@
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
 
+#define RETURN_IF_FALSE(COND, RET_VALUE)                                                           \
+  if (!(COND)) {                                                                                   \
+    return RET_VALUE;                                                                              \
+  }
+#define RETURN_IF_NOT_OK(CODE, RET_VALUE) RETURN_IF_FALSE((CODE) == WasmResult::Ok, RET_VALUE)
+#define ENVOY_LOG_IF_FALSE(COND, LEVEL, ...)                                                       \
+  if (!(COND)) {                                                                                   \
+    ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
+  }
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

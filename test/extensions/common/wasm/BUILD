@@ -112,3 +112,14 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "context_test",
+    srcs = ["context_test.cc"],
+    deps = [
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
