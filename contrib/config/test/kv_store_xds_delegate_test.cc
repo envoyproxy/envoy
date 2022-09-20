@@ -1,3 +1,4 @@
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
@@ -25,7 +26,7 @@ using ::Envoy::Config::XdsSourceId;
 
 envoy::config::core::v3::TypedExtensionConfig kvStoreDelegateConfig() {
   const std::string filename = TestEnvironment::temporaryPath("xds_kv_store.txt");
-  ::unlink(filename.c_str());
+  Api::OsSysCallsSingleton().get().unlink(filename.c_str());
 
   const std::string config_str = fmt::format(R"EOF(
     name: envoy.config.config.KeyValueStoreXdsDelegate

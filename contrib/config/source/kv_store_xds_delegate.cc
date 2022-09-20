@@ -47,7 +47,8 @@ KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
     resources = getAllResources(source_id);
   } else {
     for (const std::string& resource_name : resource_names) {
-      if (auto existing_resource = xds_config_store_->get(constructKey(source_id, resource_name))) {
+      if (const auto existing_resource =
+              xds_config_store_->get(constructKey(source_id, resource_name))) {
         envoy::service::discovery::v3::Resource r;
         r.ParseFromString(std::string(*existing_resource));
         resources.push_back(std::move(r));

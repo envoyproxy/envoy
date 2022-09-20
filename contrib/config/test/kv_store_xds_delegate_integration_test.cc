@@ -1,4 +1,5 @@
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
@@ -18,7 +19,7 @@ constexpr char CLIENT_CERT_NAME[] = "client_cert";
 
 std::string kvStoreDelegateConfig() {
   const std::string filename = TestEnvironment::temporaryPath("xds_kv_store.txt");
-  ::unlink(filename.c_str());
+  Api::OsSysCallsSingleton().get().unlink(filename.c_str());
 
   return fmt::format(R"EOF(
     name: envoy.config.config.KeyValueStoreXdsDelegate
