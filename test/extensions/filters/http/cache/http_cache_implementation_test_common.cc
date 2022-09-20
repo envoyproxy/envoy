@@ -20,6 +20,7 @@
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::_;
 using ::testing::AnyNumber;
+using ::testing::Not;
 
 namespace Envoy {
 namespace Extensions {
@@ -486,7 +487,7 @@ TEST_P(HttpCacheImplementationTest, VaryOnDisallowedKey) {
   LookupContextPtr first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   const std::string body("one");
-  ASSERT_THAT(insert(move(first_value_vary), response_headers, body), IsOk());
+  ASSERT_THAT(insert(move(first_value_vary), response_headers, body), Not(IsOk()));
   first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }

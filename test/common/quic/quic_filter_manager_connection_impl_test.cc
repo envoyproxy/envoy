@@ -63,5 +63,12 @@ TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoProviderSharedPtr) {
   EXPECT_TRUE(impl_.connectionInfoProviderSharedPtr() == nullptr);
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, UpdateBytesBuffered) {
+  impl_.updateBytesBuffered(0, 110);
+  EXPECT_EQ(110u, impl_.bytesToSend());
+  impl_.updateBytesBuffered(110, 0);
+  EXPECT_EQ(0u, impl_.bytesToSend());
+}
+
 } // namespace Quic
 } // namespace Envoy
