@@ -32,28 +32,41 @@ absl::string_view yaml_config = R"(
     cache_path: /tmp/
 )";
 
-class FileSystemHttpCacheTestDelegate : public HttpCacheTestDelegate {
+class FileSystemCacheTestContext {
 public:
-  FileSystemHttpCacheTestDelegate() {
-    envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
-    TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
-    ConfigProto cfg;
-    MessageUtil::unpackTo(cache_config.typed_config(), cfg);
-    cfg.set_cache_path(absl::StrCat(env_.temporaryDirectory(), "/"));
+  FileSystemCacheTestContext() {
+    cache_path_ = absl::StrCat(env_.temporaryDirectory(), "/");
+    ConfigProto cfg = testConfig();
     deleteCacheFiles(cfg.cache_path());
-    cache_config.mutable_typed_config()->PackFrom(cfg);
+    auto cache_config = cacheConfig(cfg);
     const std::string type{
         TypeUtil::typeUrlToDescriptorFullName(cache_config.typed_config().type_url())};
-    HttpCacheFactory* const http_cache_factory =
-        Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
-    if (http_cache_factory == nullptr) {
+    http_cache_factory_ = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
+    if (http_cache_factory_ == nullptr) {
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
 
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
-        http_cache_factory->getCache(cache_config, context_));
+        http_cache_factory_->getCache(cache_config, context_));
   }
+
+  ConfigProto testConfig() {
+    envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
+    TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
+    ConfigProto cfg;
+    MessageUtil::unpackTo(cache_config.typed_config(), cfg);
+    cfg.set_cache_path(cache_path_);
+    return cfg;
+  }
+
+  envoy::extensions::filters::http::cache::v3::CacheConfig cacheConfig(ConfigProto cfg) {
+    envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
+    cache_config.mutable_typed_config()->PackFrom(cfg);
+    return cache_config;
+  }
+
+protected:
   void deleteCacheFiles(std::string path) {
     for (const auto& it : ::Envoy::Filesystem::Directory(path)) {
       if (absl::StartsWith(it.name_, "cache-")) {
@@ -61,14 +74,41 @@ public:
       }
     }
   }
-  std::shared_ptr<HttpCache> cache() override { return cache_; }
-  bool validationEnabled() const override { return true; }
 
-private:
   ::Envoy::TestEnvironment env_;
+  std::string cache_path_;
   testing::NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<FileSystemHttpCache> cache_;
   LogLevelSetter log_level_ = LogLevelSetter(spdlog::level::debug);
+  HttpCacheFactory* http_cache_factory_;
+};
+
+class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public testing::Test {};
+
+TEST_F(FileSystemHttpCacheTest, ExceptionOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
+  ConfigProto cfg = testConfig();
+  cfg.mutable_manager_config()->mutable_thread_pool()->set_thread_count(2);
+  EXPECT_ANY_THROW(http_cache_factory_->getCache(cacheConfig(cfg), context_));
+}
+
+TEST_F(FileSystemHttpCacheTest, IdenticalCacheConfigReturnsSameCacheInstance) {
+  ConfigProto cfg = testConfig();
+  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  EXPECT_EQ(cache_, second_cache);
+}
+
+TEST_F(FileSystemHttpCacheTest, CacheConfigsWithDifferentPathsReturnDistinctCacheInstances) {
+  ConfigProto cfg = testConfig();
+  cfg.set_cache_path(env_.temporaryDirectory());
+  auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
+  EXPECT_NE(cache_, second_cache);
+}
+
+class FileSystemHttpCacheTestDelegate : public HttpCacheTestDelegate,
+                                        public FileSystemCacheTestContext {
+public:
+  std::shared_ptr<HttpCache> cache() override { return cache_; }
+  bool validationEnabled() const override { return true; }
 };
 
 INSTANTIATE_TEST_SUITE_P(FileSystemHttpCacheTest, HttpCacheImplementationTest,

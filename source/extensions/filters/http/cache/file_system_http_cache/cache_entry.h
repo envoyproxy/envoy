@@ -23,9 +23,6 @@ namespace FileSystemHttpCache {
 
 using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileManager;
 
-Buffer::OwnedImpl headersToBuffer(const CacheFileHeader& headers);
-Buffer::OwnedImpl trailersToBuffer(const CacheFileTrailer& trailers);
-
 class CacheEntry : public NonCopyable {
 public:
   void touch(TimeSource& time_source);

@@ -28,7 +28,6 @@ public:
   FileSystemHttpCache(Singleton::InstanceSharedPtr owner, ConfigProto config,
                       TimeSource& time_source,
                       std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager);
-  std::shared_ptr<FileSystemHttpCache> testXXXXX() { return shared_from_this(); }
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
                                      Http::StreamDecoderFilterCallbacks& callbacks) override;
