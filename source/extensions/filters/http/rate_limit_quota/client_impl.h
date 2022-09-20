@@ -38,9 +38,9 @@ public:
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
   // RawAsyncStreamCallbacks
-  // void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  // void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
-  // void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
+  void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // RateLimitClient

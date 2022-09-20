@@ -7,8 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
-                                        const std::string& message) {
+void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
   stream_closed_ = true;
   // if (status == Grpc::Status::Ok) {
   //   ENVOY_LOG(debug, "gRPC stream closed remotely with OK status {}: {}", status, message);
@@ -44,7 +43,7 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
     if (stream_ == nullptr) {
       // std::string error_string = "Unable to establish the new stream";
       // ENVOY_LOG(error, error_string);
-      return absl::InternalError(error_string);
+      return absl::InternalError("Unable to establish the new stream");
     }
   }
   return absl::OkStatus();
