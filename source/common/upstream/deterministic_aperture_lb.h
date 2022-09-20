@@ -79,8 +79,17 @@ public:
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
     //
-    // Utility Ring methods. Note that they are public so that we can add unit tests easily.
+    // Utility Ring methods
     //
+
+    /*
+     * The ratio of intersection of the two rings.
+     * @param index Index of the inner ring
+     * @param offset Offset of the outer/peer ring
+     * @param width Width for which the overlap has to be calculated.
+     */
+    absl::optional<double> weight(size_t index, double offset, double width) const;
+
 
     /*
      * Gets the index of the Ring's entry at a given offset.

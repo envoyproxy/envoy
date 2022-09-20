@@ -70,6 +70,24 @@ DeterministicApertureLoadBalancer::Ring::Ring(
   }
 }
 
+absl::optional<double> DeterministicApertureLoadBalancer::Ring::weight(size_t index, double offset,
+                                                                       double width) const {
+  if (index >= ring_size_ || width > 1 || offset > 1) {
+    return absl::nullopt;
+  }
+
+  double index_begin = index * unit_width_;
+  double index_end = index_begin + unit_width_;
+
+  if (offset + width > 1) {
+    double start = std::fmod((offset + width), 1.0);
+
+    return 1.0 - (intersect(index_begin, index_end, start, offset)) / unit_width_;
+  }
+
+  return intersect(index_begin, index_end, offset, offset + width) / unit_width_;
+}
+
 size_t DeterministicApertureLoadBalancer::Ring::getIndex(double offset) const {
   RELEASE_ASSERT(offset >= 0 && offset <= 1, "valid offset");
   return offset / unit_width_;
