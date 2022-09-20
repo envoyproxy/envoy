@@ -343,8 +343,8 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   EXPECT_EQ("saz", getRuntimeKey("baz"));
 
   // Reset the RTDS upstream to a FakeUpstream again, and re-establish the connection.
-  getRtdsUpstream().reset(
-      new FakeUpstream(rtds_upstream_port_, version_, configWithType(Http::CodecType::HTTP2)));
+  getRtdsUpstream() = std::make_unique<FakeUpstream>(rtds_upstream_port_, version_,
+                                                     configWithType(Http::CodecType::HTTP2));
 
   // Send v2 of the RTDS layer.
   initXdsStream(*getRtdsUpstream(), rtds_connection_, rtds_stream_);
