@@ -519,10 +519,10 @@ private:
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
-      // Drains any connection pools associated with the removed hosts. All conections will be
+      // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and new connection is invalid for these hosts.
       void drainConnPools(const HostVector& hosts_removed);
-      // Drains any connection pools associated with the all hosts. All conections will be
+      // Drains any connection pools associated with the all hosts. All connections will be
       // closed gracefully and new connection is invalid for these hosts.
       void drainConnPools();
       // Drain any connection pools associated with the hosts that filtered by the predicate.

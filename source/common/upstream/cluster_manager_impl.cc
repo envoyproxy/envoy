@@ -1,6 +1,5 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 
-#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
