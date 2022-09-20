@@ -18,8 +18,8 @@ void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
 
 HeaderBasedSessionStateFactory::HeaderBasedSessionStateFactory(
     const HeaderBasedSessionStateProto& config)
-    : name_(config.header().name()), path_(config.header().path()) {
-  if (config.header().name().empty()) {
+    : name_(config.name()), path_(config.path()) {
+  if (config.name().empty()) {
     throw EnvoyException("Header name cannot be empty for header based stateful sessions");
   }
 

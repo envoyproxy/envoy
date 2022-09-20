@@ -19,9 +19,8 @@ TEST(HeaderBasedSessionStateFactoryConfigTest, Basic) {
 
   HeaderBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-        header:
-            name: custom-header
-            path: /path
+        name: custom-header
+        path: /path
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
@@ -36,8 +35,7 @@ TEST(HeaderBasedSessionStateFactoryConfigTest, MissingHeaderName) {
 
   HeaderBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-        header:
-            path: /path
+        path: /path
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 

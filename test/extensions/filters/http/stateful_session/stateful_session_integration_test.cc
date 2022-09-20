@@ -108,9 +108,8 @@ typed_config:
     name: envoy.http.stateful_session.header
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
-      header:
-        name: session-header
-        path: /test
+      name: session-header
+      path: /test
 )EOF";
 
 static const std::string DISABLE_STATEFUL_SESSION =
@@ -141,9 +140,8 @@ stateful_session:
     name: envoy.http.stateful_session.header
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
-      header:
-        name: route-session-header
-        path: /test
+      name: route-session-header
+      path: /test
 )EOF";
 
 TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
@@ -437,9 +435,10 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
     EXPECT_TRUE(response->complete());
 
     // The selected upstream server address would be selected to the response headers.
-    EXPECT_EQ(
-        encoded_address,
-        response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+    EXPECT_EQ(encoded_address, response->headers()
+                                   .get(Http::LowerCaseString("session-header"))[0]
+                                   ->value()
+                                   .getStringView());
 
     cleanupUpstreamAndDownstream();
   }
@@ -580,7 +579,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   }
 }
 
-TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
+TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, OVERRIDE_STATEFUL_SESSION);
 
   {
@@ -625,6 +624,44 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
 
     cleanupUpstreamAndDownstream();
   }
+  {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},
+        {":path", "/test"},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"},
+        {"cookie", fmt::format("route-session-cookie=\"{}\"", encoded_address)}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    // Stateful session is overridden and the upstream with index 2 should be selected..
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    EXPECT_EQ(upstream_index.value(), 2);
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_F(StatefulSessionIntegrationTest, HeaderStatefulSessionOverriddenByRoute) {
+  initializeFilterAndRoute(STATEFUL_SESSION_HEADER_FILTER, OVERRIDE_STATEFUL_SESSION_HEADER);
 
   {
     envoy::config::endpoint::v3::LbEndpoint endpoint;
@@ -660,45 +697,11 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_TRUE(response->complete());
 
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("route-session-header")).empty());
     EXPECT_EQ(route_encoded_address, response->headers()
-                                         .get(Http::LowerCaseString("session-header"))[0]
+                                         .get(Http::LowerCaseString("route-session-header"))[0]
                                          ->value()
                                          .getStringView());
-
-    cleanupUpstreamAndDownstream();
-  }
-
-  {
-    envoy::config::endpoint::v3::LbEndpoint endpoint;
-    setUpstreamAddress(2, endpoint);
-    const std::string address_string =
-        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
-    const std::string encoded_address =
-        Envoy::Base64::encode(address_string.data(), address_string.size());
-
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"},
-        {":path", "/test"},
-        {":scheme", "http"},
-        {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("route-session-cookie=\"{}\"", encoded_address)}};
-
-    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
-
-    // Stateful session is overridden and the upstream with index 2 should be selected..
-    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
-    EXPECT_EQ(upstream_index.value(), 2);
-
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-
-    ASSERT_TRUE(response->waitForEndStream());
-
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_TRUE(response->complete());
-
-    // No response header to be added.
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
 
     cleanupUpstreamAndDownstream();
   }
@@ -716,7 +719,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
                                                    {":path", "/test"},
                                                    {":scheme", "http"},
                                                    {":authority", "stateful.session.com"},
-                                                   {"session-header", encoded_address}};
+                                                   {"route-session-header", encoded_address}};
 
     auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
@@ -732,7 +735,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     EXPECT_TRUE(response->complete());
 
     // No response header to be added.
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("route-session-header")).empty());
 
     cleanupUpstreamAndDownstream();
   }

@@ -20,7 +20,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
 
   {
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
+    config.set_name("session-header");
     HeaderBasedSessionStateFactory factory(config);
 
     // No valid address in the request headers.
@@ -40,8 +40,8 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
 
   {
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
-    config.mutable_header()->set_path("/path");
+    config.set_name("session-header");
+    config.set_path("/path");
     HeaderBasedSessionStateFactory factory(config);
 
     // Get upstream address from request headers.
@@ -71,8 +71,8 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
 
   {
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
-    config.mutable_header()->set_path("/path");
+    config.set_name("session-header");
+    config.set_path("/path");
     HeaderBasedSessionStateFactory factory(config);
 
     // Get upstream address from request headers.
@@ -88,7 +88,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
   {
     // Any request match for empty path
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
+    config.set_name("session-header");
     HeaderBasedSessionStateFactory factory(config);
 
     EXPECT_TRUE(factory.requestPathMatch("/"));
@@ -102,8 +102,8 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
   {
     // Any request match for root path
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
-    config.mutable_header()->set_path("/");
+    config.set_name("session-header");
+    config.set_path("/");
     HeaderBasedSessionStateFactory factory(config);
 
     EXPECT_TRUE(factory.requestPathMatch("/"));
@@ -117,8 +117,8 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
   {
     // Request path match for config path ending with '/'
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
-    config.mutable_header()->set_path("/foo/");
+    config.set_name("session-header");
+    config.set_path("/foo/");
     HeaderBasedSessionStateFactory factory(config);
 
     EXPECT_FALSE(factory.requestPathMatch("/"));
@@ -133,8 +133,8 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
   {
     // Request path match misc
     HeaderBasedSessionStateProto config;
-    config.mutable_header()->set_name("session-header");
-    config.mutable_header()->set_path("/foo");
+    config.set_name("session-header");
+    config.set_path("/foo");
     HeaderBasedSessionStateFactory factory(config);
 
     EXPECT_FALSE(factory.requestPathMatch("/"));
