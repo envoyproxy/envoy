@@ -2082,7 +2082,7 @@ virtual_hosts:
       cluster: default-boring-service
   )EOF";
   auto route_configuration = parseRouteConfigurationFromYaml(yaml);
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
   factory_context_.cluster_manager_.initializeClusters(
       {"local_service_grpc", "default-boring-service"}, {});
   {
@@ -2095,20 +2095,25 @@ virtual_hosts:
   // Set ignore_port_in_host_matching to true, and path-parameters will be ignored.
   route_configuration.set_ignore_path_parameters_in_path_matching(true);
   {
-    Http::TestRequestHeaderMapImpl headers =
-        genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET");
-    stream_info.setPathWithoutQueryAndFragment(headers);
     TestConfigImpl config(route_configuration, factory_context_, true);
-    EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
+    EXPECT_EQ(config.route(genHeaders("www.lyft.com", "/path-bluh;env=prod", "GET"), 0)
+                  ->routeEntry()
+                  ->routeName(),
               "business-specific-route");
-    headers = genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET");
-    stream_info.setPathWithoutQueryAndFragment(headers);
-    EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
-              "business-specific-route");
-    headers = genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET");
-    stream_info.setPathWithoutQueryAndFragment(headers);
-    EXPECT_EQ(config.route(headers, stream_info, 0)->routeEntry()->routeName(),
-              "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d#foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
+    EXPECT_EQ(
+        config
+            .route(genHeaders("www.lyft.com", "/path-bluh;env=prod;ver=3?a=b;c=d;&foo=bar", "GET"),
+                   0)
+            ->routeEntry()
+            ->routeName(),
+        "business-specific-route");
   }
 }
 
@@ -7384,9 +7389,8 @@ virtual_hosts:
                           "/exact-path", PathMatchType::Exact);
   Http::TestRequestHeaderMapImpl headers = genHeaders("www.foo.com", "/path/separated", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
-  checkPathMatchCriterion(
-      config.route(headers, stream_info, 0).get(), "/path/separated",
-      PathMatchType::PathSeparatedPrefix);
+  checkPathMatchCriterion(config.route(headers, stream_info, 0).get(), "/path/separated",
+                          PathMatchType::PathSeparatedPrefix);
   const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
@@ -8275,41 +8279,29 @@ virtual_hosts:
   headers = genHeaders("path.prefix.com", "/rest/api", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api?param=true", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api#fragment", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
 
   // Prefix matches
   headers = genHeaders("path.prefix.com", "/rest/api", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
 
   // Non-matching prefixes
   EXPECT_EQ("default-cluster",
@@ -8397,37 +8389,23 @@ virtual_hosts:
   headers = genHeaders("path.prefix.com", "/rest/API", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
 
-  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)
-                                  ->routeEntry()
-                                  ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/API?param=true", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
-  EXPECT_EQ("case-sensitive",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/API/", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
-  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)
-                                  ->routeEntry()
-                                  ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/rest/API/thing?param=true", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
-  EXPECT_EQ("case-sensitive",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/REST/api", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("case-sensitive-explicit",
-            config.route(headers, stream_info, 0)
-                ->routeEntry()
-                ->clusterName());
+            config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   headers = genHeaders("path.prefix.com", "/REST/API", "GET");
   stream_info.setPathWithoutQueryAndFragment(headers);
-  EXPECT_EQ("case-insensitive", config.route(headers, stream_info, 0)
-                                    ->routeEntry()
-                                    ->clusterName());
+  EXPECT_EQ("case-insensitive", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
 }
 
 TEST_F(RouteMatcherTest, PathSeparatedPrefixMatchTrailingSlash) {
@@ -8525,7 +8503,7 @@ virtual_hosts:
     stream_info.setPathWithoutQueryAndFragment(headers);
     headers.addCopy("cookies", "");
 
-    EXPECT_EQ("default", config.route(headers, stream_info,0)->routeEntry()->clusterName());
+    EXPECT_EQ("default", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 }
 
