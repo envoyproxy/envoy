@@ -4,12 +4,9 @@
 #include "envoy/network/io_handle.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/io/io_uring.h"
 
 namespace Envoy {
-
-namespace Io {
-class IoUringFactory;
-} // namespace Io
 
 namespace Network {
 
