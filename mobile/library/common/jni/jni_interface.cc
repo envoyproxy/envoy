@@ -1149,7 +1149,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 }
 
 bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult = env->FindClass("org/chromium/net/AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   bool is_issued_by_known_root =
@@ -1159,7 +1159,7 @@ bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
 }
 
 envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
-  jclass jcls_AndroidCertVerifyResult = env->FindClass("org/chromium/net/AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_getStatus = env->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   envoy_cert_verify_status_t result = static_cast<envoy_cert_verify_status_t>(
       env->CallIntMethod(jcls_AndroidCertVerifyResult, jmid_getStatus, j_result));
@@ -1168,7 +1168,7 @@ envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
 }
 
 jobjectArray jvm_cert_get_certificate_chain_encoded(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult = env->FindClass("org/chromium/net/AndroidCertVerifyResult");
+  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
   jmethodID jmid_getCertificateChainEncoded =
       env->GetMethodID(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   jobjectArray certificate_chain = static_cast<jobjectArray>(
@@ -1199,7 +1199,7 @@ static jobject call_jvm_verify_x509_cert_chain(JNIEnv* env,
                                                const std::vector<std::string>& cert_chain,
                                                std::string auth_type, std::string host) {
   jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
-  jclass jcls_AndroidNetworkLibrary = env->FindClass("org/chromium/net/AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
   jmethodID jmid_verifyServerCertificates =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "verifyServerCertificates",
                              "([[B[B[B)Lorg/chromium/net/AndroidCertVerifyResult;");
@@ -1236,7 +1236,7 @@ static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chai
 static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   jni_log("[Envoy]", "jvm_add_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = env->FindClass("org/chromium/net/AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
   jmethodID jmid_addTestRootCertificate =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "addTestRootCertificate", "([B)V");
 
@@ -1249,7 +1249,7 @@ static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
 static void jvm_clear_test_root_certificate() {
   jni_log("[Envoy]", "jvm_clear_test_root_certificate");
   JNIEnv* env = get_env();
-  jclass jcls_AndroidNetworkLibrary = env->FindClass("org/chromium/net/AndroidNetworkLibrary");
+  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
   jmethodID jmid_clearTestRootCertificates =
       env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "clearTestRootCertificates", "()V");
 
