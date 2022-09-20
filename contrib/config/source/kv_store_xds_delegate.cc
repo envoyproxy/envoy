@@ -103,10 +103,6 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
       r.set_name(decoded_resource.name());
       r.set_version(decoded_resource.version());
       r.mutable_resource()->PackFrom(decoded_resource.resource());
-      if (decoded_resource.ttl()) {
-        r.mutable_ttl()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(
-            decoded_resource.ttl().value().count()));
-      }
       // TODO(abeyad): Set TTL parameter, if it exists.
       xds_config_store_->addOrUpdate(constructKey(source_id, r.name()), r.SerializeAsString(),
                                      absl::nullopt);
