@@ -87,7 +87,7 @@ public:
   }
 
   // SendBufferMonitor
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override {
     if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }
