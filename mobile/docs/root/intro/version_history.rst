@@ -14,7 +14,7 @@ Bugfixes:
 
 Features:
 
--
+- kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
 
 
 0.5.0 (September 2, 2022)

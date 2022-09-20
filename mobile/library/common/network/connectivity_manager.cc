@@ -102,6 +102,24 @@ envoy_netconf_t ConnectivityManager::setPreferredNetwork(envoy_network_t network
   return network_state_.configuration_key_;
 }
 
+void ConnectivityManager::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
+  if (proxy_settings_ == nullptr && new_proxy_settings != nullptr) {
+    ENVOY_LOG_EVENT(info, "netconf_proxy_change", new_proxy_settings->asString());
+    proxy_settings_ = new_proxy_settings;
+  } else if (proxy_settings_ != nullptr && new_proxy_settings == nullptr) {
+    ENVOY_LOG_EVENT(info, "netconf_proxy_change", "no_proxy_configured");
+    proxy_settings_ = new_proxy_settings;
+  } else if (proxy_settings_ != nullptr && new_proxy_settings != nullptr &&
+             *proxy_settings_ != *new_proxy_settings) {
+    ENVOY_LOG_EVENT(info, "netconf_proxy_change", new_proxy_settings->asString());
+    proxy_settings_ = new_proxy_settings;
+  }
+
+  return;
+}
+
+ProxySettingsConstSharedPtr ConnectivityManager::getProxySettings() { return proxy_settings_; }
+
 envoy_network_t ConnectivityManager::getPreferredNetwork() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.network_;

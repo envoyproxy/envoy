@@ -127,4 +127,13 @@ public interface EnvoyEngine {
    * @param network The network to be preferred for new streams.
    */
   void setPreferredNetwork(EnvoyNetworkType network);
+
+  /**
+   * Update proxy settings.
+   *
+   * @param host The proxy host defined as a hostname or an IP address. Android
+   *             allow users to specify proxy using either one of these.
+   * @param port The proxy port.
+   */
+  void setProxySettings(String host, int port);
 }

@@ -514,6 +514,18 @@ to use IPv6. Note this is an experimental option and should be enabled with caut
   builder.forceIPv6(true)
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableProxying``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Specify whether to respect system Proxy settings when establishing connections.
+Available on Andorid only.
+
+**Example**::
+
+    // Kotlin
+    builder.enableProxying(true)
+
+
 ----------------------
 Advanced configuration
 ----------------------

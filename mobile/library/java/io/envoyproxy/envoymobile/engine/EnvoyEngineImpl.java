@@ -233,4 +233,8 @@ public class EnvoyEngineImpl implements EnvoyEngine {
       return;
     }
   }
+
+  public void setProxySettings(String host, int port) {
+    JniLibrary.setProxySettings(engineHandle, host, port);
+  }
 }

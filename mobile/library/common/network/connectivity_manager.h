@@ -10,6 +10,7 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
+#include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
 /**
@@ -129,6 +130,12 @@ public:
   envoy_netconf_t getConfigurationKey();
 
   /**
+   *
+   * @return the current proxy settings.
+   */
+  Envoy::Network::ProxySettingsConstSharedPtr getProxySettings();
+
+  /**
    * Call to report on the current viability of the passed network configuration after an attempt
    * at transmission (e.g., an HTTP request).
    * @param network_fault, whether a transmission attempt terminated w/o receiving upstream bytes.
@@ -142,6 +149,13 @@ public:
    * @returns configuration key to associate with any related calls.
    */
   static envoy_netconf_t setPreferredNetwork(envoy_network_t network);
+
+  /**
+   * @brief Sets the current proxy settings.
+   *
+   * @param host The proxy settings. `nullptr` if there is no proxy configured on a device.
+   */
+  void setProxySettings(ProxySettingsConstSharedPtr proxy_settings);
 
   /**
    * Configure whether connections should be drained after a triggered DNS refresh. Currently this
@@ -211,6 +225,7 @@ private:
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
+  ProxySettingsConstSharedPtr proxy_settings_;
   static NetworkState network_state_;
 };
 

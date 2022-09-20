@@ -16,6 +16,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "proxy_settings_test",
+    srcs = ["proxy_settings_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/common/network:connectivity_manager_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "src_addr_socket_option_impl_test",
     srcs = ["src_addr_socket_option_impl_test.cc"],
     repository = "@envoy",

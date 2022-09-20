@@ -20,6 +20,7 @@ envoy_cc_library(
     hdrs = [
         "android.h",
         "connectivity_manager.h",
+        "proxy_settings.h",
     ],
     copts = select({
         "//bazel:include_ifaddrs": ["-DINCLUDE_IFADDRS"],

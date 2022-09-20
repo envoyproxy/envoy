@@ -49,6 +49,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = false;
   private boolean mEnableInterfaceBinding = false;
+  private boolean mEnableProxying = false;
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
   private boolean mH2ExtendKeepaliveTimeout = false;
@@ -89,8 +90,8 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   }
 
   EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning) {
-    AndroidEngineImpl engine =
-        new AndroidEngineImpl(getContext(), onEngineRunning, mEnvoyLogger, mEnvoyEventTracker);
+    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, mEnvoyLogger,
+                                                     mEnvoyEventTracker, mEnableProxying);
     AndroidJniLibrary.load(getContext());
     AndroidNetworkMonitor.load(getContext(), engine);
     engine.runWithConfig(createEnvoyConfiguration(), getLogLevel());
