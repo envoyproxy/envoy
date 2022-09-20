@@ -2,9 +2,10 @@ package org.chromium.net;
 
 import static org.junit.Assert.assertEquals;
 
+import android.content.Context;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
-
+import androidx.test.platform.app.InstrumentationRegistry;
 import java.nio.charset.StandardCharsets;
 
 import org.junit.After;
@@ -23,7 +24,8 @@ import org.robolectric.RobolectricTestRunner;
 public final class CertificateVerificationTest {
   static {
     AndroidJniLibrary.loadTestLibrary();
-    JniLibrary.load();
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    AndroidJniLibrary.load(context.getApplicationContext());
   }
 
   private static final byte[] host = FakeX509Util.expectedHost.getBytes(StandardCharsets.UTF_8);
