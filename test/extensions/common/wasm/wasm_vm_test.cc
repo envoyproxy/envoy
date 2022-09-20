@@ -55,7 +55,7 @@ private:
 };
 
 TEST_F(NoneVmTest, NoAvailableEngine) {
-  // When there is no registered factory, `first_wasm_engine_name` should be empty
+  // When there is no registered factory, `first_wasm_engine_name` should be empty.
   absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
   EXPECT_TRUE(first_wasm_engine_name.empty());
 }

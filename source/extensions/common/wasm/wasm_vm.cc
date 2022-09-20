@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <unordered_map>
 
 #include "source/extensions/common/wasm/context.h"
 #include "source/extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
@@ -19,15 +18,15 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-const absl::flat_hash_map<spdlog::level::level_enum, proxy_wasm::LogLevel> log_level_map = {
-    {spdlog::level::trace, proxy_wasm::LogLevel::trace},
-    {spdlog::level::debug, proxy_wasm::LogLevel::debug},
-    {spdlog::level::info, proxy_wasm::LogLevel::info},
-    {spdlog::level::warn, proxy_wasm::LogLevel::warn},
-    {spdlog::level::err, proxy_wasm::LogLevel::error},
-};
-
 proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
+  static const absl::flat_hash_map<spdlog::level::level_enum, proxy_wasm::LogLevel> log_level_map =
+      {
+          {spdlog::level::trace, proxy_wasm::LogLevel::trace},
+          {spdlog::level::debug, proxy_wasm::LogLevel::debug},
+          {spdlog::level::info, proxy_wasm::LogLevel::info},
+          {spdlog::level::warn, proxy_wasm::LogLevel::warn},
+          {spdlog::level::err, proxy_wasm::LogLevel::error},
+      };
   auto it = log_level_map.find(ENVOY_LOGGER().level());
   if (it != log_level_map.end()) {
     return it->second;
