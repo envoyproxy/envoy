@@ -205,5 +205,42 @@ TEST_F(ConnectivityManagerTest, EnumerateInterfacesFiltersByFlags) {
   EXPECT_EQ(empty.size(), 0);
 }
 
+TEST_F(ConnectivityManagerTest, OverridesNoProxySettingsWithNewProxySettings) {
+  EXPECT_EQ(nullptr, connectivity_manager_->getProxySettings());
+
+  const auto proxy_settings = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
+  connectivity_manager_->setProxySettings(proxy_settings);
+  EXPECT_EQ("127.0.0.1:9999", connectivity_manager_->getProxySettings()->asString());
+}
+
+TEST_F(ConnectivityManagerTest, OverridesCurrentProxySettingsWithNoProxySettings) {
+  const auto proxy_settings = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
+  connectivity_manager_->setProxySettings(proxy_settings);
+  EXPECT_EQ("127.0.0.1:9999", connectivity_manager_->getProxySettings()->asString());
+
+  connectivity_manager_->setProxySettings(nullptr);
+  EXPECT_EQ(nullptr, connectivity_manager_->getProxySettings());
+}
+
+TEST_F(ConnectivityManagerTest, OverridesCurrentProxySettingsWithNewProxySettings) {
+  const auto proxy_settings1 = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
+  connectivity_manager_->setProxySettings(proxy_settings1);
+  EXPECT_EQ("127.0.0.1:9999", connectivity_manager_->getProxySettings()->asString());
+
+  const auto proxy_settings2 = ProxySettings::parseHostAndPort("127.0.0.1", 8888);
+  connectivity_manager_->setProxySettings(proxy_settings2);
+  EXPECT_EQ(proxy_settings2, connectivity_manager_->getProxySettings());
+}
+
+TEST_F(ConnectivityManagerTest, IgnoresDuplicatedProxySettingsUpdates) {
+  const auto proxy_settings1 = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
+  connectivity_manager_->setProxySettings(proxy_settings1);
+  EXPECT_EQ("127.0.0.1:9999", connectivity_manager_->getProxySettings()->asString());
+
+  const auto proxy_settings2 = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
+  connectivity_manager_->setProxySettings(proxy_settings2);
+  EXPECT_EQ(proxy_settings1, connectivity_manager_->getProxySettings());
+}
+
 } // namespace Network
 } // namespace Envoy

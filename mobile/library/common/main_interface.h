@@ -99,6 +99,16 @@ envoy_status_t reset_stream(envoy_engine_t engine, envoy_stream_t stream);
 envoy_status_t set_preferred_network(envoy_engine_t engine, envoy_network_t network);
 
 /**
+ * @brief Update the currently active proxy settings.
+ *
+ * @param engine, the engine whose proxy settings should be updated.
+ * @param host, the proxy host.
+ * @param port, the proxy port.
+ * @return envoy_status_t, the resulting status of the operation.
+ */
+envoy_status_t set_proxy_settings(envoy_engine_t engine, const char* host, const uint16_t port);
+
+/**
  * Increment a counter with the given elements and by the given count.
  * @param engine, the engine that owns the counter.
  * @param elements, the string that identifies the counter to increment.

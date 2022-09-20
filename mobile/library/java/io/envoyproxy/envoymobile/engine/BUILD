@@ -9,6 +9,7 @@ android_library(
         "AndroidEngineImpl.java",
         "AndroidJniLibrary.java",
         "AndroidNetworkMonitor.java",
+        "AndroidProxyMonitor.java",
     ],
     custom_package = "io.envoyproxy.envoymobile.engine",
     manifest = "AndroidEngineManifest.xml",

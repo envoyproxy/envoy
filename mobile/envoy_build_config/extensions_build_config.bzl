@@ -21,6 +21,7 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.getaddrinfo":              "//source/extensions/network/dns_resolver/getaddrinfo:config",
     "envoy.retry.options.network_configuration":           "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     "envoy.stat_sinks.metrics_service":                    "//source/extensions/stat_sinks/metrics_service:config",
+    "envoy.transport_sockets.http_11_proxy":               "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
     "envoy.transport_sockets.raw_buffer":                  "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tls":                         "//source/extensions/transport_sockets/tls:config",
     "envoy.http.stateful_header_formatters.preserve_case": "//source/extensions/http/header_formatters/preserve_case:config",

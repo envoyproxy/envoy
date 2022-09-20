@@ -153,15 +153,19 @@ R"(
 
 !ignore tls_socket_defs:
 - &base_tls_socket
-  name: envoy.transport_sockets.tls
+  name: envoy.transport_sockets.http_11_proxy
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-    common_tls_context:
-      tls_params:
-        tls_maximum_protocol_version: TLSv1_3
-      validation_context:
-        trusted_ca:
-          inline_string: *tls_root_certs
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_params:
+            tls_maximum_protocol_version: TLSv1_3
+          validation_context:
+            trusted_ca:
+              inline_string: *tls_root_certs
 )";
 
 const char* config_template = R"(
@@ -406,9 +410,13 @@ static_resources:
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
     transport_socket:
-      name: envoy.transport_sockets.raw_buffer
+      name: envoy.transport_sockets.http_11_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *h1_protocol_options
@@ -422,17 +430,21 @@ static_resources:
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
     transport_socket:
-      name: envoy.transport_sockets.tls
+      name: envoy.transport_sockets.http_11_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          alpn_protocols: [h2]
-          tls_params:
-            tls_maximum_protocol_version: TLSv1_3
-          validation_context:
-            trusted_ca:
-              inline_string: *tls_root_certs
-            trust_chain_verification: *trust_chain_verification
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+            common_tls_context:
+              alpn_protocols: [h2]
+              tls_params:
+                tls_maximum_protocol_version: TLSv1_3
+              validation_context:
+                trusted_ca:
+                  inline_string: *tls_root_certs
+                trust_chain_verification: *trust_chain_verification
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *h2_protocol_options

@@ -2,10 +2,14 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/common/network/filter_state_proxy_info.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace NetworkConfiguration {
+
+const Http::LowerCaseString AuthorityHeaderName{":authority"};
 
 void NetworkConfigurationFilter::setDecoderFilterCallbacks(
     Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -24,6 +28,36 @@ void NetworkConfigurationFilter::setDecoderFilterCallbacks(
   connectivity_manager_->setDrainPostDnsRefreshEnabled(enable_drain_post_dns_refresh_);
   extra_stream_info_->configuration_key_ = connectivity_manager_->addUpstreamSocketOptions(options);
   decoder_callbacks_->addUpstreamSocketOptions(options);
+}
+
+Http::FilterHeadersStatus
+NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
+  const auto proxy_settings = connectivity_manager_->getProxySettings();
+
+  ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
+  if (proxy_settings == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  const auto proxy_address = proxy_settings->address();
+
+  if (proxy_address != nullptr) {
+    const auto authorityHeader = request_headers.get(AuthorityHeaderName);
+    if (authorityHeader.empty()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+
+    const auto authority = authorityHeader[0]->value().getStringView();
+
+    ENVOY_LOG(trace, "netconf_filter_set_proxy_for_request", proxy_settings->asString());
+    decoder_callbacks_->streamInfo().filterState()->setData(
+        Network::Http11ProxyInfoFilterState::key(),
+        std::make_unique<Network::Http11ProxyInfoFilterState>(authority, proxy_address),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus NetworkConfigurationFilter::encodeHeaders(Http::ResponseHeaderMap&,

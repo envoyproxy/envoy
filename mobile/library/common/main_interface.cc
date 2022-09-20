@@ -75,6 +75,13 @@ envoy_status_t set_preferred_network(envoy_engine_t engine, envoy_network_t netw
   return ENVOY_SUCCESS;
 }
 
+envoy_status_t set_proxy_settings(envoy_engine_t e, const char* host, const uint16_t port) {
+  return Envoy::EngineHandle::runOnEngineDispatcher(
+      e,
+      [proxy_settings = Envoy::Network::ProxySettings::parseHostAndPort(host, port)](auto& engine)
+          -> void { engine.networkConnectivityManager().setProxySettings(proxy_settings); });
+}
+
 envoy_status_t record_counter_inc(envoy_engine_t e, const char* elements, envoy_stats_tags tags,
                                   uint64_t count) {
   return Envoy::EngineHandle::runOnEngineDispatcher(

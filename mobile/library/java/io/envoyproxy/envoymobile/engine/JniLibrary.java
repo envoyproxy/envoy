@@ -357,6 +357,16 @@ public class JniLibrary {
   protected static native int setPreferredNetwork(long engine, int network);
 
   /**
+   * Update the proxy settings.
+   *
+   * @param engine Handle to the engine whose proxy settings should be updated.
+   * @param host The proxy host.
+   * @param port The proxy port.
+   * @return The resulting status of the operation.
+   */
+  protected static native int setProxySettings(long engine, String host, int port);
+
+  /**
    * Mimic a call to AndroidNetworkLibrary#verifyServerCertificates from native code.
    * To be used for testing only.
    *
