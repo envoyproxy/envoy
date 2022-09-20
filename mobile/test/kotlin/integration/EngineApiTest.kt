@@ -30,11 +30,7 @@ class EngineApiTest {
     engine = EngineBuilder()
       .addLogLevel(LogLevel.INFO)
       .addStatsFlushSeconds(1)
-      .setLogger { msg ->
-        if (msg.contains("starting main dispatch loop")) {
-          countDownLatch.countDown()
-        }
-      }
+      .setOnEngineRunning { countDownLatch.countDown() }
       .build()
 
     assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
