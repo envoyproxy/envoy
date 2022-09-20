@@ -1,6 +1,7 @@
 #include "test/common/router/router_test_base.h"
 
 #include "source/common/router/debug_config.h"
+#include "source/common/router/upstream_codec_filter.h"
 
 namespace Envoy {
 namespace Router {

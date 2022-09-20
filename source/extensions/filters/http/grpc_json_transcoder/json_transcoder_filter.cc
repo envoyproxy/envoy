@@ -503,7 +503,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
 
   if (!per_route_config_->matchIncomingRequestInfo()) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   if (end_stream && method_->request_type_is_http_body_) {
@@ -647,7 +647,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   response_in_.move(data);
-  if (encoderBufferLimitReached(response_in_.bytesStored())) {
+  if (encoderBufferLimitReached(response_in_.bytesStored() + response_out_.length())) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -655,16 +655,23 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     response_in_.finish();
   }
 
-  readToBuffer(*transcoder_->ResponseOutput(), data);
+  readToBuffer(*transcoder_->ResponseOutput(), response_out_);
   if (checkAndRejectIfResponseTranscoderFailed()) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   if (!method_->descriptor_->server_streaming() && !end_stream) {
-    // Buffer until the response is complete.
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    ENVOY_STREAM_LOG(debug,
+                     "internally buffering unary response waiting for end_stream during "
+                     "encodeData, transcoded data size={}",
+                     *encoder_callbacks_, response_out_.length());
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  data.move(response_out_);
+  ENVOY_STREAM_LOG(debug,
+                   "continuing response during encodeData, transcoded data size={}, end_stream={}",
+                   *encoder_callbacks_, data.length(), end_stream);
   return Http::FilterDataStatus::Continue;
 }
 
@@ -689,13 +696,15 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   }
 
   if (!method_->response_type_is_http_body_) {
-    Buffer::OwnedImpl data;
-    readToBuffer(*transcoder_->ResponseOutput(), data);
+    readToBuffer(*transcoder_->ResponseOutput(), response_out_);
     if (checkAndRejectIfResponseTranscoderFailed()) {
       return;
     }
-    if (data.length()) {
-      encoder_callbacks_->addEncodedData(data, true);
+    if (response_out_.length() > 0) {
+      ENVOY_STREAM_LOG(debug,
+                       "adding remaining data during encodeTrailers, transcoded data size={}",
+                       *encoder_callbacks_, response_out_.length());
+      encoder_callbacks_->addEncodedData(response_out_, true);
     }
   }
 

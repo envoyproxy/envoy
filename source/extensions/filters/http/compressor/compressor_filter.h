@@ -145,6 +145,7 @@ public:
   Envoy::Compression::Compressor::CompressorPtr makeCompressor();
 
   const std::string contentEncoding() const { return content_encoding_; };
+  bool chooseFirst() const { return choose_first_; };
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
 
@@ -155,6 +156,7 @@ private:
 
   const std::string content_encoding_;
   const Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory_;
+  const bool choose_first_;
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
@@ -198,6 +200,11 @@ private:
   private:
     const std::string encoding_;
     const HeaderStat stat_;
+  };
+
+  struct CompressorInChain {
+    uint32_t registration_count_;
+    bool choose_first_;
   };
 
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;

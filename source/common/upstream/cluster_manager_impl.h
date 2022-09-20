@@ -66,7 +66,7 @@ public:
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
         tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), quic_stat_names_(quic_stat_names),
+        quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
@@ -96,7 +96,7 @@ public:
                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
 
 protected:
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -113,7 +113,6 @@ protected:
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
-  Singleton::Manager& singleton_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
@@ -436,10 +435,13 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
+          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
+                                                                                    host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
       bool draining_{false};
@@ -450,8 +452,12 @@ private:
     };
 
     struct TcpConnPoolsContainer {
+      TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       ConnPools pools_;
       bool draining_{false};
     };
@@ -480,8 +486,14 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    using TcpConnectionsMap =
-        absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
+    struct TcpConnectionsMap {
+      TcpConnectionsMap(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
+      absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
+          connections_;
+    };
 
     class ClusterEntry : public ThreadLocalCluster {
     public:

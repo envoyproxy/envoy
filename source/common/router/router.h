@@ -590,6 +590,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
+  std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
   absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
