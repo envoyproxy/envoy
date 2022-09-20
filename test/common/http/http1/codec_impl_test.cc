@@ -3282,11 +3282,6 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
