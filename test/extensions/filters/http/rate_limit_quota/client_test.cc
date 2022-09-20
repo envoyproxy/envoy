@@ -90,6 +90,11 @@ TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   EXPECT_OK(client_->startStream(stream_info_));
   ASSERT_NE(stream_callbacks_, nullptr);
 
+  auto empty_request_headers = Http::RequestHeaderMapImpl::create();
+  stream_callbacks_->onCreateInitialMetadata(*empty_request_headers);
+  auto empty_response_headers = Http::ResponseHeaderMapImpl::create();
+  stream_callbacks_->onReceiveInitialMetadata(std::move(empty_response_headers));
+
   // Send empty report and ensure that we get it.
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   client_->rateLimit(callbacks_);
@@ -99,6 +104,9 @@ TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
   auto response_buf = Grpc::Common::serializeMessage(resp);
   EXPECT_TRUE(stream_callbacks_->onReceiveMessageRaw(std::move(response_buf)));
+
+  auto empty_response_trailers = Http::ResponseTrailerMapImpl::create();
+  stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
