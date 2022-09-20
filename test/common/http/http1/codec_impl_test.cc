@@ -958,6 +958,69 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
 }
 
+TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailersIgnored) {
+  if (parser_impl_ == ParserImpl::HttpParser) {
+    // HttpParser signals error even if `enable_trailers_` is false.
+    return;
+  }
+
+  initialize();
+  StrictMock<MockRequestDecoder> decoder;
+
+  // First request contains invalid trailers.
+  // Trailers are ignored by default, therefore processing can continue.
+  {
+    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
+                             "Host: www.somewhere.com\r\n"
+                             "connection: keep-alive\r\n"
+                             "Transfer-Encoding: chunked\r\n\r\n"
+                             "5\r\ndata1\r\n"
+                             "0\r\n"
+                             "invalid-trailer\r\n\r\n");
+
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data1"), false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+
+    std::string output;
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+  }
+
+  testing::Mock::VerifyAndClearExpectations(&decoder);
+
+  // Second request is successfully parsed.
+  {
+    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
+                             "Host: www.somewhere.com\r\n"
+                             "connection: keep-alive\r\n"
+                             "Transfer-Encoding: chunked\r\n\r\n"
+                             "5\r\ndata2\r\n"
+                             "0\r\n\r\n");
+
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data2"), false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+  }
+}
+
 TEST_P(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
   initialize();
 
