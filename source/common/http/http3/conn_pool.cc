@@ -132,9 +132,10 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   }
   Network::ConnectionSocket::OptionsSharedPtr socket_options =
       Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
-  return Quic::createQuicNetworkConnection(
-      quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, socket_options, transportSocketOptions());
+  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
+                                           dispatcher(), host()->address(), source_address,
+                                           quic_stat_names, rtt_cache, scope, socket_options,
+                                           transportSocketOptions(), connection_id_generator_);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
