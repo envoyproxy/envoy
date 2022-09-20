@@ -14,15 +14,6 @@
 namespace Envoy {
 namespace Network {
 
-namespace {
-
-// TODO (soulxu): making those configurable if needed.
-constexpr uint32_t DefaultIoUringSize = 300;
-constexpr uint32_t DefaultReadBufferSize = 8192;
-constexpr bool UseSubmissionQueuePolling = false;
-
-} // namespace
-
 void DefaultSocketInterfaceExtension::onServerInitialized() {
   if (io_uring_factory_ != nullptr) {
     io_uring_factory_->onServerInitialized();
@@ -60,7 +51,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 #else
   int flags = SOCK_NONBLOCK;
 
-  if (io_uring_factory_ != nullptr) {
+  if (io_uring_factory_.lock() != nullptr) {
     flags = 0;
   }
 
@@ -99,7 +90,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
   IoHandlePtr io_handle =
-      makeSocket(result.return_value_, socket_v6only, domain, io_uring_factory_.get());
+      makeSocket(result.return_value_, socket_v6only, domain, io_uring_factory_.lock().get());
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -146,10 +137,15 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
     const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context) {
   // TODO (soulxu): Add runtime flag here.
   if (Io::isIoUringSupported()) {
-    io_uring_factory_ = std::make_unique<Io::IoUringFactoryImpl>(
-        DefaultIoUringSize, UseSubmissionQueuePolling, context.threadLocal());
+    std::shared_ptr<Io::IoUringFactoryImpl> io_uring_factory =
+        std::make_unique<Io::IoUringFactoryImpl>(DefaultIoUringSize, UseSubmissionQueuePolling,
+                                                 context.threadLocal());
+    io_uring_factory_ = io_uring_factory;
+
+    return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_factory);
+  } else {
+    return std::make_unique<DefaultSocketInterfaceExtension>(*this, nullptr);
   }
-  return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_factory_);
 }
 
 ProtobufTypes::MessagePtr SocketInterfaceImpl::createEmptyConfigProto() {
