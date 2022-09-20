@@ -31,8 +31,8 @@ public:
                       Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)) {
-    // TODO(tyxia) It is opened on the first request not at time when client is created here
-    // startStream();
+    // TODO(tyxia) startStream() is opened on the first request not at time when client is created
+    // here.
   }
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;

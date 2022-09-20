@@ -57,7 +57,7 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
     }
   } else {
     data_ptr_->onRequestHeaders(headers);
-    // TODO(tyxia) This function should trigger the CEL expression matching
+    // TODO(tyxia) This function should trigger the CEL expression matching.
     // We need to implement the custom_matcher and factory and register so that CEL matching will be
     // triggered with its own match() method.
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);

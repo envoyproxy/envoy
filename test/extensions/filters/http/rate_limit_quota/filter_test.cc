@@ -67,7 +67,7 @@ const std::string GrpcConfig = R"EOF(
       cluster_name: "rate_limit_quota_server"
   )EOF";
 
-// TODO(tyxia) CEL matcher config use later.
+// TODO(tyxia) CEL matcher config to be used later.
 // constexpr char CelMatcherConfig[] = R"EOF(
 //     matcher_list:
 //       matchers:
