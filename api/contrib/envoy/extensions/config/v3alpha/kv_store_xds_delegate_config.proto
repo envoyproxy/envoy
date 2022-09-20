@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // servers, enabling configuration to be persisted locally and used on startup in case connectivity
 // with the xDS management servers could not be established.
 //
-// The KV Store based delegate's handling of wildcard resources (empty resource list or "*") is 
+// The KV Store based delegate's handling of wildcard resources (empty resource list or "*") is
 // designed for use with O(100) resources or fewer, so it's not currently advised to use this
 // feature for large configurations with heavy use of wildcard resources.
 message KeyValueStoreXdsDelegateConfig {
