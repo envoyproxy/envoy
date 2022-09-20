@@ -7376,13 +7376,16 @@ virtual_hosts:
   Registry::InjectFactory<HttpRouteTypedMetadataFactory> registered_factory(baz_factory);
   factory_context_.cluster_manager_.initializeClusters({"ww2", "www2"}, {});
   const TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/regex", "GET"), 0).get(),
                           "/rege[xy]", PathMatchType::Regex);
   checkPathMatchCriterion(config.route(genHeaders("www.foo.com", "/exact-path", "GET"), 0).get(),
                           "/exact-path", PathMatchType::Exact);
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www.foo.com", "/path/separated", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   checkPathMatchCriterion(
-      config.route(genHeaders("www.foo.com", "/path/separated", "GET"), 0).get(), "/path/separated",
+      config.route(headers, stream_info, 0).get(), "/path/separated",
       PathMatchType::PathSeparatedPrefix);
   const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
@@ -8266,32 +8269,45 @@ virtual_hosts:
       {"path-separated-cluster", "case-sensitive-cluster", "default-cluster", "rewrite-cluster"},
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   // Exact matches
+  Http::TestRequestHeaderMapImpl headers;
+  headers = genHeaders("path.prefix.com", "/rest/api", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/api?param=true", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api?param=true", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/api#fragment", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api#fragment", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
 
   // Prefix matches
+  headers = genHeaders("path.prefix.com", "/rest/api", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/thing?param=true", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("path-separated-cluster",
-            config.route(genHeaders("path.prefix.com", "/rest/api/thing#fragment", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
 
@@ -8326,7 +8342,8 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("path.prefix.com", "/rewrite?param=true#fragment", "GET");
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    stream_info.setPathWithoutQueryAndFragment(headers);
+    const RouteEntry* route = config.route(headers, stream_info, 0)->routeEntry();
     EXPECT_EQ("/new/api?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("rewrite-cluster", route->clusterName());
@@ -8338,7 +8355,8 @@ virtual_hosts:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     Http::TestRequestHeaderMapImpl headers =
         genHeaders("path.prefix.com", "/rewrite/this?param=true#fragment", "GET");
-    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    stream_info.setPathWithoutQueryAndFragment(headers);
+    const RouteEntry* route = config.route(headers, stream_info, 0)->routeEntry();
     EXPECT_EQ("/new/api/this?param=true#fragment", route->currentUrlPathAfterRewrite(headers));
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("rewrite-cluster", route->clusterName());
@@ -8374,27 +8392,40 @@ virtual_hosts:
       {"case-sensitive", "case-sensitive-explicit", "case-insensitive", "default"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API", "GET"), 0)
-                                  ->routeEntry()
-                                  ->clusterName());
-  EXPECT_EQ("case-sensitive",
-            config.route(genHeaders("path.prefix.com", "/rest/API?param=true", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
-  EXPECT_EQ("case-sensitive", config.route(genHeaders("path.prefix.com", "/rest/API/", "GET"), 0)
-                                  ->routeEntry()
-                                  ->clusterName());
-  EXPECT_EQ("case-sensitive",
-            config.route(genHeaders("path.prefix.com", "/rest/API/thing?param=true", "GET"), 0)
-                ->routeEntry()
-                ->clusterName());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl headers;
+  headers = genHeaders("path.prefix.com", "/rest/API", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
 
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/API?param=true", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
+  EXPECT_EQ("case-sensitive",
+            config.route(headers, stream_info, 0)
+                ->routeEntry()
+                ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/API/", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
+  EXPECT_EQ("case-sensitive", config.route(headers, stream_info, 0)
+                                  ->routeEntry()
+                                  ->clusterName());
+  headers = genHeaders("path.prefix.com", "/rest/API/thing?param=true", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
+  EXPECT_EQ("case-sensitive",
+            config.route(headers, stream_info, 0)
+                ->routeEntry()
+                ->clusterName());
+  headers = genHeaders("path.prefix.com", "/REST/api", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
   EXPECT_EQ("case-sensitive-explicit",
-            config.route(genHeaders("path.prefix.com", "/REST/api", "GET"), 0)
+            config.route(headers, stream_info, 0)
                 ->routeEntry()
                 ->clusterName());
-
-  EXPECT_EQ("case-insensitive", config.route(genHeaders("path.prefix.com", "/REST/API", "GET"), 0)
+  headers = genHeaders("path.prefix.com", "/REST/API", "GET");
+  stream_info.setPathWithoutQueryAndFragment(headers);
+  EXPECT_EQ("case-insensitive", config.route(headers, stream_info, 0)
                                     ->routeEntry()
                                     ->clusterName());
 }
@@ -8473,25 +8504,28 @@ virtual_hosts:
 
   factory_context_.cluster_manager_.initializeClusters({"some-cluster", "default"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   {
     auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    stream_info.setPathWithoutQueryAndFragment(headers);
     headers.addCopy("cookies", "");
 
-    EXPECT_EQ("some-cluster", config.route(headers, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("some-cluster", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
 
   {
     auto headers = genHeaders("path.prefix.com", "/rest/api?param=test", "GET");
+    stream_info.setPathWithoutQueryAndFragment(headers);
     headers.addCopy("pizza", "");
 
-    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("default", config.route(headers, stream_info, 0)->routeEntry()->clusterName());
   }
   {
     auto headers = genHeaders("path.prefix.com", "/rest/api?param=testing", "GET");
+    stream_info.setPathWithoutQueryAndFragment(headers);
     headers.addCopy("cookies", "");
 
-    EXPECT_EQ("default", config.route(headers, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("default", config.route(headers, stream_info,0)->routeEntry()->clusterName());
   }
 }
 

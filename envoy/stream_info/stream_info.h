@@ -732,8 +732,14 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
+  /**
+   * @param sanitized_path, the path without query and fragment.
+   */
   virtual void setPathWithoutQueryAndFragment(const Http::RequestHeaderMap& headers) PURE;
 
+  /**
+   * @return the sanitized_path for the stream.
+   */
   virtual const absl::string_view getPathWithoutQueryAndFragment() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,

@@ -1519,11 +1519,8 @@ PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   uint64_t random_value) const {
-  absl::string_view sanitized_path =
-      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
-
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(sanitized_path)) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;
@@ -1551,12 +1548,8 @@ PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& hea
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 uint64_t random_value) const {
-
-  absl::string_view sanitized_path =
-      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
-
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
-      path_matcher_->match(sanitized_path)) {
+      path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
     return clusterEntry(headers, random_value);
   }
 
@@ -1593,11 +1586,8 @@ RegexRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& he
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info,
                                                  uint64_t random_value) const {
-  absl::string_view sanitized_path =
-      sanitizePathBeforePathMatching(stream_info.getPathWithoutQueryAndFragment());
-
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    if (path_matcher_->match(sanitized_path)) {
+    if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
       return clusterEntry(headers, random_value);
     }
   }
