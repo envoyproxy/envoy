@@ -818,7 +818,8 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
       ENVOY_LOG(
           error,
           "Dropping upstream request with no well formatted header. Error: {}", metadata->errorMessage());
-      parent_.onError(metadata, ErrorCode::BadRequest, metadata->errorMessage());
+      // For the moment we discard the message, without sending local reply, until decide what error code to send
+      /*parent_.onError(metadata, ErrorCode::BadRequest, metadata->errorMessage());*/
       return FilterStatus::StopIteration;
     }
 
@@ -827,15 +828,17 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
       ENVOY_LOG(
           error,
           "Dropping upstream request with no X-Envoy-Origin-Ingress header.");
-      parent_.onError(metadata, ErrorCode::BadRequest,
-                      "Missing X-Envoy-Origin-Ingress header");
+      // For the moment we discard the message, without sending local reply, until decide what error code to send
+      /*parent_.onError(metadata, ErrorCode::BadRequest,
+                      "Missing X-Envoy-Origin-Ingress header");*/
       return FilterStatus::StopIteration;
     } else if (!origin_ingress->isValid()) {
       ENVOY_LOG(
           error,
           "Dropping upstream request with invalid format of X-Envoy-Origin-Ingress header.");
-      parent_.onError(metadata, ErrorCode::BadRequest,
-                      "Invalid format of X-Envoy-Origin-Ingress header");
+      // For the moment we discard the message, without sending local reply, until decide what error code to send
+      /*parent_.onError(metadata, ErrorCode::BadRequest,
+                      "Invalid format of X-Envoy-Origin-Ingress header");*/
       return FilterStatus::StopIteration;
     }
 

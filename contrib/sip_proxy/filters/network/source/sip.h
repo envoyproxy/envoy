@@ -70,7 +70,6 @@ enum class AppExceptionType {
 };
 
 enum ErrorCode {
-  BadRequest,
   ServiceUnavailable,
 };
 
