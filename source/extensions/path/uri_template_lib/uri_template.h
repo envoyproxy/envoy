@@ -71,18 +71,6 @@ absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_vi
  */
 absl::Status isValidMatchPattern(absl::string_view match_pattern);
 
-/**
- * Concatenates literals and extracts variable values to form the final rewritten path.
- * For example:
- * rewrite_pattern: [capture_index=2, literal="cat"]
- * path: "/bar/var"
- * capture_regex: "(1)/(2)"
- * Rewrite would result in rewrite of "/var/cat".
- */
-absl::StatusOr<std::string> rewritePathTemplatePattern(absl::string_view path,
-                                                       absl::string_view capture_regex,
-                                                       const RewriteSegments& rewrite_pattern);
-
 } // namespace UriTemplate
 } // namespace Extensions
 } // namespace Envoy

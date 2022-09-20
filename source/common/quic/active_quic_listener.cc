@@ -43,7 +43,7 @@ ActiveQuicListener::ActiveQuicListener(
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_id_generator_(quic::kQuicDefaultConnectionIdLength) {
-  ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
+  ASSERT(!GetQuicFlag(quic_header_size_limit_includes_overhead));
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
 

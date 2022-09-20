@@ -20,6 +20,8 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/rds/config.h"
 #include "envoy/router/internal_redirect.h"
+#include "envoy/router/path_matcher.h"
+#include "envoy/router/path_rewriter.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -768,7 +770,7 @@ enum class PathMatchType {
   Exact,
   Regex,
   PathSeparatedPrefix,
-  Pattern,
+  Template,
 };
 
 /**
@@ -919,6 +921,16 @@ public:
    *         simply proxied as normal responses.
    */
   virtual const InternalRedirectPolicy& internalRedirectPolicy() const PURE;
+
+  /**
+   * @return const PathMatcherSharedPtr& the path match policy for the route.
+   */
+  virtual const PathMatcherSharedPtr& pathMatcher() const PURE;
+
+  /**
+   * @return const PathRewriterSharedPtr& the path match rewrite for the route.
+   */
+  virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
@@ -1195,6 +1207,8 @@ public:
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
+class RouteEntryAndRoute : public RouteEntry, public Route {};
+
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
  * if the matched route has been accepted or it wants the route matching to
@@ -1388,13 +1402,13 @@ public:
    * @param upstream supplies the generic upstream for the stream.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
-   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param connection_info_provider, supplies the address provider of the upstream connection.
    * @param info supplies the stream info object associated with the upstream connection.
    * @param protocol supplies the protocol associated with the upstream connection.
    */
   virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
-                           const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                           const Network::ConnectionInfoProvider& connection_info_provider,
                            StreamInfo::StreamInfo& info,
                            absl::optional<Http::Protocol> protocol) PURE;
 

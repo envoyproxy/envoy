@@ -131,10 +131,10 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
   IS_ENVOY_BUG("unexpected call to rawWrite");
 }
 
-void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
-                                                          size_t new_buffered_bytes) {
+void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_bytes,
+                                                          uint64_t new_buffered_bytes) {
   int64_t delta = new_buffered_bytes - old_buffered_bytes;
-  const size_t bytes_to_send_old = bytes_to_send_;
+  const uint64_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
     ENVOY_BUG(bytes_to_send_old > bytes_to_send_, "Underflowed");

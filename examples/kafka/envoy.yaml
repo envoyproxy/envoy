@@ -27,8 +27,9 @@ static_resources:
         - endpoint:
             address:
               socket_address:
+                # Kafka server's listener for client traffic ('EXTERNAL').
                 address: kafka-server
-                port_value: 9092
+                port_value: 10000
 
 admin:
   address:
