@@ -145,7 +145,7 @@ TEST(DubboCodecTest, DecodeHeaderTest) {
   {
     Buffer::OwnedImpl buffer;
     MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
-    buffer.add(std::string({'\xda', '\xbb', '\xa2', 0x00}));
+    buffer.add(std::string({'\xda', '\xbb', '\xe2', 0x00}));
     addInt64(buffer, 1);
     addInt32(buffer, 1);
     auto result = codec.decodeHeader(buffer, *metadata);
@@ -449,7 +449,7 @@ TEST(DubboCodecTest, EncodeTest) {
     EXPECT_EQ(MagicNumber, buffer.peekBEInt<uint16_t>());
 
     // Check flag.
-    EXPECT_EQ(0xa2, buffer.peekBEInt<uint8_t>(FlagOffset));
+    EXPECT_EQ(0xe2, buffer.peekBEInt<uint8_t>(FlagOffset));
 
     // Check status. Only response has valid status byte.
     EXPECT_EQ(0, buffer.peekBEInt<uint8_t>(StatusOffset));

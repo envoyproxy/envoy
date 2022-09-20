@@ -56,6 +56,7 @@ void encodeHeader(Buffer::Instance& buffer, Context& context, uint32_t body_size
   case MessageType::HeartbeatRequest:
     // Event request.
     flag ^= MessageTypeMask;
+    flag ^= TwoWayMask;
     flag ^= EventMask;
     break;
   case MessageType::HeartbeatResponse:
