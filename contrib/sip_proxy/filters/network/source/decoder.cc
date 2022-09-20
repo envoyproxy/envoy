@@ -533,7 +533,6 @@ int Decoder::decode() {
       metadata->addMsgHeader(HeaderType::TopLine, sip_line);
       metadata->setMsgType(sipMsgType(sip_line));
       metadata->setMethodType(sipMethod(sip_line));
-      // parseTopLine(sip_line);
       current_header_ = HeaderType::Other;
 
       handler = MessageFactory::create(metadata->methodType(), *this);
