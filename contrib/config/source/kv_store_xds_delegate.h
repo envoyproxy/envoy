@@ -15,6 +15,8 @@ namespace Config {
   COUNTER(load_success)                                                                            \
   /* Number of times no resources were found for a load attempt from the KV store. */              \
   COUNTER(resources_not_found)                                                                     \
+  /* Number of times a persisted resource failed to parse into a xDS proto. */                     \
+  COUNTER(parse_failed)                                                                            \
   /* Number of times a resource was requested but not found from the KV store. */                  \
   COUNTER(resource_missing)
 

@@ -114,6 +114,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, SaveAndRetrieve) {
   EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
@@ -162,6 +163,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
   EXPECT_EQ(3, store_.counter("xds.kv_store.load_success").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
@@ -208,6 +210,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
   EXPECT_EQ(1, store_.counter("xds.kv_store.load_success").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
@@ -238,6 +241,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
   EXPECT_EQ(2, store_.counter("xds.kv_store.load_success").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resources_not_found").value());
   EXPECT_EQ(0, store_.counter("xds.kv_store.resource_missing").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
 TEST_F(KeyValueStoreXdsDelegateTest, ResourceNotFound) {
@@ -259,6 +263,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourceNotFound) {
   EXPECT_EQ(0, store_.counter("xds.kv_store.load_success").value());
   EXPECT_EQ(1, store_.counter("xds.kv_store.resources_not_found").value());
   EXPECT_EQ(1, store_.counter("xds.kv_store.resource_missing").value());
+  EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
 // TODO(abeyad): add test for resource eviction.

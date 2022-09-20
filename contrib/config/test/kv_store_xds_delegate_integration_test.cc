@@ -336,6 +336,7 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   EXPECT_EQ(2, test_server_->counter("xds.kv_store.load_success")->value());
   EXPECT_EQ(0, test_server_->counter("xds.kv_store.resources_not_found")->value());
   EXPECT_EQ(0, test_server_->counter("xds.kv_store.resource_missing")->value());
+  EXPECT_EQ(0, test_server_->counter("xds.kv_store.parse_failed")->value());
   checkSecretExists(std::string(CLIENT_CERT_NAME), /*version_info=*/"1");
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
   EXPECT_EQ("yar", getRuntimeKey("bar"));
