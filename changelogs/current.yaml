@@ -220,6 +220,10 @@ new_features:
 - area: redis
   change: |
     added support for quit command to the redis proxy.
+- area: access_log
+  change: |
+    log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
+    and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls forward proxy.
 
 deprecated:
 - area: http
