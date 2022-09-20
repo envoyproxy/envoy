@@ -90,7 +90,6 @@ public:
      */
     absl::optional<double> weight(size_t index, double offset, double width) const;
 
-
     /*
      * Gets the index of the Ring's entry at a given offset.
      * @param offset for which index is to be calculated.
