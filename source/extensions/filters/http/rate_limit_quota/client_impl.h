@@ -31,8 +31,8 @@ public:
                       Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)) {
-    // TODO(tyxia) startStream() is opened on the first request not at time when client is created
-    // here.
+    // TODO(tyxia) startStream function is opened on the first request not at time when client is
+    // created here.
   }
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
@@ -48,7 +48,6 @@ public:
 
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
   void closeStream();
-  void createReports(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&) {}
   void send(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports,
             bool end_stream);
 
