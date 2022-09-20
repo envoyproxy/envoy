@@ -27,6 +27,11 @@
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include "url/gurl.h"
+#pragma GCC diagnostic pop
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -259,13 +264,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
       const auto state =
           Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
-      Http::Utility::Url state_url;
-      if (!state_url.initialize(state, false)) {
+
+      GURL state_url(state);
+      if (!state_url.is_valid()) {
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
       // Avoid infinite redirect storm
-      if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
+      if (config_->redirectPathMatcher().match(state_url.PathForRequest())) {
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -346,8 +352,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   auth_code_ = query_parameters.at(queryParamsCode());
   state_ = Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
 
-  Http::Utility::Url state_url;
-  if (!state_url.initialize(state_, false)) {
+  GURL state_url(state_);
+  if (!state_url.is_valid()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
