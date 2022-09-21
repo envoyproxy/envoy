@@ -108,10 +108,15 @@ std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVecto
   absl::flat_hash_set<absl::string_view> dup_set;
   forEachExtractorMatching(metric_name, [&remove_characters, &tags, &tag_extraction_context,
                                          &dup_set](const TagExtractorPtr& tag_extractor) {
+    // It is relatively cheap to populate a set of string_view for every tag,
+    // but it saves 2% CPU time to only populate and check dup_set for tag-names
+    // where there is more than one extractor. This is rare. For built-in
+    // extractors this only occurs with HTTP_CONN_MANAGER_PREFIX. Istio/Wasm
+    // add configuration for an alternate pattern for RESPONSE_CODE.
     bool other_extractor_with_same_name_exists = tag_extractor->otherExtractorWithSameNameExists();
     if (other_extractor_with_same_name_exists &&
         dup_set.find(tag_extractor->name()) != dup_set.end()) {
-      ENVOY_LOG_MISC(warn, "Skipping duplicate tag for ", tag_extractor->name());
+      ENVOY_LOG_EVERY_POW_2_MISC(warn, "Skipping duplicate tag for ", tag_extractor->name());
       return;
     }
     if (tag_extractor->extractTag(tag_extraction_context, tags, remove_characters) &&

@@ -111,7 +111,7 @@ protected:
    * @param tags the list of tags
    * @return a reference to the value of the tag that was added.
    */
-  std::string& addTag(std::vector<Tag>& tags) const;
+  std::string& addTagReturningValueRef(std::vector<Tag>& tags) const;
 
   const std::string name_;
   std::string prefix_; // non-const so TagExtractorTokensImpl can override in its constructor.
