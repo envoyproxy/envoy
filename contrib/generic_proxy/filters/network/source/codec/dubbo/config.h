@@ -30,8 +30,10 @@ public:
   void forEach(IterateCallback callback) const override;
   absl::optional<absl::string_view> getByKey(absl::string_view key) const override;
   void setByKey(absl::string_view key, absl::string_view val) override;
-  void setByReferenceKey(absl::string_view key, absl::string_view val) override;
-  void setByReference(absl::string_view key, absl::string_view val) override;
+  void setByReferenceKey(absl::string_view key, absl::string_view val) override {
+    setByKey(key, val);
+  }
+  void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
   absl::string_view host() const override { return {}; }
   absl::string_view path() const override { return inner_request_->request().serviceName(); }
   absl::string_view method() const override { return inner_request_->request().methodName(); }
