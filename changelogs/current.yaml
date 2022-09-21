@@ -38,6 +38,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: logging
+  change: |
+    changed the ``UPSTREAM_REMOTE_ADDRESS``, ``UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, and ``UPSTREAM_REMOTE_PORT`` fields to log based on the actual upstream connection rather than the upstream host. This fixes a bug where the address components were not consistently correct for Happy Eyeballs connections and proxied connections, but also means in cases where the host was selected but a connection was not established, the fields will be absent. This change can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.correct_remote_address`` to false.
 - area: resource_monitors
   change: |
     changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
@@ -53,12 +56,17 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: local_ratelimit
+  change: |
+    added :ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
 - area: health_check
   change: |
     support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 - area: http
   change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
+  change: |
+    the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
 - area: stats
   change: |
     Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the original name during the extraction. This
@@ -77,6 +85,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    fixed a bug with internal redirects not being performed for drained connections.
 - area: listener
   change: |
     fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
@@ -86,6 +97,9 @@ bug_fixes:
 - area: logger
   change: |
     added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
+- area: router
+  change: |
+    fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -116,6 +130,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+- area: tracing
+  change: |
+    removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
 - area: http
@@ -206,6 +223,10 @@ new_features:
 - area: redis
   change: |
     added support for quit command to the redis proxy.
+- area: access_log
+  change: |
+    log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
+    and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls forward proxy.
 
 deprecated:
 - area: http

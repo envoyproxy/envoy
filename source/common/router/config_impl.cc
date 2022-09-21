@@ -669,6 +669,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
+  if (!route.route().prefix_rewrite().empty() && path_matcher_ != nullptr) {
+    throw EnvoyException("Cannot use prefix_rewrite with matcher extension");
+  }
+
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
@@ -1268,9 +1272,9 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RouteConstSharedPtr
-RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
-                                                const Http::HeaderMap& headers) const {
+RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
+    const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
+    const RouteEntryAndRoute* route_selector_override) const {
   const auto entry = headers.get(cluster_header_name);
   std::string final_cluster_name;
   if (!entry.empty()) {
@@ -1282,7 +1286,10 @@ RouteEntryImplBase::pickClusterViaClusterHeader(const Http::LowerCaseString& clu
   // NOTE: Though we return a shared_ptr here, the current ownership model
   // assumes that the route table sticks around. See snapped_route_config_ in
   // ConnectionManagerImpl::ActiveStream.
-  return std::make_shared<DynamicRouteEntry>(this, final_cluster_name);
+  return std::make_shared<DynamicRouteEntry>(route_selector_override
+                                                 ? route_selector_override
+                                                 : static_cast<const RouteEntryAndRoute*>(this),
+                                             final_cluster_name);
 }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
@@ -1293,7 +1300,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
     } else if (!cluster_header_name_.get().empty()) {
-      return pickClusterViaClusterHeader(cluster_header_name_, headers);
+      return pickClusterViaClusterHeader(cluster_header_name_, headers,
+                                         /*route_selector_override=*/nullptr);
     } else {
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
       // cluster specifier plugin.
@@ -1351,7 +1359,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     if (selected_value >= begin && selected_value < end) {
       if (!cluster->clusterHeaderName().get().empty() &&
           !headers.get(cluster->clusterHeaderName()).empty()) {
-        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers);
+        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers,
+                                           static_cast<RouteEntryAndRoute*>(cluster.get()));
       }
       return cluster;
     }
@@ -1573,7 +1582,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing
   // the route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(path_matcher_->match(path));
+  ASSERT(path_matcher_->match(sanitizePathBeforePathMatching(path)));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 

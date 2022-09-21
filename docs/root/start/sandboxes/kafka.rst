@@ -49,7 +49,7 @@ Start by creating a Kafka topic with the name ``envoy-kafka-broker``:
 .. code-block:: console
 
   $ export TOPIC="envoy-kafka-broker"
-  $ docker-compose run --rm kafka-client --bootstrap-server proxy:10000 --create --topic $TOPIC
+  $ docker-compose run --rm kafka-client kafka-topics --bootstrap-server proxy:10000 --create --topic $TOPIC
 
 
 Step 3: Check the Kafka topic
@@ -92,17 +92,23 @@ Step 6: Check admin ``kafka_broker`` stats
 
 When you proxy to the Kafka broker, Envoy records various stats.
 
-You can check the broker stats by querying the Envoy admin interface:
+You can check the broker stats by querying the Envoy admin interface
+(the numbers might differ a little as the kafka-client does not expose precise control over its network traffic):
 
 .. code-block:: console
 
-  $ curl -s "http://localhost:8001/stats?filter=kafka.kafka_broker" | grep -v ": 0"
-  kafka.kafka_broker.request.api_versions_request: 4
-  kafka.kafka_broker.request.find_coordinator_request: 1
-  kafka.kafka_broker.request.metadata_request: 4
-  kafka.kafka_broker.response.api_versions_response: 4
-  kafka.kafka_broker.response.find_coordinator_response: 1
-  kafka.kafka_broker.response.metadata_response: 4
+  $ curl -s "http://localhost:8001/stats?filter=kafka.kafka_broker" | grep -v ": 0" | grep "_request:"
+  kafka.kafka_broker.request.api_versions_request: 9
+  kafka.kafka_broker.request.create_topics_request: 1
+  kafka.kafka_broker.request.fetch_request: 2
+  kafka.kafka_broker.request.find_coordinator_request: 8
+  kafka.kafka_broker.request.join_group_request: 2
+  kafka.kafka_broker.request.leave_group_request: 1
+  kafka.kafka_broker.request.list_offsets_request: 1
+  kafka.kafka_broker.request.metadata_request: 12
+  kafka.kafka_broker.request.offset_fetch_request: 1
+  kafka.kafka_broker.request.produce_request: 1
+  kafka.kafka_broker.request.sync_group_request: 1
 
 
 Step 7: Check admin ``kafka_service`` cluster stats

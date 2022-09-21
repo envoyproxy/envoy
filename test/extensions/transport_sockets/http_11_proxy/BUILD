@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
