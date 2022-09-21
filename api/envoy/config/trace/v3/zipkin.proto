@@ -82,5 +82,5 @@ message ZipkinConfig {
   //   If this is set to true, then the
   //   :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
   //   SHOULD be set to true also to ensure the correctness of trace chain.
-  bool split_spans_for_request  = 7;
+  bool split_spans_for_request = 7;
 }
