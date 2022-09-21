@@ -162,7 +162,7 @@ new_features:
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
 - area: zipkin
   change: |
-    added :ref:`independent_proxy <envoy_v3_api_field_config.trace.v3.ZipkinConfig.independent_proxy>` to make Envoy appear
+    added :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>` to make Envoy appear
     as an independent hop for zipkin tracing.
 - area: cluster
   change: |

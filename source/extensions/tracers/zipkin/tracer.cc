@@ -20,9 +20,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Build the CS annotation
   Annotation cs;
   cs.setEndpoint(std::move(ep));
-  if (independent_proxy_) {
+  if (split_spans_for_request_) {
     // No previous context then this must be span created for downstream request. Server span will
-    // be created for downstream request when independent_proxy is set to true
+    // be created for downstream request when split_spans_for_request is set to true
     cs.setValue(SERVER_RECV);
   } else {
     cs.setValue(config.operationName() == Tracing::OperationName::Egress ? CLIENT_SEND
@@ -68,9 +68,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   span_ptr->setName(span_name);
 
   // Set the span's kind (client or server)
-  if (independent_proxy_) {
+  if (split_spans_for_request_) {
     // If previous context is inner context then this span must be span created for upstream
-    // request. Client span will be created for upstream request when independent_proxy is
+    // request. Client span will be created for upstream request when split_spans_for_request is
     // set to true.
     if (previous_context.innerContext()) {
       annotation.setValue(CLIENT_SEND);

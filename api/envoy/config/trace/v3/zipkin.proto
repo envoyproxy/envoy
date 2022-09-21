@@ -69,13 +69,18 @@ message ZipkinConfig {
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
   string collector_hostname = 6;
 
-  // If this is set to true, then Envoy will be treated as an independent hop in trace chain. Server span will be created
-  // for a downstream request and client span will be created for an upstream request.
+  // If this is set to true, then Envoy will be treated as an independent hop in trace chain. An complete span pair will be created for single
+  // request. Server span will be created for the downstream request and client span will be created for the related upstream request.
+  // This should be set to true in the following cases:
+  //
+  // * The Envoy Proxy is used as gateway or ingress.
+  // * The Envoy Proxy is used as sidecar but inbound traffic capturing or outbound traffic capturing is disabled.
+  // * Any case that the `start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>` is set to true.
   //
   // .. attention::
   //
   //   If this is set to true, then the
   //   :ref:`start_child_span of router <envoy_v3_api_field_extensions.filters.http.router.v3.Router.start_child_span>`
   //   SHOULD be set to true also to ensure the correctness of trace chain.
-  bool independent_proxy = 7;
+  bool split_spans_for_request  = 7;
 }
