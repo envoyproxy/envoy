@@ -61,11 +61,18 @@ constexpr char MatcherConfig[] = R"EOF(
             reporting_interval: 60s
   )EOF";
 
-const std::string GrpcConfig = R"EOF(
+const std::string GoogleGrpcConfig = R"EOF(
   rlqs_server:
-    envoy_grpc:
-      cluster_name: "rate_limit_quota_server"
+    google_grpc:
+      target_uri: rate_limit_quota_server
+      stat_prefix: google
   )EOF";
+
+// const std::string GrpcConfig = R"EOF(
+//   rlqs_server:
+//     envoy_grpc:
+//       cluster_name: "rate_limit_quota_server"
+//   )EOF";
 
 // TODO(tyxia) CEL matcher config to be used later.
 // constexpr char CelMatcherConfig[] = R"EOF(
@@ -101,7 +108,7 @@ class FilterTest : public testing::Test {
 public:
   FilterTest() {
     // Add the grpc service config.
-    TestUtility::loadFromYaml(GrpcConfig, config_);
+    TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
 
     // Add the matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
