@@ -572,8 +572,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    // [#not-implemented-hide:]
-    // [#comment: TODO(silverstar195): Hook into extension once added]
+    // [#extension-category: envoy.path.match]
     core.v3.TypedExtensionConfig path_match_policy = 15;
   }
 
@@ -1030,9 +1029,9 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>` or
-  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
-  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
   //
   // .. attention::
   //
@@ -1067,9 +1066,9 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
-  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
+  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`, or
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
   // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
@@ -1090,8 +1089,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  // [#not-implemented-hide:]
-  // [#comment: TODO(silverstar195): Hook into extension once added]
+  // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
   oneof host_rewrite_specifier {
