@@ -3,8 +3,15 @@ on:
   schedule:
   - cron: '0 5 * * 1,2,3,4,5'
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
 jobs:
   pr_notifier:
+    permissions:
+      contents: read # to fetch code (actions/checkout)
+      statuses: read # for pr_notifier.py
+      pull-requests: read # for pr_notifier.py
     name: PR Notifier
     runs-on: ubuntu-latest
     if: github.repository == 'envoyproxy/envoy'
