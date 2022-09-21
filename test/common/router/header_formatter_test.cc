@@ -21,6 +21,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -53,6 +54,12 @@ public:
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
+    if (test_with_and_without_runtime_) {
+      TestScopedRuntime runtime_;
+      auto f = StreamInfoHeaderFormatter(variable);
+      const std::string formatted_string = f.format(stream_info);
+      EXPECT_EQ(expected_output, formatted_string);
+    }
   }
 
   void testFormatting(const std::string& variable, const std::string& expected_output) {
@@ -64,6 +71,7 @@ public:
     EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter{variable}, EnvoyException,
                               fmt::format("field '{}' not supported as custom header", variable));
   }
+  bool test_with_and_without_runtime_ = false;
 };
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
@@ -165,26 +173,41 @@ TEST_F(StreamInfoHeaderFormatterTest,
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemotePortVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_PORT", "443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_PORT", "");
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressWithoutPortVariable) {
+  test_with_and_without_runtime_ = true;
   testFormatting("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "10.0.0.1");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   stream_info.upstreamInfo()->setUpstreamHost(nullptr);
+  Network::Address::InstanceConstSharedPtr nullptr_address;
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(stream_info.upstream_info_.get()),
+              upstreamRemoteAddress())
+      .WillRepeatedly(ReturnRef(nullptr_address));
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "");
 }
 

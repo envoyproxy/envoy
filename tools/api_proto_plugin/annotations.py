@@ -31,6 +31,10 @@ NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
 
+# Annotation on leading comments that permits fields to be declared with the
+# fully-qualified-name (FQN) type.
+ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION = 'allow-fully-qualified-name'
+
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     EXTENSION_ANNOTATION,
@@ -39,6 +43,7 @@ VALID_ANNOTATIONS = set([
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
+    ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION,
 ])
 
 # These can propagate from file scope to message/enum scope (and be overridden).
