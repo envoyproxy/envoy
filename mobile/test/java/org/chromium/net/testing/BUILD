@@ -43,7 +43,7 @@ android_library(
         "@maven//:androidx_annotation_annotation",
         "@maven//:androidx_test_monitor",
         "@maven//:com_squareup_okhttp3_mockwebserver",
-        "@maven//:com_squareup_okio_okio",
+        "@maven//:com_squareup_okio_okio_jvm",
         "@maven//:io_netty_netty_buffer",
         "@maven//:io_netty_netty_codec_http",
         "@maven//:io_netty_netty_codec_http2",

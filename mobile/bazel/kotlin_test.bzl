@@ -99,7 +99,7 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
             "@maven//:org_mockito_mockito_core",
             "@maven//:com_squareup_okhttp3_okhttp",
             "@maven//:com_squareup_okhttp3_mockwebserver",
-            "@maven//:com_squareup_okio_okio",
+            "@maven//:com_squareup_okio_okio_jvm",
             "@maven//:org_hamcrest_hamcrest",
             "@maven//:com_google_truth_truth",
         ],
