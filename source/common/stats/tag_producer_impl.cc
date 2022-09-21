@@ -101,7 +101,6 @@ void TagProducerImpl::forEachExtractorMatching(
 
 std::string TagProducerImpl::produceTags(absl::string_view metric_name, TagVector& tags) const {
   // TODO(jmarantz): Skip the creation of string-based tags, creating a StatNameTagVector instead.
-  // tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;
   TagExtractionContext tag_extraction_context(metric_name);
   std::vector<absl::string_view> tokens;
