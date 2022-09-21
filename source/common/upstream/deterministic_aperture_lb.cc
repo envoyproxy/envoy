@@ -89,7 +89,7 @@ absl::optional<double> DeterministicApertureLoadBalancer::Ring::weight(size_t in
 }
 
 size_t DeterministicApertureLoadBalancer::Ring::getIndex(double offset) const {
-  RELEASE_ASSERT(offset >= 0 && offset <= 1, "valid offset");
+  ASSERT(offset >= 0 && offset <= 1, "valid offset");
   return offset / unit_width_;
 }
 
@@ -103,7 +103,7 @@ size_t DeterministicApertureLoadBalancer::Ring::pick() const {
   return getIndex(std::fmod((offset_ + width_ * nextRandom()), 1.0));
 }
 
-size_t DeterministicApertureLoadBalancer::Ring::tryPickSecond(size_t first) const {
+size_t DeterministicApertureLoadBalancer::Ring::pickSecond(size_t first) const {
   double f_begin = first * unit_width_;
   ENVOY_LOG(trace, "Pick second for (first: {}, offset: {}, width: {}, first begin: {})", first,
             offset_, width_, f_begin);
@@ -136,14 +136,14 @@ size_t DeterministicApertureLoadBalancer::Ring::tryPickSecond(size_t first) cons
 std::pair<size_t, size_t> DeterministicApertureLoadBalancer::Ring::pick2() const {
   ENVOY_LOG(trace, "pick2 for offset: {}, width: {}", offset_, width_);
   const size_t first = pick();
-  const size_t second = tryPickSecond(first);
+  const size_t second = pickSecond(first);
 
   if (first == second) {
     stats_.pick2_same_.inc();
   }
 
   ENVOY_LOG(trace, "Returning: ({}, {})", first, second);
-  return std::pair<size_t, size_t>(first, second);
+  return {first, second};
 }
 
 } // namespace Upstream

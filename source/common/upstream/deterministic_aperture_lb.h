@@ -108,7 +108,7 @@ public:
      * @param first Index that was already picked. The new pick cannot overlap the first pick's
      * region.
      */
-    size_t tryPickSecond(size_t first) const;
+    size_t pickSecond(size_t first) const;
 
     /*
      * Picks two indexes as per the `p2c` algorithm.
