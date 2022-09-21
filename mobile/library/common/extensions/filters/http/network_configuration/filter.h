@@ -18,8 +18,10 @@ namespace NetworkConfiguration {
 /**
  * Filter to set upstream socket options based on network conditions.
  */
-class NetworkConfigurationFilter final : public Http::PassThroughFilter,
-                                         public Logger::Loggable<Logger::Id::filter> {
+class NetworkConfigurationFilter final
+    : public Http::PassThroughFilter,
+      public Logger::Loggable<Logger::Id::filter>,
+      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
 public:
   NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
                              bool enable_drain_post_dns_refresh, bool enable_interface_binding)
@@ -36,11 +38,25 @@ public:
   // Http::StreamFilterBase
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
+  // LoadDnsCacheEntryCallbacks
+  void onLoadDnsCacheComplete(
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
+
+  void onDestroy() override;
+
 private:
+  void setInfo(absl::string_view authority, Network::Address::InstanceConstSharedPtr address);
+  bool
+  onAddressResolved(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
+
+  // This is only present if there is an active proxy DNS lookup in progress.
+  std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandle>
+      dns_cache_handle_;
   Network::ConnectivityManagerSharedPtr connectivity_manager_;
   StreamInfo::ExtraStreamInfo* extra_stream_info_;
   bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;
+  Event::SchedulableCallbackPtr continue_decoding_callback_;
 };
 
 } // namespace NetworkConfiguration

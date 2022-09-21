@@ -67,7 +67,7 @@ envoy_status_t reset_stream(envoy_engine_t engine, envoy_stream_t stream) {
 
 envoy_status_t set_preferred_network(envoy_engine_t engine, envoy_network_t network) {
   envoy_netconf_t configuration_key =
-      Envoy::Network::ConnectivityManager::setPreferredNetwork(network);
+      Envoy::Network::ConnectivityManagerImpl::setPreferredNetwork(network);
   Envoy::EngineHandle::runOnEngineDispatcher(engine, [configuration_key](auto& engine) -> void {
     engine.networkConnectivityManager().refreshDns(configuration_key, true);
   });

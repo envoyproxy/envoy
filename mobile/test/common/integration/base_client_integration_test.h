@@ -38,6 +38,7 @@ public:
   virtual ~BaseClientIntegrationTest() = default;
 
 protected:
+  envoy_engine_t& rawEngine() { return engine_->engine_; }
   virtual void initialize() override;
   virtual void cleanup();
   void createEnvoy() override;

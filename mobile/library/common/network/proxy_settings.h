@@ -22,7 +22,8 @@ struct ProxySettings {
    * @param port The proxy port.
    */
   ProxySettings(const std::string& host, const uint16_t port)
-      : address_(Envoy::Network::Utility::parseInternetAddressNoThrow(host, port)) {}
+      : address_(Envoy::Network::Utility::parseInternetAddressNoThrow(host, port)), hostname_(host),
+        port_(port) {}
 
   /**
    * @brief Parses given host and domain and creates proxy settings. Returns nullptr
@@ -53,6 +54,20 @@ struct ProxySettings {
   const Envoy::Network::Address::InstanceConstSharedPtr& address() const { return address_; }
 
   /**
+   * @brief Returns the hostname of a proxy.
+   *
+   * @return Hostname of a proxy or the empty string if there is no hostname.
+   */
+  const std::string& hostname() const { return hostname_; }
+
+  /**
+   * @brief Returns the port of the proxy.
+   *
+   * @return Port of the proxy.
+   */
+  uint16_t port() const { return port_; }
+
+  /**
    * @brief Returns a human readable representation of the proxy settings represented
    *        by the receiver
    *
@@ -62,21 +77,23 @@ struct ProxySettings {
     if (address_ != nullptr) {
       return address_->asString();
     }
+    if (!hostname_.empty()) {
+      return absl::StrCat(hostname_, ":", port_);
+    }
     return "no_proxy_configured";
   }
 
   bool operator==(ProxySettings const& rhs) const {
-    if (this->address() == nullptr || rhs.address() == nullptr) {
-      return this->address() == nullptr && rhs.address() == nullptr;
-    }
-
-    return this->address()->asString() == rhs.address()->asString();
+    // Even if the hostnames are IP addresses, they'll be stored in hostname_
+    return this->hostname() == rhs.hostname() && this->port() == rhs.port();
   }
 
   bool operator!=(ProxySettings const& rhs) const { return !(*this == rhs); }
 
 private:
   Envoy::Network::Address::InstanceConstSharedPtr address_;
+  std::string hostname_;
+  uint16_t port_;
 };
 
 } // namespace Network

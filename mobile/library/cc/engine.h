@@ -8,6 +8,8 @@
 #include "stream_client.h"
 
 namespace Envoy {
+class BaseClientIntegrationTest;
+
 namespace Platform {
 
 class StreamClient;
@@ -27,6 +29,8 @@ private:
   friend class EngineBuilder;
   // required to use envoy_engine_t without exposing it publicly
   friend class StreamPrototype;
+  // for testing only
+  friend class ::Envoy::BaseClientIntegrationTest;
 
   envoy_engine_t engine_;
   StreamClientSharedPtr stream_client_;

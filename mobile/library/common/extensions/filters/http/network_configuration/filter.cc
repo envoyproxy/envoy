@@ -30,34 +30,102 @@ void NetworkConfigurationFilter::setDecoderFilterCallbacks(
   decoder_callbacks_->addUpstreamSocketOptions(options);
 }
 
+void NetworkConfigurationFilter::onLoadDnsCacheComplete(
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+  if (onAddressResolved(host_info)) {
+    continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
+        [this]() { decoder_callbacks_->continueDecoding(); });
+    continue_decoding_callback_->scheduleCallbackNextIteration();
+    return;
+  }
+}
+
+bool NetworkConfigurationFilter::onAddressResolved(
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+  if (host_info->address()) {
+    setInfo(decoder_callbacks_->streamInfo().getRequestHeaders()->getHostValue(),
+            host_info->address());
+    return true;
+  }
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                     "Proxy configured but DNS resolution failed", nullptr,
+                                     absl::nullopt, "no_dns_address_for_proxy");
+  return false;
+}
+
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
-  const auto proxy_settings = connectivity_manager_->getProxySettings();
-
   ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
+
+  const auto authority = request_headers.getHostValue();
+  if (authority.empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // If there is no proxy configured, continue.
+  const auto proxy_settings = connectivity_manager_->getProxySettings();
   if (proxy_settings == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
+  ENVOY_LOG(trace, "netconf_filter_processing_proxy_for_request", proxy_settings->asString());
+  // If there is a proxy with a raw address, set the information, and continue.
   const auto proxy_address = proxy_settings->address();
-
   if (proxy_address != nullptr) {
     const auto authorityHeader = request_headers.get(AuthorityHeaderName);
-    if (authorityHeader.empty()) {
-      return Http::FilterHeadersStatus::Continue;
-    }
 
-    const auto authority = authorityHeader[0]->value().getStringView();
-
-    ENVOY_LOG(trace, "netconf_filter_set_proxy_for_request", proxy_settings->asString());
-    decoder_callbacks_->streamInfo().filterState()->setData(
-        Network::Http11ProxyInfoFilterState::key(),
-        std::make_unique<Network::Http11ProxyInfoFilterState>(authority, proxy_address),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::FilterChain);
+    setInfo(request_headers.getHostValue(), proxy_address);
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  return Http::FilterHeadersStatus::Continue;
+  // If there's no address or hostname, continue.
+  if (proxy_settings->hostname().empty()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  // If there's a proxy hostname but no way to do a DNS lookup, fail the request.
+  if (!connectivity_manager_->dnsCache()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       "Proxy configured but no DNS cache available", nullptr,
+                                       absl::nullopt, "no_dns_cache_for_proxy");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // Attempt to load the proxy's hostname from the DNS cache.
+  auto result = connectivity_manager_->dnsCache()->loadDnsCacheEntry(proxy_settings->hostname(),
+                                                                     proxy_settings->port(), *this);
+
+  // If the hostname is not in the cache, pause filter iteration. The DNS cache will call
+  // onLoadDnsCacheComplete when DNS resolution succeeds, fails, or times out and processing
+  // will resume from there.
+  if (result.status_ == Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading) {
+    dns_cache_handle_ = std::move(result.handle_);
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
+
+  // If the hostname is in cache, set the info and continue.
+  if (result.host_info_.has_value()) {
+    if (onAddressResolved(*result.host_info_)) {
+      return Http::FilterHeadersStatus::Continue;
+    } else {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
+
+  // If DNS lookup straight up fails, fail the request.
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                     "Proxy configured but DNS resolution failed", nullptr,
+                                     absl::nullopt, "no_dns_address_for_proxy");
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+void NetworkConfigurationFilter::setInfo(absl::string_view authority,
+                                         Network::Address::InstanceConstSharedPtr address) {
+  ENVOY_LOG(trace, "netconf_filter_set_proxy_for_request", authority, address->asString());
+  decoder_callbacks_->streamInfo().filterState()->setData(
+      Network::Http11ProxyInfoFilterState::key(),
+      std::make_unique<Network::Http11ProxyInfoFilterState>(authority, address),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 Http::FilterHeadersStatus NetworkConfigurationFilter::encodeHeaders(Http::ResponseHeaderMap&,
@@ -93,6 +161,8 @@ Http::LocalErrorStatus NetworkConfigurationFilter::onLocalReply(const LocalReply
 
   return Http::LocalErrorStatus::ContinueAndResetStream;
 }
+
+void NetworkConfigurationFilter::onDestroy() { dns_cache_handle_.reset(); }
 
 } // namespace NetworkConfiguration
 } // namespace HttpFilters
