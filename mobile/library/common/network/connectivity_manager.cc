@@ -77,11 +77,11 @@ constexpr unsigned int InitialFaultThreshold = 1;
 // L7 bytes) before switching socket mode.
 constexpr unsigned int MaxFaultThreshold = 3;
 
-ConnectivityManager::NetworkState ConnectivityManager::network_state_{
+ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
     1, ENVOY_NET_GENERIC, MaxFaultThreshold, DefaultPreferredNetworkMode,
     Thread::MutexBasicLockable{}};
 
-envoy_netconf_t ConnectivityManager::setPreferredNetwork(envoy_network_t network) {
+envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(envoy_network_t network) {
   Thread::LockGuard lock{network_state_.mutex_};
 
   // TODO(goaway): Re-enable this guard. There's some concern that this will miss network updates
@@ -102,7 +102,7 @@ envoy_netconf_t ConnectivityManager::setPreferredNetwork(envoy_network_t network
   return network_state_.configuration_key_;
 }
 
-void ConnectivityManager::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
+void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
   if (proxy_settings_ == nullptr && new_proxy_settings != nullptr) {
     ENVOY_LOG_EVENT(info, "netconf_proxy_change", new_proxy_settings->asString());
     proxy_settings_ = new_proxy_settings;
@@ -118,19 +118,19 @@ void ConnectivityManager::setProxySettings(ProxySettingsConstSharedPtr new_proxy
   return;
 }
 
-ProxySettingsConstSharedPtr ConnectivityManager::getProxySettings() { return proxy_settings_; }
+ProxySettingsConstSharedPtr ConnectivityManagerImpl::getProxySettings() { return proxy_settings_; }
 
-envoy_network_t ConnectivityManager::getPreferredNetwork() {
+envoy_network_t ConnectivityManagerImpl::getPreferredNetwork() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.network_;
 }
 
-envoy_socket_mode_t ConnectivityManager::getSocketMode() {
+envoy_socket_mode_t ConnectivityManagerImpl::getSocketMode() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.socket_mode_;
 }
 
-envoy_netconf_t ConnectivityManager::getConfigurationKey() {
+envoy_netconf_t ConnectivityManagerImpl::getConfigurationKey() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.configuration_key_;
 }
@@ -141,8 +141,8 @@ envoy_netconf_t ConnectivityManager::getConfigurationKey() {
 // decrement remaining_faults_.
 //   - At 0, increment configuration_key, reset remaining_faults_ to InitialFaultThreshold and
 //     toggle socket_mode_.
-void ConnectivityManager::reportNetworkUsage(envoy_netconf_t configuration_key,
-                                             bool network_fault) {
+void ConnectivityManagerImpl::reportNetworkUsage(envoy_netconf_t configuration_key,
+                                                 bool network_fault) {
   ENVOY_LOG(debug, "reportNetworkUsage(configuration_key: {}, network_fault: {})",
             configuration_key, network_fault);
 
@@ -200,7 +200,7 @@ void ConnectivityManager::reportNetworkUsage(envoy_netconf_t configuration_key,
   }
 }
 
-void ConnectivityManager::onDnsResolutionComplete(
+void ConnectivityManagerImpl::onDnsResolutionComplete(
     const std::string& resolved_host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
     Network::DnsResolver::ResolutionStatus) {
@@ -223,7 +223,7 @@ void ConnectivityManager::onDnsResolutionComplete(
   }
 }
 
-void ConnectivityManager::setDrainPostDnsRefreshEnabled(bool enabled) {
+void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
   enable_drain_post_dns_refresh_ = enabled;
   if (!enabled) {
     hosts_to_drain_.clear();
@@ -237,11 +237,12 @@ void ConnectivityManager::setDrainPostDnsRefreshEnabled(bool enabled) {
   }
 }
 
-void ConnectivityManager::setInterfaceBindingEnabled(bool enabled) {
+void ConnectivityManagerImpl::setInterfaceBindingEnabled(bool enabled) {
   enable_interface_binding_ = enabled;
 }
 
-void ConnectivityManager::refreshDns(envoy_netconf_t configuration_key, bool drain_connections) {
+void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
+                                         bool drain_connections) {
   {
     Thread::LockGuard lock{network_state_.mutex_};
 
@@ -271,7 +272,7 @@ void ConnectivityManager::refreshDns(envoy_netconf_t configuration_key, bool dra
   }
 }
 
-Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManager::dnsCache() {
+Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManagerImpl::dnsCache() {
   auto cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
   if (!cache) {
     ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", BaseDnsCache);
@@ -279,7 +280,7 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManager::
   return cache;
 }
 
-void ConnectivityManager::resetConnectivityState() {
+void ConnectivityManagerImpl::resetConnectivityState() {
   envoy_netconf_t configuration_key;
   {
     Thread::LockGuard lock{network_state_.mutex_};
@@ -291,17 +292,17 @@ void ConnectivityManager::resetConnectivityState() {
   refreshDns(configuration_key, true);
 }
 
-std::vector<InterfacePair> ConnectivityManager::enumerateV4Interfaces() {
+std::vector<InterfacePair> ConnectivityManagerImpl::enumerateV4Interfaces() {
   return enumerateInterfaces(AF_INET, 0, 0);
 }
 
-std::vector<InterfacePair> ConnectivityManager::enumerateV6Interfaces() {
+std::vector<InterfacePair> ConnectivityManagerImpl::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6, 0, 0);
 }
 
 Socket::OptionsSharedPtr
-ConnectivityManager::getUpstreamSocketOptions(envoy_network_t network,
-                                              envoy_socket_mode_t socket_mode) {
+ConnectivityManagerImpl::getUpstreamSocketOptions(envoy_network_t network,
+                                                  envoy_socket_mode_t socket_mode) {
   if (enable_interface_binding_ && socket_mode == AlternateBoundInterfaceMode &&
       network != ENVOY_NET_GENERIC) {
     return getAlternateInterfaceSocketOptions(network);
@@ -320,13 +321,13 @@ ConnectivityManager::getUpstreamSocketOptions(envoy_network_t network,
 }
 
 Socket::OptionsSharedPtr
-ConnectivityManager::getAlternateInterfaceSocketOptions(envoy_network_t network) {
+ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(envoy_network_t network) {
   auto v4_pair = getActiveAlternateInterface(network, AF_INET);
   auto v6_pair = getActiveAlternateInterface(network, AF_INET6);
   ENVOY_LOG(debug, "found active alternate interface (ipv4): {} {}", std::get<0>(v4_pair),
-            std::get<1>(v4_pair));
+            std::get<1>(v4_pair)->asString());
   ENVOY_LOG(debug, "found active alternate interface (ipv6): {} {}", std::get<0>(v6_pair),
-            std::get<1>(v6_pair));
+            std::get<1>(v6_pair)->asString());
 
   auto options = std::make_shared<Socket::Options>();
 
@@ -355,7 +356,8 @@ ConnectivityManager::getAlternateInterfaceSocketOptions(envoy_network_t network)
   return options;
 }
 
-envoy_netconf_t ConnectivityManager::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
+envoy_netconf_t
+ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
   envoy_netconf_t configuration_key;
   envoy_network_t network;
   envoy_socket_mode_t socket_mode;
@@ -372,8 +374,8 @@ envoy_netconf_t ConnectivityManager::addUpstreamSocketOptions(Socket::OptionsSha
   return configuration_key;
 }
 
-InterfacePair ConnectivityManager::getActiveAlternateInterface(envoy_network_t network,
-                                                               unsigned short family) {
+InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(envoy_network_t network,
+                                                                   unsigned short family) {
   // Attempt to derive an active interface that differs from the passed network parameter.
   if (network == ENVOY_NET_WWAN) {
     // Network is cellular, so look for a WiFi interface.
@@ -408,9 +410,9 @@ InterfacePair ConnectivityManager::getActiveAlternateInterface(envoy_network_t n
 }
 
 std::vector<InterfacePair>
-ConnectivityManager::enumerateInterfaces([[maybe_unused]] unsigned short family,
-                                         [[maybe_unused]] unsigned int select_flags,
-                                         [[maybe_unused]] unsigned int reject_flags) {
+ConnectivityManagerImpl::enumerateInterfaces([[maybe_unused]] unsigned short family,
+                                             [[maybe_unused]] unsigned int select_flags,
+                                             [[maybe_unused]] unsigned int reject_flags) {
   std::vector<InterfacePair> pairs{};
 
   if (!Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
@@ -440,26 +442,19 @@ ConnectivityManager::enumerateInterfaces([[maybe_unused]] unsigned short family,
 }
 
 ConnectivityManagerSharedPtr ConnectivityManagerFactory::get() {
-  return context_.singletonManager().getTyped<ConnectivityManager>(
+  return context_.singletonManager().getTyped<ConnectivityManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager), [&] {
         Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory{
             context_};
-        return std::make_shared<ConnectivityManager>(context_.clusterManager(),
-                                                     cache_manager_factory.get());
+        return std::make_shared<ConnectivityManagerImpl>(context_.clusterManager(),
+                                                         cache_manager_factory.get());
       });
 }
 
 ConnectivityManagerSharedPtr ConnectivityManagerHandle::get() {
-  return singleton_manager_.getTyped<ConnectivityManager>(
+  return singleton_manager_.getTyped<ConnectivityManagerImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(connectivity_manager));
 }
 
 } // namespace Network
 } // namespace Envoy
-
-// NOLINT(namespace-envoy)
-namespace fmt {
-// Allow fmtlib to format InterfacePair::string_view
-template <>
-struct formatter<Envoy::Network::Address::InstanceConstSharedPtr> : ostream_formatter {};
-} // namespace fmt

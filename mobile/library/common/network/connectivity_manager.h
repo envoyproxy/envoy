@@ -78,12 +78,129 @@ using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedP
  *
  */
 class ConnectivityManager
-    : public Logger::Loggable<Logger::Id::upstream>,
-      public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
-      public Singleton::Instance {
+    : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
 public:
-  ConnectivityManager(Upstream::ClusterManager& cluster_manager,
-                      DnsCacheManagerSharedPtr dns_cache_manager)
+  virtual ~ConnectivityManager() = default;
+
+  /**
+   * @returns a list of local network interfaces supporting IPv4.
+   */
+  virtual std::vector<InterfacePair> enumerateV4Interfaces() PURE;
+
+  /**
+   * @returns a list of local network interfaces supporting IPv6.
+   */
+  virtual std::vector<InterfacePair> enumerateV6Interfaces() PURE;
+
+  /**
+   * @param family, network family of the interface.
+   * @param select_flags, flags which MUST be set for each returned interface.
+   * @param reject_flags, flags which MUST NOT be set for any returned interface.
+   * @returns a list of local network interfaces filtered by the providered flags.
+   */
+  virtual std::vector<InterfacePair> enumerateInterfaces(unsigned short family,
+                                                         unsigned int select_flags,
+                                                         unsigned int reject_flags) PURE;
+
+  /**
+   * @returns the current OS default/preferred network class.
+   */
+  virtual envoy_network_t getPreferredNetwork() PURE;
+
+  /**
+   * @returns the current mode used to determine upstream socket options.
+   */
+  virtual envoy_socket_mode_t getSocketMode() PURE;
+
+  /**
+   * @returns configuration key representing current network state.
+   */
+  virtual envoy_netconf_t getConfigurationKey() PURE;
+
+  /**
+   *
+   * @return the current proxy settings.
+   */
+  virtual Envoy::Network::ProxySettingsConstSharedPtr getProxySettings() PURE;
+
+  /**
+   * Call to report on the current viability of the passed network configuration after an attempt
+   * at transmission (e.g., an HTTP request).
+   * @param network_fault, whether a transmission attempt terminated w/o receiving upstream bytes.
+   */
+  virtual void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault) PURE;
+
+  /**
+   * @brief Sets the current proxy settings.
+   *
+   * @param proxy_settings The proxy settings. `nullptr` if there is no proxy configured on a
+   * device.
+   */
+  virtual void setProxySettings(ProxySettingsConstSharedPtr proxy_settings) PURE;
+
+  /**
+   * Configure whether connections should be drained after a triggered DNS refresh. Currently this
+   * may happen either due to an external call to refreshConnectivityState or an update to
+   * setPreferredNetwork.
+   * @param enabled, whether to enable connection drain after DNS refresh.
+   */
+  virtual void setDrainPostDnsRefreshEnabled(bool enabled) PURE;
+
+  /**
+   * Sets whether subsequent calls for upstream socket options may leverage options that bind
+   * to specific network interfaces.
+   * @param enabled, whether to enable interface binding.
+   */
+  virtual void setInterfaceBindingEnabled(bool enabled) PURE;
+
+  /**
+   * Refresh DNS in response to preferred network update. May be no-op.
+   * @param configuration_key, key provided by this class representing the current configuration.
+   * @param drain_connections, request that connections be drained after next DNS resolution.
+   */
+  virtual void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) PURE;
+
+  /**
+   * Drain all upstream connections associated with this Engine.
+   */
+  virtual void resetConnectivityState() PURE;
+
+  /**
+   * @returns the current socket options that should be used for connections.
+   */
+  virtual Socket::OptionsSharedPtr getUpstreamSocketOptions(envoy_network_t network,
+                                                            envoy_socket_mode_t socket_mode) PURE;
+
+  /**
+   * @param options, upstream connection options to which additional options should be appended.
+   * @returns configuration key to associate with any related calls.
+   */
+  virtual envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) PURE;
+
+  /**
+   * Returns the default DNS cache set up in base configuration. This cache may be missing either
+   * due to engine lifecycle-related timing or alternate configurations. If it is, operations
+   * that use it should revert to no-ops.
+   *
+   * @returns the default DNS cache set up in base configuration or nullptr.
+   */
+  virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
+};
+
+class ConnectivityManagerImpl : public ConnectivityManager,
+                                public Singleton::Instance,
+                                public Logger::Loggable<Logger::Id::upstream> {
+public:
+  /**
+   * Sets the current OS default/preferred network class. Note this function is allowed to be
+   * called from any thread.
+   * @param network, the OS-preferred network.
+   * @returns configuration key to associate with any related calls.
+   */
+  static envoy_netconf_t setPreferredNetwork(envoy_network_t network);
+
+  ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
+                          DnsCacheManagerSharedPtr dns_cache_manager)
       : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
@@ -95,106 +212,25 @@ public:
                                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
                                Network::DnsResolver::ResolutionStatus) override;
 
-  /**
-   * @returns a list of local network interfaces supporting IPv4.
-   */
-  std::vector<InterfacePair> enumerateV4Interfaces();
-
-  /**
-   * @returns a list of local network interfaces supporting IPv6.
-   */
-  std::vector<InterfacePair> enumerateV6Interfaces();
-
-  /**
-   * @param family, network family of the interface.
-   * @param select_flags, flags which MUST be set for each returned interface.
-   * @param reject_flags, flags which MUST NOT be set for any returned interface.
-   * @returns a list of local network interfaces filtered by the providered flags.
-   */
+  // ConnectivityManager
+  std::vector<InterfacePair> enumerateV4Interfaces() override;
+  std::vector<InterfacePair> enumerateV6Interfaces() override;
   std::vector<InterfacePair> enumerateInterfaces(unsigned short family, unsigned int select_flags,
-                                                 unsigned int reject_flags);
-
-  /**
-   * @returns the current OS default/preferred network class.
-   */
-  envoy_network_t getPreferredNetwork();
-
-  /**
-   * @returns the current mode used to determine upstream socket options.
-   */
-  envoy_socket_mode_t getSocketMode();
-
-  /**
-   * @returns configuration key representing current network state.
-   */
-  envoy_netconf_t getConfigurationKey();
-
-  /**
-   *
-   * @return the current proxy settings.
-   */
-  Envoy::Network::ProxySettingsConstSharedPtr getProxySettings();
-
-  /**
-   * Call to report on the current viability of the passed network configuration after an attempt
-   * at transmission (e.g., an HTTP request).
-   * @param network_fault, whether a transmission attempt terminated w/o receiving upstream bytes.
-   */
-  void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault);
-
-  /**
-   * Sets the current OS default/preferred network class. Note this function is allowed to be
-   * called from any thread.
-   * @param network, the OS-preferred network.
-   * @returns configuration key to associate with any related calls.
-   */
-  static envoy_netconf_t setPreferredNetwork(envoy_network_t network);
-
-  /**
-   * @brief Sets the current proxy settings.
-   *
-   * @param host The proxy settings. `nullptr` if there is no proxy configured on a device.
-   */
-  void setProxySettings(ProxySettingsConstSharedPtr proxy_settings);
-
-  /**
-   * Configure whether connections should be drained after a triggered DNS refresh. Currently this
-   * may happen either due to an external call to refreshConnectivityState or an update to
-   * setPreferredNetwork.
-   * @param enabled, whether to enable connection drain after DNS refresh.
-   */
-  void setDrainPostDnsRefreshEnabled(bool enabled);
-
-  /**
-   * Sets whether subsequent calls for upstream socket options may leverage options that bind
-   * to specific network interfaces.
-   * @param enabled, whether to enable interface binding.
-   */
-  void setInterfaceBindingEnabled(bool enabled);
-
-  /**
-   * Refresh DNS in response to preferred network update. May be no-op.
-   * @param configuration_key, key provided by this class representing the current configuration.
-   * @param drain_connections, request that connections be drained after next DNS resolution.
-   */
-  void refreshDns(envoy_netconf_t configuration_key, bool drain_connections);
-
-  /**
-   * Drain all upstream connections associated with this Engine.
-   */
-  void resetConnectivityState();
-
-  /**
-   * @returns the current socket options that should be used for connections.
-   */
+                                                 unsigned int reject_flags) override;
+  envoy_network_t getPreferredNetwork() override;
+  envoy_socket_mode_t getSocketMode() override;
+  envoy_netconf_t getConfigurationKey() override;
+  Envoy::Network::ProxySettingsConstSharedPtr getProxySettings() override;
+  void reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault) override;
+  void setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) override;
+  void setDrainPostDnsRefreshEnabled(bool enabled) override;
+  void setInterfaceBindingEnabled(bool enabled) override;
+  void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) override;
+  void resetConnectivityState() override;
   Socket::OptionsSharedPtr getUpstreamSocketOptions(envoy_network_t network,
-                                                    envoy_socket_mode_t socket_mode);
-
-  /**
-   * @param options, upstream connection options to which additional options should be appended.
-   * @returns configuration key to associate with any related calls.
-   */
-  envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options);
+                                                    envoy_socket_mode_t socket_mode) override;
+  envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
 
 private:
   struct NetworkState {
@@ -208,15 +244,6 @@ private:
   };
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(envoy_network_t network);
   InterfacePair getActiveAlternateInterface(envoy_network_t network, unsigned short family);
-
-  /**
-   * Returns the default DNS cache set up in base configuration. This cache may be missing either
-   * due to engine lifecycle-related timing or alternate configurations. If it is, operations
-   * that use it should revert to no-ops.
-   *
-   * @returns the default DNS cache set up in base configuration or nullptr.
-   */
-  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache();
 
   bool enable_drain_post_dns_refresh_{false};
   bool enable_interface_binding_{false};

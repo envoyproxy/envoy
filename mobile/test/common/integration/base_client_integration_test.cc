@@ -13,7 +13,7 @@ namespace Envoy {
 namespace {
 
 void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
-                         bool upstream_tls) {
+                         bool upstream_tls, bool is_first_request) {
   if (expect_dns) {
     EXPECT_NE(-1, final_intel.dns_start_ms);
     EXPECT_NE(-1, final_intel.dns_end_ms);
@@ -35,7 +35,9 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_NE(-1, final_intel.response_start_ms);
   ASSERT_NE(-1, final_intel.stream_end_ms);
 
-  ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
+  if (is_first_request) {
+    ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
+  }
   ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
   ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
   ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
@@ -77,7 +79,7 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_, upstream_tls_);
+        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();

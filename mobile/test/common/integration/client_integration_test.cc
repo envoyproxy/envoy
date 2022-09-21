@@ -4,6 +4,8 @@
 #include "test/integration/autonomous_upstream.h"
 
 #include "library/common/data/utility.h"
+#include "library/common/main_interface.h"
+#include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
 using testing::ReturnRef;
@@ -23,7 +25,6 @@ public:
   }
 
   void TearDown() override {
-    ASSERT_EQ(cc_.on_complete_calls + cc_.on_cancel_calls + cc_.on_error_calls, 1);
     cleanup();
     BaseClientIntegrationTest::TearDown();
   }
@@ -134,6 +135,7 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
 
   // Now cancel, and make sure the cancel is received.
   stream_->cancel();
+  memset(&cc_.final_intel, 0, sizeof(cc_.final_intel));
   terminal_callback_.waitReady();
 
   ASSERT_EQ(cc_.on_headers_calls, 1);
@@ -285,6 +287,32 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   ASSERT_EQ(cc_.on_data_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
   ASSERT_EQ(cc_.on_error_calls, 1);
+}
+
+// TODO(alyssawilk) get this working in a follow-up.
+TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
+  addLogLevel(Platform::LogLevel::trace);
+  initialize();
+  if (version_ == Network::Address::IpVersion::v6) {
+    // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
+    return;
+  }
+
+  set_proxy_settings(rawEngine(), "localhost", fake_upstreams_[0]->localAddress()->ip()->port());
+
+  // The initial request will do the DNS lookup and resolve localhost to 127.0.0.1
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+  stream_.reset();
+
+  // The second request will use the cached DNS entry and should succeed as well.
+  stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_complete_calls, 2);
 }
 
 } // namespace
