@@ -1,4 +1,4 @@
-Dubbo filters
+Generic filters
 ==============
 
 .. toctree::
