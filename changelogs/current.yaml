@@ -100,6 +100,9 @@ bug_fixes:
 - area: router
   change: |
     fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
+- area: upstream
+  change: |
+    fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
