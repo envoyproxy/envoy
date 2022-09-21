@@ -6304,7 +6304,6 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           weighted_clusters:
-            total_weight: 50
             clusters:
               - cluster_header: x-route-to-this-cluster
                 weight: 50
