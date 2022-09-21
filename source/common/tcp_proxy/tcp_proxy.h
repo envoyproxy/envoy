@@ -137,14 +137,15 @@ public:
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
-  void emitResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+  void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
 private:
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
-  const bool emit_response_headers_;
+  const bool propagate_response_headers_;
 };
 
 /**

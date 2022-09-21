@@ -864,7 +864,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    proxy_config.mutable_tunneling_config()->set_emit_response_headers(true);
+    proxy_config.mutable_tunneling_config()->set_propagate_response_headers(true);
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(

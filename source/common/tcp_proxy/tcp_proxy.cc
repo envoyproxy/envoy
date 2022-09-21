@@ -564,7 +564,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
-      emit_response_headers_(config_message.emit_response_headers()) {
+      propagate_response_headers_(config_message.propagate_response_headers()) {
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
       config_message.hostname());
@@ -579,10 +579,10 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
                                absl::string_view());
 }
 
-void TunnelingConfigHelperImpl::emitResponseHeaders(
+void TunnelingConfigHelperImpl::propagateResponseHeaders(
     Http::ResponseHeaderMapPtr&& headers,
     const StreamInfo::FilterStateSharedPtr& filter_state) const {
-  if (!emit_response_headers_) {
+  if (!propagate_response_headers_) {
     return;
   }
   filter_state->setData(
