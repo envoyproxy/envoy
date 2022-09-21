@@ -12,10 +12,6 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-std::string headersToSerializedString(const CacheFileHeader& headers);
-Buffer::OwnedImpl headersToBuffer(const CacheFileHeader& headers);
-Buffer::OwnedImpl trailersToBuffer(const CacheFileTrailer& trailers);
-
 void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
                                        const Http::ResponseHeaderMap& response_headers,
                                        const ResponseMetadata& metadata);
@@ -27,6 +23,8 @@ CacheFileHeader protoFromHeadersAndMetadata(const Key& key,
 size_t headerProtoSize(const CacheFileHeader& proto);
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto);
+Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto);
+std::string serializedStringFromProto(const CacheFileHeader& proto);
 
 } // namespace FileSystemHttpCache
 } // namespace Cache

@@ -186,7 +186,7 @@ void InsertOperationQueue::insertTrailers(std::shared_ptr<InsertOperationQueue> 
     t->set_value(std::string{trailer.value().getStringView()});
     return Http::HeaderMap::Iterate::Continue;
   });
-  push(p, QueuedFileChunk{QueuedFileChunk::Type::Trailer, trailersToBuffer(file_trailer),
+  push(p, QueuedFileChunk{QueuedFileChunk::Type::Trailer, bufferFromProto(file_trailer),
                           insert_complete, true});
 }
 

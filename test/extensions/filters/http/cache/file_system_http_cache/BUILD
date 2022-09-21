@@ -16,6 +16,7 @@ envoy_extension_cc_test(
         "//source/common/filesystem:directory_lib",
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
         "//source/extensions/filters/http/cache/file_system_http_cache:config",
+        "//test/extensions/common/async_files:mocks",
         "//test/extensions/filters/http/cache:common",
         "//test/extensions/filters/http/cache:http_cache_implementation_test_common_lib",
         "//test/mocks/server:factory_context_mocks",

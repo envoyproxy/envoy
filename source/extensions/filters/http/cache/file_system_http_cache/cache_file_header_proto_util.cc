@@ -28,10 +28,6 @@ const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate() {
 }
 } // namespace
 
-std::string headersToSerializedString(const CacheFileHeader& headers) {
-  return headers.SerializeAsString();
-}
-
 Buffer::OwnedImpl headersToBuffer(const CacheFileHeader& headers) {
   Buffer::OwnedImpl buffer;
   std::string serialized_headers = headers.SerializeAsString();
@@ -128,6 +124,14 @@ size_t headerProtoSize(const CacheFileHeader& proto) { return proto.SerializeAsS
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto) {
   return Buffer::OwnedImpl{proto.SerializeAsString()};
+}
+
+Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto) {
+  return Buffer::OwnedImpl{proto.SerializeAsString()};
+}
+
+std::string serializedStringFromProto(const CacheFileHeader& proto) {
+  return proto.SerializeAsString();
 }
 
 } // namespace FileSystemHttpCache

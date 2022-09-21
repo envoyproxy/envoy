@@ -69,7 +69,7 @@ Buffer::OwnedImpl CacheEntryVaryRedirect::asBuffer() const {
   auto h = header.add_headers();
   h->set_key(Http::CustomHeaders::get().Vary.get());
   h->set_value(vary_header_values_copy_);
-  std::string serialized_headers = headersToSerializedString(header);
+  std::string serialized_headers = serializedStringFromProto(header);
   block.setHeadersSize(serialized_headers.length());
   buffer.add(block.stringView());
   buffer.add(serialized_headers);
