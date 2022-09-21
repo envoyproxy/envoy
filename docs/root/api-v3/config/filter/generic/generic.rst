@@ -1,5 +1,5 @@
 Generic filters
-==============
+===============
 
 .. toctree::
   :glob:
