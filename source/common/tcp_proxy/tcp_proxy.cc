@@ -555,7 +555,7 @@ ProtobufTypes::MessagePtr TunnelResponseHeaders::serializeAsProto() const {
 }
 
 const std::string& TunnelResponseHeaders::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.tunnel_response_headers");
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_headers");
 }
 
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(

@@ -170,8 +170,8 @@ private:
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
-        parent_.config_.emitResponseHeaders(std::move(headers),
-                                            parent_.downstream_info_.filterState());
+        parent_.config_.propagateResponseHeaders(std::move(headers),
+                                                 parent_.downstream_info_.filterState());
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();
       }

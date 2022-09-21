@@ -225,7 +225,7 @@ new_features:
     added support for quit command to the redis proxy.
 - area: tcp_proxy
   change: |
-    added support for emitting the response headers in :ref:`TunnelingConfig
+    added support for propagating the response headers in :ref:`TunnelingConfig
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers>` to
     the downstream info filter state.
 - area: access_log

@@ -868,7 +868,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "%FILTER_STATE(envoy.tcp_proxy.tunnel_response_headers:TYPED)%\n");
+        "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
     proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
