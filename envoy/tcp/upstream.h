@@ -71,14 +71,14 @@ public:
    * @param info supplies the stream info object associated with the upstream connection.
    * @param upstream supplies the generic upstream for the stream.
    * @param host supplies the description of the host that will carry the request.
-   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param address_provider supplies the address provider of the upstream connection.
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
-  virtual void
-  onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
-                     Upstream::HostDescriptionConstSharedPtr& host,
-                     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                     Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
+  virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
+                                  std::unique_ptr<GenericUpstream>&& upstream,
+                                  Upstream::HostDescriptionConstSharedPtr& host,
+                                  const Network::ConnectionInfoProvider& address_provider,
+                                  Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
   /**
    * Called to indicate a failure for GenericConnPool::newStream to establish a stream.

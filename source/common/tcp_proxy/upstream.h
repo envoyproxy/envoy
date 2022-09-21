@@ -72,7 +72,7 @@ public:
     virtual ~Callbacks() = default;
     virtual void onSuccess(Http::RequestEncoder& request_encoder) {
       ASSERT(conn_pool_ != nullptr);
-      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionLocalAddress(),
+      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionInfoProvider(),
                                      ssl_info_);
     }
     virtual void onFailure() {
@@ -92,7 +92,7 @@ public:
 
 private:
   void onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
-                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          const Network::ConnectionInfoProvider& address_provider,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfigHelper& config_;
   Http::CodecType type_;

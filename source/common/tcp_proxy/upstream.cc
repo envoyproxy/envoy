@@ -189,7 +189,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(
       &connection.streamInfo(), std::move(upstream), host,
-      latched_data->connection().connectionInfoProvider().localAddress(),
+      latched_data->connection().connectionInfoProvider(),
       latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
@@ -252,9 +252,9 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
-                                      const Network::Address::InstanceConstSharedPtr& local_address,
+                                      const Network::ConnectionInfoProvider& address_provider,
                                       Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, local_address, ssl_info);
+  callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host, address_provider, ssl_info);
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,

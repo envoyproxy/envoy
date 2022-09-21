@@ -157,8 +157,8 @@ public:
                              const Http::ConnectionPool::Instance::StreamOptions&)
                              -> Http::ConnectionPool::Cancellable* {
           response_decoder = &decoder;
-          EXPECT_CALL(encoder.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address1_));
+          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+              .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
                                 stream_info_, Http::Protocol::Http10);
@@ -199,8 +199,8 @@ public:
                              const Http::ConnectionPool::Instance::StreamOptions&)
                              -> Http::ConnectionPool::Cancellable* {
           response_decoder = &decoder;
-          EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address1_));
+          EXPECT_CALL(encoder1.stream_, connectionInfoProvider())
+              .WillRepeatedly(ReturnRef(connection_info1_));
           callbacks.onPoolReady(encoder1,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
                                 stream_info_, Http::Protocol::Http10);
@@ -231,8 +231,8 @@ public:
           EXPECT_CALL(
               context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
-          EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
-              .WillRepeatedly(ReturnRef(upstream_local_address2_));
+          EXPECT_CALL(encoder2.stream_, connectionInfoProvider())
+              .WillRepeatedly(ReturnRef(connection_info2_));
           callbacks.onPoolReady(encoder2,
                                 context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
                                 stream_info_, Http::Protocol::Http10);
@@ -264,6 +264,10 @@ public:
       Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
   Network::Address::InstanceConstSharedPtr upstream_local_address2_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:10212")};
+  Network::ConnectionInfoSetterImpl connection_info1_{upstream_local_address1_,
+                                                      upstream_local_address1_};
+  Network::ConnectionInfoSetterImpl connection_info2_{upstream_local_address2_,
+                                                      upstream_local_address2_};
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
 

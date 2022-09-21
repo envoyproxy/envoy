@@ -360,7 +360,7 @@ public:
   // GenericConnectionPoolCallbacks
   void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
                           Upstream::HostDescriptionConstSharedPtr& host,
-                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          const Network::ConnectionInfoProvider& address_provider,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info) override;
   void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                             absl::string_view failure_reason,
