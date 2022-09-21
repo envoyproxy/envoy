@@ -85,6 +85,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http
+  change: |
+    fixed a bug with internal redirects not being performed for drained connections.
 - area: listener
   change: |
     fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
@@ -230,3 +233,8 @@ deprecated:
   change: |
     deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
     :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.
+- area: router
+  change: |
+    deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted
+    clusters. The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
+    will be used as the total weight.

@@ -136,12 +136,12 @@ public:
   // SendBufferMonitor
   // Update the book keeping of the aggregated buffered bytes cross all the
   // streams, and run watermark check.
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override;
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override;
 
   // Called after each write when a previous connection close call is postponed.
   void maybeApplyDelayClosePolicy();
 
-  uint32_t bytesToSend() { return bytes_to_send_; }
+  uint64_t bytesToSend() { return bytes_to_send_; }
 
   virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
     http3_options_ = http3_options;
@@ -195,7 +195,7 @@ private:
 
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;
-  uint32_t bytes_to_send_{0};
+  uint64_t bytes_to_send_{0};
   uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
