@@ -62,7 +62,6 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
       ASSERT(dynamic_cast<RateLimitOnMactchAction*>(result.get()));
       const RateLimitOnMactchAction& match_action =
           static_cast<const RateLimitOnMactchAction&>(*result);
-      // return static_cast<const RateLimitOnMactchAction&>(*result);
       return match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
     } else {
       return absl::InternalError(absl::StrCat("Failed to match the request"));
