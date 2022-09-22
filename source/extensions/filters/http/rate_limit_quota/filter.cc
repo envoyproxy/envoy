@@ -12,11 +12,18 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                              bool) {
   // Start the stream on the first request.
   auto start_stream = rate_limit_client_->startStream(callbacks_->streamInfo());
   if (!start_stream.ok()) {
     // TODO(tyxia) Consider adding the log.
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  absl::StatusOr<BucketId> bucket_id = requestMatching(headers);
+  if (!bucket_id.ok()) {
+    // Failed to generate the bucket id for the incoming request.
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
@@ -65,6 +72,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
       // Try to generate the bucket id if matching succeeded.
       return match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
     } else {
+      // TODO(tyxia) Check if `on_no_match` field is configured or not.
       return absl::InternalError("Failed to match the request");
     }
   }
