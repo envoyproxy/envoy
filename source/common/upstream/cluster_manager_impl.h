@@ -435,13 +435,15 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
+          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
+                                                                                    host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool draining_{false};
 
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
@@ -449,10 +451,13 @@ private:
     };
 
     struct TcpConnPoolsContainer {
+      TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       ConnPools pools_;
-      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -479,8 +484,14 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    using TcpConnectionsMap =
-        absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
+    struct TcpConnectionsMap {
+      TcpConnectionsMap(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
+      absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
+          connections_;
+    };
 
     class ClusterEntry : public ThreadLocalCluster {
     public:

@@ -559,6 +559,16 @@ public:
     return config;
   }
 
+  const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
+  makeHealthCheckConfigAltAddress(const std::string& address, uint32_t port) {
+    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+    auto* socket_address = config.mutable_address()->mutable_socket_address();
+    socket_address->set_address(address);
+    socket_address->set_port_value(port);
+    config.set_port_value(port);
+    return config;
+  }
+
   void appendTestHosts(std::shared_ptr<MockClusterMockPrioritySet> cluster,
                        const HostWithHealthCheckMap& hosts, const std::string& protocol = "tcp://",
                        const uint32_t priority = 0) {
@@ -2850,6 +2860,78 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   // Prepares a set of hosts along with its designated health check ports.
   const HostWithHealthCheckMap hosts = {{"127.0.0.1:80", makeHealthCheckConfig(8000)},
                                         {"127.0.0.1:81", makeHealthCheckConfig(8001)}};
+  appendTestHosts(cluster_, hosts);
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate(hosts);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectSessionCreate(hosts);
+  expectStreamCreate(1);
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).Times(2);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .Times(2)
+      .WillRepeatedly(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  EXPECT_CALL(*test_sessions_[1]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[1]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  respond(1, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->health());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltAddress) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
+  setupServiceValidationHC();
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  // Prepares a host with its designated health check port.
+  const HostWithHealthCheckMap hosts{
+      {"127.0.0.1:80", makeHealthCheckConfigAltAddress("127.0.0.2", 8000)}};
+  appendTestHosts(cluster_, hosts);
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate(hosts);
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        EXPECT_EQ(headers.getHostValue(), host);
+        EXPECT_EQ(headers.getPathValue(), path);
+        return Http::okStatus();
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, false, true, false, health_checked_cluster);
+  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
+}
+
+// Test host check success with multiple hosts by checking each host defined health check address.
+TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltAddress) {
+  setupNoServiceValidationHC();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
+
+  // Prepares a set of hosts along with its designated health check ports.
+  const HostWithHealthCheckMap hosts = {
+      {"127.0.0.1:80", makeHealthCheckConfigAltAddress("127.0.0.2", 8000)},
+      {"127.0.0.2:81", makeHealthCheckConfigAltAddress("127.0.0.2", 8000)}};
   appendTestHosts(cluster_, hosts);
   cluster_->info_->stats().upstream_cx_total_.inc();
   cluster_->info_->stats().upstream_cx_total_.inc();

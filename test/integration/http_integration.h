@@ -12,6 +12,10 @@
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+#endif
+
 namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
@@ -345,6 +349,10 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+#ifdef ENVOY_ENABLE_QUIC
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
+#endif
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

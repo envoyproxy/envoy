@@ -93,6 +93,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
+  ~AsyncStreamImpl() override { router_.onDestroy(); }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -231,6 +232,8 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
+    const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
+    const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -294,6 +297,8 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
+    static const Router::PathMatcherSharedPtr path_matcher_;
+    static const Router::PathRewriterSharedPtr path_rewriter_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;

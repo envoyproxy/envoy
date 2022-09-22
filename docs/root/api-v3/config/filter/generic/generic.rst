@@ -1,5 +1,5 @@
-Dubbo filters
-==============
+Generic filters
+===============
 
 .. toctree::
   :glob:
