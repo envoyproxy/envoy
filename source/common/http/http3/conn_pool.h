@@ -14,6 +14,7 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -174,6 +175,9 @@ private:
   quic::QuicServerId server_id_;
   // If not nullopt, called when the handshake state changes.
   OptRef<PoolConnectResultCallback> connect_callback_;
+
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
 };
 
 std::unique_ptr<Http3ConnPoolImpl>

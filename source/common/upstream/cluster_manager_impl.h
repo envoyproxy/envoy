@@ -444,7 +444,6 @@ private:
       const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool draining_{false};
 
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
@@ -459,7 +458,6 @@ private:
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
       ConnPools pools_;
-      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection

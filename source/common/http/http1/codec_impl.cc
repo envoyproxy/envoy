@@ -375,8 +375,8 @@ void StreamEncoderImpl::readDisable(bool disable) {
 
 uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
-const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().connectionInfoProvider().localAddress();
+const Network::ConnectionInfoProvider& StreamEncoderImpl::connectionInfoProvider() {
+  return connection_.connection().connectionInfoProvider();
 }
 
 static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
@@ -511,7 +511,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024);
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
   }

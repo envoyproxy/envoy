@@ -252,7 +252,8 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
       quic::QuicServerId(
           quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr,
+      connection_id_generator_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -314,7 +315,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
           downstream_protocol,
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 

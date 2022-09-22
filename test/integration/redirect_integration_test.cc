@@ -157,9 +157,12 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.set_via("via_value"); });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    hcm.mutable_delayed_close_timeout()->set_seconds(0);
+    hcm.set_via("via_value");
+    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(1);
+  });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
