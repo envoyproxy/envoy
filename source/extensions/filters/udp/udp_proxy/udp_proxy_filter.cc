@@ -354,7 +354,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       set. We allow the OS to select the right IP based on outbound routing rules if
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
-  if (!use_original_src_ip_ && !skip_connecting_) {
+  if (!use_original_src_ip_ && !skip_connect_) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_proxy_connect")) {
       Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
       if (SOCKET_FAILURE(rc.return_value_)) {
@@ -364,7 +364,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
       }
     }
 
-    skip_connecting_ = true;
+    skip_connect_ = true;
   }
   Api::IoCallUint64Result rc =
       Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
