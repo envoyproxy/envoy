@@ -72,7 +72,7 @@ public:
   // With a non-overridden MockAsyncFileManager, action functions put the action into queue_,
   // and the actions can be completed by calling nextActionCompletes with the parameter to
   // be passed to the callback.
-  // For callbacks taking StatusOr<T>, the value must be passed as explicitly a StatusOr<T>,
+  // For callbacks taking StatusOr<T>, the value must be passed as eplicitly a StatusOr<T>,
   // not just a Status or a T.
   template <typename T> void nextActionCompletes(T result) {
     ASSERT_FALSE(queue_.empty());

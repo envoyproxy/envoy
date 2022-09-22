@@ -2,10 +2,10 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
+#include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
 
 #include "source/extensions/common/async_files/async_file_manager.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_entry.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_entry.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "absl/base/thread_annotations.h"
@@ -19,7 +19,7 @@ namespace Cache {
 namespace FileSystemHttpCache {
 
 using ConfigProto =
-    envoy::extensions::filters::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
+    envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,

@@ -1,8 +1,8 @@
-#include "source/extensions/filters/http/cache/file_system_http_cache/file_system_http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/insert_context.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/lookup_context.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
+#include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
+#include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
 #include "cache_entry.h"
 
@@ -46,7 +46,7 @@ void FileSystemHttpCache::writeVaryNodeToDisk(const Key& key,
 }
 
 absl::string_view FileSystemHttpCache::name() {
-  return "envoy.extensions.filters.http.cache.file_system_http_cache";
+  return "envoy.extensions.http.cache.file_system_http_cache";
 }
 
 FileSystemHttpCache::FileSystemHttpCache(

@@ -229,8 +229,8 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.extensions.filters.http.cache.file_system_http_cache": "//source/extensions/filters/http/cache/file_system_http_cache:config",
     "envoy.extensions.http.cache.simple":                         "//source/extensions/filters/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache.file_system_http_cache": "//source/extensions/http/cache/file_system_http_cache:config",
 
     #
     # Internal redirect predicates

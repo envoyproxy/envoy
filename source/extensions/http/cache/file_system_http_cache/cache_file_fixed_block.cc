@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_fixed_block.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 
 #include <netinet/in.h>
 

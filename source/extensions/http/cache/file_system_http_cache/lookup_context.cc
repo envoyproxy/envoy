@@ -1,7 +1,7 @@
-#include "source/extensions/filters/http/cache/file_system_http_cache/lookup_context.h"
+#include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_header.pb.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/file_system_http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {

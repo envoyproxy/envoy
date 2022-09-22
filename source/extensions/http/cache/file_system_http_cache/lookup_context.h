@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "source/extensions/common/async_files/async_file_handle.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_entry.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_entry.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 namespace Envoy {
@@ -16,6 +16,12 @@ class FileSystemHttpCache;
 
 using Envoy::Extensions::Common::AsyncFiles::AsyncFileHandle;
 using Envoy::Extensions::Common::AsyncFiles::CancelFunction;
+using HttpFilters::Cache::AdjustedByteRange;
+using HttpFilters::Cache::LookupBodyCallback;
+using HttpFilters::Cache::LookupContext;
+using HttpFilters::Cache::LookupHeadersCallback;
+using HttpFilters::Cache::LookupRequest;
+using HttpFilters::Cache::LookupTrailersCallback;
 
 // A LookupContext that always just returns no-result.
 class NoOpLookupContext : public LookupContext {

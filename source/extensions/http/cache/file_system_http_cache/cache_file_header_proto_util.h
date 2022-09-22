@@ -4,7 +4,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_header.pb.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 
 namespace Envoy {
 namespace Extensions {

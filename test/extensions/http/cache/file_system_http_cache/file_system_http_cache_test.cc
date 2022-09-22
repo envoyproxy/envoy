@@ -6,7 +6,7 @@
 #include "source/common/filesystem/directory.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/file_system_http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
 #include "test/extensions/filters/http/cache/common.h"
@@ -37,7 +37,7 @@ using ::testing::NiceMock;
 
 absl::string_view yaml_config = R"(
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
+    "@type": type.googleapis.com/envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
     manager_config:
       thread_pool:
         thread_count: 1
@@ -222,13 +222,13 @@ INSTANTIATE_TEST_SUITE_P(FileSystemHttpCacheTest, HttpCacheImplementationTest,
 
 TEST(Registration, GetCacheFromFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.extensions.filters.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig");
+      "envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
-            "envoy.extensions.filters.http.cache.file_system_http_cache");
+            "envoy.extensions.http.cache.file_system_http_cache");
 }
 
 } // namespace

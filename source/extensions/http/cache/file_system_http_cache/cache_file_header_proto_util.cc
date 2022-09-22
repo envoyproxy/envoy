@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -9,7 +9,7 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
-const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate() {
+const absl::flat_hash_set<Envoy::Http::LowerCaseString> headersNotToUpdate() {
   CONSTRUCT_ON_FIRST_USE(
       absl::flat_hash_set<Http::LowerCaseString>,
       // Content range should not be changed upon validation

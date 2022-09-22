@@ -1,8 +1,8 @@
-#include "source/extensions/filters/http/cache/file_system_http_cache/insert_context.h"
+#include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/file_system_http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {

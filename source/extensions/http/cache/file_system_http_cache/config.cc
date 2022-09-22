@@ -1,12 +1,12 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
-#include "envoy/extensions/filters/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.validate.h"
+#include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
+#include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
-#include "source/extensions/filters/http/cache/file_system_http_cache/file_system_http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
 namespace Envoy {

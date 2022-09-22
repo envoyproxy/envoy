@@ -11,11 +11,11 @@ envoy_package()
 envoy_extension_cc_test(
     name = "file_system_http_cache_test",
     srcs = ["file_system_http_cache_test.cc"],
-    extension_names = ["envoy.extensions.filters.http.cache.file_system_http_cache"],
+    extension_names = ["envoy.extensions.http.cache.file_system_http_cache"],
     deps = [
         "//source/common/filesystem:directory_lib",
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
-        "//source/extensions/filters/http/cache/file_system_http_cache:config",
+        "//source/extensions/http/cache/file_system_http_cache:config",
         "//test/extensions/common/async_files:mocks",
         "//test/extensions/filters/http/cache:common",
         "//test/extensions/filters/http/cache:http_cache_implementation_test_common_lib",
