@@ -69,7 +69,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 }
 
-BucketId
+absl::StatusOr<BucketId>
 RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
                                           Server::Configuration::FactoryContext& factory_context,
                                           RateLimitQuotaValidationVisitor& visitor) const {
@@ -104,10 +104,10 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           // Build the bucket id from the matched result.
           bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
         } else {
-          // ENVOY_LOG(debug, "Empty matched result.");
+          return absl::InternalError("Empty matched result.");
         }
       } else {
-        // ENVOY_LOG(debug, "Failed to retrieve the result from custom value");
+        return absl::InternalError("Failed to retrieve the result from custom value config.");
       }
       break;
     }

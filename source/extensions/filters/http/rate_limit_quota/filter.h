@@ -51,9 +51,9 @@ public:
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings settings)
       : setting_(std::move(settings)) {}
 
-  BucketId generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                            Server::Configuration::FactoryContext& factory_context,
-                            RateLimitQuotaValidationVisitor& visitor) const;
+  absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
+                                            Server::Configuration::FactoryContext& factory_context,
+                                            RateLimitQuotaValidationVisitor& visitor) const;
 
 private:
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings setting_;
