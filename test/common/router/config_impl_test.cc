@@ -3270,7 +3270,6 @@ TEST_F(RouteMatcherTest, WeightedClusterHeader) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 100
                   clusters:
                     - cluster_header: some_header
                       weight: 30
@@ -3303,7 +3302,6 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 80
                   header_name: "x_random_value"
                   clusters:
                     - name: cluster1
@@ -5848,7 +5846,6 @@ virtual_hosts:
                 weight: 3000
               - name: cluster3
                 weight: 5000
-            total_weight: 10000
   - name: www3
     domains: ["www3.lyft.com"]
     routes:
@@ -5877,7 +5874,6 @@ virtual_hosts:
                 weight: 3000
               - name: cluster3
                 weight: 5000
-            total_weight: 10000
   )EOF";
 
   BazFactory baz_factory;
@@ -6147,7 +6143,7 @@ virtual_hosts:
                EnvoyException);
 }
 
-TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
+TEST_F(RouteMatcherTest, WeightedClustersZeroSumOfWeights) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
@@ -6156,19 +6152,33 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           weighted_clusters:
-            total_weight: 99
             clusters:
               - name: cluster1
-                weight: 3
               - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 99");
+      "Field 'weight' is missing in: name: \"cluster1\"\n");
+
+  const std::string yaml2 = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 0
+              - name: cluster2
+                weight: 0
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml2), factory_context_, true),
+      EnvoyException, "Sum of weights in the weighted_cluster must be greater than 0.");
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
@@ -6296,7 +6306,6 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           weighted_clusters:
-            total_weight: 50
             clusters:
               - cluster_header: x-route-to-this-cluster
                 weight: 50
@@ -6343,7 +6352,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeade
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 100
                   clusters:
                     - cluster_header: some_header
                       name: some_name
@@ -6368,7 +6376,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 30
                   clusters:
                    - weight:
                       30
@@ -6388,7 +6395,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 30
                   clusters:
                     - cluster_header: "test\r"
                       weight: 30

@@ -37,7 +37,6 @@ static_resources:
                   value: |
                     {}
                 vm_config:
-                  runtime: "envoy.wasm.runtime.v8"
                   vm_id: "my_vm_id"
                   code:
                     local:

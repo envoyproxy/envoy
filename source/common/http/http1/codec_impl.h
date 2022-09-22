@@ -62,7 +62,7 @@ public:
   void readDisable(bool disable) override;
   uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
-  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
+  const Network::ConnectionInfoProvider& connectionInfoProvider() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
     // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
     // connection, invoking any watermarks as necessary. There is no internal buffering that would

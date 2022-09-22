@@ -428,31 +428,41 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
   initPerRouteConfig();
   if (per_route_config_->disabled()) {
+    ENVOY_STREAM_LOG(debug,
+                     "Transcoding is disabled for the route. Request headers is passed through.",
+                     *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (Grpc::Common::isGrpcRequestHeaders(headers)) {
-    ENVOY_LOG(debug, "Request headers has application/grpc content-type. Request is passed through "
-                     "without transcoding.");
+    ENVOY_STREAM_LOG(debug,
+                     "Request headers has application/grpc content-type. Request is passed through "
+                     "without transcoding.",
+                     *decoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
   const auto status =
       per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
   if (!status.ok()) {
-    ENVOY_LOG(debug, "Failed to transcode request headers: {}", status.message());
+    ENVOY_STREAM_LOG(debug, "Failed to transcode request headers: {}", *decoder_callbacks_,
+                     status.message());
 
     if (status.code() == StatusCode::kNotFound &&
         !config_.request_validation_options_.reject_unknown_method()) {
-      ENVOY_LOG(debug, "Request is passed through without transcoding because it cannot be mapped "
-                       "to a gRPC method.");
+      ENVOY_STREAM_LOG(debug,
+                       "Request is passed through without transcoding because it cannot be mapped "
+                       "to a gRPC method.",
+                       *decoder_callbacks_);
       return Http::FilterHeadersStatus::Continue;
     }
 
     if (status.code() == StatusCode::kInvalidArgument &&
         !config_.request_validation_options_.reject_unknown_query_parameters()) {
-      ENVOY_LOG(debug, "Request is passed through without transcoding because it contains unknown "
-                       "query parameters.");
+      ENVOY_STREAM_LOG(debug,
+                       "Request is passed through without transcoding because it contains unknown "
+                       "query parameters.",
+                       *decoder_callbacks_);
       return Http::FilterHeadersStatus::Continue;
     }
 
@@ -461,7 +471,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     auto http_code = Envoy::Grpc::Utility::grpcToHttpStatus(
         static_cast<Envoy::Grpc::Status::GrpcStatus>(status.code()));
 
-    ENVOY_LOG(debug, "Request is rejected due to strict rejection policy.");
+    ENVOY_STREAM_LOG(debug, "Request is rejected due to strict rejection policy.",
+                     *decoder_callbacks_);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
         static_cast<Http::Code>(http_code), status.message().ToString(), nullptr, absl::nullopt,
@@ -479,9 +490,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 
     bool done = !readToBuffer(*transcoder_->RequestOutput(), initial_request_data_);
     if (!done) {
-      ENVOY_LOG(
+      ENVOY_STREAM_LOG(
           debug,
-          "Transcoding of query arguments of HttpBody request is not done (unexpected state)");
+          "Transcoding of query arguments of HttpBody request is not done (unexpected state)",
+          *decoder_callbacks_);
       error_ = true;
       decoder_callbacks_->sendLocalReply(
           Http::Code::BadRequest, "Bad request", nullptr, absl::nullopt,
@@ -519,6 +531,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
+      ENVOY_STREAM_LOG(debug, "adding initial data during decodeHeaders, transcoded data size={}",
+                       *decoder_callbacks_, data.length());
       decoder_callbacks_->addDecodedData(data, true);
     }
   }
@@ -529,6 +543,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   ASSERT(!error_);
 
   if (!transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Request data is passed through", *decoder_callbacks_);
     return Http::FilterDataStatus::Continue;
   }
 
@@ -561,6 +576,10 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailed)) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
+
+  ENVOY_STREAM_LOG(debug,
+                   "continuing request during decodeData, transcoded data size={}, end_stream={}",
+                   *decoder_callbacks_, data.length(), end_stream);
   return Http::FilterDataStatus::Continue;
 }
 
@@ -568,6 +587,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTra
   ASSERT(!error_);
 
   if (!transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Request trailers is passed through", *decoder_callbacks_);
     return Http::FilterTrailersStatus::Continue;
   }
 
@@ -580,6 +600,9 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTra
     readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length()) {
+      ENVOY_STREAM_LOG(debug,
+                       "adding remaining data during decodeTrailers, transcoded data size={}",
+                       *decoder_callbacks_, data.length());
       decoder_callbacks_->addDecodedData(data, true);
     }
   }
@@ -594,10 +617,16 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
+    ENVOY_STREAM_LOG(
+        debug,
+        "Response headers is NOT application/grpc content-type. Response is passed through "
+        "without transcoding.",
+        *encoder_callbacks_);
     error_ = true;
   }
 
   if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -630,6 +659,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response data is passed through", *encoder_callbacks_);
     return Http::FilterDataStatus::Continue;
   }
 
@@ -647,7 +677,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   }
 
   response_in_.move(data);
-  if (encoderBufferLimitReached(response_in_.bytesStored())) {
+  if (encoderBufferLimitReached(response_in_.bytesStored() + response_out_.length())) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -655,16 +685,23 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     response_in_.finish();
   }
 
-  readToBuffer(*transcoder_->ResponseOutput(), data);
+  readToBuffer(*transcoder_->ResponseOutput(), response_out_);
   if (checkAndRejectIfResponseTranscoderFailed()) {
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   if (!method_->descriptor_->server_streaming() && !end_stream) {
-    // Buffer until the response is complete.
-    return Http::FilterDataStatus::StopIterationAndBuffer;
+    ENVOY_STREAM_LOG(debug,
+                     "internally buffering unary response waiting for end_stream during "
+                     "encodeData, transcoded data size={}",
+                     *encoder_callbacks_, response_out_.length());
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
+  data.move(response_out_);
+  ENVOY_STREAM_LOG(debug,
+                   "continuing response during encodeData, transcoded data size={}, end_stream={}",
+                   *encoder_callbacks_, data.length(), end_stream);
   return Http::FilterDataStatus::Continue;
 }
 
@@ -677,6 +714,7 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
   if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
+    ENVOY_STREAM_LOG(debug, "Response headers/trailers is passed through", *encoder_callbacks_);
     return;
   }
 
@@ -689,13 +727,15 @@ void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_
   }
 
   if (!method_->response_type_is_http_body_) {
-    Buffer::OwnedImpl data;
-    readToBuffer(*transcoder_->ResponseOutput(), data);
+    readToBuffer(*transcoder_->ResponseOutput(), response_out_);
     if (checkAndRejectIfResponseTranscoderFailed()) {
       return;
     }
-    if (data.length()) {
-      encoder_callbacks_->addEncodedData(data, true);
+    if (response_out_.length() > 0) {
+      ENVOY_STREAM_LOG(debug,
+                       "adding remaining data during encodeTrailers, transcoded data size={}",
+                       *encoder_callbacks_, response_out_.length());
+      encoder_callbacks_->addEncodedData(response_out_, true);
     }
   }
 
@@ -746,7 +786,8 @@ void JsonTranscoderFilter::setEncoderFilterCallbacks(
 bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::string& details) {
   const auto& request_status = transcoder_->RequestStatus();
   if (!request_status.ok()) {
-    ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
+    ENVOY_STREAM_LOG(debug, "Transcoding request error {}", *decoder_callbacks_,
+                     request_status.ToString());
     error_ = true;
     decoder_callbacks_->sendLocalReply(
         Http::Code::BadRequest,
@@ -765,7 +806,8 @@ bool JsonTranscoderFilter::checkAndRejectIfRequestTranscoderFailed(const std::st
 bool JsonTranscoderFilter::checkAndRejectIfResponseTranscoderFailed() {
   const auto& response_status = transcoder_->ResponseStatus();
   if (!response_status.ok()) {
-    ENVOY_LOG(debug, "Transcoding response error {}", response_status.ToString());
+    ENVOY_STREAM_LOG(debug, "Transcoding response error {}", *encoder_callbacks_,
+                     response_status.ToString());
     error_ = true;
     encoder_callbacks_->sendLocalReply(
         Http::Code::BadGateway,
@@ -892,7 +934,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
   auto translate_status =
       per_route_config_->translateProtoMessageToJson(*status_details, &json_status);
   if (!translate_status.ok()) {
-    ENVOY_LOG(debug, "Transcoding status error {}", translate_status.ToString());
+    ENVOY_STREAM_LOG(debug, "Transcoding status error {}", *encoder_callbacks_,
+                     translate_status.ToString());
     return false;
   }
 
@@ -922,10 +965,10 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
   if (buffer_length > decoder_callbacks_->decoderBufferLimit()) {
-    ENVOY_LOG(debug,
-              "Request rejected because the transcoder's internal buffer size exceeds the "
-              "configured limit: {} > {}",
-              buffer_length, decoder_callbacks_->decoderBufferLimit());
+    ENVOY_STREAM_LOG(debug,
+                     "Request rejected because the transcoder's internal buffer size exceeds the "
+                     "configured limit: {} > {}",
+                     *decoder_callbacks_, buffer_length, decoder_callbacks_->decoderBufferLimit());
     error_ = true;
     decoder_callbacks_->sendLocalReply(
         Http::Code::PayloadTooLarge,
@@ -940,10 +983,11 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
   if (buffer_length > encoder_callbacks_->encoderBufferLimit()) {
-    ENVOY_LOG(debug,
-              "Response not transcoded because the transcoder's internal buffer size exceeds the "
-              "configured limit: {} > {}",
-              buffer_length, encoder_callbacks_->encoderBufferLimit());
+    ENVOY_STREAM_LOG(
+        debug,
+        "Response not transcoded because the transcoder's internal buffer size exceeds the "
+        "configured limit: {} > {}",
+        *encoder_callbacks_, buffer_length, encoder_callbacks_->encoderBufferLimit());
     error_ = true;
     encoder_callbacks_->sendLocalReply(
         Http::Code::InternalServerError,
