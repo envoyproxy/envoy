@@ -39,6 +39,11 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
 
       new_format = "%" + m.str(1) + "_METADATA(" + new_format + ")%";
 
+      ENVOY_LOG_MISC(
+          warn,
+          "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
+          m.str(1) + "_METADATA", new_format.c_str());
+
       auto index = new_header_value.find(m.str(0));
       new_header_value.replace(index, m.str(0).length(), new_format);
     }
@@ -65,6 +70,8 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
     ASSERT(m.size() == 2);
     std::string new_format = "%FILTER_STATE(" + m.str(1) + ":PLAIN)%";
 
+    ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
+                   new_format.c_str());
     auto index = new_header_value.find(m.str(0));
     new_header_value.replace(index, m.str(0).length(), new_format);
   }
