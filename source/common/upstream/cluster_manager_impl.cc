@@ -1409,7 +1409,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
   // Make a copy to protect against erasure in the callback.
   std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
-  container.draining_ = true;
 
   // We need to hold off on actually emptying out the container until we have finished processing
   // `addIdleCallback`. If we do not, then it's possible that the container could be erased in
@@ -1435,7 +1434,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
     pools.push_back(pair.second.get());
   }
 
-  container.draining_ = true;
   for (auto pool : pools) {
     pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }

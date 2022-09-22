@@ -99,9 +99,6 @@ public:
     Decoder::REGISTERHandler msgHandler(decoder);
     Decoder::HeaderHandler headerHandler(msgHandler);
     EXPECT_EQ(HeaderType::Via, headerHandler.currentHeader());
-    absl::string_view str("");
-    headerHandler.processEvent(str);
-    headerHandler.processCseq(str);
 
     DecoderStateMachine::DecoderStatus status(State::MessageBegin);
   }
