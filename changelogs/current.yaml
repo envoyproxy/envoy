@@ -138,6 +138,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
+- area: header_formatters
+  change: |
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
+    header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
+    ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: http
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.

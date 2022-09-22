@@ -5916,8 +5916,10 @@ virtual_hosts:
     EXPECT_EQ("meh", route->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
+    Http::TestRequestHeaderMapImpl request_headers;
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
+    EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&request_headers));
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
@@ -6979,11 +6981,17 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression "
-      "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException,
+        "Invalid header configuration. Un-terminated variable expression "
+        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  } else {
+    EXPECT_THROW(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException);
+  }
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
