@@ -12,12 +12,12 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Start the stream on the first request.
   auto start_stream = rate_limit_client_->startStream(callbacks_->streamInfo());
   if (!start_stream.ok()) {
     // TODO(tyxia) Consider adding the log.
-    return Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   // TODO(tyxia) Placeholder, add actual implementation.
