@@ -68,7 +68,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //test/swift/apps/baseline:app &> /tmp/envoy.log &
         name: 'Run swift app'
-      - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+      - run: sed '/received headers with status 301/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
         name: 'Check connectivity'
       - run: cat /tmp/envoy.log
         if: ${{ failure() || cancelled() }}
