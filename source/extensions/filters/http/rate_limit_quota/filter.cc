@@ -56,15 +56,15 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     // triggered with its own match() method.
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
     if (match.result_) {
-      std::cout << "Matcher succeed!!!" << std::endl;
       const auto result = match.result_();
       ASSERT(result->typeUrl() == RateLimitOnMactchAction::staticTypeUrl());
       ASSERT(dynamic_cast<RateLimitOnMactchAction*>(result.get()));
       const RateLimitOnMactchAction& match_action =
           static_cast<const RateLimitOnMactchAction&>(*result);
+      // Try to generate the bucket id if matched.
       return match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
     } else {
-      return absl::InternalError(absl::StrCat("Failed to match the request"));
+      return absl::InternalError("Failed to match the request");
     }
   }
 }
