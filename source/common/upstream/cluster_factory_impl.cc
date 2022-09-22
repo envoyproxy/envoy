@@ -108,10 +108,8 @@ ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& serv
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context =
           std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-              context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-              context.localInfo(), context.mainThreadDispatcher(), context.stats(),
-              context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
-              context.api(), context.options(), context.logManager());
+              server_context, context.sslContextManager(), *stats_scope, context.clusterManager(),
+              context.stats(), context.messageValidationVisitor());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(server_context, cluster, context, *transport_factory_context,

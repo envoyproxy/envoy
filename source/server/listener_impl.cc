@@ -353,12 +353,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                           }),
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
-              parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-              parent_.server_.clusterManager(), parent_.server_.localInfo(),
-              parent_.server_.dispatcher(), parent_.server_.stats(),
-              parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options(),
-              parent_.server_.accessLogManager())),
+              parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
+              listenerScope(), parent_.server_.clusterManager(), parent_.server_.stats(),
+              validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
