@@ -35,6 +35,11 @@ behavior_changes:
     limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
     behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
+- area: config
+  change: |
+    Fixed resource tracking when using the Incremental (Delta-xDS) protocol. The protocol state will be updated after
+    the resources are successfully ingested and an ACK is sent. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

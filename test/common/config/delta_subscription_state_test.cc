@@ -681,7 +681,10 @@ TEST_P(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
-    EXPECT_CALL(*ttl_timer_, disableTimer());
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+      EXPECT_CALL(*ttl_timer_, disableTimer());
+    }
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3", "oh no");
     EXPECT_EQ("nonce3", ack.nonce_);
     EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -702,7 +705,10 @@ TEST_P(DeltaSubscriptionStateTest, AckGenerated) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
         populateRepeatedResource(
             {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3D"}});
-    EXPECT_CALL(*ttl_timer_, disableTimer());
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+      EXPECT_CALL(*ttl_timer_, disableTimer());
+    }
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug5", "nonce5",
                                                 very_large_error_message);
     EXPECT_EQ("nonce5", ack.nonce_);
@@ -1225,6 +1231,42 @@ TEST_P(DeltaSubscriptionStateTest, TypeUrlMismatch) {
                                 e->what()));
       }));
   handleResponse(message);
+}
+
+// Verifies that an update that is NACKed doesn't update the tracked
+// versions of the registered resources.
+TEST_P(DeltaSubscriptionStateTest, NoVersionUpdateOnNack) {
+  // The xDS server's first response includes items for name1 and 2, but not 3.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
+        populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
+    EXPECT_EQ("nonce1", ack.nonce_);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+  }
+  // The next response tries but fails to update the 2 and add name3, and so should produce a NACK.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
+        populateRepeatedResource(
+            {{"name1", "version1B"}, {"name2", "version2B"}, {"name3", "version3A"}});
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+      EXPECT_CALL(*ttl_timer_, disableTimer());
+    }
+    UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug2", "nonce2", "oh no");
+    EXPECT_EQ("nonce2", ack.nonce_);
+    EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+  }
+  // Verify that a reconnect keeps the old versions.
+  markStreamFresh();
+  {
+    auto req = getNextRequestAckless();
+    EXPECT_THAT(req->resource_names_subscribe(), UnorderedElementsAre("name1", "name2", "name3"));
+    EXPECT_TRUE(req->resource_names_unsubscribe().empty());
+    EXPECT_THAT(req->initial_resource_versions(),
+                UnorderedElementsAre(Pair("name1", "version1A"), Pair("name2", "version2A")));
+  }
 }
 
 class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestWithResources {
