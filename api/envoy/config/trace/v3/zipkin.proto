@@ -69,7 +69,7 @@ message ZipkinConfig {
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
   string collector_hostname = 6;
 
-  // If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for single
+  // If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for a single
   // request. Server span will be created for the downstream request and client span will be created for the related upstream request.
   // This should be set to true in the following cases:
   //
