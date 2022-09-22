@@ -500,10 +500,9 @@ private:
 /**
  * Base implementation for all route entries.
  */
-class RouteEntryImplBase : public RouteEntry,
+class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
-                           public Route,
                            public PathMatchCriterion,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
@@ -642,9 +641,9 @@ public:
   // path matching to ignore the path-parameters.
   absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
 
-  class DynamicRouteEntry : public RouteEntry, public Route {
+  class DynamicRouteEntry : public RouteEntryAndRoute {
   public:
-    DynamicRouteEntry(const RouteEntryImplBase* parent, const std::string& name)
+    DynamicRouteEntry(const RouteEntryAndRoute* parent, const std::string& name)
         : parent_(parent), cluster_name_(name) {}
 
     const std::string& routeName() const override { return parent_->routeName(); }
@@ -697,13 +696,13 @@ public:
     }
     bool usingNewTimeouts() const override { return parent_->usingNewTimeouts(); }
     absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-      return parent_->max_stream_duration_;
+      return parent_->maxStreamDuration();
     }
     absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-      return parent_->grpc_timeout_header_max_;
+      return parent_->grpcTimeoutHeaderMax();
     }
     absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-      return parent_->grpc_timeout_header_offset_;
+      return parent_->grpcTimeoutHeaderOffset();
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return parent_->maxGrpcTimeout();
@@ -773,7 +772,7 @@ public:
     };
 
   private:
-    const RouteEntryImplBase* parent_;
+    const RouteEntryAndRoute* parent_;
     const std::string cluster_name_;
   };
 
@@ -941,8 +940,10 @@ private:
   PathRewriterSharedPtr buildPathRewriter(envoy::config::route::v3::Route route,
                                           ProtobufMessage::ValidationVisitor& validator) const;
 
-  RouteConstSharedPtr pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
-                                                  const Http::HeaderMap& headers) const;
+  RouteConstSharedPtr
+  pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
+                              const Http::HeaderMap& headers,
+                              const RouteEntryAndRoute* route_selector_override) const;
 
   RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers, uint64_t random_value,
                                           bool ignore_overflow) const;

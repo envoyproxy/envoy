@@ -166,7 +166,6 @@ public:
         "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
         "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>");
     metadata_->addMsgHeader(HeaderType::From, "User.0001@10.0.0.1:5060");
-    metadata_->parseHeader(HeaderType::Route);
     metadata_->resetAffinityIteration();
     if (set_destination) {
       metadata_->setDestination("10.0.0.1");
@@ -429,7 +428,6 @@ TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
                           "Route: "
                           "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;"
                           "x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
   metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
   metadata_->resetAffinityIteration();
 
@@ -451,7 +449,6 @@ TEST_F(SipRouterTest, QueryPending) {
                           "Route: "
                           "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;"
                           "x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
   metadata_->affinity().emplace_back("Route", "lskpmc", "S1F1", false, false);
   metadata_->resetAffinityIteration();
   EXPECT_CALL(*tra_handler_, retrieveTrafficRoutingAssistant(_, _, _, _, _))
@@ -585,7 +582,6 @@ TEST_F(SipRouterTest, DestNotEqualToHost) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=192.168.0.1>");
-  metadata_->parseHeader(HeaderType::Route);
 
   metadata_->resetAffinityIteration();
 
@@ -747,7 +743,6 @@ TEST_F(SipRouterTest, RouteMatch) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -776,7 +771,6 @@ TEST_F(SipRouterTest, RouteEmptyDomain) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -805,7 +799,6 @@ TEST_F(SipRouterTest, RouteDefaultDomain) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_EQ(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -834,7 +827,6 @@ TEST_F(SipRouterTest, RouteEmptyHeader) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -861,7 +853,6 @@ TEST_F(SipRouterTest, RouteNoRouteHeaderUsingTopLine) {
   metadata_->addMsgHeader(HeaderType::TopLine,
                           "INVITE sip:User.0000@scscf-internal.cncs.svc.cluster.local;ep=127.0.0.1 "
                           "SIP/2.0\x0d\x0a");
-  metadata_->parseHeader(HeaderType::TopLine);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -933,7 +924,6 @@ TEST_F(SipRouterTest, RouteHeaderHostDomain) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
@@ -962,7 +952,6 @@ TEST_F(SipRouterTest, RouteHeaderWildcardDomain) {
       "Route: "
       "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
       "sip:scscf-internal.cncs.svc.cluster.local:5060>");
-  metadata_->parseHeader(HeaderType::Route);
 
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }

@@ -133,11 +133,11 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     factory->supportsAlpn();
   }
   {
-      // TODO(alyssawilk) fix in a follow-up PR.
-      // std::vector<uint8_t> key;
-      // EXPECT_CALL(*inner_factory, hashKey(_, _));
-      // factory->hashKey(key, nullptr);
-  } {
+    std::vector<uint8_t> key;
+    EXPECT_CALL(*inner_factory, hashKey(_, _));
+    factory->hashKey(key, nullptr);
+  }
+  {
     EXPECT_CALL(*inner_factory, sslCtx());
     factory->sslCtx();
   }
