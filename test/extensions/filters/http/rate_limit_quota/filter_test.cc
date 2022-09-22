@@ -11,6 +11,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,10 +23,11 @@ namespace RateLimitQuota {
 namespace {
 
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
+using ::Envoy::StatusHelpers::StatusIs;
 using Server::Configuration::MockFactoryContext;
 using ::testing::NiceMock;
 
-constexpr char MatcherConfig[] = R"EOF(
+constexpr char ValidMatcherConfig[] = R"EOF(
   matcher_list:
     matchers:
       # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
@@ -109,11 +111,16 @@ public:
   FilterTest() {
     // Add the grpc service config.
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
+  }
 
-    // Add the matcher configuration.
-    xds::type::matcher::v3::Matcher matcher;
-    TestUtility::loadFromYaml(MatcherConfig, matcher);
-    config_.mutable_bucket_matchers()->MergeFrom(matcher);
+  void addMatcherConfigAndCreateFilter(bool valid) {
+    // Add the matcher configuration. Invalid bucket_matcher configuration will be just empty
+    // matcher config.
+    if (valid) {
+      xds::type::matcher::v3::Matcher matcher;
+      TestUtility::loadFromYaml(ValidMatcherConfig, matcher);
+      config_.mutable_bucket_matchers()->MergeFrom(matcher);
+    }
 
     filter_config_ = std::make_shared<FilterConfig>(config_);
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, nullptr);
@@ -126,13 +133,25 @@ public:
   std::unique_ptr<RateLimitQuotaFilter> filter_;
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
+  Http::TestRequestHeaderMapImpl default_headers_{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 };
 
+TEST_F(FilterTest, InvalidBucketMatcherConfig) {
+  addMatcherConfigAndCreateFilter(/*valid=*/false);
+  auto match = filter_->requestMatching(default_headers_);
+  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match.status().message(), "Matcher has not been initialized yet");
+}
+
 TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
+  addMatcherConfigAndCreateFilter(/*valid=*/true);
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
+  // Http::TestRequestHeaderMapImpl headers = default_headers_;
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
@@ -160,6 +179,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
 }
 
 TEST_F(FilterTest, BuildBucketSettingsFailed) {
+  addMatcherConfigAndCreateFilter(/*valid=*/true);
   // Define the wrong input that doesn't match the values in the config: it has `{"env", "staging"}`
   // rather than `{"environment", "staging"}`.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
@@ -168,7 +188,7 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
   for (auto const& pair : custom_value_pairs) {
-    headers.addCopy(pair.first, pair.second);
+    default_headers_.addCopy(pair.first, pair.second);
   }
 
   // The expected bucket ids has one additional pair that is built via `string_value` static method
@@ -180,6 +200,8 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
   // `custom_value_pairs` above.
   auto match = filter_->requestMatching(headers);
   EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match.status().message(), "Failed to match the request");
 }
 
 } // namespace

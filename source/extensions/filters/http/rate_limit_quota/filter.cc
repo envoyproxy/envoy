@@ -33,7 +33,6 @@ void RateLimitQuotaFilter::createMatcher() {
   }
 }
 
-// Perform the request matching.
 absl::StatusOr<BucketId>
 RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent requests.
@@ -43,12 +42,12 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
       data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(
           callbacks_->streamInfo().downstreamAddressProvider());
     } else {
-      return absl::InternalError("Filter callback has not been initialized yet.");
+      return absl::InternalError("Filter callback has not been initialized successfully yet.");
     }
   }
 
   if (matcher_ == nullptr) {
-    return absl::InternalError("Matcher has not been initialized yet.");
+    return absl::InternalError("Matcher has not been initialized yet");
   } else {
     data_ptr_->onRequestHeaders(headers);
     // TODO(tyxia) This function should trigger the CEL expression matching.
@@ -57,12 +56,10 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
     if (match.result_) {
       const auto result = match.result_();
-      ASSERT(result->typeUrl() == RateLimitOnMactchAction::staticTypeUrl());
-      ASSERT(dynamic_cast<RateLimitOnMactchAction*>(result.get()));
-      const RateLimitOnMactchAction& match_action =
-          static_cast<const RateLimitOnMactchAction&>(*result);
-      // Try to generate the bucket id if matched.
-      return match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
+      const RateLimitOnMactchAction* match_action =
+          dynamic_cast<RateLimitOnMactchAction*>(result.get());
+      // Try to generate the bucket id if matching succeeded.
+      return match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
     } else {
       return absl::InternalError("Failed to match the request");
     }
@@ -81,13 +78,12 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
 
     // Generate the bucket id based on builder method type.
     switch (builder_method.value_specifier_case()) {
-    // Retrieve the static string value directly from the config.
+    // Retrieve the string value directly from the config (static method).
     case ValueSpecifierCase::kStringValue: {
-      // Build the final bucket id directly from config.
       bucket_id.mutable_bucket()->insert({bucket_id_key, builder_method.string_value()});
       break;
     }
-    // Retrieve the dynamic value from the `custom_value` typed extension config.
+    // Retrieve the dynamic value from the `custom_value` typed extension config (dynamic method).
     case ValueSpecifierCase::kCustomValue: {
       // Initialize the pointer to input factory on first use.
       if (input_factory_ptr == nullptr) {

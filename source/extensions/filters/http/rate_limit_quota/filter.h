@@ -103,8 +103,8 @@ public:
   // RateLimitQuota::RateLimitQuotaCallbacks
   void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
 
-  // Perform request matching, this function returns the generated bucket ids if matched and error
-  // status if not matched.
+  // Perform request matching. It returns the generated bucket ids if the matching succeeded and
+  // error status otherwise.
   absl::StatusOr<BucketId> requestMatching(const Http::RequestHeaderMap& headers);
 
   ~RateLimitQuotaFilter() override = default;
@@ -116,7 +116,7 @@ private:
   FilterConfigConstSharedPtr config_;
   RateLimitClientPtr rate_limit_client_;
   Server::Configuration::FactoryContext& factory_context_;
-  Http::StreamDecoderFilterCallbacks* callbacks_;
+  Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
