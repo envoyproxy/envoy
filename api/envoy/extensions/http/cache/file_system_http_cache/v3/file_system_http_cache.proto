@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.cache.file_system_http_cache.v3;
+package envoy.extensions.http.cache.file_system_http_cache.v3;
 
 import "envoy/extensions/common/async_files/v3/async_file_manager.proto";
 
@@ -11,16 +11,16 @@ import "xds/annotations/v3/status.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.file_system_http_cache.v3";
+option java_package = "io.envoyproxy.envoy.extensions.http.cache.file_system_http_cache.v3";
 option java_outer_classname = "FileSystemHttpCacheProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/cache/file_system_http_cache/v3;file_system_http_cachev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/cache/file_system_http_cache/v3;file_system_http_cachev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: FileSystemHttpCache CacheFilter storage plugin]
 // [#not-implemented-hide:]
-// [#comment: TODO: when extension is added make this #extension: envoy.filters.http.cache.file_system_http_cache]
+// [#comment: TODO: when extension is added make this #extension: envoy.http.cache.file_system_http_cache]
 //
 // Configuration for a cache implementation that caches in the local filesystem.
 //
