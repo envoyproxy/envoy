@@ -32,6 +32,15 @@ public:
     }
     return Network::CommonUpstreamTransportSocketFactory::hashKey(key, options);
   }
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override {
+    return transport_socket_factory_->sslCtx();
+  }
+  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override {
+    return transport_socket_factory_->clientContextConfig();
+  }
+  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() override {
+    return transport_socket_factory_->getCryptoConfig();
+  }
 
 protected:
   // The wrapped factory.

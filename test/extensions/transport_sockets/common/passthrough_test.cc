@@ -137,6 +137,18 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     EXPECT_CALL(*inner_factory, hashKey(_, _));
     factory->hashKey(key, nullptr);
   }
+  {
+    EXPECT_CALL(*inner_factory, sslCtx());
+    factory->sslCtx();
+  }
+  {
+    EXPECT_CALL(*inner_factory, clientContextConfig());
+    factory->clientContextConfig();
+  }
+  {
+    EXPECT_CALL(*inner_factory, getCryptoConfig());
+    factory->getCryptoConfig();
+  }
 }
 
 class DownstreamTestFactory : public DownstreamPassthroughFactory {
