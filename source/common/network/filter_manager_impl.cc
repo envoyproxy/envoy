@@ -88,6 +88,19 @@ void FilterManagerImpl::onRead() {
   onContinueReading(nullptr, connection_);
 }
 
+bool FilterManagerImpl::startUpstreamSecureTransport() {
+  for (auto& filter : upstream_filters_) {
+    if (!(filter)->filter_) {
+      continue;
+    }
+    if (filter->filter_->startUpstreamSecureTransport()) {
+      // Success. The filter converted upstream's transport socket to secure mode.
+      return true;
+    }
+  }
+  return false;
+}
+
 FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }
 
 FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,

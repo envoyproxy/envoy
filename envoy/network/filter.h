@@ -161,6 +161,14 @@ public:
    * Set the currently selected upstream host for the connection.
    */
   virtual void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Signal to the filter manager to enable secure transport mode in upstream connection.
+   * This is done when upstream connection's transport socket is of startTLS type. At the moment
+   * it is the only transport socket type which can be programmatically converted from non-secure
+   * mode to secure mode.
+   */
+  virtual bool startUpstreamSecureTransport() PURE;
 };
 
 /**
@@ -199,6 +207,13 @@ public:
    * @param callbacks supplies the callbacks.
    */
   virtual void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Method is called by the filter manager to convert upstream's connection transport socket
+   * from non-secure mode to secure mode. Only terminal filters are aware of upstream connection and
+   * non-terminal filters should not implement startUpstreamSecureTransport.
+   */
+  virtual bool startUpstreamSecureTransport() { return false; }
 };
 
 using ReadFilterSharedPtr = std::shared_ptr<ReadFilter>;

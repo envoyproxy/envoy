@@ -103,6 +103,7 @@ public:
   MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(bool, startUpstreamSecureTransport, ());
 
   testing::NiceMock<MockConnection> connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -116,6 +117,7 @@ public:
   MOCK_METHOD(FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterStatus, onNewConnection, ());
   MOCK_METHOD(void, initializeReadFilterCallbacks, (ReadFilterCallbacks & callbacks));
+  MOCK_METHOD(bool, startUpstreamSecureTransport, ());
 
   ReadFilterCallbacks* callbacks_{};
 };
