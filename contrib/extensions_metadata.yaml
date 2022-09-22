@@ -93,3 +93,13 @@ envoy.filters.network.generic_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.generic.router:
+  categories:
+  - envoy.generic_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.generic_proxy.codec.dubbo:
+  categories:
+  - envoy.generic_proxy.codec
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

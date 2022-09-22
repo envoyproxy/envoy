@@ -112,6 +112,8 @@ categories:
 - envoy.filters.http.upstream
 - envoy.path.match
 - envoy.path.rewrite
+- envoy.generic_proxy.filters
+- envoy.generic_proxy.codec
 
 status_values:
 - name: stable

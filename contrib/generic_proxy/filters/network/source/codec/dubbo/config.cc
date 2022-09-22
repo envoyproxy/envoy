@@ -1,8 +1,10 @@
 #include "contrib/generic_proxy/filters/network/source/codec/dubbo/config.h"
-#include "source/extensions/common/dubbo/message_impl.h"
+
+#include <memory>
 
 #include "envoy/registry/registry.h"
-#include <memory>
+
+#include "source/extensions/common/dubbo/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,11 +13,68 @@ namespace GenericProxy {
 namespace Codec {
 namespace Dubbo {
 
-void GenericRequest::forEach(IterateCallback callback) const {
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest()) !=
+namespace {
+
+#define ENUM_TO_STRING_VIEW(X)                                                                     \
+  case Common::Dubbo::ResponseStatus::X:                                                           \
+    static constexpr absl::string_view X##_VIEW = #X;                                              \
+    return X##_VIEW;
+
+absl::string_view responseStatusToStringView(Common::Dubbo::ResponseStatus status) {
+  switch (status) {
+    ENUM_TO_STRING_VIEW(Ok);
+    ENUM_TO_STRING_VIEW(ClientTimeout);
+    ENUM_TO_STRING_VIEW(ServerTimeout);
+    ENUM_TO_STRING_VIEW(BadRequest);
+    ENUM_TO_STRING_VIEW(BadResponse);
+    ENUM_TO_STRING_VIEW(ServiceNotFound);
+    ENUM_TO_STRING_VIEW(ServiceError);
+    ENUM_TO_STRING_VIEW(ServerError);
+    ENUM_TO_STRING_VIEW(ClientError);
+    ENUM_TO_STRING_VIEW(ServerThreadpoolExhaustedError);
+  }
+}
+
+Common::Dubbo::ResponseStatus genericStatusToStatus(StatusCode code) {
+  switch (code) {
+  case StatusCode::kOk:
+    return Common::Dubbo::ResponseStatus::Ok;
+  case StatusCode::kInvalidArgument:
+    return Common::Dubbo::ResponseStatus::BadRequest;
+  default:
+    return Common::Dubbo::ResponseStatus::ServerError;
+  }
+}
+
+StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
+  switch (status) {
+  case Common::Dubbo::ResponseStatus::Ok:
+    return StatusCode::kOk;
+  case Common::Dubbo::ResponseStatus::ClientTimeout:
+  case Common::Dubbo::ResponseStatus::ServerTimeout:
+    return StatusCode::kUnknown;
+  case Common::Dubbo::ResponseStatus::BadRequest:
+    return StatusCode::kInvalidArgument;
+  case Common::Dubbo::ResponseStatus::BadResponse:
+    return StatusCode::kUnknown;
+  case Common::Dubbo::ResponseStatus::ServiceNotFound:
+    return StatusCode::kNotFound;
+  case Common::Dubbo::ResponseStatus::ServiceError:
+  case Common::Dubbo::ResponseStatus::ServerError:
+  case Common::Dubbo::ResponseStatus::ClientError:
+    return StatusCode::kUnavailable;
+  case Common::Dubbo::ResponseStatus::ServerThreadpoolExhaustedError:
+    return StatusCode::kResourceExhausted;
+  }
+}
+
+} // namespace
+
+void DubboRequest::forEach(IterateCallback callback) const {
+  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
   auto* typed_request =
-      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest());
+      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   // TODO(wbpcode): better attachment structure is necessary to simplify these code the improve
   // performance.
   typed_request->attachment().headers().iterate(
@@ -27,11 +86,11 @@ void GenericRequest::forEach(IterateCallback callback) const {
         }
       });
 }
-absl::optional<absl::string_view> GenericRequest::getByKey(absl::string_view key) const {
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest()) !=
+absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) const {
+  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
   auto* typed_request =
-      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest());
+      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
 
   auto* result = typed_request->attachment().lookup(std::string(key));
   if (result == nullptr) {
@@ -39,16 +98,56 @@ absl::optional<absl::string_view> GenericRequest::getByKey(absl::string_view key
   }
   return absl::make_optional<absl::string_view>(*result);
 }
-void GenericRequest::setByKey(absl::string_view key, absl::string_view val) {
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest()) !=
+void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
+  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
   auto* typed_request =
-      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_request_->mutableRequest());
+      dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   typed_request->mutableAttachment()->insert(std::string(key), std::string(val));
 }
 
-void GenericRespnose::refreshGenericStatus() {
+void DubboResponse::refreshGenericStatus() {
+  ASSERT(inner_metadata_ != nullptr);
+  ASSERT(inner_metadata_->hasResponse() && inner_metadata_->hasResponseStatus());
 
+  using Common::Dubbo::RpcResponseType;
+
+  auto status = inner_metadata_->context().responseStatus();
+  auto optional_type = inner_metadata_->response().responseType();
+
+  if (status == Common::Dubbo::ResponseStatus::Ok) {
+    ASSERT(optional_type.has_value());
+    auto type = optional_type.value_or(RpcResponseType::ResponseWithException);
+    if (type == RpcResponseType::ResponseWithException ||
+        type == RpcResponseType::ResponseWithExceptionWithAttachments) {
+      status_ = Status(StatusCode::kUnavailable, "exception_via_upstream");
+      return;
+    }
+    status_ = absl::OkStatus();
+    return;
+  }
+
+  status_ = Status(statusToGenericStatus(status), responseStatusToStringView(status));
+}
+
+DubboCodecBase::DubboCodecBase()
+    : codec_(Common::Dubbo::DubboCodec::codecFromSerializeType(
+          Common::Dubbo::SerializeType::Hessian2)) {}
+
+ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_request) {
+  ASSERT(dynamic_cast<const DubboRequest*>(&origin_request) != nullptr);
+  const auto* type_request = static_cast<const DubboRequest*>(&origin_request);
+
+  absl::optional<Common::Dubbo::RpcResponseType> optional_type;
+  if (status.ok()) {
+    optional_type.emplace(Common::Dubbo::RpcResponseType::ResponseWithException);
+  }
+
+  auto response_metadata = Common::Dubbo::DirectResponseUtil::localResponse(
+      *type_request->inner_metadata_, genericStatusToStatus(status.code()), optional_type,
+      status.message());
+
+  return std::make_unique<DubboResponse>(std::move(response_metadata));
 }
 
 CodecFactoryPtr

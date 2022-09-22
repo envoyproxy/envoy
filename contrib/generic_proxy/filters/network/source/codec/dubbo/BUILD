@@ -4,6 +4,8 @@ load(
     "envoy_contrib_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 envoy_contrib_package()
 
 envoy_cc_contrib_extension(

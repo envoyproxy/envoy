@@ -1,11 +1,13 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
+#include <memory>
+
+#include "source/common/common/logger.h"
+#include "source/extensions/common/dubbo/codec.h"
+
 #include "contrib/envoy/extensions/filters/network/generic_proxy/codec/dubbo/v3/dubbo.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/codec/dubbo/v3/dubbo.pb.validate.h"
-
-#include "source/extensions/common/dubbo/codec.h"
-#include <memory>
+#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,13 +18,13 @@ namespace Dubbo {
 
 static constexpr absl::string_view DubboProtocolName = "dubbo";
 
-class GenericRequest : public Request {
+class DubboRequest : public Request {
 public:
-  GenericRequest(Common::Dubbo::MessageMetadataSharedPtr inner_request)
-      : inner_request_(std::move(inner_request)) {
-    ASSERT(inner_request_ != nullptr);
-    ASSERT(inner_request_->hasContext());
-    ASSERT(inner_request_->hasRequest());
+  DubboRequest(Common::Dubbo::MessageMetadataSharedPtr inner_request)
+      : inner_metadata_(std::move(inner_request)) {
+    ASSERT(inner_metadata_ != nullptr);
+    ASSERT(inner_metadata_->hasContext());
+    ASSERT(inner_metadata_->hasRequest());
   }
 
   // Request
@@ -34,20 +36,22 @@ public:
     setByKey(key, val);
   }
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
-  absl::string_view host() const override { return {}; }
-  absl::string_view path() const override { return inner_request_->request().serviceName(); }
-  absl::string_view method() const override { return inner_request_->request().methodName(); }
 
-  Common::Dubbo::MessageMetadataSharedPtr inner_request_;
+  absl::string_view host() const override { return inner_metadata_->request().serviceName(); }
+  absl::string_view path() const override { return inner_metadata_->request().serviceName(); }
+
+  absl::string_view method() const override { return inner_metadata_->request().methodName(); }
+
+  Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
 };
 
-class GenericRespnose : public Response {
+class DubboResponse : public Response {
 public:
-  GenericRespnose(Common::Dubbo::MessageMetadataSharedPtr inner_response)
-      : inner_response_(std::move(inner_response)) {
-    ASSERT(inner_response_ != nullptr);
-    ASSERT(inner_response_->hasContext());
-    ASSERT(inner_response_->hasResponse());
+  DubboResponse(Common::Dubbo::MessageMetadataSharedPtr inner_response)
+      : inner_metadata_(std::move(inner_response)) {
+    ASSERT(inner_metadata_ != nullptr);
+    ASSERT(inner_metadata_->hasContext());
+    ASSERT(inner_metadata_->hasResponse());
     refreshGenericStatus();
   }
 
@@ -66,29 +70,95 @@ public:
   Status status() const override { return status_; }
 
   Status status_;
-  Common::Dubbo::MessageMetadataSharedPtr inner_response_;
+  Common::Dubbo::MessageMetadataSharedPtr inner_metadata_;
 };
 
-class DubboRequestDecoder : public RequestDecoder {
+class DubboCodecBase : public Logger::Loggable<Logger::Id::connection> {
 public:
-  void setDecoderCallback(RequestDecoderCallback& callback) override;
-  void decode(Buffer::Instance& buffer) override;
+  DubboCodecBase();
+
+protected:
+  Common::Dubbo::DubboCodecPtr codec_;
 };
 
-class DubboResponseDecoder : public ResponseDecoder {
+template <class DecoderType, class MessageType, class CallBackType>
+class DubboDecoderBase : public DubboCodecBase, public DecoderType {
 public:
-  void setDecoderCallback(ResponseDecoderCallback& callback) override;
-  void decode(Buffer::Instance& buffer) override;
+  DubboDecoderBase() = default;
+
+  void setDecoderCallback(CallBackType& callback) override { callback_ = &callback; }
+
+  void decode(Buffer::Instance& buffer) override {
+    if (metadata_ == nullptr) {
+      metadata_ = std::make_shared<Common::Dubbo::MessageMetadata>();
+    }
+
+    try {
+      Common::Dubbo::DecodeStatus inner_status{Common::Dubbo::DecodeStatus::Success};
+      if (!metadata_->hasContext()) {
+        ENVOY_LOG(debug, "Dubbo codec: try to decode new dubbo request/response header");
+        inner_status = codec_->decodeHeader(buffer, *metadata_);
+      }
+
+      if (inner_status == Common::Dubbo::DecodeStatus::Success) {
+        ASSERT(metadata_->hasContext());
+        ENVOY_LOG(debug, "Dubbo codec: try to decode new dubbo request/response body");
+        inner_status = codec_->decodeData(buffer, *metadata_);
+      }
+
+      if (inner_status == Common::Dubbo::DecodeStatus::Failure) {
+        ENVOY_LOG(warn, "Dubbo codec: unexpected decoding error");
+        metadata_.reset();
+        callback_->onDecodingFailure();
+        return;
+      }
+
+      if (inner_status == Common::Dubbo::DecodeStatus::Waiting) {
+        ENVOY_LOG(debug, "Dubbo codec: waiting for more input data");
+        return;
+      }
+
+      ASSERT(inner_status == Common::Dubbo::DecodeStatus::Success);
+      callback_->onDecodingSuccess(std::make_unique<MessageType>(std::move(metadata_)));
+      metadata_.reset();
+    } catch (EnvoyException& error) {
+      ENVOY_LOG(warn, "Dubbo codec: decoding error: {}", error.what());
+      metadata_.reset();
+      callback_->onDecodingFailure();
+    }
+  }
+
+  Common::Dubbo::MessageMetadataSharedPtr metadata_;
+  CallBackType* callback_{};
 };
 
-class DubboRequestEncoder : public RequestEncoder {
+using DubboRequestDecoder = DubboDecoderBase<RequestDecoder, DubboRequest, RequestDecoderCallback>;
+using DubboResponseDecoder =
+    DubboDecoderBase<ResponseDecoder, DubboResponse, ResponseDecoderCallback>;
+
+class DubboRequestEncoder : public RequestEncoder, DubboCodecBase {
 public:
-  void encode(const Request&, RequestEncoderCallback& callback) override;
+  void encode(const Request& request, RequestEncoderCallback& callback) override {
+    ASSERT(dynamic_cast<const DubboRequest*>(&request) != nullptr);
+    const auto* type_message = static_cast<const DubboRequest*>(&request);
+
+    Buffer::OwnedImpl buffer;
+    codec_->encode(buffer, *type_message->inner_metadata_);
+    callback.onEncodingSuccess(buffer, type_message->inner_metadata_->messageType() !=
+                                           Common::Dubbo::MessageType::Oneway);
+  }
 };
 
-class DubboResponseEncoder : public ResponseEncoder {
+class DubboResponseEncoder : public ResponseEncoder, DubboCodecBase {
 public:
-  void encode(const Response&, ResponseEncoderCallback& callback) override;
+  void encode(const Response& response, ResponseEncoderCallback& callback) override {
+    ASSERT(dynamic_cast<const DubboResponse*>(&response) != nullptr);
+    const auto* type_message = static_cast<const DubboResponse*>(&response);
+
+    Buffer::OwnedImpl buffer;
+    codec_->encode(buffer, *type_message->inner_metadata_);
+    callback.onEncodingSuccess(buffer, false);
+  }
 };
 
 class DubboMessageCreator : public MessageCreator {
