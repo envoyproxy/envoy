@@ -34,30 +34,22 @@ void RateLimitQuotaFilter::createMatcher() {
 }
 
 // Perform the request matching.
-BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
+absl::StatusOr<BucketId>
+RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent requests.
   // This avoids creating the data object for every request, which is expensive.
   if (data_ptr_ == nullptr) {
     if (callbacks_ != nullptr) {
       data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(
           callbacks_->streamInfo().downstreamAddressProvider());
+    } else {
+      return absl::InternalError("Filter callback has not been initialized yet.");
     }
-    // else {
-    // ENVOY_LOG(error, "Filter callback has not been initialized yet.");
-    // }
   }
 
-  BucketId id;
-  // if (data_ptr_ == nullptr || matcher_ == nullptr) {
-  //   if (data_ptr_ == nullptr) {
-  //     ENVOY_LOG(error, "Matching data object has not been initialized yet.");
-  //   }
-
-  //   if (matcher_ == nullptr) {
-  //     ENVOY_LOG(error, "Matcher has not been initialized yet.");
-  //   }
-  // } else
-  {
+  if (matcher_ == nullptr) {
+    return absl::InternalError("Matcher has not been initialized yet.");
+  } else {
     data_ptr_->onRequestHeaders(headers);
     // TODO(tyxia) This function should trigger the CEL expression matching.
     // We need to implement the custom_matcher and factory and register so that CEL matching will be
@@ -70,12 +62,12 @@ BucketId RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& hea
       ASSERT(dynamic_cast<RateLimitOnMactchAction*>(result.get()));
       const RateLimitOnMactchAction& match_action =
           static_cast<const RateLimitOnMactchAction&>(*result);
-      id = match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
+      // return static_cast<const RateLimitOnMactchAction&>(*result);
+      return match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
     } else {
-      ENVOY_LOG(debug, "Failed to match the request.");
+      return absl::InternalError(absl::StrCat("Failed to match the request"));
     }
   }
-  return id;
 }
 
 BucketId

@@ -15,6 +15,8 @@
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -35,44 +37,6 @@ public:
                                           absl::string_view) override {
     return absl::OkStatus();
   }
-};
-
-class RateLimitQuotaFilter : public Http::PassThroughFilter,
-                             public RateLimitQuotaCallbacks,
-                             public Logger::Loggable<Logger::Id::filter> {
-public:
-  RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context,
-                       RateLimitClientPtr client)
-      : config_(std::move(config)), rate_limit_client_(std::move(client)),
-        factory_context_(factory_context) {
-    createMatcher();
-  }
-
-  // Http::PassThroughDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
-  void onDestroy() override;
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
-
-  // RateLimitQuota::RateLimitQuotaCallbacks
-  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
-
-  BucketId buildMatcherTree(const Http::RequestHeaderMap& headers);
-  BucketId requestMatching(const Http::RequestHeaderMap& headers);
-
-  ~RateLimitQuotaFilter() override = default;
-
-private:
-  // Create the matcher factory and matcher.
-  void createMatcher();
-
-  FilterConfigConstSharedPtr config_;
-  RateLimitClientPtr rate_limit_client_;
-  Server::Configuration::FactoryContext& factory_context_;
-  Http::StreamDecoderFilterCallbacks* callbacks_;
-  RateLimitQuotaValidationVisitor visitor_ = {};
-  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
-  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 
 // Contextual information used to construct the onMatch actions for a match tree.
@@ -117,6 +81,45 @@ public:
     return std::make_unique<
         envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>();
   }
+};
+
+class RateLimitQuotaFilter : public Http::PassThroughFilter,
+                             public RateLimitQuotaCallbacks,
+                             public Logger::Loggable<Logger::Id::filter> {
+public:
+  RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
+                       Server::Configuration::FactoryContext& factory_context,
+                       RateLimitClientPtr client)
+      : config_(std::move(config)), rate_limit_client_(std::move(client)),
+        factory_context_(factory_context) {
+    createMatcher();
+  }
+
+  // Http::PassThroughDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
+  void onDestroy() override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+
+  // RateLimitQuota::RateLimitQuotaCallbacks
+  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
+
+  // Perform request matching, this function returns the generated bucket ids if matched and error
+  // status if not matched.
+  absl::StatusOr<BucketId> requestMatching(const Http::RequestHeaderMap& headers);
+
+  ~RateLimitQuotaFilter() override = default;
+
+private:
+  // Create the matcher factory and matcher.
+  void createMatcher();
+
+  FilterConfigConstSharedPtr config_;
+  RateLimitClientPtr rate_limit_client_;
+  Server::Configuration::FactoryContext& factory_context_;
+  Http::StreamDecoderFilterCallbacks* callbacks_;
+  RateLimitQuotaValidationVisitor visitor_ = {};
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
+  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 };
 
 } // namespace RateLimitQuota

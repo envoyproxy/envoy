@@ -146,8 +146,11 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
 
-  // Get the generated bucket ids.
-  auto bucket_ids = filter_->requestMatching(headers).bucket();
+  // Perform request matching and get the generated bucket ids if matched.
+  auto match = filter_->requestMatching(headers);
+  EXPECT_TRUE(match.ok());
+  auto bucket_ids = match.value().bucket();
+
   // Serialize the proto map to std map for comparison. We can avoid this conversion by using
   // `EqualsProto()` directly once it is available in the Envoy code base.
   auto serialized_bucket_ids =
@@ -173,14 +176,10 @@ TEST_F(FilterTest, BuildBucketSettingsFailed) {
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
 
-  // Get the generated bucket ids.
-  auto bucket_ids = filter_->requestMatching(headers).bucket();
-  // Serialize the proto map to std map for easier matching comparison. We can avoid this conversion
-  // by using `EqualsProto()` directly once that is added to the Envoy code base.
-  auto serialize_bucket_ids =
-      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
-  EXPECT_THAT(expected_bucket_ids,
-              testing::Not(testing::UnorderedPointwise(testing::Eq(), serialize_bucket_ids)));
+  // Perform request matching and matching is expected to fail due to wrong inputs provided by
+  // `custom_value_pairs` above.
+  auto match = filter_->requestMatching(headers);
+  EXPECT_FALSE(match.ok());
 }
 
 } // namespace
