@@ -154,6 +154,7 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
   Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(match_yaml_string);
 
   absl::Status error = rewriter->isCompatiblePathMatcher(matcher);
