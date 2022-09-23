@@ -18,40 +18,10 @@ void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
 
 HeaderBasedSessionStateFactory::HeaderBasedSessionStateFactory(
     const HeaderBasedSessionStateProto& config)
-    : name_(config.name()), path_(config.path()) {
+    : name_(config.name()) {
   if (config.name().empty()) {
     throw EnvoyException("Header name cannot be empty for header based stateful sessions");
   }
-
-  // If no request path is specified or root path is specified then this session state will
-  // be enabled for any request
-  if (path_.empty() || path_ == "/") {
-    path_matcher_ = [](absl::string_view) { return true; };
-    return;
-  }
-
-  if (absl::EndsWith(path_, "/")) {
-    path_matcher_ = [path = path_](absl::string_view request_path) {
-      return absl::StartsWith(request_path, path);
-    };
-    return;
-  }
-
-  path_matcher_ = [path = path_](absl::string_view request_path) {
-    if (absl::StartsWith(request_path, path)) {
-      // Request path matches exactly
-      if (request_path.size() == path.size()) {
-        return true;
-      }
-
-      ASSERT(request_path.size() > path.size());
-      const char next_char = request_path[path.size()];
-      if (next_char == '/' || next_char == '?' || next_char == '#') {
-        return true;
-      }
-    }
-    return false;
-  };
 }
 
 } // namespace Header

@@ -41,7 +41,6 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
   {
     HeaderBasedSessionStateProto config;
     config.set_name("session-header");
-    config.set_path("/path");
     HeaderBasedSessionStateFactory factory(config);
 
     // Get upstream address from request headers.
@@ -67,84 +66,6 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
 
     // Update session state because the current request is routed to a new upstream host.
     EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("2.3.4.5:80", 10));
-  }
-
-  {
-    HeaderBasedSessionStateProto config;
-    config.set_name("session-header");
-    config.set_path("/path");
-    HeaderBasedSessionStateFactory factory(config);
-
-    // Get upstream address from request headers.
-    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
-        {":path", "/not_match_path"}, {"session-header", Envoy::Base64::encode("1.2.3.4:80", 10)}};
-
-    auto session_state = factory.create(request_headers);
-    EXPECT_EQ(session_state, nullptr);
-  }
-}
-
-TEST(HeaderBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
-  {
-    // Any request match for empty path
-    HeaderBasedSessionStateProto config;
-    config.set_name("session-header");
-    HeaderBasedSessionStateFactory factory(config);
-
-    EXPECT_TRUE(factory.requestPathMatch("/"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo"));
-    EXPECT_TRUE(factory.requestPathMatch("/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
-  }
-  {
-    // Any request match for root path
-    HeaderBasedSessionStateProto config;
-    config.set_name("session-header");
-    config.set_path("/");
-    HeaderBasedSessionStateFactory factory(config);
-
-    EXPECT_TRUE(factory.requestPathMatch("/"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo"));
-    EXPECT_TRUE(factory.requestPathMatch("/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
-  }
-  {
-    // Request path match for config path ending with '/'
-    HeaderBasedSessionStateProto config;
-    config.set_name("session-header");
-    config.set_path("/foo/");
-    HeaderBasedSessionStateFactory factory(config);
-
-    EXPECT_FALSE(factory.requestPathMatch("/"));
-    EXPECT_FALSE(factory.requestPathMatch("/foo"));
-    EXPECT_FALSE(factory.requestPathMatch("/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
-    EXPECT_FALSE(factory.requestPathMatch("/foo#bar"));
-    EXPECT_FALSE(factory.requestPathMatch("/foo?bar"));
-    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
-  }
-  {
-    // Request path match misc
-    HeaderBasedSessionStateProto config;
-    config.set_name("session-header");
-    config.set_path("/foo");
-    HeaderBasedSessionStateFactory factory(config);
-
-    EXPECT_FALSE(factory.requestPathMatch("/"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo"));
-    EXPECT_FALSE(factory.requestPathMatch("/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
-    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
-    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
   }
 }
 

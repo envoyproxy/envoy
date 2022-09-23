@@ -36,7 +36,6 @@ static_resources:
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
                   name: session-header
-                  path: /path
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

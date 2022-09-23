@@ -87,5 +87,7 @@ Similar example for header based configuration would be:
     :lineno-start: 28
     :caption: :download:`stateful-header-session.yaml <_include/stateful-header-session.yaml>`
 
-Note: The header based implementation assumes that the client will use the last supplied value for the session
+Note: 
+1. The header based implementation assumes that the client will use the last supplied value for the session
 header and will pass it with every subsequent request.
+2. StatefulSessionPerRoute should be used if path match is required.

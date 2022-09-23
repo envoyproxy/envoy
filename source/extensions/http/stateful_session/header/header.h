@@ -39,15 +39,7 @@ public:
   HeaderBasedSessionStateFactory(const HeaderBasedSessionStateProto& config);
 
   Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap& headers) const override {
-    if (!requestPathMatch(headers.getPathValue())) {
-      return nullptr;
-    }
     return std::make_unique<SessionStateImpl>(parseAddress(headers), *this);
-  }
-
-  bool requestPathMatch(absl::string_view request_path) const {
-    ASSERT(path_matcher_ != nullptr);
-    return path_matcher_(request_path);
   }
 
 private:
@@ -65,9 +57,6 @@ private:
   std::string getHeaderName() const { return name_; }
 
   const std::string name_;
-  const std::string path_;
-
-  std::function<bool(absl::string_view)> path_matcher_;
 };
 
 } // namespace Header

@@ -109,7 +109,6 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
       name: session-header
-      path: /test
 )EOF";
 
 static const std::string DISABLE_STATEFUL_SESSION =
@@ -141,7 +140,6 @@ stateful_session:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
       name: route-session-header
-      path: /test
 )EOF";
 
 TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
