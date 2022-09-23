@@ -10,12 +10,12 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
-#include "absl/container/btree_map.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -124,7 +124,23 @@ private:
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
   // TODO(tyxia) Revisit, could use unorder_map with hash function or message_hasher for BucketId.
-  // absl::btree_map<BucketId, QuotaAssignmentAction> quota_assignment_map_;
+  struct BucketIdHash {
+    size_t operator()(const BucketId& bucket_id) const {
+      // return absl::Hash<Protobuf::Map<ProtobufWkt::StringValue, ProtobufWkt::StringValue>>()(
+      //     bucket_id.bucket());
+
+      const auto bucket_id_hash = MessageUtil::hash(bucket_id);
+      return bucket_id_hash;
+    }
+  };
+
+  struct BucketIdEqual {
+    bool operator()(const BucketId& id1, const BucketId& id2) const {
+      return Protobuf::util::MessageDifferencer::Equals(id1, id2);
+    }
+  };
+  absl::node_hash_map<BucketId, QuotaAssignmentAction, BucketIdHash, BucketIdEqual>
+      quota_assignment_map_;
 };
 
 } // namespace RateLimitQuota

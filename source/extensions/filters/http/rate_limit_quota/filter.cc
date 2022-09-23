@@ -24,20 +24,27 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // TODO(tyxia) Boilerplate code, polish implementation later.
   absl::StatusOr<BucketId> match_result = requestMatching(headers);
 
-  // Requests are not matched by any matcher (could because of various reasons). In this case,
-  // requests are allowed by default (i.e., fail-open) and will not be reported to RLQS server.
+  // Requests are not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
+  // fail-open) and will not be reported to RLQS server.
   if (!match_result.ok()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   BucketId bucket_id = match_result.value();
-  // Catch-all case for requests are not matched by any matchers but has `on_no_match` config.
+  // Catch-all clause for requests are not matched by any matcher but the `on_no_match` field is
+  // configured. In this case, the requests are DENIED by default.
+  // TODO(tyxia) How to represent DENIED and ALLOWED here.
   if (bucket_id.bucket().empty()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // Request has been matched successfully and corresponding bucket id has been generated.
-  // Check if there is already quota assignment for the bucket with this `bucket_id`
+  // Request has been matched successfully and the corresponding bucket id has been generated.
+  // If the quota assignment for the bucket with this `bucket_id` is found
+  if (quota_assignment_map_.find(bucket_id) != quota_assignment_map_.end()) {
+
+  } else {
+    // Send the request to RLQS server for the quota assignment.
+  }
 
   rate_limit_client_->rateLimit(*this);
 
