@@ -130,5 +130,9 @@ TEST_F(QuicFilterManagerConnectionImplTest, EnableHalfClose) {
   EXPECT_DEATH(impl_.enableHalfClose(true), "Quic connection doesn't support half close.");
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, IsHalfCloseEnabled) {
+  EXPECT_FALSE(impl_.isHalfCloseEnabled());
+}
+
 } // namespace Quic
 } // namespace Envoy
