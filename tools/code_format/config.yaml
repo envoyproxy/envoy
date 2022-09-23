@@ -166,7 +166,7 @@ paths:
   serialize_as_string:
     include:
     - source/common/protobuf/utility.cc
-    - source/extensions/filters/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
+    - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
