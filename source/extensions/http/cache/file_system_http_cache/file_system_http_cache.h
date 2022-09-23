@@ -79,10 +79,10 @@ public:
   static absl::string_view name();
 
   enum class PurgeOption { PurgeFile, KeepFile };
-  void removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile>&& value,
+  void removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile> value,
                         PurgeOption purge_option) ABSL_LOCKS_EXCLUDED(cache_mu_);
 
-  void purgeCacheFile(std::shared_ptr<CacheEntryFile>&& cache_entry);
+  void purgeCacheFile(std::shared_ptr<CacheEntryFile> cache_entry);
 
   std::string generateFilename(const Key& key);
   absl::string_view cachePath() const;

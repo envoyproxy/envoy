@@ -293,7 +293,7 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(noop_lookup));
 }
 
-void FileSystemHttpCache::removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile>&& value,
+void FileSystemHttpCache::removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile> value,
                                            PurgeOption purge_option) {
   absl::MutexLock lock(&cache_mu_);
   auto it = cache_.find(key);
@@ -307,7 +307,7 @@ void FileSystemHttpCache::removeCacheEntry(const Key& key, std::shared_ptr<Cache
   }
 }
 
-void FileSystemHttpCache::purgeCacheFile(std::shared_ptr<CacheEntryFile>&& cache_entry) {
+void FileSystemHttpCache::purgeCacheFile(std::shared_ptr<CacheEntryFile> cache_entry) {
   std::string filename = absl::StrCat(cachePath(), cache_entry->filename());
   cache_entry->setOnDestroy([file_manager = async_file_manager_, filename]() {
     file_manager->unlink(filename, [filename](absl::Status s) {
