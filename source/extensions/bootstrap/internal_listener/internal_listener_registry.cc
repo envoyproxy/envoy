@@ -19,7 +19,7 @@ InternalListenerExtension::InternalListenerExtension(
       tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {
   // Convert buffer size proto config to KB. If configuration is zero or not specified,
   // assign default buffer size to be 1MB.
-  buffer_size_ = config.buffer_size() * 1024;
+  buffer_size_ = config.buffer_size().value() * 1024;
   if (buffer_size_ == 0) {
     buffer_size_ = INTERNAL_CONNECTION_DEFAULT_BUFFER_SIZE;
   }
@@ -57,11 +57,10 @@ void InternalListenerExtension::onServerInitialized() {
 }
 
 Server::BootstrapExtensionPtr InternalListenerFactory::createBootstrapExtension(
-    const Protobuf::Message& config,
-    Server::Configuration::ServerFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   const auto& message = MessageUtil::downcastAndValidate<
-        const envoy::extensions::bootstrap::internal_listener::v3::InternalListener&>(
-        config, context.messageValidationVisitor());
+      const envoy::extensions::bootstrap::internal_listener::v3::InternalListener&>(
+      config, context.messageValidationVisitor());
   return std::make_unique<InternalListenerExtension>(context, message);
 }
 

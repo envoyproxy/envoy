@@ -30,9 +30,10 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
         std::make_shared<Network::Address::EnvoyInternalInstance>("internal_client_address");
   }
 
-  ENVOY_LOG(debug, "Internal client connection buffer size {}.",  buffer_size_);
+  ENVOY_LOG(debug, "Internal client connection buffer size {}.", buffer_size_);
   auto [io_handle_client, io_handle_server] =
-      Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(buffer_size_ );
+      Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(
+          buffer_size_ );
 
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
       dispatcher,

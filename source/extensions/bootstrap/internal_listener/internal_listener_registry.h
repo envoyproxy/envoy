@@ -39,8 +39,9 @@ public:
 // initialized.
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
-  InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context,
-                            const envoy::extensions::bootstrap::internal_listener::v3::InternalListener& config);
+  InternalListenerExtension(
+      Server::Configuration::ServerFactoryContext& server_context,
+      const envoy::extensions::bootstrap::internal_listener::v3::InternalListener& config);
 
   ~InternalListenerExtension() override = default;
 

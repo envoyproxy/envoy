@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.bootstrap.internal_listener.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -24,5 +26,5 @@ message InternalListener {
   // For example, if buffer_size is set to 5, then the actual buffer size is
   // 5 KB = 5 * 1024 bytes.
   // If the buffer_size is not specified, the buffer size is set to 1024 KB.
-  uint32 buffer_size = 1 [(validate.rules).uint32 = {lte: 8192}];
+  google.protobuf.UInt32Value buffer_size = 1 [(validate.rules).uint32 = {lte: 8192}];
 }
