@@ -31,13 +31,13 @@ static_resources:
         address: 0.0.0.0
         port_value: 443
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
     # - name: envoy.filters.listener.proxy_protocol
     #   typed_config:
     #     "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     per_connection_buffer_limit_bytes: 32768  # 32 KiB
     filter_chains:
     - filter_chain_match:
