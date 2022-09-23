@@ -86,14 +86,14 @@ TEST_F(GrpcStreamTest, LogClose) {
     EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
 
     // Benign status: debug.
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream to test_destination closed", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "Ok");
     });
     EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
 
     // Non-retriable failure: warn.
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("warn", "gRPC config stream to test_destination closed", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::NotFound, "Not Found");
     });
@@ -102,7 +102,7 @@ TEST_F(GrpcStreamTest, LogClose) {
   // Repeated failures that warn after enough time.
   {
     // Retriable failure: debug.
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream to test_destination closed", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Unavailable, "Unavailable");
     });
@@ -111,7 +111,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
     // Different retriable failure: warn.
     time_system_.advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("warn",
                         "stream to test_destination closed: 4, Deadline Exceeded (previously 14, "
                         "Unavailable since 1s ago)",
@@ -125,7 +125,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
     // Same retriable failure after a short amount of time: debug.
     time_system_.advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream to test_destination closed", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
                                  "Deadline Exceeded");
@@ -135,7 +135,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
     // Same retriable failure after a long time: warn.
     time_system_.advanceTimeWait(std::chrono::seconds(100));
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS(
         "warn",
         "gRPC config stream to test_destination closed since 101s ago: 4, Deadline Exceeded", {
@@ -147,7 +147,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
     // Warn again, using the newest message.
     time_system_.advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS(
         "warn", "gRPC config stream to test_destination closed since 102s ago: 4, new message", {
           grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
@@ -158,7 +158,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 
     // Different retriable failure, using the most recent error message from the previous one.
     time_system_.advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_CALL(callbacks_, onEstablishmentFailure());
+    EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
     EXPECT_LOG_CONTAINS("warn",
                         "gRPC config stream to test_destination closed: 14, Unavailable "
                         "(previously 4, new message since 103s ago)",
@@ -190,7 +190,7 @@ TEST_F(GrpcStreamTest, LogClose) {
 // sendMessage would segfault.
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, onEstablishmentFailure());
+  EXPECT_CALL(callbacks_, onEstablishmentFailure(_));
   grpc_stream_.establishNewStream();
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
 }
