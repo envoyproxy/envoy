@@ -182,6 +182,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/ssl:context_interface",
         "//envoy/stream_info:filter_state_interface",
     ],
 )

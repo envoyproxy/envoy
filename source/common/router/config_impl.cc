@@ -534,8 +534,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      total_cluster_weight_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 0UL)),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
@@ -593,9 +591,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_cluster_weight_ > 0 && total_weight != total_cluster_weight_) {
-      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       total_cluster_weight_));
+    // Reject the config if the total_weight of all clusters is 0.
+    if (total_weight == 0) {
+      throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
     total_cluster_weight_ = total_weight;
@@ -669,7 +667,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
-  if (!route.route().prefix_rewrite().empty() && path_matcher_ != nullptr) {
+  if (!prefix_rewrite_.empty() && path_matcher_ != nullptr) {
     throw EnvoyException("Cannot use prefix_rewrite with matcher extension");
   }
 
@@ -861,7 +859,11 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers,
+                                   stream_info.getRequestHeaders() == nullptr
+                                       ? *Http::StaticEmptyHeaders::get().request_headers
+                                       : *stream_info.getRequestHeaders(),
+                                   headers, stream_info);
   }
 }
 

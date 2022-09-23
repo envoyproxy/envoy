@@ -515,6 +515,15 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
   EXPECT_EQ(IpVersion::v6, (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->ip()->version());
   EXPECT_EQ("[::ffff:192.0.2.128]:32000",
             (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->asString());
+
+// Verify that when forceV6() is true, IPv4-mapped IPv6 address will be converted even when |v6only|
+// is true
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.always_use_v6", true);
+  EXPECT_EQ(IpVersion::v4, (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->ip()->version());
+  EXPECT_EQ("192.0.2.128:32000",
+            (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->asString());
+#endif
 }
 
 TEST(AddressFromSockAddrDeathTest, Pipe) {
