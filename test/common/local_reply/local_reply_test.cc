@@ -368,19 +368,25 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
             key: foo-3
             value: append-bar3
           append_action: APPEND_IF_EXISTS_OR_ADD
+        - header:
+            key: local-reply-req-id
+            value: '%REQ(req-id)%'
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
 
   response_headers_.addCopy("foo-2", "bar2");
   response_headers_.addCopy("foo-3", "bar3");
-  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
+  Http::TestRequestHeaderMapImpl request_headers_with_req_id{{"req-id", "123"}};
+  local->rewrite(&request_headers_with_req_id, response_headers_, stream_info_, code_, body_,
+                 content_type_);
   EXPECT_EQ(code_, TestInitCode);
   EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(content_type_, "text/plain");
 
   EXPECT_EQ(response_headers_.get_("foo-1"), "bar1");
   EXPECT_EQ(response_headers_.get_("foo-2"), "override-bar2");
+  EXPECT_EQ(response_headers_.get_("local-reply-req-id"), "123");
   const auto out = response_headers_.get(Http::LowerCaseString("foo-3"));
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0]->value().getStringView(), "bar3");

@@ -88,7 +88,8 @@ public:
       body = body_.value();
     }
 
-    header_parser_->evaluateHeaders(response_headers, stream_info);
+    header_parser_->evaluateHeaders(response_headers, request_headers, response_headers,
+                                    stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();

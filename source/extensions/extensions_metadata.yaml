@@ -149,6 +149,7 @@ envoy.filters.http.adaptive_concurrency:
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: stable
   type_urls:
@@ -757,7 +758,7 @@ envoy.matching.matchers.ip:
 envoy.path.match.uri_template.uri_template_matcher:
     categories:
     - envoy.path.match
-    security_posture: unknown
+    security_posture: robust_to_untrusted_downstream_and_upstream
     status: stable
     undocumented: true
     type_urls:
@@ -765,7 +766,7 @@ envoy.path.match.uri_template.uri_template_matcher:
 envoy.path.rewrite.uri_template.uri_template_rewriter:
       categories:
       - envoy.path.rewrite
-      security_posture: unknown
+      security_posture: robust_to_untrusted_downstream_and_upstream
       status: stable
       undocumented: true
       type_urls:

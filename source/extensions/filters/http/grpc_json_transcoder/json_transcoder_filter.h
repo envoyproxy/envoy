@@ -216,6 +216,9 @@ private:
   bool error_{false};
   bool has_body_{false};
   bool http_body_response_headers_set_{false};
+
+  // Don't buffer unary response data in the `FilterManager` buffer.
+  Buffer::OwnedImpl response_out_;
 };
 
 } // namespace GrpcJsonTranscoder
