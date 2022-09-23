@@ -425,6 +425,79 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
       respBody);
 }
 
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
+  HttpIntegrationTest::initialize();
+
+  // JSON enum value string "FEMALE" should work.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"FEMALE"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+
+  // JSON enum value string "Female" should fail.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"Female"})", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "gender: invalid value \"Female\" for type type.googleapis.com/bookstore.Author.Gender",
+      false);
+}
+
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+// After enable the "case_insensitive_enum_parsing" flag,
+// JSON enum value string can be in any case.
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
+  // Enable case_insensitive_enum_parsing flag
+  const std::string filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              case_insensitive_enum_parsing : true
+            )EOF";
+  config_helper_.prependFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  // JSON enum value string "FEMALE" should work.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"FEMALE"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+
+  // JSON enum value string "Female" should work too.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"Female"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   HttpIntegrationTest::initialize();
   testTranscoding<Empty, bookstore::ListShelvesResponse>(

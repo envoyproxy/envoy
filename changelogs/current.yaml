@@ -235,6 +235,9 @@ new_features:
   change: |
     log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
     and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls forward proxy.
+- area: grpc_json_transcoder
+  change: |
+    added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
 
 deprecated:
 - area: http
