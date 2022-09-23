@@ -284,14 +284,13 @@ std::string FileSystemHttpCache::generateFilename(const Key& key) {
 
 InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
                                                         Http::StreamEncoderFilterCallbacks&) {
-  auto noop_lookup = dynamic_cast<NoOpLookupContext*>(lookup_context.get());
+  auto noop_lookup = std::unique_ptr<NoOpLookupContext>(
+      dynamic_cast<NoOpLookupContext*>(lookup_context.release()));
   ASSERT(noop_lookup);
   if (noop_lookup->refuseInserts()) {
     return std::make_unique<DontInsertContext>();
   }
-  auto& lookup = noop_lookup->lookup();
-  return std::make_unique<FileInsertContext>(shared_from_this(), lookup.key(),
-                                             lookup.requestHeaders(), lookup.varyAllowList());
+  return std::make_unique<FileInsertContext>(shared_from_this(), std::move(noop_lookup));
 }
 
 void FileSystemHttpCache::removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile>&& value,

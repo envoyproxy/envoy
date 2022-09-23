@@ -16,7 +16,7 @@ namespace FileSystemHttpCache {
 using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileHandle;
 using ::Envoy::Extensions::Common::AsyncFiles::CancelFunction;
 
-class FileLookupContext;
+class NoOpLookupContext;
 class FileSystemHttpCache;
 
 // Because the cache implementation doesn't use a "ready" callback from insertHeaders,
@@ -107,9 +107,8 @@ public:
 
 class FileInsertContext : public InsertContext {
 public:
-  FileInsertContext(std::shared_ptr<FileSystemHttpCache> cache, const Key& key,
-                    const Http::RequestHeaderMap& request_headers,
-                    const VaryAllowList& vary_allow_list);
+  FileInsertContext(std::shared_ptr<FileSystemHttpCache> cache,
+                    std::unique_ptr<NoOpLookupContext> lookup_context);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, InsertCallback insert_complete,
                      bool end_stream) override;
@@ -120,6 +119,7 @@ public:
   void onDestroy() override {} // Destruction of queue_ is all the cleanup.
 
 private:
+  std::unique_ptr<NoOpLookupContext> lookup_context_;
   std::shared_ptr<InsertOperationQueue> queue_;
 };
 

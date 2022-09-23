@@ -120,6 +120,17 @@ CacheFileHeader protoFromHeadersAndMetadata(const Key& key,
   return file_header;
 }
 
+CacheFileTrailer protoFromTrailers(const Http::ResponseTrailerMap& response_trailers) {
+  CacheFileTrailer file_trailer;
+  response_trailers.iterate([&file_trailer](const Http::HeaderEntry& trailer) {
+    auto t = file_trailer.add_trailers();
+    t->set_key(std::string{trailer.key().getStringView()});
+    t->set_value(std::string{trailer.value().getStringView()});
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return file_trailer;
+}
+
 size_t headerProtoSize(const CacheFileHeader& proto) { return proto.SerializeAsString().size(); }
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto) {
@@ -132,6 +143,31 @@ Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto) {
 
 std::string serializedStringFromProto(const CacheFileHeader& proto) {
   return proto.SerializeAsString();
+}
+
+Http::ResponseHeaderMapPtr headersFromHeaderProto(const CacheFileHeader& header) {
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  for (const auto& h : header.headers()) {
+    headers->addCopy(Http::LowerCaseString(h.key()), h.value());
+  }
+  return headers;
+}
+
+Http::ResponseTrailerMapPtr trailersFromTrailerProto(const CacheFileTrailer& trailer) {
+  auto trailers = Http::ResponseTrailerMapImpl::create();
+  for (const auto& t : trailer.trailers()) {
+    trailers->addCopy(Http::LowerCaseString(t.key()), t.value());
+  }
+  return trailers;
+}
+
+ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
+  ResponseMetadata metadata;
+  SystemTime epoch_time;
+  metadata.response_time_ =
+      epoch_time + std::chrono::milliseconds(Protobuf::util::TimeUtil::TimestampToMilliseconds(
+                       header.metadata_response_time()));
+  return metadata;
 }
 
 } // namespace FileSystemHttpCache

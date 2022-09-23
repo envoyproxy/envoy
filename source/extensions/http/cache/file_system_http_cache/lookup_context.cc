@@ -1,6 +1,7 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
@@ -8,35 +9,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-
-namespace {
-
-Http::ResponseHeaderMapPtr headersFromHeaderProto(const CacheFileHeader& header) {
-  auto headers = Http::ResponseHeaderMapImpl::create();
-  for (const auto& h : header.headers()) {
-    headers->addCopy(Http::LowerCaseString(h.key()), h.value());
-  }
-  return headers;
-}
-
-Http::ResponseTrailerMapPtr trailersFromTrailerProto(const CacheFileTrailer& trailer) {
-  auto trailers = Http::ResponseTrailerMapImpl::create();
-  for (const auto& t : trailer.trailers()) {
-    trailers->addCopy(Http::LowerCaseString(t.key()), t.value());
-  }
-  return trailers;
-}
-
-ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
-  ResponseMetadata metadata;
-  SystemTime epoch_time;
-  metadata.response_time_ =
-      epoch_time + std::chrono::milliseconds(Protobuf::util::TimeUtil::TimestampToMilliseconds(
-                       header.metadata_response_time()));
-  return metadata;
-}
-
-} // namespace
 
 void NoOpLookupContext::getHeaders(LookupHeadersCallback&& cb) { cb(LookupResult{}); }
 

@@ -6,6 +6,7 @@
 #include "source/common/filesystem/directory.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 #include "test/extensions/common/async_files/mocks.h"
@@ -14,6 +15,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -34,6 +36,7 @@ using Common::AsyncFiles::MockAsyncFileManagerFactory;
 using ::envoy::extensions::filters::http::cache::v3::CacheConfig;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
+using ::testing::StrictMock;
 
 absl::string_view yaml_config = R"(
   typed_config:
@@ -158,6 +161,14 @@ public:
 
   void SetUp() override { initCache(); }
 
+  InsertContextPtr testInserter() {
+    auto request = LookupRequest{request_headers_, time_system_.systemTime(), vary_allow_list_};
+    key_ = request.key();
+    LookupContextPtr lookup = cache_->makeLookupContext(std::move(request), decoder_callbacks_);
+    auto ret = cache_->makeInsertContext(std::move(lookup), encoder_callbacks_);
+    return ret;
+  }
+
 protected:
   ::testing::NiceMock<MockSingletonManager> mock_singleton_manager_;
   std::shared_ptr<MockAsyncFileManagerFactory> mock_async_file_manager_factory_ =
@@ -165,31 +176,35 @@ protected:
   std::shared_ptr<MockAsyncFileManager> mock_async_file_manager_ =
       std::make_shared<NiceMock<MockAsyncFileManager>>();
   MockAsyncFileHandle mock_async_file_handle_ =
-      std::make_shared<MockAsyncFileContext>(mock_async_file_manager_);
+      std::make_shared<StrictMock<MockAsyncFileContext>>(mock_async_file_manager_);
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Event::SimulatedTimeSystem time_system_;
   Http::TestRequestHeaderMapImpl request_headers_;
   VaryAllowList vary_allow_list_{varyAllowListConfig().allowed_vary_headers()};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
+  Http::TestResponseHeaderMapImpl response_headers_{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"},
+  };
+  Http::TestResponseTrailerMapImpl response_trailers_{{"fruit", "banana"}};
+  const ResponseMetadata metadata_{time_system_.systemTime()};
+  Key key_;
 };
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedWriteOfVaryNodeJustClosesTheFile) {
-  auto request = LookupRequest{request_headers_, time_system_.systemTime(), vary_allow_list_};
-  LookupContextPtr lookup = cache_->makeLookupContext(std::move(request), decoder_callbacks_);
-  absl::Cleanup destroy_lookup{[&lookup]() { lookup->onDestroy(); }};
-  InsertContextPtr inserter = cache_->makeInsertContext(std::move(lookup), encoder_callbacks_);
+  auto inserter = testInserter();
   absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
       {"date", formatter_.fromTime(time_system_.systemTime())},
       {"cache-control", "public,max-age=3600"},
       {"vary", "accept"}};
-  const ResponseMetadata metadata{time_system_.systemTime()};
   // one file created for the vary node, one for the actual write.
   EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _)).Times(2);
   inserter->insertHeaders(
-      response_headers, metadata, [&](bool result) { EXPECT_FALSE(result); }, true);
+      response_headers, metadata_, [&](bool result) { EXPECT_FALSE(result); }, true);
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _));
   // File handle for the vary node.
   // (This triggers the expected write call.)
@@ -202,6 +217,104 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedWriteOfVaryNodeJustClosesTheF
   // Fail to write for the vary node.
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(absl::UnknownError("write failure")));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, LookupDuringAnotherInsertPreventsInserts) {
+  auto inserter = testInserter();
+  absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
+  // First inserter will try to create a file.
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  inserter->insertHeaders(
+      response_headers_, metadata_, [&](bool result) { EXPECT_FALSE(result); }, false);
+
+  auto inserter2 = testInserter();
+  absl::Cleanup destroy_inserter2{[&inserter2]() { inserter2->onDestroy(); }};
+  // Allow the first inserter to complete after the second lookup was made.
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>{absl::UnknownError("intentionally failed to open file")});
+  int called = 0;
+  auto result_callback = [&](bool result) {
+    EXPECT_FALSE(result);
+    called++;
+  };
+  inserter2->insertHeaders(response_headers_, metadata_, result_callback, false);
+  inserter2->insertBody(Buffer::OwnedImpl("boop"), result_callback, false);
+  inserter2->insertTrailers(response_trailers_, result_callback);
+  EXPECT_EQ(called, 3);
+  // The file handle didn't actually get used in this test, but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, DuplicateInsertWhileInsertInProgressIsPrevented) {
+  auto inserter = testInserter();
+  absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
+  auto inserter2 = testInserter();
+  absl::Cleanup destroy_inserter2{[&inserter2]() { inserter2->onDestroy(); }};
+  // First inserter will try to create a file.
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  inserter->insertHeaders(
+      response_headers_, metadata_, [&](bool result) { EXPECT_FALSE(result); }, false);
+  int called = 0;
+  auto result_callback = [&](bool result) {
+    EXPECT_FALSE(result);
+    called++;
+  };
+  inserter2->insertHeaders(response_headers_, metadata_, result_callback, false);
+  // Allow the first inserter to complete after the second insert was called.
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>{absl::UnknownError("intentionally failed to open file")});
+  inserter2->insertBody(Buffer::OwnedImpl("boop"), result_callback, false);
+  inserter2->insertTrailers(response_trailers_, result_callback);
+  EXPECT_EQ(called, 3);
+  // The file handle didn't actually get used in this test, but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
+// The documentation for cache_filter suggests it will wait for ready_for_next_chunk to be
+// called before sending another chunk, but it does not. This verifies that the cache
+// doesn't rely on the documented behavior.
+TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallbackWorks) {
+  auto inserter = testInserter();
+  absl::Cleanup destroy_inserter{[&inserter]() { inserter->onDestroy(); }};
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  int called = 0;
+  auto result_callback = [&](bool result) {
+    EXPECT_TRUE(result);
+    called++;
+  };
+  inserter->insertHeaders(response_headers_, metadata_, result_callback, false);
+  absl::string_view body1 = "herp";
+  absl::string_view body2 = "derp";
+  size_t trailers_size = bufferFromProto(protoFromTrailers(response_trailers_)).length();
+  size_t headers_size =
+      headerProtoSize(protoFromHeadersAndMetadata(key_, response_headers_, metadata_));
+  inserter->insertBody(Buffer::OwnedImpl(body1), result_callback, false);
+  inserter->insertBody(Buffer::OwnedImpl(body2), result_callback, false);
+  inserter->insertTrailers(response_trailers_, result_callback);
+  EXPECT_EQ(0, called);
+  EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(6);
+  // Open file
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>{mock_async_file_handle_});
+  // Preheader
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
+  // Body1
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body1.size()));
+  // Body2
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body2.size()));
+  // Trailers
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size));
+  // Headers
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size));
+  // Updated preheader (which triggers createHardLink)
+  EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
+  // createHardLink
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  // Should have been 4 callbacks; insertHeaders, insertBody, insertBody, insertTrailers.
+  EXPECT_EQ(called, 4);
 }
 
 // For the standard cache tests from http_cache_implementation_test_common.cc

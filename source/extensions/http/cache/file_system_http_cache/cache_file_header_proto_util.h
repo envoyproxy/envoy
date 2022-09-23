@@ -19,12 +19,17 @@ void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
 CacheFileHeader protoFromHeadersAndMetadata(const Key& key,
                                             const Http::ResponseHeaderMap& response_headers,
                                             const ResponseMetadata& metadata);
+CacheFileTrailer protoFromTrailers(const Http::ResponseTrailerMap& response_trailers);
 
 size_t headerProtoSize(const CacheFileHeader& proto);
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto);
 Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto);
 std::string serializedStringFromProto(const CacheFileHeader& proto);
+
+Http::ResponseHeaderMapPtr headersFromHeaderProto(const CacheFileHeader& header);
+Http::ResponseTrailerMapPtr trailersFromTrailerProto(const CacheFileTrailer& trailer);
+ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header);
 
 } // namespace FileSystemHttpCache
 } // namespace Cache
