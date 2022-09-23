@@ -64,15 +64,21 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     // TODO(tyxia) This function should trigger the CEL expression matching.
     // We need to implement the custom_matcher and factory and register so that CEL matching will be
     // triggered with its own match() method.
-    auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
-    if (match.result_) {
-      const auto result = match.result_();
-      const RateLimitOnMactchAction* match_action =
-          dynamic_cast<RateLimitOnMactchAction*>(result.get());
-      // Try to generate the bucket id if matching succeeded.
-      return match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
+    auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
+
+    if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {
+      if (match_result.result_) {
+        // on_match case.
+        const auto result = match_result.result_();
+        const RateLimitOnMactchAction* match_action =
+            dynamic_cast<RateLimitOnMactchAction*>(result.get());
+        // Try to generate the bucket id if matching succeeded.
+        return match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
+      } else {
+        return absl::NotFoundError("The match was completed, no match found");
+      }
     } else {
-      // TODO(tyxia) Check if `on_no_match` field is configured or not.
+      // Returned state from `evaluateMatch` is `MatchState::UnableToMatch` for this case.
       return absl::InternalError("Failed to match the request");
     }
   }
@@ -125,6 +131,9 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
       PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
+
+  // Empty BucketId will be returned if request is not matcher to any matcher but `on_no_match`
+  // field is configured.
   return bucket_id;
 }
 

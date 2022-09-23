@@ -63,6 +63,16 @@ constexpr char ValidMatcherConfig[] = R"EOF(
             reporting_interval: 60s
   )EOF";
 
+constexpr char OnNoMatchConfig[] = R"EOF(
+  action:
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+      no_assignment_behavior:
+        fallback_rate_limit:
+          blanket_rule: DENY_ALL
+      reporting_interval: 60s
+)EOF";
+
 const std::string GoogleGrpcConfig = R"EOF(
   rlqs_server:
     google_grpc:
@@ -106,6 +116,8 @@ const std::string GoogleGrpcConfig = R"EOF(
 //                       string_value: "prod"
 //   )EOF";
 
+enum class MatcherConfigType { Valid, Invalid, IncludeOnNoMatchConfig };
+
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
@@ -113,18 +125,48 @@ public:
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
   }
 
-  void addMatcherConfigAndCreateFilter(bool valid) {
-    // Add the matcher configuration. Invalid bucket_matcher configuration will be just empty
-    // matcher config.
-    if (valid) {
+  void addMatcherConfigAndCreateFilter(MatcherConfigType config_type) {
+    // Add the matcher configuration.
+    switch (config_type) {
+    case MatcherConfigType::Valid: {
       xds::type::matcher::v3::Matcher matcher;
       TestUtility::loadFromYaml(ValidMatcherConfig, matcher);
       config_.mutable_bucket_matchers()->MergeFrom(matcher);
+      break;
+    }
+    case MatcherConfigType::IncludeOnNoMatchConfig: {
+      xds::type::matcher::v3::Matcher::OnMatch on_no_matcher;
+      TestUtility::loadFromYaml(OnNoMatchConfig, on_no_matcher);
+
+      xds::type::matcher::v3::Matcher matcher;
+      TestUtility::loadFromYaml(ValidMatcherConfig, matcher);
+
+      matcher.mutable_on_no_match()->MergeFrom(on_no_matcher);
+      config_.mutable_bucket_matchers()->MergeFrom(matcher);
+      break;
+    }
+    // Invalid bucket_matcher configuration will be just empty
+    // matcher config.
+    case MatcherConfigType::Invalid:
+    default:
+      break;
     }
 
     filter_config_ = std::make_shared<FilterConfig>(config_);
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  }
+
+  void constructMismatchedRequestHeader() {
+    // Define the wrong input that doesn't match the values in the config: it has `{"env",
+    // "staging"}` rather than `{"environment", "staging"}`.
+    absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
+                                                                        {"group", "envoy"}};
+
+    // Add custom_value_pairs to the request header for exact value_match in the predicate.
+    for (auto const& pair : custom_value_pairs) {
+      default_headers_.addCopy(pair.first, pair.second);
+    }
   }
 
   NiceMock<MockFactoryContext> context_;
@@ -138,26 +180,23 @@ public:
 };
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
-  addMatcherConfigAndCreateFilter(/*valid=*/false);
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Invalid);
   auto match = filter_->requestMatching(default_headers_);
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match.status().message(), "Matcher has not been initialized yet");
 }
 
-TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
-  addMatcherConfigAndCreateFilter(/*valid=*/true);
+TEST_F(FilterTest, RequestMatchingSucceeded) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
-  // Http::TestRequestHeaderMapImpl headers = default_headers_;
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 
   // Add custom_value_pairs to the request header for exact value_match in the predicate.
   for (auto const& pair : custom_value_pairs) {
-    headers.addCopy(pair.first, pair.second);
+    default_headers_.addCopy(pair.first, pair.second);
   }
 
   // The expected bucket ids has one additional pair that is built statically via `string_value`
@@ -166,7 +205,7 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
   expected_bucket_ids.insert({"name", "prod"});
 
   // Perform request matching and get the generated bucket ids if matched.
-  auto match = filter_->requestMatching(headers);
+  auto match = filter_->requestMatching(default_headers_);
   EXPECT_TRUE(match.ok());
   auto bucket_ids = match.value().bucket();
 
@@ -178,30 +217,29 @@ TEST_F(FilterTest, BuildBucketSettingsSucceeded) {
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
-TEST_F(FilterTest, BuildBucketSettingsFailed) {
-  addMatcherConfigAndCreateFilter(/*valid=*/true);
-  // Define the wrong input that doesn't match the values in the config: it has `{"env", "staging"}`
-  // rather than `{"environment", "staging"}`.
-  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"env", "staging"},
-                                                                      {"group", "envoy"}};
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+TEST_F(FilterTest, RequestMatchingFailed) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  constructMismatchedRequestHeader();
 
-  for (auto const& pair : custom_value_pairs) {
-    default_headers_.addCopy(pair.first, pair.second);
-  }
-
-  // The expected bucket ids has one additional pair that is built via `string_value` static method
-  // from the config.
-  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
-  expected_bucket_ids.insert({"name", "prod"});
-
-  // Perform request matching and matching is expected to fail due to wrong inputs provided by
-  // `custom_value_pairs` above.
-  auto match = filter_->requestMatching(headers);
+  // Perform request matching.
+  auto match = filter_->requestMatching(default_headers_);
+  // Not_OK status is expected to be returned because the matching failed due to mismatched inputs.
   EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match.status().message(), "Failed to match the request");
+  EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
+  EXPECT_EQ(match.status().message(), "The match was completed, no match found");
+}
+
+TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::IncludeOnNoMatchConfig);
+  constructMismatchedRequestHeader();
+
+  // Perform request matching.
+  auto match = filter_->requestMatching(default_headers_);
+  // OK status is expected to be returned even if the exact request matching failed. It is because
+  // `on_no_match` field is configured.
+  EXPECT_TRUE(match.ok());
+  // Empty BucketId is expected to be returned here.
+  EXPECT_EQ(match.value().bucket().size(), 0);
 }
 
 } // namespace
