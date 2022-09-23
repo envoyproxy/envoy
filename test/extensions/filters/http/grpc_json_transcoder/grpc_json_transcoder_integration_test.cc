@@ -425,10 +425,13 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
       respBody);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueDefault) {
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
   HttpIntegrationTest::initialize();
 
-  // All uppercase enum value "FEMALE" should work.
+  // JSON enum value string "FEMALE" should work.
   testTranscoding<bookstore::Author, bookstore::Author>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
@@ -440,7 +443,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueDefault) {
                                       {"grpc-status", "0"}},
       R"({"id":"1234","gender":"FEMALE"})");
 
-  // Not all uppercase enum value "Female" should fail.
+  // JSON enum value string "Female" should fail.
   testTranscoding<bookstore::Author, bookstore::Author>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
@@ -450,6 +453,11 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueDefault) {
       false);
 }
 
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+// After enable the "case_insensitive_enum_parsing" flag,
+// JSON enum value string can be in any case.
 TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
   // Enable case_insensitive_enum_parsing flag
   const std::string filter =
@@ -465,7 +473,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
-  // All uppercase enum value "FEMALE" should work.
+  // JSON enum value string "FEMALE" should work.
   testTranscoding<bookstore::Author, bookstore::Author>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
@@ -477,7 +485,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
                                       {"grpc-status", "0"}},
       R"({"id":"1234","gender":"FEMALE"})");
 
-  // With case_insensitive_enum_parsing = true, "Female" should work too.
+  // JSON enum value string "Female" should work too.
   testTranscoding<bookstore::Author, bookstore::Author>(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
