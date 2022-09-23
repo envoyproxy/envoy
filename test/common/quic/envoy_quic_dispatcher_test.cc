@@ -362,7 +362,9 @@ TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {
   const quic::QuicSocketAddress self_address;
 
   EnvoyQuicCryptoServerStreamHelper helper;
-  EXPECT_ENVOY_BUG(helper.CanAcceptClientHello(message, client_address, peer_address, self_address, nullptr), "Unexpected call to CanAcceptClientHello");
+  EXPECT_ENVOY_BUG(
+      helper.CanAcceptClientHello(message, client_address, peer_address, self_address, nullptr),
+      "Unexpected call to CanAcceptClientHello");
 }
 
 } // namespace Quic
