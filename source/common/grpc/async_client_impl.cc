@@ -96,6 +96,11 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
       parent_.host_name_.empty() ? parent_.remote_cluster_name_ : parent_.host_name_,
       service_full_name_, method_name_, options_.timeout);
   // Fill service-wide initial metadata.
+  // TODO(cpakulski): Find a better way to access requestHeaders after runtime guard
+  // envoy_reloadable_features_unified_header_formatter runtime guard is deprecated and
+  // request headers are not stored in stream_info.
+  // Maybe put it to parent_context?
+  // Since request headers may be empty, consider using Envoy::OptRef.
   parent_.metadata_parser_->evaluateHeaders(headers_message_->headers(),
                                             options_.parent_context.stream_info);
 

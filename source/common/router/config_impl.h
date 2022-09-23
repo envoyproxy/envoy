@@ -814,7 +814,11 @@ public:
                                                    bool do_formatting = true) const override;
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                  const StreamInfo::StreamInfo& stream_info) const override {
-      response_headers_parser_->evaluateHeaders(headers, stream_info);
+      const Http::RequestHeaderMap& request_headers =
+          stream_info.getRequestHeaders() == nullptr
+              ? *Http::StaticEmptyHeaders::get().request_headers
+              : *stream_info.getRequestHeaders();
+      response_headers_parser_->evaluateHeaders(headers, request_headers, headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,

@@ -156,7 +156,7 @@ public:
   };
 
   void addEPOperation(
-      size_t raw_offset, absl::string_view& header,
+      size_t raw_offset, absl::string_view& header, HeaderType type,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
           local_services);
   void addOpaqueOperation(size_t raw_offset, absl::string_view& header);
@@ -164,7 +164,7 @@ public:
 
   void addMsgHeader(HeaderType type, absl::string_view value);
 
-  std::string getDomainFromHeaderParameter(absl::string_view& header, const std::string& parameter);
+  absl::string_view getDomainFromHeaderParameter(HeaderType type, const std::string& parameter);
 
   void parseHeader(HeaderType type, unsigned short index = 0) {
     return headers_[type][index].parseHeader();
@@ -214,7 +214,7 @@ private:
   TraContextMap tra_context_map_{};
 
   bool isDomainMatched(
-      absl::string_view& header,
+      HeaderType type,
       const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
           local_services) {
     for (auto& service : local_services) {
@@ -222,7 +222,7 @@ private:
         // no default value
         continue;
       }
-      if (service.domain() == getDomainFromHeaderParameter(header, service.parameter())) {
+      if (service.domain() == getDomainFromHeaderParameter(type, service.parameter())) {
         return true;
       }
     }
