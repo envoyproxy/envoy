@@ -17,6 +17,7 @@ def envoy_dependencies_extra(python_version = PYTHON_VERSION):
     python_register_toolchains(
         name = "python%s" % ("_".join(python_version.split(".")[:-1])),
         python_version = python_version,
+        ignore_root_user_error = True,
     )
 
     aspect_bazel_lib_dependencies()
