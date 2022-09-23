@@ -15,6 +15,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
 
+#define INTERNAL_CONNECTION_DEFAULT_BUFFER_SIZE (1024*1024)
+
 // This factory creates the client connection to an envoy internal address.
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
@@ -35,6 +37,7 @@ public:
   // TODO(lambdai): make it friend to only bootstrap extension.
   static ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
       registry_tls_slot_;
+  static uint32_t buffer_size_;
 };
 
 } // namespace InternalListener
