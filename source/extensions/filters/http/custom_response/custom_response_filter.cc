@@ -28,28 +28,40 @@ bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
 
 Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeaderMap& header_map,
                                                               bool) {
-  downstream_headers_ = &header_map;
-  const auto* per_route_settings =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-  base_config_ = per_route_settings ? static_cast<const FilterConfigBase*>(per_route_settings)
-                                    : static_cast<const FilterConfigBase*>(config_.get());
+  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
+      "envoy.filters.http.custom_response");
+  if (!filter_state) {
+    downstream_headers_ = &header_map;
+    const auto* per_route_settings =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+    base_config_ = per_route_settings ? static_cast<const FilterConfigBase*>(per_route_settings)
+                                      : static_cast<const FilterConfigBase*>(config_.get());
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                              bool end_stream) {
-  (void)end_stream;
-  // check if filter state exists already.
+                                                              bool) {
+  // If filter state for custom response exists, it means this response is a
+  // custom response. Apply the custom response mutations to the response from
+  // the remote source and return.
   auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
       "envoy.filters.http.custom_response");
   if (filter_state) {
+    // Apply mutations if this is a non-error response. Else leave be.
+    auto const cr_code = Http::Utility::getResponseStatusOrNullopt(headers);
+    if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
+      return Http::FilterHeadersStatus::Continue;
+    }
     filter_state->mutateHeaders(headers, encoder_callbacks_->streamInfo());
     if (filter_state->statusCode().has_value()) {
       auto const code = *filter_state->statusCode();
       headers.setStatus(std::to_string(enumToInt(code)));
       encoder_callbacks_->streamInfo().setResponseCode(static_cast<uint32_t>(code));
     }
+    return Http::FilterHeadersStatus::Continue;
   }
+
   auto custom_response = base_config_->getResponse(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
