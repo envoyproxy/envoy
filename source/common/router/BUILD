@@ -401,7 +401,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "header_parser_lib",
-    srcs = ["header_parser.cc"],
+    srcs = [
+        "header_parser.cc",
+        "header_parser_utils.cc",
+    ],
     hdrs = ["header_parser.h"],
     deps = [
         ":header_formatter_lib",
