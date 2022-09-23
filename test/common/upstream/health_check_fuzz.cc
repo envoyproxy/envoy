@@ -544,6 +544,7 @@ void HealthCheckFuzz::initializeAndReplay(test::common::upstream::HealthCheckTes
 
 void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& input) {
   constexpr auto max_actions = 64;
+  bool already_connected = false;
   for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& event = input.actions(i);
     // The last_action boolean prevents final actions from creating a client and stream that will
@@ -564,7 +565,15 @@ void HealthCheckFuzz::replay(const test::common::upstream::HealthCheckTestCase& 
       break;
     }
     case test::common::upstream::Action::kRaiseEvent: {
-      raiseEvent(getEventTypeFromProto(event.raise_event()), last_action);
+      auto raise_event = getEventTypeFromProto(event.raise_event());
+      if (raise_event == Network::ConnectionEvent::Connected) {
+        if (already_connected) {
+          break;
+        } else {
+          already_connected = true;
+        }
+      }
+      raiseEvent(raise_event, last_action);
       break;
     }
     case test::common::upstream::Action::kRaiseGoAway: {
