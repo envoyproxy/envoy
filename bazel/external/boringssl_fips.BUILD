@@ -31,5 +31,5 @@ genrule(
         "crypto/libcrypto.a",
         "ssl/libssl.a",
     ],
-    cmd = genrule_cmd("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
+    cmd = genrule_cmd("//bazel/external:boringssl_fips.genrule_cmd"),
 )
