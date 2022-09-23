@@ -6,8 +6,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
-#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
 namespace Extensions {
