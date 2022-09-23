@@ -536,11 +536,11 @@ TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:errors_sent)% "
-      "%DYNAMIC_METADATA(udp.proxy.session:errors_received)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
       "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%";
 
-  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)% "
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:errors_received)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)% "
                                               "%DYNAMIC_METADATA(udp.proxy.proxy:sess_total)% "
                                               "%DYNAMIC_METADATA(udp.proxy.proxy:idle_timeout)%";
 
@@ -595,8 +595,8 @@ matcher:
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
-  EXPECT_EQ(output_.front(), "0 1 0");
-  EXPECT_EQ(output_.back(), "fake_cluster 0 10 1 1 0 2");
+  EXPECT_EQ(output_.front(), "1 0 1 0");
+  EXPECT_EQ(output_.back(), "fake_cluster 0 10 1 0 2");
 }
 
 // No upstream host handling.

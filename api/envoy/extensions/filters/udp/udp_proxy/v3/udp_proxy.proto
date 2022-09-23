@@ -105,8 +105,9 @@ message UdpProxyConfig {
   // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
   bool use_per_packet_load_balancing = 7;
 
-  // Configuration for access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
+  // Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog sess_access_log = 8;
 
+  // Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
 }

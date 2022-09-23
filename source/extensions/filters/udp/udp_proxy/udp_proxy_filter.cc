@@ -309,8 +309,6 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   fields_map["bytes_sent"] = ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_);
   fields_map["bytes_received"] = ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_);
   fields_map["errors_sent"] = ValueUtil::numberValue(session_stats_.downstream_sess_tx_errors_);
-  fields_map["errors_received"] =
-      ValueUtil::numberValue(cluster_.filter_.config_->stats().downstream_sess_rx_errors_.value());
   fields_map["datagrams_sent"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_tx_datagrams_);
   fields_map["datagrams_received"] =
