@@ -121,8 +121,12 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
     return upstream_socket_config_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const { return sess_access_logs_; }
-  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const { return proxy_access_logs_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const {
+    return sess_access_logs_;
+  }
+  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const {
+    return proxy_access_logs_;
+  }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
