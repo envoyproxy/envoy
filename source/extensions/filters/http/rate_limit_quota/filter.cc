@@ -21,13 +21,24 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  absl::StatusOr<BucketId> bucket_id = requestMatching(headers);
-  if (!bucket_id.ok()) {
-    // Failed to generate the bucket id for the incoming request.
+  // TODO(tyxia) Boilerplate code, polish implementation later.
+  absl::StatusOr<BucketId> match_result = requestMatching(headers);
+
+  // Requests are not matched by any matcher (could because of various reasons). In this case,
+  // requests are allowed by default (i.e., fail-open) and will not be reported to RLQS server.
+  if (!match_result.ok()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // TODO(tyxia) Placeholder, add actual implementation.
+  BucketId bucket_id = match_result.value();
+  // Catch-all case for requests are not matched by any matchers but has `on_no_match` config.
+  if (bucket_id.bucket().empty()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  // Request has been matched successfully and corresponding bucket id has been generated.
+  // Check if there is already quota assignment for the bucket with this `bucket_id`
+
   rate_limit_client_->rateLimit(*this);
 
   return Envoy::Http::FilterHeadersStatus::Continue;
@@ -72,14 +83,14 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
         const auto result = match_result.result_();
         const RateLimitOnMactchAction* match_action =
             dynamic_cast<RateLimitOnMactchAction*>(result.get());
-        // Try to generate the bucket id if matching succeeded.
+        // Try to generate the bucket id if the matching succeeded.
         return match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
       } else {
         return absl::NotFoundError("The match was completed, no match found");
       }
     } else {
-      // Returned state from `evaluateMatch` is `MatchState::UnableToMatch` for this case.
-      return absl::InternalError("Failed to match the request");
+      // Returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
+      return absl::InternalError("Unable to match the request");
     }
   }
 }
@@ -90,6 +101,16 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
                                           RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
+
+  if (setting_.has_no_assignment_behavior()) {
+    // If we reach to this function when request matching was complete but no match was found, it
+    // means `on_no_match` field is configured to assign the catch-all bucket. According to the
+    // design, `no_assignment_behavior` is used for this field.
+    // TODO(tyxia) Returns the empty BucketId for now, parse the `blanket_rule` from the config for
+    // fail-open fail-close behavior.
+    return bucket_id;
+  }
+
   for (const auto& id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
     std::string bucket_id_key = id_builder.first;
     auto builder_method = id_builder.second;
@@ -132,8 +153,6 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
     }
   }
 
-  // Empty BucketId will be returned if request is not matcher to any matcher but `on_no_match`
-  // field is configured.
   return bucket_id;
 }
 

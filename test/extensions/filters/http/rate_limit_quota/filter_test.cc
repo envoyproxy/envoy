@@ -145,8 +145,7 @@ public:
       config_.mutable_bucket_matchers()->MergeFrom(matcher);
       break;
     }
-    // Invalid bucket_matcher configuration will be just empty
-    // matcher config.
+    // Invalid bucket_matcher configuration will be just empty matcher config.
     case MatcherConfigType::Invalid:
     default:
       break;

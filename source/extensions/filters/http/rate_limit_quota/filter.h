@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
+#include "absl/container/btree_map.h"
 #include "absl/status/statusor.h"
 
 namespace Envoy {
@@ -28,6 +29,8 @@ using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
 using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 using BucketId = ::envoy::service::rate_limit_quota::v3::BucketId;
+using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
+    BucketAction::QuotaAssignmentAction;
 
 class RateLimitQuotaValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
@@ -120,6 +123,8 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
+  // TODO(tyxia) Revisit, could use unorder_map with hash function or message_hasher for BucketId.
+  // absl::btree_map<BucketId, QuotaAssignmentAction> quota_assignment_map_;
 };
 
 } // namespace RateLimitQuota
