@@ -65,10 +65,10 @@ services:
       dockerfile: Dockerfile-opentelemetry
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:13133 || exit 1"]
-      interval: 10s
-      timeout: 20s
-      retries: 20
-      start_period: 10s
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
     - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
