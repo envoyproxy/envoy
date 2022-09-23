@@ -357,9 +357,27 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   EXPECT_EQ(true_callbacks_called_, 4);
 }
 
+TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadInvalidatesTheCacheEntry) {
+  insertTestCacheRecord();
+  auto lookup = testLookupContext();
+  absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
+  LookupResult result;
+  lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
+  lookup->getBody(AdjustedByteRange(0, 8),
+                  [&](Buffer::InstancePtr body) { EXPECT_EQ(body.get(), nullptr); });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(absl::UnknownError("Intentionally failed to open file")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  // File handle didn't get used but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfBodyInvalidatesTheCacheEntry) {
   insertTestCacheRecord();
   auto lookup = testLookupContext();
+  absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
   LookupResult result;
   lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
   EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
@@ -375,7 +393,74 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfBodyInvalidatesTheCache
       absl::UnknownError("intentionally failed to unlink, for coverage"));
 }
 
+TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfTrailersInvalidatesTheCacheEntry) {
+  insertTestCacheRecord();
+  auto lookup = testLookupContext();
+  absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
+  LookupResult result;
+  lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(_, _, _));
+  lookup->getBody(AdjustedByteRange(0, 8),
+                  [&](Buffer::InstancePtr body) { EXPECT_EQ(body->toString(), "beepbeep"); });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(std::make_unique<Buffer::OwnedImpl>("beepbeep")));
+  EXPECT_CALL(*mock_async_file_handle_, read(_, _, _));
+  // No point validating that the trailers are empty since that's not even particularly
+  // desirable behavior - it's a quirk of the filter that we can't properly signify an error.
+  lookup->getTrailers([&](Http::ResponseTrailerMapPtr) {});
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<Buffer::InstancePtr>(
+      absl::UnknownError("intentional failure to read trailers")));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::UnknownError("intentionally failed to unlink, for coverage"));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, ReadWithMultipleBlocksWorksCorrectly) {
+  insertTestCacheRecord();
+  auto lookup = testLookupContext();
+  LookupResult result;
+  lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(CacheFileFixedBlock::offsetToBody(), 4, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(CacheFileFixedBlock::offsetToBody() + 4, 4, _));
+  lookup->getBody(AdjustedByteRange(0, 4),
+                  [&](Buffer::InstancePtr body) { EXPECT_EQ(body->toString(), "beep"); });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(std::make_unique<Buffer::OwnedImpl>("beep")));
+  lookup->getBody(AdjustedByteRange(4, 8),
+                  [&](Buffer::InstancePtr body) { EXPECT_EQ(body->toString(), "boop"); });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(std::make_unique<Buffer::OwnedImpl>("boop")));
+  // While we're here, incidentally test the behavior of aborting a lookup in progress
+  // while no file actions are in flight.
+  lookup->onDestroy();
+  lookup.reset();
+  // There should be a file-close in the queue.
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, DestroyingALookupWithFileActionInFlightCancelsAction) {
+  insertTestCacheRecord();
+  auto lookup = testLookupContext();
+  absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
+  LookupResult result;
+  lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_manager_, mockCancel());
+  lookup->getBody(AdjustedByteRange(0, 4),
+                  [&](Buffer::InstancePtr body) { EXPECT_EQ(body.get(), nullptr); });
+  // File wasn't used in this test but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
 // For the standard cache tests from http_cache_implementation_test_common.cc
+// These will be run with the real file system, and therefore only cover the
+// "no file errors" paths.
 class FileSystemHttpCacheTestDelegate : public HttpCacheTestDelegate,
                                         public FileSystemCacheTestContext {
 public:
