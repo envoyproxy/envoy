@@ -11,6 +11,8 @@ namespace Config {
 
 // All KV store xDS delegate stats. @see stats_macros.h.
 #define ALL_XDS_KV_STORE_STATS(COUNTER)                                                            \
+  /* Number of times a resource failed to serialize for persistence in the KV store. */            \
+  COUNTER(serialization_failed)                                                                    \
   /* Number of times resources were loaded successfully from the KV store. */                      \
   COUNTER(load_success)                                                                            \
   /* Number of times no resources were found for a load attempt from the KV store. */              \

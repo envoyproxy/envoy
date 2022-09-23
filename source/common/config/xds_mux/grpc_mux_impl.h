@@ -97,7 +97,9 @@ public:
 
   // GrpcStreamCallbacks
   void onStreamEstablished() override { handleEstablishedStream(); }
-  void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
+  void onEstablishmentFailure(ControlPlaneStats& /*control_plane_stats*/) override {
+    handleStreamEstablishmentFailure();
+  }
   void onWriteable() override { trySendDiscoveryRequests(); }
   void onDiscoveryResponse(std::unique_ptr<RS>&& message,
                            ControlPlaneStats& control_plane_stats) override {

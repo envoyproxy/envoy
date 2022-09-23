@@ -19,6 +19,7 @@ using ScopedResume = std::unique_ptr<Cleanup>;
  */
 #define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE, TEXT_READOUT)                                      \
   COUNTER(rate_limit_enforced)                                                                     \
+  COUNTER(xds_local_load_failed)                                                                   \
   GAUGE(connected_state, NeverImport)                                                              \
   GAUGE(pending_requests, Accumulate)                                                              \
   TEXT_READOUT(identifier)
@@ -128,7 +129,7 @@ public:
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
    */
-  virtual void onEstablishmentFailure() PURE;
+  virtual void onEstablishmentFailure(ControlPlaneStats& control_plane_stats) PURE;
 
   /**
    * For the GrpcStream to pass received protos to the context.

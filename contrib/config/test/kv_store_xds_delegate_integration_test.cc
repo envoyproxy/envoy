@@ -1,13 +1,20 @@
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/key_value_store.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
+#include "source/common/config/xds_source_id.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/config/test/invalid_proto_kv_store_config.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -15,6 +22,7 @@ namespace {
 
 constexpr char SDS_CLUSTER_NAME[] = "sds_cluster.lyft.com";
 constexpr char RTDS_CLUSTER_NAME[] = "rtds_cluster";
+constexpr char CDS_CLUSTER_NAME[] = "cds_cluster";
 constexpr char CLIENT_CERT_NAME[] = "client_cert";
 
 std::string kvStoreDelegateConfig() {
@@ -33,6 +41,19 @@ std::string kvStoreDelegateConfig() {
             filename: {}
     )EOF",
                      filename);
+}
+
+std::string invalidProtoKvStoreDelegateConfig() {
+  return R"EOF(
+    name: envoy.config.config.KeyValueStoreXdsDelegate
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig
+      key_value_store_config:
+        config:
+          name: envoy.common.key_value.test_store
+          typed_config:
+            "@type": type.googleapis.com/test.envoy.config.xds.InvalidProtoKeyValueStoreConfig
+    )EOF";
 }
 
 class KeyValueStoreXdsDelegateIntegrationTest : public HttpIntegrationTest,
@@ -363,6 +384,138 @@ TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   // connectivity is re-established.
   EXPECT_EQ("zoo", getRuntimeKey("foo"));
   EXPECT_EQ("jazz", getRuntimeKey("baz"));
+}
+
+// A KeyValueStore implementation that returns an invalid proto field value for a Cluster resource.
+class InvalidProtoKeyValueStore : public KeyValueStore {
+public:
+  absl::optional<absl::string_view> get(absl::string_view) override { return absl::nullopt; }
+  void remove(absl::string_view) override {}
+  void addOrUpdate(absl::string_view, absl::string_view,
+                   absl::optional<std::chrono::seconds>) override {}
+  void flush() override {}
+
+  // We only have a cds_config making wildcard requests, so we only need to implement the iterate
+  // function.
+  void iterate(ConstIterateCb cb) const override {
+    const Config::XdsConfigSourceId source_id{CDS_CLUSTER_NAME, Config::TypeUrl::get().Cluster};
+    const std::string cluster_name = "cluster_A";
+    const std::string key = absl::StrCat(source_id.toKey(), "+", cluster_name);
+
+    // 9999 is an invalid enum value for LbPolicy.
+    auto cluster_resource = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+        fmt::format(R"EOF(
+         name: {}
+         connect_timeout: 5s
+         type: STATIC
+         load_assignment:
+           cluster_name: {}
+         lb_policy: {}
+         typed_extension_protocol_options:
+           envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+             "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+             explicit_http_config:
+               http2_protocol_options: {{}}
+        )EOF",
+                    cluster_name, cluster_name, 9999));
+
+    envoy::service::discovery::v3::Resource r;
+    r.set_name(cluster_name);
+    r.set_version("1");
+    r.mutable_resource()->PackFrom(cluster_resource);
+
+    std::string value;
+    r.SerializeToString(&value);
+
+    cb(key, value);
+  }
+};
+
+// A factory for creating the InvalidProtoKeyValueStore test implementation.
+class InvalidProtoKeyValueStoreFactory : public KeyValueStoreFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::envoy::config::xds::InvalidProtoKeyValueStoreConfig>();
+  }
+
+  std::string name() const override { return "envoy.common.key_value.test_store"; };
+
+  KeyValueStorePtr createStore(const Protobuf::Message& /*config*/,
+                               ProtobufMessage::ValidationVisitor& /*validation_visitor*/,
+                               Event::Dispatcher& /*dispatcher*/,
+                               Filesystem::Instance& /*file_system*/) override {
+    return std::make_unique<InvalidProtoKeyValueStore>();
+  }
+};
+
+class InvalidProtoKeyValueStoreXdsDelegateIntegrationTest
+    : public HttpIntegrationTest,
+      public Grpc::GrpcClientIntegrationParamTest {
+public:
+  InvalidProtoKeyValueStoreXdsDelegateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
+                            ConfigHelper::baseConfigNoListeners()) {
+    use_lds_ = false;
+    // TODO(abeyad): add UnifiedSotw tests too when implementation is ready.
+    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
+    skip_tag_extraction_rule_check_ = true;
+
+    // One static CDS cluster and CDS config.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* xds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      xds_cluster->set_name(std::string(CDS_CLUSTER_NAME));
+      xds_cluster->mutable_load_assignment()->set_cluster_name(xds_cluster->name());
+      ConfigHelper::setHttp2(*xds_cluster);
+
+      auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+      const std::string cds_yaml = fmt::format(R"EOF(
+        resource_api_version: V3
+        api_config_source:
+          api_type: GRPC
+          transport_api_version: V3
+          grpc_services:
+            envoy_grpc:
+              cluster_name: {}
+          set_node_on_first_message_only: true
+      )EOF",
+                                               CDS_CLUSTER_NAME);
+      TestUtility::loadFromYaml(cds_yaml, *cds);
+    });
+
+    // Add test xDS delegate.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* delegate_extension = bootstrap.mutable_xds_delegate_extension();
+      TestUtility::loadFromYaml(invalidProtoKvStoreDelegateConfig(), *delegate_extension);
+    });
+  }
+
+  void initialize() override {
+    setUpstreamCount(1);
+    HttpIntegrationTest::initialize();
+    // Reset the upstream so the connection cannot be established.
+    fake_upstreams_[0].reset();
+    registerTestServerPorts({});
+  }
+
+  void TearDown() override { test_server_.reset(); }
+
+  void createUpstreams() override {
+    // CDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, InvalidProtoKeyValueStoreXdsDelegateIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
+  InvalidProtoKeyValueStoreFactory factory;
+  Registry::InjectFactory<KeyValueStoreFactory> registered(factory);
+
+  initialize();
+
+  // Make sure that the proto parsing of a serialized resource with an invalid enum value fails.
+  test_server_->waitForCounterEq("cluster_manager.cds.control_plane.xds_local_load_failed", 1);
 }
 
 } // namespace

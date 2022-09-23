@@ -53,7 +53,7 @@ KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
         if (!r.ParseFromString(std::string(*existing_resource))) {
           // Resource failed to parse; this shouldn't happen unless fields get removed from the
           // proto. Since the serialized resource in the KV store is no longer parseable into an
-          // xDS resource, we'll remove it from the store.
+          // xDS resource, we'll remove it from the store and not use it in xDS processing.
           xds_config_store_->remove(resource_key);
           stats_.parse_failed_.inc();
         }
@@ -103,9 +103,18 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
       r.set_name(decoded_resource.name());
       r.set_version(decoded_resource.version());
       r.mutable_resource()->PackFrom(decoded_resource.resource());
-      // TODO(abeyad): Set TTL parameter, if it exists.
-      xds_config_store_->addOrUpdate(constructKey(source_id, r.name()), r.SerializeAsString(),
-                                     absl::nullopt);
+      // TODO(abeyad): Set TTL parameter.
+      std::string serialized_resource;
+      if (r.SerializeToString(&serialized_resource)) {
+        xds_config_store_->addOrUpdate(constructKey(source_id, r.name()),
+                                       std::move(serialized_resource), absl::nullopt);
+      } else {
+        stats_.serialization_failed_.inc();
+        ENVOY_LOG_MISC(
+            warn,
+            "KeyValueStore xDS delegate didn't persist xDS update {}: resource serialiation failed",
+            decoded_resource.name());
+      }
     } else {
       ENVOY_LOG_MISC(warn,
                      "KeyValueStore xDS delegate didn't persist xDS update {}: missing resource",

@@ -108,7 +108,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 }
 
 void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
-                                         const std::vector<std::string>& resource_names) {
+                                         const std::vector<std::string>& resource_names,
+                                         ControlPlaneStats& control_plane_stats) {
   if (!xds_resources_delegate_.has_value()) {
     return;
   }
@@ -146,7 +147,8 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
   }
   END_TRY
   catch (const EnvoyException& e) {
-    // TODO(abeyad): do something more than just logging the error?
+    // TODO(abeyad): do something more than just logging the error and incrementing a counter?
+    control_plane_stats.xds_local_load_failed_.inc();
     ENVOY_LOG(warn, "Failed to load locally-persisted xDS configuration for {}, type url {}: {}",
               target_xds_authority_, type_url, e.what());
   }
@@ -374,7 +376,7 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure() {
+void GrpcMuxImpl::onEstablishmentFailure(ControlPlaneStats& control_plane_stats) {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(
@@ -387,7 +389,8 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       loadConfigFromDelegate(
           /*type_url=*/api_state.first,
           std::vector<std::string>{api_state.second->request_.resource_names().begin(),
-                                   api_state.second->request_.resource_names().end()});
+                                   api_state.second->request_.resource_names().end()},
+          control_plane_stats);
     }
   }
   previously_fetched_data_ = true;

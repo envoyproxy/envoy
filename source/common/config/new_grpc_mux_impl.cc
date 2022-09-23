@@ -121,7 +121,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::onEstablishmentFailure() {
+void NewGrpcMuxImpl::onEstablishmentFailure(ControlPlaneStats& /*control_plane_stats*/) {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
