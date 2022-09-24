@@ -520,7 +520,7 @@ private:
                        HostMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts. All connections will be
-      // closed gracefully and new connection is invalid for these hosts.
+      // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
       // Drains any connection pools associated with the all hosts. All connections will be
       // closed gracefully and new connection is invalid for these hosts.
