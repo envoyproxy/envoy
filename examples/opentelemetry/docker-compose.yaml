@@ -70,8 +70,6 @@ services:
       retries: 10
       start_period: 40s
     command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-    - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
     - "${PORT_UI:-4317}:4317"
     - "${PORT_COLLECTOR_ZPAGE:-55679}:55679"
