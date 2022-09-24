@@ -5,7 +5,7 @@
 #include "test/extensions/common/dubbo/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
-#include "contrib/generic_proxy/filters/network/source/codec/dubbo/config.h"
+#include "contrib/generic_proxy/filters/network/source/codecs/dubbo/config.h"
 #include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
 #include "gtest/gtest.h"
 

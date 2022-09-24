@@ -1,4 +1,4 @@
-#include "contrib/generic_proxy/filters/network/source/codec/dubbo/config.h"
+#include "contrib/generic_proxy/filters/network/source/codecs/dubbo/config.h"
 
 #include <memory>
 

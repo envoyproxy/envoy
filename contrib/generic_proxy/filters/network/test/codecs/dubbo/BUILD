@@ -14,7 +14,7 @@ envoy_cc_test(
         "config_test.cc",
     ],
     deps = [
-        "//contrib/generic_proxy/filters/network/source/codec/dubbo:config",
+        "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
         "//contrib/generic_proxy/filters/network/test/mocks:codec_mocks",
         "//test/extensions/common/dubbo:mocks_lib",
         "//test/mocks/server:factory_context_mocks",

@@ -5,8 +5,8 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/dubbo/codec.h"
 
-#include "contrib/envoy/extensions/filters/network/generic_proxy/codec/dubbo/v3/dubbo.pb.h"
-#include "contrib/envoy/extensions/filters/network/generic_proxy/codec/dubbo/v3/dubbo.pb.validate.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.pb.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3/dubbo.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 
 namespace Envoy {
@@ -17,7 +17,7 @@ namespace Codec {
 namespace Dubbo {
 
 using ProtoConfig =
-    envoy::extensions::filters::network::generic_proxy::codec::dubbo::v3::DubboCodecConfig;
+    envoy::extensions::filters::network::generic_proxy::codecs::dubbo::v3::DubboCodecConfig;
 
 static constexpr absl::string_view DubboProtocolName = "dubbo";
 

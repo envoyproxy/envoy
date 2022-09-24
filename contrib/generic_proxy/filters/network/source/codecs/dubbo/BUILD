@@ -19,6 +19,6 @@ envoy_cc_contrib_extension(
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
         "//source/extensions/common/dubbo:codec_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/codec/dubbo/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3:pkg_cc_proto",
     ],
 )

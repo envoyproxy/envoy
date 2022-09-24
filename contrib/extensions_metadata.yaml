@@ -106,4 +106,4 @@ envoy.generic_proxy.codecs.dubbo:
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.network.generic_proxy.codec.dubbo.v3.DubboCodecConfig
+  - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig
