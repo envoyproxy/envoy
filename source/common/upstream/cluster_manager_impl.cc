@@ -1476,7 +1476,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
       TcpConnectionsMap& container = it->second;
       container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
-
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
@@ -1557,14 +1556,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
-    const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_or_close) {
+    const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
   // Drain or close any HTTP connection pool for the host.
   {
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
       container->do_not_delete_ = true;
-      if (drain_or_close.has_value()) {
-        container->pools_->drainConnections(drain_or_close.value());
+      if (drain_behavior.has_value()) {
+        container->pools_->drainConnections(drain_behavior.value());
       } else {
         // TODO(wbpcode): in the original implementation, if the
         // 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' is set, the http connection pool will be
@@ -1592,8 +1591,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
       }
 
       for (auto* pool : pools) {
-        if (drain_or_close.has_value()) {
-          pool->drainConnections(drain_or_close.value());
+        if (drain_behavior.has_value()) {
+          pool->drainConnections(drain_behavior.value());
         } else {
           pool->closeConnections();
         }

@@ -567,7 +567,7 @@ private:
     // Drain or close connections of host. If no drain behavior is provided then closing will
     // be immediate.
     void drainOrCloseConnPools(const HostSharedPtr& host,
-                               absl::optional<ConnectionPool::DrainBehavior> drain_or_close);
+                               absl::optional<ConnectionPool::DrainBehavior> drain_behavior);
 
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
