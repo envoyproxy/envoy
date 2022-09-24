@@ -133,6 +133,7 @@ private:
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
+  bool case_insensitive_enum_parsing_{false};
 
   bool disabled_;
 };

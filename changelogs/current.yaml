@@ -100,6 +100,9 @@ bug_fixes:
 - area: router
   change: |
     fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
+- area: upstream
+  change: |
+    fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -135,6 +138,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
+- area: header_formatters
+  change: |
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
+    header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
+    ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: http
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
@@ -231,9 +239,17 @@ new_features:
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: grpc_json_transcoder
+  change: |
+    added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
 
 deprecated:
 - area: http
   change: |
     deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
     :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.
+- area: router
+  change: |
+    deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted
+    clusters. The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
+    will be used as the total weight.

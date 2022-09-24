@@ -36,11 +36,11 @@ TEST(MatchTest, BasicUsage) {
         path_template: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathMatcherSharedPtr predicate = createMatcherFromYaml(yaml_string);
-  EXPECT_EQ(predicate->uriTemplate(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(), "envoy.path.match.uri_template.uri_template_matcher");
+  Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(yaml_string);
+  EXPECT_EQ(matcher->uriTemplate(), "/bar/{lang}/{country}");
+  EXPECT_EQ(matcher->name(), "envoy.path.match.uri_template.uri_template_matcher");
 
-  EXPECT_TRUE(predicate->match("/bar/en/us"));
+  EXPECT_TRUE(matcher->match("/bar/en/us"));
 }
 
 } // namespace Match

@@ -8,6 +8,7 @@
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/header_map.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/header_formatter.h"
 
@@ -53,9 +54,34 @@ public:
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  void evaluateHeaders(Http::HeaderMap& headers,
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo& stream_info) const override;
-  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const;
+  void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
+                       const Http::ResponseHeaderMap& response_headers,
+                       const StreamInfo::StreamInfo* stream_info) const;
+
+  /**
+   * Helper methods to evaluate methods without explicitly passing request and response headers.
+   * The method will try to fetch request headers from steam_info. Response headers will always be
+   * empty.
+   */
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
+    evaluateHeaders(headers,
+                    stream_info.getRequestHeaders() != nullptr
+                        ? *stream_info.getRequestHeaders()
+                        : *Http::StaticEmptyHeaders::get().request_headers,
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
+  void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo* stream_info) const {
+    evaluateHeaders(headers,
+                    stream_info == nullptr
+                        ? *Http::StaticEmptyHeaders::get().request_headers
+                        : (stream_info->getRequestHeaders() != nullptr
+                               ? *stream_info->getRequestHeaders()
+                               : *Http::StaticEmptyHeaders::get().request_headers),
+                    *Http::StaticEmptyHeaders::get().response_headers.get(), stream_info);
+  }
 
   /*
    * Same as evaluateHeaders, but returns the modifications that would have been made rather than
@@ -67,12 +93,15 @@ public:
   Http::HeaderTransforms getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                              bool do_formatting = true) const;
 
+  static std::string translateMetadataFormat(const std::string& header_value);
+  static std::string translatePerRequestState(const std::string& header_value);
+
 protected:
   HeaderParser() = default;
 
 private:
   struct HeadersToAddEntry {
-    HeaderFormatterPtr formatter_;
+    HttpHeaderFormatterPtr formatter_;
     std::string original_value_;
     HeaderAppendAction append_action_;
     bool add_if_empty_ = false;
