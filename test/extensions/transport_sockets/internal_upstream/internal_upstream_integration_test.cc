@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/network/connection.h"
@@ -101,11 +102,13 @@ public:
           auto* route = virtual_host->mutable_routes(0);
           route->mutable_route()->set_cluster("internal_upstream");
         });
-    config_helper_.addBootstrapExtension(R"EOF(
+    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
     name: envoy.bootstrap.internal_listener
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
-    )EOF");
+      buffer_size: {}
+    )EOF",
+                                                     buffer_size_));
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
@@ -117,21 +120,29 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  void internalConnectionBufferSizeTest() {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
+    waitForNextUpstreamRequest();
+    cleanupUpstreamAndDownstream();
+  }
+
+  Envoy::Http::TestRequestHeaderMapImpl request_header_{Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host.com"},
+      {"internal-header", "FOO"},
+  }};
   bool add_metadata_{true};
   bool use_transport_socket_{true};
+  uint32_t buffer_size_{0};
 };
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "host.com"},
-      {"internal-header", "FOO"},
-  });
+  auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -166,13 +177,7 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "host.com"},
-      {"internal-header", "FOO"},
-  });
+  auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -180,6 +185,29 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
   EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("-,-,-"));
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTestDefault) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 65536",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest128KB) {
+  buffer_size_ = 128;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 131072",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest8MB) {
+  buffer_size_ = 8192;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 8388608",
+                      internalConnectionBufferSizeTest());
 }
 
 } // namespace
