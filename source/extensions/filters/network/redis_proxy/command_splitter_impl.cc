@@ -451,12 +451,12 @@ SplitRequestPtr TransactionRequest::create(Router& router,
                                            SplitCallbacks& callbacks, CommandStats& command_stats,
                                            TimeSource& time_source, bool delay_command_latency) {
   Common::Redis::Client::Transaction& transaction = callbacks.transaction();
-  std::string to_lower_string = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+  std::string command_name = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
 
   // Within transactions we only support simple commands.
   // So if this is not a transaction command or a simple command, it is an error.
-  if (Common::Redis::SupportedCommands::transactionCommands().count(to_lower_string) == 0 &&
-      Common::Redis::SupportedCommands::simpleCommands().count(to_lower_string) == 0) {
+  if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
+      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));
@@ -464,7 +464,7 @@ SplitRequestPtr TransactionRequest::create(Router& router,
   }
 
   // Start transaction on MULTI, and stop on EXEC/DISCARD.
-  if (to_lower_string == "multi") {
+  if (command_name == "multi") {
     // Check for nested MULTI commands.
     if (transaction.active_) {
       callbacks.onResponse(
@@ -476,17 +476,17 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     localResponse(callbacks, "OK");
     return nullptr;
 
-  } else if (to_lower_string == "exec" || to_lower_string == "discard") {
+  } else if (command_name == "exec" || command_name == "discard") {
     // Handle the case where we don't have an open transaction.
     if (transaction.active_ == false) {
       callbacks.onResponse(Common::Redis::Utility::makeError(
-          fmt::format("{} without MULTI", absl::AsciiStrToUpper(to_lower_string))));
+          fmt::format("{} without MULTI", absl::AsciiStrToUpper(command_name))));
       return nullptr;
     }
 
     // Handle the case where the transaction is empty.
     if (transaction.key_.empty()) {
-      if (to_lower_string == "exec") {
+      if (command_name == "exec") {
         Common::Redis::RespValuePtr empty_array{new Common::Redis::Client::EmptyArray{}};
         callbacks.onResponse(std::move(empty_array));
       } else {
@@ -582,9 +582,9 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     }
   }
 
-  std::string to_lower_string = absl::AsciiStrToLower(request->asArray()[0].asString());
+  std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
 
-  if (to_lower_string == Common::Redis::SupportedCommands::auth()) {
+  if (command_name == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
       onInvalidRequest(callbacks);
       return nullptr;
@@ -603,7 +603,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (to_lower_string == Common::Redis::SupportedCommands::ping()) {
+  if (command_name == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
     Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());
     pong->type(Common::Redis::RespType::SimpleString);
@@ -618,14 +618,14 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   if (request->asArray().size() < 2 &&
-      Common::Redis::SupportedCommands::transactionCommands().count(to_lower_string) == 0) {
-    // Commands other than PING, QUIT and transaction commands all have at least two arguments.
+      Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
+    // Commands other than PING and transaction commands all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }
 
   // Get the handler for the downstream request
-  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
+  auto handler = handler_lookup_table_.find(command_name.c_str());
   if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(
@@ -640,7 +640,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   // Fault Injection Check
-  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(to_lower_string);
+  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(command_name);
 
   // Check if delay, which determines which callbacks to use. If a delay fault is enabled,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
