@@ -63,5 +63,5 @@ CONTRIB_EXTENSIONS = {
     # Extensions for generic proxy
     #
     "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
-    "envoy.generic_proxy.codec.dubbo":                          "//contrib/generic_proxy/filters/network/source/codec/dubbo:config",
+    "envoy.generic_proxy.codecs.dubbo":                          "//contrib/generic_proxy/filters/network/source/codec/dubbo:config",
 }

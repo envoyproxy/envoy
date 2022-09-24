@@ -131,7 +131,7 @@ public:
             name: fake
             typed_config:
               "@type": type.googleapis.com/xds.type.v3.TypedStruct
-              type_url: envoy.generic_proxy.codec.fake.type
+              type_url: envoy.generic_proxy.codecs.fake.type
               value: {}
           route_config:
             name: test-routes

@@ -15,6 +15,8 @@ namespace Dubbo {
 
 namespace {
 
+constexpr absl::string_view VERSION_KEY = "version";
+
 #define ENUM_TO_STRING_VIEW(X)                                                                     \
   case Common::Dubbo::ResponseStatus::X:                                                           \
     static constexpr absl::string_view X##_VIEW = #X;                                              \
@@ -86,7 +88,12 @@ void DubboRequest::forEach(IterateCallback callback) const {
         }
       });
 }
+
 absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) const {
+  if (key == VERSION_KEY) {
+    return inner_metadata_->request().serviceVersion();
+  }
+
   ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
   auto* typed_request =
@@ -130,24 +137,26 @@ void DubboResponse::refreshGenericStatus() {
   status_ = Status(statusToGenericStatus(status), responseStatusToStringView(status));
 }
 
-DubboCodecBase::DubboCodecBase()
-    : codec_(Common::Dubbo::DubboCodec::codecFromSerializeType(
-          Common::Dubbo::SerializeType::Hessian2)) {}
+DubboCodecBase::DubboCodecBase(Common::Dubbo::DubboCodecPtr codec) : codec_(std::move(codec)) {}
 
 ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_request) {
   ASSERT(dynamic_cast<const DubboRequest*>(&origin_request) != nullptr);
   const auto* type_request = static_cast<const DubboRequest*>(&origin_request);
 
+  Common::Dubbo::ResponseStatus response_status;
   absl::optional<Common::Dubbo::RpcResponseType> optional_type;
+  absl::string_view content;
   if (status.ok()) {
+    response_status = Common::Dubbo::ResponseStatus::Ok;
     optional_type.emplace(Common::Dubbo::RpcResponseType::ResponseWithException);
+    content = "exception_via_proxy";
+  } else {
+    response_status = genericStatusToStatus(status.code());
+    content = status.message();
   }
 
-  auto response_metadata = Common::Dubbo::DirectResponseUtil::localResponse(
-      *type_request->inner_metadata_, genericStatusToStatus(status.code()), optional_type,
-      status.message());
-
-  return std::make_unique<DubboResponse>(std::move(response_metadata));
+  return std::make_unique<DubboResponse>(Common::Dubbo::DirectResponseUtil::localResponse(
+      *type_request->inner_metadata_, response_status, optional_type, content));
 }
 
 CodecFactoryPtr

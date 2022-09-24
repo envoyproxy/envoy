@@ -16,6 +16,9 @@ namespace GenericProxy {
 namespace Codec {
 namespace Dubbo {
 
+using ProtoConfig =
+    envoy::extensions::filters::network::generic_proxy::codec::dubbo::v3::DubboCodecConfig;
+
 static constexpr absl::string_view DubboProtocolName = "dubbo";
 
 class DubboRequest : public Request {
@@ -57,7 +60,7 @@ public:
 
   void refreshGenericStatus();
 
-  // Request
+  // Response.
   absl::string_view protocol() const override { return DubboProtocolName; }
   void forEach(IterateCallback) const override {}
   absl::optional<absl::string_view> getByKey(absl::string_view) const override {
@@ -75,7 +78,7 @@ public:
 
 class DubboCodecBase : public Logger::Loggable<Logger::Id::connection> {
 public:
-  DubboCodecBase();
+  DubboCodecBase(Common::Dubbo::DubboCodecPtr codec);
 
 protected:
   Common::Dubbo::DubboCodecPtr codec_;
@@ -84,7 +87,7 @@ protected:
 template <class DecoderType, class MessageType, class CallBackType>
 class DubboDecoderBase : public DubboCodecBase, public DecoderType {
 public:
-  DubboDecoderBase() = default;
+  using DubboCodecBase::DubboCodecBase;
 
   void setDecoderCallback(CallBackType& callback) override { callback_ = &callback; }
 
@@ -138,25 +141,29 @@ using DubboResponseDecoder =
 
 class DubboRequestEncoder : public RequestEncoder, DubboCodecBase {
 public:
+  using DubboCodecBase::DubboCodecBase;
+
   void encode(const Request& request, RequestEncoderCallback& callback) override {
     ASSERT(dynamic_cast<const DubboRequest*>(&request) != nullptr);
-    const auto* type_message = static_cast<const DubboRequest*>(&request);
+    const auto* typed_request = static_cast<const DubboRequest*>(&request);
 
     Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *type_message->inner_metadata_);
-    callback.onEncodingSuccess(buffer, type_message->inner_metadata_->messageType() !=
+    codec_->encode(buffer, *typed_request->inner_metadata_);
+    callback.onEncodingSuccess(buffer, typed_request->inner_metadata_->messageType() !=
                                            Common::Dubbo::MessageType::Oneway);
   }
 };
 
 class DubboResponseEncoder : public ResponseEncoder, DubboCodecBase {
 public:
+  using DubboCodecBase::DubboCodecBase;
+
   void encode(const Response& response, ResponseEncoderCallback& callback) override {
     ASSERT(dynamic_cast<const DubboResponse*>(&response) != nullptr);
-    const auto* type_message = static_cast<const DubboResponse*>(&response);
+    const auto* typed_response = static_cast<const DubboResponse*>(&response);
 
     Buffer::OwnedImpl buffer;
-    codec_->encode(buffer, *type_message->inner_metadata_);
+    codec_->encode(buffer, *typed_response->inner_metadata_);
     callback.onEncodingSuccess(buffer, false);
   }
 };
@@ -169,16 +176,20 @@ public:
 class DubboCodecFactory : public CodecFactory {
 public:
   RequestDecoderPtr requestDecoder() const override {
-    return std::make_unique<DubboRequestDecoder>();
+    return std::make_unique<DubboRequestDecoder>(
+        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
   }
   ResponseDecoderPtr responseDecoder() const override {
-    return std::make_unique<DubboResponseDecoder>();
+    return std::make_unique<DubboResponseDecoder>(
+        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
   }
   RequestEncoderPtr requestEncoder() const override {
-    return std::make_unique<DubboRequestEncoder>();
+    return std::make_unique<DubboRequestEncoder>(
+        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
   }
   ResponseEncoderPtr responseEncoder() const override {
-    return std::make_unique<DubboResponseEncoder>();
+    return std::make_unique<DubboResponseEncoder>(
+        Common::Dubbo::DubboCodec::codecFromSerializeType(Common::Dubbo::SerializeType::Hessian2));
   }
   MessageCreatorPtr messageCreator() const override {
     return std::make_unique<DubboMessageCreator>();
@@ -190,10 +201,9 @@ public:
   CodecFactoryPtr createFactory(const Protobuf::Message& config,
                                 Envoy::Server::Configuration::FactoryContext& context) override;
 
-  std::string name() const override { return "envoy.generic_proxy.codec.dubbo"; }
+  std::string name() const override { return "envoy.generic_proxy.codecs.dubbo"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::filters::network::generic_proxy::codec::dubbo::v3::DubboCodecConfig>();
+    return std::make_unique<ProtoConfig>();
   }
 };
 

@@ -28,6 +28,7 @@ message GenericProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The codec which encodes and decodes the application protocol.
+  // [#extension-category: envoy.generic_proxy.codecs]
   config.core.v3.TypedExtensionConfig codec_config = 2
       [(validate.rules).message = {required: true}];
 
@@ -45,6 +46,7 @@ message GenericProxy {
   // A list of individual Layer-7 filters that make up the filter chain for requests made to the
   // proxy. Order matters as the filters are processed sequentially as request events
   // happen.
+  // [#extension-category: envoy.generic_proxy.filters]
   repeated config.core.v3.TypedExtensionConfig filters = 5;
 }
 

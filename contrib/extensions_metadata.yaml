@@ -98,8 +98,12 @@ envoy.filters.generic.router:
   - envoy.generic_proxy.filters
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
-envoy.generic_proxy.codec.dubbo:
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.router.v3.Router
+envoy.generic_proxy.codecs.dubbo:
   categories:
-  - envoy.generic_proxy.codec
+  - envoy.generic_proxy.codecs
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codec.dubbo.v3.DubboCodecConfig

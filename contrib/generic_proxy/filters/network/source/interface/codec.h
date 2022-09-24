@@ -186,7 +186,7 @@ public:
   virtual CodecFactoryPtr createFactory(const Protobuf::Message& config,
                                         Envoy::Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.generic_proxy.codec"; }
+  std::string category() const override { return "envoy.generic_proxy.codecs"; }
 };
 
 } // namespace GenericProxy
