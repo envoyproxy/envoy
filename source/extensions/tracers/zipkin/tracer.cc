@@ -69,9 +69,8 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   // Set the span's kind (client or server)
   if (split_spans_for_request_) {
-    // If the previous context is an inner context then this span must be a span created for an upstream
-    // request. A client span will be created for an upstream request when split_spans_for_request is
-    // set to true.
+    // If the previous context is an inner context then this span must be a span created for an
+    // upstream request. A client span will be created for an upstream request.
     if (previous_context.innerContext()) {
       annotation.setValue(CLIENT_SEND);
     } else {
