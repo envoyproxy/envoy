@@ -564,8 +564,8 @@ private:
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
 
-    // Drain or close connections of host. If no any drain behavior is provided then closing will
-    // be applied.
+    // Drain or close connections of host. If no drain behavior is provided then closing will
+    // be immediate.
     void drainOrCloseConnPools(const HostSharedPtr& host,
                                absl::optional<ConnectionPool::DrainBehavior> drain_or_close);
 
