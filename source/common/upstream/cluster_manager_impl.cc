@@ -1565,9 +1565,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
       if (drain_behavior.has_value()) {
         container->pools_->drainConnections(drain_behavior.value());
       } else {
-        // TODO(wbpcode): in the original implementation, if the
-        // 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' is set, the http connection pool will be
-        // drained rather then be closed. I am not sure why but just keep it.
+        // TODO(wbpcode): 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' and 'closeConnections'
+        // is only supported for TCP connection pools for now. Use 'DrainExistingConnections'
+        // drain here as alternative.
         container->pools_->drainConnections(
             ConnectionPool::DrainBehavior::DrainExistingConnections);
       }
