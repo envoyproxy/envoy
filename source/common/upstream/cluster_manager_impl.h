@@ -525,7 +525,7 @@ private:
       // Drains any connection pools associated with the all hosts. All connections will be
       // closed gracefully and no new connections will be created.
       void drainConnPools();
-      // Drain any connection pools associated with the hosts that filtered by the predicate.
+      // Drain any connection pools associated with the hosts filtered by the predicate.
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
 
