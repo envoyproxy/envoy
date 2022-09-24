@@ -97,31 +97,31 @@ public:
     }
 
     try {
-      Common::Dubbo::DecodeStatus inner_status{Common::Dubbo::DecodeStatus::Success};
+      Common::Dubbo::DecodeStatus decode_status{Common::Dubbo::DecodeStatus::Success};
       if (!metadata_->hasContext()) {
         ENVOY_LOG(debug, "Dubbo codec: try to decode new dubbo request/response header");
-        inner_status = codec_->decodeHeader(buffer, *metadata_);
+        decode_status = codec_->decodeHeader(buffer, *metadata_);
       }
 
-      if (inner_status == Common::Dubbo::DecodeStatus::Success) {
+      if (decode_status == Common::Dubbo::DecodeStatus::Success) {
         ASSERT(metadata_->hasContext());
         ENVOY_LOG(debug, "Dubbo codec: try to decode new dubbo request/response body");
-        inner_status = codec_->decodeData(buffer, *metadata_);
+        decode_status = codec_->decodeData(buffer, *metadata_);
       }
 
-      if (inner_status == Common::Dubbo::DecodeStatus::Failure) {
+      if (decode_status == Common::Dubbo::DecodeStatus::Failure) {
         ENVOY_LOG(warn, "Dubbo codec: unexpected decoding error");
         metadata_.reset();
         callback_->onDecodingFailure();
         return;
       }
 
-      if (inner_status == Common::Dubbo::DecodeStatus::Waiting) {
+      if (decode_status == Common::Dubbo::DecodeStatus::Waiting) {
         ENVOY_LOG(debug, "Dubbo codec: waiting for more input data");
         return;
       }
 
-      ASSERT(inner_status == Common::Dubbo::DecodeStatus::Success);
+      ASSERT(decode_status == Common::Dubbo::DecodeStatus::Success);
       callback_->onDecodingSuccess(std::make_unique<MessageType>(std::move(metadata_)));
       metadata_.reset();
     } catch (EnvoyException& error) {

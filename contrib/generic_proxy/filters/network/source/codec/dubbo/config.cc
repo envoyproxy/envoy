@@ -75,7 +75,7 @@ StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
 void DubboRequest::forEach(IterateCallback callback) const {
   ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
-  auto* typed_request =
+  const auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   // TODO(wbpcode): better attachment structure is necessary to simplify these code the improve
   // performance.
@@ -96,10 +96,10 @@ absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) 
 
   ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
          nullptr);
-  auto* typed_request =
+  const auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
 
-  auto* result = typed_request->attachment().lookup(std::string(key));
+  const auto* result = typed_request->attachment().lookup(std::string(key));
   if (result == nullptr) {
     return absl::nullopt;
   }
@@ -119,8 +119,8 @@ void DubboResponse::refreshGenericStatus() {
 
   using Common::Dubbo::RpcResponseType;
 
-  auto status = inner_metadata_->context().responseStatus();
-  auto optional_type = inner_metadata_->response().responseType();
+  const auto status = inner_metadata_->context().responseStatus();
+  const auto optional_type = inner_metadata_->response().responseType();
 
   if (status == Common::Dubbo::ResponseStatus::Ok) {
     ASSERT(optional_type.has_value());
