@@ -41,10 +41,9 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // Request has been matched successfully and the corresponding bucket id has been generated.
   // If the quota assignment for the bucket with this `bucket_id` is found
   if (quota_assignment_map_.find(bucket_id) != quota_assignment_map_.end()) {
-
-  } else {
-    // Send the request to RLQS server for the quota assignment.
   }
+  // Otherwise, insert the bucket_id to the map and send the request to RLQS server for the quota
+  // assignment.
 
   rate_limit_client_->rateLimit(*this);
 
