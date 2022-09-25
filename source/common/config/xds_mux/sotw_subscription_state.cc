@@ -1,6 +1,7 @@
 #include "source/common/config/xds_mux/sotw_subscription_state.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_source_id.h"
 
 namespace Envoy {
 namespace Config {
@@ -9,8 +10,11 @@ namespace XdsMux {
 SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              Event::Dispatcher& dispatcher,
-                                             OpaqueResourceDecoderSharedPtr resource_decoder)
-    : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher),
+                                             OpaqueResourceDecoderSharedPtr resource_decoder,
+                                             XdsResourcesDelegateOptRef xds_resources_delegate,
+                                             const std::string& target_xds_authority)
+    : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher, xds_resources_delegate,
+                            target_xds_authority),
       resource_decoder_(resource_decoder) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
@@ -44,8 +48,6 @@ void SotwSubscriptionState::markStreamFresh() {
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
   std::vector<DecodedResourcePtr> non_heartbeat_resources;
-  std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(
-      message.resources().size());
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
@@ -71,12 +73,66 @@ void SotwSubscriptionState::handleGoodResponse(
   // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
   // support passing of decoded resources. This would also avoid a resource copy above.
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
-  // TODO(abeyad): Add support for calling the Config::UpdateListener registered listeners.
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
+
+  // Send the resources to the xDS delegate, if configured.
+  if (xds_resources_delegate_.has_value()) {
+    XdsConfigSourceId source_id{target_xds_authority_, message.type_url()};
+    std::vector<DecodedResourceRef> resource_refs;
+    for (const DecodedResourcePtr& r : non_heartbeat_resources) {
+      resource_refs.emplace_back(*r);
+    }
+    xds_resources_delegate_->onConfigUpdated(source_id, resource_refs);
+  }
+
   ENVOY_LOG(debug, "Config update for {} (version {}) accepted with {} resources", typeUrl(),
             message.version_info(), message.resources().size());
+}
+
+void SotwSubscriptionState::handleEstablishmentFailure() {
+  BaseSubscriptionState::handleEstablishmentFailure();
+
+  if (previously_fetched_data_ || !xds_resources_delegate_.has_value()) {
+    return;
+  }
+
+  const XdsConfigSourceId source_id{target_xds_authority_, type_url_};
+  TRY_ASSERT_MAIN_THREAD {
+    const std::vector<std::string> resource_names{names_tracked_.begin(), names_tracked_.end()};
+    std::vector<envoy::service::discovery::v3::Resource> resources =
+        xds_resources_delegate_->getResources(source_id, resource_names);
+
+    std::vector<DecodedResourcePtr> decoded_resources;
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    std::string version_info;
+    for (const auto& resource : resources) {
+      if (version_info.empty()) {
+        version_info = resource.version();
+      } else {
+        ASSERT(version_info == resource.version());
+      }
+
+      TRY_ASSERT_MAIN_THREAD {
+        auto decoded_resource = DecodedResourceImpl::fromResource(*resource_decoder_, resource);
+        setResourceTtl(*decoded_resource);
+        decoded_resources.emplace_back(std::move(decoded_resource));
+      }
+      END_TRY
+      catch (const EnvoyException& e) {
+        xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
+      }
+    }
+
+    callbacks().onConfigUpdate(decoded_resources, version_info);
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
+    // TODO(abeyad): do something more than just logging the error?
+    ENVOY_LOG(warn, "xDS delegate failed onEstablishmentFailure() for {}: {}", source_id.toKey(),
+              e.what());
+  }
 }
 
 std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
