@@ -32,6 +32,21 @@ The *:scheme* header will be used by Envoy over *x-forwarded-proto* where the UR
 
 .. _config_http_conn_man_headers_user-agent:
 
+:path
+-----
+
+The *:path* header is a pseudo-header populated by Envoy using the value of the path of the HTTP
+request. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1`` would have a *:path* value
+of ``/docs/thing``.
+
+:method
+-------
+
+The *:method* header is a pseudo-header populated by Envoy using the value of the method of the HTTP
+request. E.g. an HTTP request of the form ``GET /docs/thing HTTP/1.1`` would have a *:method* value
+of ``GET``. Values are in upper-case, e.g. ``GET``, ``PUT``, ``POST``, and ``DELETE``. Other possible
+values are described in `HTTP Methods <https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods>`.
+
 user-agent
 ----------
 
