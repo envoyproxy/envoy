@@ -1287,7 +1287,7 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
 
 // This tests a full redis transaction.
 
-TEST_P(RedisProxyIntegrationTest, FullTransaction) {
+TEST_P(RedisProxyWithRoutesIntegrationTest, FullTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
