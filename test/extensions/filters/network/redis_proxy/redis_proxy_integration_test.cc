@@ -1289,14 +1289,7 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
 
 TEST_P(RedisProxyIntegrationTest, FullTransaction) {
   initialize();
-  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection;
-
-  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"set", "mykey", "val"}), "OK",
-                          redis_client, fake_upstream_connection, "", "");
-
-  EXPECT_TRUE(fake_upstream_connection->close());
-  redis_client->close();
+  simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nyyy\r\n");
 }
 
 } // namespace
