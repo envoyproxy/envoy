@@ -1290,11 +1290,18 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
 TEST_P(RedisProxyIntegrationTest, FullTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
 
-  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"set", "foo", "bar"}), "-upstream failure\r\n",
-                    redis_client);
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"multi"}), "OK", redis_client,
+                          fake_upstream_connection, "", "");
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"set", "mykey", "val"}), "OK",
+                          redis_client, fake_upstream_connection, "", "");
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "mykey"}), "val",
+                          redis_client, fake_upstream_connection, "", "");
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"exec"}), "OK",
+                          redis_client, fake_upstream_connection, "", "");
 
+  EXPECT_TRUE(fake_upstream_connection->close());
   redis_client->close();
 }
 
