@@ -612,7 +612,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (to_lower_string == Common::Redis::SupportedCommands::quit()) {
+  if (command_name == Common::Redis::SupportedCommands::quit()) {
     callbacks.onQuit();
     return nullptr;
   }
