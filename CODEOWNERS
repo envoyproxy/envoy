@@ -269,6 +269,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
 # path rewrite by pattern
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
+# Dubbo codec
+/*/extensions/common/dubbo @wbpcode @lizan
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

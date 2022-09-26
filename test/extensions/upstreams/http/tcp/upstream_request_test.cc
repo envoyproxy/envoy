@@ -2,6 +2,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"

@@ -39,7 +39,7 @@ config:
     hmac_secret:
       name: hmac
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback
@@ -92,7 +92,7 @@ config:
       oauth_hmac: OauthHMAC
       oauth_expires: OauthExpires
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback
@@ -168,7 +168,7 @@ config:
     cookie_names:
       bearer_token: "?"
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback

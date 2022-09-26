@@ -184,6 +184,7 @@ paths:
     - source/common/common/regex.cc
     - source/common/common/utility.cc
     - source/common/formatter/substitution_formatter.cc
+    - source/common/router/header_parser_utils.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc

@@ -625,13 +625,8 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
                                                    {"content-type", "application/grpc"}};
 
   Http::TestResponseTrailerMapImpl response_trailers;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
-    response_trailers.setGrpcStatus("14");
-    response_trailers.setGrpcMessage("unavailable");
-  } else {
-    response_trailers.setGrpcStatus("7");
-    response_trailers.setGrpcMessage("permission denied");
-  }
+  response_trailers.setGrpcStatus("14");
+  response_trailers.setGrpcMessage("unavailable");
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
   absl::optional<uint32_t> response_code(200);
@@ -649,14 +644,9 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcErrorTag) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcTimeout), Eq("10s")));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  } else {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
-  }
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,
@@ -680,13 +670,8 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"}};
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
-    response_headers.setGrpcStatus("14");
-    response_headers.setGrpcMessage("unavailable");
-  } else {
-    response_headers.setGrpcStatus("7");
-    response_headers.setGrpcMessage("permission denied");
-  }
+  response_headers.setGrpcStatus("14");
+  response_headers.setGrpcMessage("unavailable");
 
   Http::TestResponseTrailerMapImpl response_trailers;
 
@@ -705,14 +690,9 @@ TEST_F(HttpConnManFinalizerImplTest, GrpcTrailersOnly) {
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcPath), Eq("/pb.Foo/Bar")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcAuthority), Eq("example.com:80")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcContentType), Eq("application/grpc")));
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  } else {
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
-    EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
-  }
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("unavailable")));
+  EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().PeerAddress), Eq(expected_ip)));
 
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, &response_headers,

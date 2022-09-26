@@ -506,14 +506,15 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
 void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
                                 std::unique_ptr<GenericUpstream>&& upstream,
                                 Upstream::HostDescriptionConstSharedPtr& host,
-                                const Network::Address::InstanceConstSharedPtr& local_address,
+                                const Network::ConnectionInfoProvider& address_provider,
                                 Ssl::ConnectionInfoConstSharedPtr ssl_info) {
   upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   StreamInfo::UpstreamInfo& upstream_info = *getStreamInfo().upstreamInfo();
   upstream_info.setUpstreamHost(host);
-  upstream_info.setUpstreamLocalAddress(local_address);
+  upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
+  upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(ssl_info);
   onUpstreamConnection();
   read_callbacks_->continueReading();

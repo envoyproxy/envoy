@@ -20,7 +20,8 @@ public:
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::ConnectionSocketPtr connection_socket);
+                            Network::ConnectionSocketPtr connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   // quic::QuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.

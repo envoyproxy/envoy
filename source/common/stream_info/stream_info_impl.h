@@ -49,9 +49,16 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
+  const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const override {
+    return upstream_remote_address_;
+  }
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
     upstream_local_address_ = upstream_local_address;
+  }
+  void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) override {
+    upstream_remote_address_ = upstream_remote_address;
   }
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
@@ -84,6 +91,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   UpstreamTiming upstream_timing_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;

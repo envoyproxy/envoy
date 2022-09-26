@@ -386,10 +386,10 @@ message WeightedCluster {
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
-    // An integer between 0 and :ref:`total_weight
-    // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
-    // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
+    // The weight of the cluster. This value is relative to the other clusters'
+    // weights. When a request matches the route, the choice of an upstream cluster
+    // is determined by its weight. The sum of weights across all
+    // entries in the clusters array must be greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -459,7 +459,10 @@ message WeightedCluster {
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, if this is greater than 0.
-  google.protobuf.UInt32Value total_weight = 3;
+  // This field is now deprecated, and the client will use the sum of all
+  // cluster weights. It is up to the management server to supply the correct weights.
+  google.protobuf.UInt32Value total_weight = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the ``runtime_key_prefix`` is

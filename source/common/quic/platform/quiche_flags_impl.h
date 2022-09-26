@@ -67,9 +67,9 @@ QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)      // NOLINT
 
 namespace quiche {
 
-#define GetQuicheFlagImpl(flag) absl::GetFlag(flag)
+#define GetQuicheFlagImpl(flag) absl::GetFlag(FLAGS_##flag)
 
-#define SetQuicheFlagImpl(flag, value) absl::SetFlag(&flag, value)
+#define SetQuicheFlagImpl(flag, value) absl::SetFlag(&FLAGS_##flag, value)
 
 #define GetQuicheReloadableFlagImpl(module, flag) absl::GetFlag(FLAGS_quic_reloadable_flag_##flag)
 

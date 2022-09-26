@@ -641,7 +641,11 @@ def _com_github_ncopa_suexec():
     )
 
 def _com_google_googletest():
-    external_http_archive("com_google_googletest")
+    external_http_archive(
+        "com_google_googletest",
+        patches = ["@envoy//bazel:googletest.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "googletest",
         actual = "@com_google_googletest//:gtest",

@@ -45,8 +45,9 @@ public:
   void SetUp() override {}
 
   void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
-    config_helper_.prependFilter(ADMISSION_CONTROL_CONFIG);
+    config_helper_.prependFilter(ADMISSION_CONTROL_CONFIG, downstream_filter_);
     HttpIntegrationTest::initialize();
   }
 
@@ -94,6 +95,7 @@ protected:
     codec_client_->close();
     return response;
   }
+  bool downstream_filter_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdmissionControlIntegrationTest,
@@ -137,9 +139,47 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
   }
 }
 
+TEST_P(AdmissionControlIntegrationTest, UpstreamTest) {
+  downstream_filter_ = false;
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Drop the success rate to a very low value.
+  ENVOY_LOG(info, "dropping success rate");
+  for (int i = 0; i < 300; ++i) {
+    sendRequestWithReturnCode("500");
+  }
+
+  // Measure throttling rate from the admission control filter.
+  double throttle_count = 0;
+  double request_count = 0;
+  ENVOY_LOG(info, "validating throttling rate");
+  for (int i = 0; i < 300; ++i) {
+    auto response = sendRequestWithReturnCode("500");
+    auto rc = response->headers().Status()->value().getStringView();
+    if (rc == "503") {
+      ++throttle_count;
+    } else {
+      ASSERT_EQ(rc, "500");
+    }
+    ++request_count;
+  }
+
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
+  // throttling rate.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
+
+  // We now wait for the history to become stale.
+  timeSystem().advanceTimeWait(std::chrono::seconds(120));
+
+  // We expect a 100% success rate after waiting. No throttling should occur.
+  for (int i = 0; i < 100; ++i) {
+    verifyHttpSuccess(sendRequestWithReturnCode("200"));
+  }
+}
+
 TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   autonomous_upstream_ = true;
-  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   // Drop the success rate to a very low value.

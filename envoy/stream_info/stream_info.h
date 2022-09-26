@@ -403,6 +403,17 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
 
   /**
+   * @param upstream_remote_address sets the remote address of the upstream connection.
+   */
+  virtual void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) PURE;
+
+  /**
+   * @return the upstream remote address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const PURE;
+
+  /**
    * @param failure_reason the upstream transport failure reason.
    */
   virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
