@@ -107,7 +107,7 @@ public:
   void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
 
   // Perform request matching. It returns the generated bucket ids if the matching succeeded and
-  // error status otherwise.
+  // returns the error status otherwise.
   absl::StatusOr<BucketId> requestMatching(const Http::RequestHeaderMap& headers);
 
   ~RateLimitQuotaFilter() override = default;
@@ -123,13 +123,12 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
-  // TODO(tyxia) Revisit, could use unorder_map with hash function or message_hasher for BucketId.
+
+  // Customized hash and equal struct for `BucketId` hash key.
   struct BucketIdHash {
     size_t operator()(const BucketId& bucket_id) const {
-      // return absl::Hash<Protobuf::Map<ProtobufWkt::StringValue, ProtobufWkt::StringValue>>()(
-      //     bucket_id.bucket());
-
       const auto bucket_id_hash = MessageUtil::hash(bucket_id);
+      return MessageUtil::hash(bucket_id);
       return bucket_id_hash;
     }
   };
@@ -139,6 +138,7 @@ private:
       return Protobuf::util::MessageDifferencer::Equals(id1, id2);
     }
   };
+  // TODO(tyxia) Thread local storage.
   absl::node_hash_map<BucketId, QuotaAssignmentAction, BucketIdHash, BucketIdEqual>
       quota_assignment_map_;
 };

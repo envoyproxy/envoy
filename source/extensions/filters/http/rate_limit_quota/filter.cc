@@ -12,6 +12,7 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
   callbacks_ = &callbacks;
 }
 
+// TODO(tyxia) Mostly are example/boilerplate code, polish implementation here.
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
   // Start the stream on the first request.
@@ -20,30 +21,28 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // TODO(tyxia) Consider adding the log.
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-
-  // TODO(tyxia) Boilerplate code, polish implementation later.
   absl::StatusOr<BucketId> match_result = requestMatching(headers);
 
-  // Requests are not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
+  // Request is not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
   // fail-open) and will not be reported to RLQS server.
   if (!match_result.ok()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   BucketId bucket_id = match_result.value();
-  // Catch-all clause for requests are not matched by any matcher but the `on_no_match` field is
-  // configured. In this case, the requests are DENIED by default.
-  // TODO(tyxia) How to represent DENIED and ALLOWED here.
+  // Request is not matched by any matcher but the `on_no_match` field is configured. In this
+  // case, the request is matched to catch-all clause and is DENIED by default.
+  // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
   if (bucket_id.bucket().empty()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // Request has been matched successfully and the corresponding bucket id has been generated.
-  // If the quota assignment for the bucket with this `bucket_id` is found
+  // Request has been matched and the corresponding bucket id has been generated successfully.
+  // Retrieve the quota assignment, if the entry with specific `bucket_id` is found.
   if (quota_assignment_map_.find(bucket_id) != quota_assignment_map_.end()) {
   }
-  // Otherwise, insert the bucket_id to the map and send the request to RLQS server for the quota
-  // assignment.
+  // Otherwise, send the request to RLQS server for the quota assignment and insert the bucket_id to
+  // the map.
 
   rate_limit_client_->rateLimit(*this);
 
