@@ -496,7 +496,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteBodyChu
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
-  // Intentionally undersaddized write of body chunk.
+  // Intentionally undersized write of body chunk.
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(1));
   EXPECT_EQ(testLookupResult().cache_entry_status_, CacheEntryStatus::Unusable);
   EXPECT_EQ(false_callbacks_called_, 1);
@@ -588,6 +588,75 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToLinkFile) {
       absl::UnknownError("intentionally failed to link cache file"));
   EXPECT_EQ(testLookupResult().cache_entry_status_, CacheEntryStatus::Unusable);
   EXPECT_EQ(false_callbacks_called_, 1);
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersStillWorksIfFileOpenFailed) {
+  insertTestCacheRecord();
+  time_system_.advanceTimeWait(Seconds(3601));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  auto lookup_context = testLookupContext();
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()});
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(absl::UnknownError("Intentionally failed to open file")));
+  lookup_context->onDestroy();
+  response_headers.setReferenceKey(Http::LowerCaseString("age"), "0");
+  EXPECT_THAT(testLookupResult().headers_.get(), HeaderMapEqualIgnoreOrder(&response_headers));
+  // File is not used in this test, but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersStillWorksIfHeaderWriteToFileFailed) {
+  insertTestCacheRecord();
+  time_system_.advanceTimeWait(Seconds(3601));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  auto lookup_context = testLookupContext();
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_handle_, write(_, _, _));
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()});
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(absl::UnknownError("Intentionally failed to write headers")));
+  lookup_context->onDestroy();
+  response_headers.setReferenceKey(Http::LowerCaseString("age"), "0");
+  EXPECT_THAT(testLookupResult().headers_.get(), HeaderMapEqualIgnoreOrder(&response_headers));
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles,
+       UpdateHeadersStillWorksIfHeaderBlockWriteToFileFailed) {
+  insertTestCacheRecord();
+  time_system_.advanceTimeWait(Seconds(3601));
+  const ResponseMetadata metadata{time_system_.systemTime()};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  auto lookup_context = testLookupContext();
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(2);
+  cache_->updateHeaders(*lookup_context, response_headers, metadata);
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(
+      headerProtoSize(protoFromHeadersAndMetadata(key_, response_headers, metadata))));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(absl::UnknownError("Intentionally failed to write headers block")));
+  lookup_context->onDestroy();
+  response_headers.setReferenceKey(Http::LowerCaseString("age"), "0");
+  EXPECT_THAT(testLookupResult().headers_.get(), HeaderMapEqualIgnoreOrder(&response_headers));
 }
 
 // For the standard cache tests from http_cache_implementation_test_common.cc

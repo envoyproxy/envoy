@@ -28,20 +28,6 @@ const absl::flat_hash_set<Envoy::Http::LowerCaseString> headersNotToUpdate() {
 }
 } // namespace
 
-Buffer::OwnedImpl headersToBuffer(const CacheFileHeader& headers) {
-  Buffer::OwnedImpl buffer;
-  std::string serialized_headers = headers.SerializeAsString();
-  buffer.add(serialized_headers);
-  return buffer;
-}
-
-Buffer::OwnedImpl trailersToBuffer(const CacheFileTrailer& trailers) {
-  Buffer::OwnedImpl buffer;
-  std::string serialized_trailers = trailers.SerializeAsString();
-  buffer.add(serialized_trailers);
-  return buffer;
-}
-
 void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
                                        const Http::ResponseHeaderMap& response_headers,
                                        const ResponseMetadata& metadata) {
@@ -52,7 +38,8 @@ void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
   // 2. if an existing header had more than one value, the first one's order is retained,
   //    others are moved to the end of the headers.
   // 3. if a header existed in the original but not in the replacement, it persists
-  //    (I doubt this is correct behavior; it mimics simple_http_cache's behavior.)
+  //    (I doubt this is correct behavior; it mimics simple_http_cache's behavior,
+  //    and is currently required by the cache tests.)
   // 4. headers from headersNotToUpdate are left unchanged.
   absl::flat_hash_set<Http::LowerCaseString> updated_header_fields;
   response_headers.iterate(
