@@ -1,4 +1,4 @@
-# This configuration terminates h2 CONNECT on port 10001 and then chains an HTTP filter that always responds with 200 using
+# This configuration terminates h2 CONNECT on port 1234 and then chains an HTTP filter that always responds with 200 using
 # an internal listener.
 bootstrap_extensions:
   - name: envoy.bootstrap.internal_listener
