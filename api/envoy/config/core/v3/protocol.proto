@@ -171,6 +171,9 @@ message AlternateProtocolsCacheOptions {
 
   // Allows pre-populating the cache with entries, as described above.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
+
+  // Optional list of hostnames suffixes for which Alt-Svc entries can be shared.
+  repeated string canonical_suffixes = 5;
 }
 
 // [#next-free-field: 7]

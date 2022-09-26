@@ -158,6 +158,7 @@ void HttpServerPropertiesCacheImpl::setAlternatives(const Origin& origin,
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second),
                                   absl::nullopt);
   }
+  maybeSetCanonicalOrigin(origin);
 }
 
 void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
@@ -243,7 +244,13 @@ OptRef<const std::vector<HttpServerPropertiesCache::AlternateProtocol>>
 HttpServerPropertiesCacheImpl::findAlternatives(const Origin& origin) {
   auto entry_it = protocols_.find(origin);
   if (entry_it == protocols_.end() || !entry_it->second.protocols.has_value()) {
-    return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
+    absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
+    if (canonical.has_value()) {
+      entry_it = protocols_.find(*canonical);
+    }
+    if (entry_it == protocols_.end() || !entry_it->second.protocols.has_value()) {
+      return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
+    }
   }
   std::vector<AlternateProtocol>& protocols = *entry_it->second.protocols;
 
@@ -284,6 +291,41 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
   auto it = setPropertiesImpl(origin, data);
   return *it->second.h3_status_tracker;
+}
+
+void HttpServerPropertiesCacheImpl::addCanonicalSuffix(std::string suffix) {
+  canonical_suffixes_.push_back(suffix);
+}
+
+absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
+  for (const std::string& suffix : canonical_suffixes_) {
+    if (absl::EndsWith(hostname, suffix)) {
+      return suffix;
+    }
+  }
+  return "";
+}
+
+absl::optional<HttpServerPropertiesCache::Origin> HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
+  absl::string_view suffix = getCanonicalSuffix(hostname);
+  if (suffix.empty()) {
+    return {};
+  }
+
+  auto it = canonical_alt_svc_map_.find(std::string(suffix));
+  if (it == canonical_alt_svc_map_.end()) {
+    return {};
+  }
+  return it->second;
+}
+
+void HttpServerPropertiesCacheImpl::maybeSetCanonicalOrigin(const Origin& origin) {
+  absl::string_view suffix = getCanonicalSuffix(origin.hostname_);
+  if (suffix.empty()) {
+    return;
+  }
+
+  canonical_alt_svc_map_[std::string(suffix)] = origin;
 }
 
 } // namespace Http

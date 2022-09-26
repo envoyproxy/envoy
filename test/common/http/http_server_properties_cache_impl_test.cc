@@ -372,6 +372,23 @@ TEST_F(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 }
 
+TEST_F(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "second.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+
+  initialize();
+  protocols_->addCanonicalSuffix(suffix);
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
