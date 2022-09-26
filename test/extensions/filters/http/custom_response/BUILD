@@ -67,6 +67,7 @@ envoy_extension_cc_test(
         "custom_response_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.custom_response"],
+    shard_count = 4,
     deps = [
         ":utility_lib",
         "//source/common/config:well_known_names",
@@ -74,6 +75,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/custom_response:factory",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",

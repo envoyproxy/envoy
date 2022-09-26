@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 #include "utility.h"
 
@@ -49,8 +50,7 @@ public:
           auto* default_route =
               hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
           default_route->mutable_match()->set_prefix("/default");
-          default_route->mutable_direct_response()->set_status(
-              static_cast<uint32_t>(Http::Code::OK));
+          default_route->mutable_direct_response()->set_status(static_cast<uint32_t>(201));
           // Use inline bytes rather than a filename to avoid using a path that may look illegal
           // to Envoy.
           default_route->mutable_direct_response()->mutable_body()->set_inline_bytes(
@@ -67,6 +67,26 @@ public:
                 TestUtility::parseYaml<CustomResponse>(custom_response_filter_config_);
             filter->mutable_typed_config()->PackFrom(default_configuration);
             hcm.mutable_http_filters()->SwapElements(0, 1);
+            int cer_position = 0;
+
+            for (const auto& config : filters_before_cer_) {
+              auto* filter = hcm.mutable_http_filters()->Add();
+              TestUtility::loadFromYaml(config, *filter);
+              // swap with router filter
+              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                       hcm.mutable_http_filters()->size() - 1);
+              // swap with cer filter
+              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                       cer_position);
+              cer_position = hcm.mutable_http_filters()->size() - 2;
+            }
+            for (const auto& config : filters_after_cer_) {
+              auto* filter = hcm.mutable_http_filters()->Add();
+              TestUtility::loadFromYaml(config, *filter);
+              // swap with router filter
+              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                       hcm.mutable_http_filters()->size() - 1);
+            }
           }
         });
     HttpProtocolIntegrationTest::initialize();
@@ -94,9 +114,12 @@ protected:
                                                          {"content-length", "0"}};
   Http::TestResponseHeaderMapImpl gateway_error_response_{{":status", "502"},
                                                           {"content-length", "0"}};
+  Http::TestResponseHeaderMapImpl okay_response_{{":status", "201"}, {"content-length", "0"}};
+
   Envoy::Http::LowerCaseString test_header_key_{kTestHeaderKey};
   std::string custom_response_filter_config_;
-  // std::vector<FakeHttpConnectionPtr> upstream_connections_;
+  std::vector<std::string> filters_before_cer_;
+  std::vector<std::string> filters_after_cer_;
 };
 
 // Verify that we get expected error response if the custom response is not configured.
@@ -119,8 +142,8 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
-                                                0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
@@ -134,8 +157,8 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
@@ -182,8 +205,8 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Send request to host with per route config
   default_request_headers_.setHost("some.other.host");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(20));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
   // Verify we get the status code of the local config
   EXPECT_EQ("291", response->headers().getStatusValue());
   EXPECT_EQ("y-foo2",
@@ -197,8 +220,7 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
 
   // Send request to host without per route config
   default_request_headers_.setHost("some.route");
-  response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0,
-                                           0, std::chrono::minutes(20));
+  response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
@@ -257,8 +279,8 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
   // Verify that a 401 response will trigger 400_response policy
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_,
-                                                0, 0, std::chrono::minutes(15));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
@@ -271,6 +293,56 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get status code for fo1.example
   EXPECT_EQ("401", response->headers().getStatusValue());
+}
+
+// Verify that we can NOT intercept local replies sent during decode
+TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyBeforeCER) {
+
+  // Add filter that sends local reply after.
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // Verify we don't get a modified status value.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that we can NOT intercept local replies sent during encode
+TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyBeforeCER) {
+
+  // Add filter that sends local reply after.
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-encode
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
+  // Verify we don't get the modified status value.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that we can NOT intercept local replies sent during encode
+TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyAfterCER) {
+
+  // Add filter that sends local reply after.
+  filters_after_cer_.emplace_back(R"EOF(
+name: local-reply-during-encode
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
+  // Verify we don't get the modified status value.
+  EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,

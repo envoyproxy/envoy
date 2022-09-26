@@ -30,6 +30,15 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
         key: "foo2"
         value: "x-bar2"
       append: false
+  - name: internal_server_error_response
+    status_code: 292
+    remote:
+      uri: "https://foo.example/internal_server_error"
+    headers_to_add:
+    - header:
+        key: "foo3"
+        value: "x-bar3"
+      append: false
   custom_response_matcher:
     matcher_list:
       matchers:
@@ -79,6 +88,20 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/google.protobuf.StringValue
               value: gateway_error_response
+      - predicate:
+          single_predicate:
+            input:
+              name: status_code
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
+            value_match:
+              exact: "500"
+        on_match:
+          action:
+            name: custom_response
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: internal_server_error_response
   )EOF";
 
 }

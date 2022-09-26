@@ -45,7 +45,7 @@ message CustomResponse {
     }
 
     message LocalDataSource {
-      // The new local reply body text if specified. It will be used
+      // Optional new local reply body text. It will be used
       // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
       config.core.v3.DataSource body = 1;
 

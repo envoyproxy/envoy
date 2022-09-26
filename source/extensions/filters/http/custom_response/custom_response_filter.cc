@@ -72,7 +72,14 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // Handle remote body
   if (custom_response->isRemote()) {
     // Modify the request headers & recreate stream.
-    ASSERT(downstream_headers_ != nullptr);
+
+    // downstream_headers_ can be null if sendLocalReply was called during
+    // decodeHeaders of a previous filter. In that case just continue, as Custom
+    // Response is not compatible with sendLocalReply.
+    if (downstream_headers_ == nullptr) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+
     auto& remote_data_source = custom_response->remoteDataSource();
     if (!remote_data_source.has_value()) {
       ENVOY_LOG(trace, "RemoteDataSource is empty");
@@ -135,9 +142,6 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     encoder_callbacks_->streamInfo().filterState()->setData(
         "envoy.filters.http.custom_response", custom_response,
         StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
-    // decoder_callbacks_->modifyDecodingBuffer(
-    //[](Buffer::Instance& data) { data.drain(data.length()); });
-    // decoder_callbacks_->recreateStream(&headers);
     restore_original_headers.cancel();
     decoder_callbacks_->recreateStream(nullptr);
 
