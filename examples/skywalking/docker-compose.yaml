@@ -16,7 +16,6 @@ services:
         condition: service_started
     ports:
     - "${PORT_PROXY:-10000}:10000"
-    - "${PORT_ADMIN:-8001}:8001"
 
   envoy-1:
     build:
@@ -123,9 +122,3 @@ services:
     environment:
       SW_OAP_ADDRESS: http://skywalking-oap:12800
       SW_HEALTH_CHECKER: default
-
-  started:
-    image: hello-world:latest
-    depends_on:
-      skywalking-ui:
-        condition: service_healthy
