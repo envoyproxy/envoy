@@ -1,9 +1,5 @@
 # This proxy listens on port 10000 and routes all queries to `service-2`.
 
-node:
-  # The cluster name is used by OpenTelemetry to identify the proxy.
-  cluster: envoy-proxy-2
-
 static_resources:
   listeners:
   - address:

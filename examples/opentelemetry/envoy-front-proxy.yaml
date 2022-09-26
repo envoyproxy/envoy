@@ -3,10 +3,6 @@
 #   /trace/1 -> routes to `envoy-1` on port 10000
 #   /trace/2 -> routes to `envoy-1` on port 10001 (for onward routing to `envoy-2`)
 
-node:
-  # The cluster name is used by OpenTelemetry to identify the proxy.
-  cluster: envoy-proxy-front
-
 static_resources:
   listeners:
   - address:

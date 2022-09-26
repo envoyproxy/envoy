@@ -3,10 +3,6 @@
 #   10000 -> routes to `service-1`
 #   10001 -> routes to `envoy-2`
 
-node:
-  # The cluster name is used by OpenTelemetry to identify the proxy.
-  cluster: envoy-proxy-1
-
 static_resources:
   listeners:
   - address:
@@ -28,7 +24,7 @@ static_resources:
                   envoy_grpc:
                     cluster_name: opentelemetry_collector
                   timeout: 0.250s
-                service_name: "envoy-1"
+                service_name: envoy-1
           codec_type: AUTO
           stat_prefix: ingress_http
           http_filters:
