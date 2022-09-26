@@ -22,6 +22,9 @@ behavior_changes:
 - area: tls
   change: |
     Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+- area: gcp_authn
+  change: |
+    Add GCP Authentication filter which can be used to fetch authentication tokens from Google Compute Engine(GCE) metadata server.
 - area: http
   change: |
     For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
@@ -56,6 +59,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
+- area: udp_proxy
+  change: |
+    changed behavior of UDP proxy to connect UDP sockets unless ``use_original_src_ip`` is set. This change can be reverted by setting runtime guard ``envoy.reloadable_features.udp_proxy_connect`` to false.
 - area: local_ratelimit
   change: |
     added :ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
@@ -138,6 +144,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
+- area: header_formatters
+  change: |
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
+    header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
+    ``envoy.reloadable_features.unified_header_formatter`` to false.
 - area: http
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
@@ -226,10 +237,18 @@ new_features:
 - area: redis
   change: |
     added support for quit command to the redis proxy.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response headers in :ref:`TunnelingConfig
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers>` to
+    the downstream info filter state.
 - area: access_log
   change: |
     log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
     and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls forward proxy.
+- area: grpc_json_transcoder
+  change: |
+    added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
 
 deprecated:
 - area: http

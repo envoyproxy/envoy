@@ -5916,8 +5916,10 @@ virtual_hosts:
     EXPECT_EQ("meh", route->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
+    Http::TestRequestHeaderMapImpl request_headers;
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
+    EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&request_headers));
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
@@ -6979,11 +6981,17 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression "
-      "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException,
+        "Invalid header configuration. Un-terminated variable expression "
+        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  } else {
+    EXPECT_THROW(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException);
+  }
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
@@ -8925,14 +8933,14 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/bar/{country}/{lang}"
         route:
           cluster: some-cluster
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/bar/{lang}/{country}"
@@ -8961,7 +8969,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
@@ -8993,7 +9001,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
@@ -9001,7 +9009,7 @@ virtual_hosts:
         route: { cluster: path-pattern-cluster-one}
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/boo/{go}/{fly}/{bat}"
@@ -9009,7 +9017,7 @@ virtual_hosts:
         route: { cluster: path-pattern-cluster-two}
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
@@ -9060,7 +9068,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -9068,7 +9076,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{two}/{one}"
@@ -9094,7 +9102,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{two}"
@@ -9102,7 +9110,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
@@ -9128,7 +9136,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -9136,13 +9144,13 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/REST/{one}/{two}"
@@ -9150,7 +9158,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/TEST/{one}"
@@ -9183,7 +9191,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one/{two}"
@@ -9191,7 +9199,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
@@ -9211,7 +9219,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -9219,7 +9227,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
@@ -9242,7 +9250,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{on==e}/{two}"
@@ -9250,7 +9258,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
@@ -9271,7 +9279,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/*/{two}"
@@ -9279,7 +9287,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}"
@@ -9305,7 +9313,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/**"
@@ -9313,7 +9321,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{one}"
@@ -9340,7 +9348,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{last=**}"
@@ -9348,7 +9356,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{last}"
@@ -9375,7 +9383,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{middle=videos/*}/end"
@@ -9383,7 +9391,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{middle}"
@@ -9410,7 +9418,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{One}/end"
@@ -9418,7 +9426,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{One}/{one}"
@@ -9445,7 +9453,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"

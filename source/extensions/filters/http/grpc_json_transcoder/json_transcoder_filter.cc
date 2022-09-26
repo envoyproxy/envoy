@@ -225,6 +225,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
+  case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -332,6 +333,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   struct RequestInfo request_info;
   request_info.reject_binding_body_field_collisions =
       request_validation_options_.reject_binding_body_field_collisions();
+  request_info.case_insensitive_enum_parsing = case_insensitive_enum_parsing_;
   std::vector<VariableBinding> variable_bindings;
   method_info =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
@@ -384,7 +386,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       Grpc::Common::typeUrl(method_info->descriptor_->output_type()->full_name());
   ResponseToJsonTranslatorPtr response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_info->descriptor_->server_streaming(),
-      &response_input, print_options_)};
+      &response_input, {print_options_, false})};
 
   transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
                                                 std::move(json_request_translator),
