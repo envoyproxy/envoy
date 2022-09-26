@@ -31,7 +31,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
   BucketId bucket_id = match_result.value();
   // Request is not matched by any matcher but the `on_no_match` field is configured. In this
-  // case, the request is matched to catch-all clause and is DENIED by default.
+  // case, the request is matched to catch-all bucket and is DENIED by default.
   // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
   if (bucket_id.bucket().empty()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
@@ -77,9 +77,9 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     return absl::InternalError("Matcher has not been initialized yet");
   } else {
     data_ptr_->onRequestHeaders(headers);
-    // TODO(tyxia) This function should trigger the CEL expression matching.
-    // We need to implement the custom_matcher and factory and register so that CEL matching will be
-    // triggered with its own match() method.
+    // TODO(tyxia) This function should trigger the CEL expression matching. Here, we need to
+    // implement the custom_matcher and factory, also statcically register it so that CEL matching
+    // will be triggered with its own match() method.
     auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
 
     if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {
@@ -94,7 +94,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
         return absl::NotFoundError("The match was completed, no match found");
       }
     } else {
-      // Returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
+      // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
       return absl::InternalError("Unable to match the request");
     }
   }
@@ -109,13 +109,14 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
 
   if (setting_.has_no_assignment_behavior()) {
     // If we reach to this function when request matching was complete but no match was found, it
-    // means `on_no_match` field is configured to assign the catch-all bucket. According to the
-    // design, `no_assignment_behavior` is used for this field.
-    // TODO(tyxia) Returns the empty BucketId for now, parse the `blanket_rule` from the config for
-    // fail-open fail-close behavior.
+    // means `on_no_match` field is configured. By design,`no_assignment_behavior` is used for this
+    // field.
+    // TODO(tyxia) Returns the empty BucketId for now, later parse the `blanket_rule` based on the
+    // config for fail-open fail-close behavior.
     return bucket_id;
   }
 
+  // Generate the `BucketId` based on the bucked id builder from the configuration.
   for (const auto& id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
     std::string bucket_id_key = id_builder.first;
     auto builder_method = id_builder.second;
@@ -127,7 +128,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
       bucket_id.mutable_bucket()->insert({bucket_id_key, builder_method.string_value()});
       break;
     }
-    // Retrieve the dynamic value from the `custom_value` typed extension config (dynamic method).
+    // Retrieve the value from the `custom_value` typed extension config (dynamic method).
     case ValueSpecifierCase::kCustomValue: {
       // Initialize the pointer to input factory on first use.
       if (input_factory_ptr == nullptr) {
@@ -161,7 +162,9 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
   return bucket_id;
 }
 
-// Register the action factory.
+/**
+ * Static registration for the on match action fatcory.
+ */
 REGISTER_FACTORY(RateLimitOnMactchActionFactory,
                  Matcher::ActionFactory<RateLimitOnMactchActionContext>);
 
