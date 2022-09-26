@@ -80,7 +80,6 @@ class DubboCodecBase : public Logger::Loggable<Logger::Id::connection> {
 public:
   DubboCodecBase(Common::Dubbo::DubboCodecPtr codec);
 
-protected:
   Common::Dubbo::DubboCodecPtr codec_;
 };
 
@@ -139,7 +138,7 @@ using DubboRequestDecoder = DubboDecoderBase<RequestDecoder, DubboRequest, Reque
 using DubboResponseDecoder =
     DubboDecoderBase<ResponseDecoder, DubboResponse, ResponseDecoderCallback>;
 
-class DubboRequestEncoder : public RequestEncoder, DubboCodecBase {
+class DubboRequestEncoder : public RequestEncoder, public DubboCodecBase {
 public:
   using DubboCodecBase::DubboCodecBase;
 
@@ -154,7 +153,7 @@ public:
   }
 };
 
-class DubboResponseEncoder : public ResponseEncoder, DubboCodecBase {
+class DubboResponseEncoder : public ResponseEncoder, public DubboCodecBase {
 public:
   using DubboCodecBase::DubboCodecBase;
 

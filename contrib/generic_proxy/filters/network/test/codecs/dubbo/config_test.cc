@@ -216,14 +216,15 @@ TEST(DubboResponseTest, DubboResponseTest) {
 }
 
 TEST(RequestDecoderTest, RequestDecoderTest) {
-  auto serializer = std::make_unique<MockSerializer>();
-  auto raw_serializer = serializer.get();
   auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::move(serializer));
+  codec->initilize(std::make_unique<MockSerializer>());
 
   MockRequestDecoderCallback callback;
   DubboRequestDecoder decoder(std::move(codec));
   decoder.setDecoderCallback(callback);
+
+  auto raw_serializer = const_cast<MockSerializer*>(
+      dynamic_cast<const MockSerializer*>(decoder.codec_->serializer().get()));
 
   // Decode failure.
   {
@@ -272,14 +273,15 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
 }
 
 TEST(ResponseDecoderTest, ResponseDecoderTest) {
-  auto serializer = std::make_unique<MockSerializer>();
-  auto raw_serializer = serializer.get();
   auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::move(serializer));
+  codec->initilize(std::make_unique<MockSerializer>());
 
   MockRequestDecoderCallback callback;
   DubboRequestDecoder decoder(std::move(codec));
   decoder.setDecoderCallback(callback);
+
+  auto raw_serializer = const_cast<MockSerializer*>(
+      dynamic_cast<const MockSerializer*>(decoder.codec_->serializer().get()));
 
   // Decode failure.
   {
@@ -328,13 +330,14 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
 }
 
 TEST(RequestEncoderTest, RequestEncoderTest) {
-  auto serializer = std::make_unique<MockSerializer>();
-  auto raw_serializer = serializer.get();
   auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::move(serializer));
+  codec->initilize(std::make_unique<MockSerializer>());
 
   MockRequestEncoderCallback callback;
   DubboRequestEncoder encoder(std::move(codec));
+
+  auto raw_serializer = const_cast<MockSerializer*>(
+      dynamic_cast<const MockSerializer*>(encoder.codec_->serializer().get()));
 
   // Normal request.
   {
@@ -358,13 +361,14 @@ TEST(RequestEncoderTest, RequestEncoderTest) {
 }
 
 TEST(ResponseEncoderTest, ResponseEncoderTest) {
-  auto serializer = std::make_unique<MockSerializer>();
-  auto raw_serializer = serializer.get();
   auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::move(serializer));
+  codec->initilize(std::make_unique<MockSerializer>());
 
   MockResponseEncoderCallback callback;
   DubboResponseEncoder encoder(std::move(codec));
+
+  auto raw_serializer = const_cast<MockSerializer*>(
+      dynamic_cast<const MockSerializer*>(encoder.codec_->serializer().get()));
 
   // Normal response.
   {
