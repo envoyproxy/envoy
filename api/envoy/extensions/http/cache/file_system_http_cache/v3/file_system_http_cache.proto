@@ -18,7 +18,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/htt
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: FileSystemHttpCache CacheFilter storage plugin]
+// [#protodoc-title: FileSystemHttpCacheConfig]
 // [#extension: envoy.extensions.http.cache.file_system_http_cache]
 //
 // Configuration for a cache implementation that caches in the local file system.
