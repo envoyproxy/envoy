@@ -51,8 +51,8 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
         factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
   }
 
-  auto new_cache = std::make_shared<HttpServerPropertiesCacheImpl>(
-      dispatcher, std::move(store), options.max_entries().value());
+  auto new_cache = std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher, std::move(store),
+                                                                   options.max_entries().value());
 
   for (const std::string& suffix : options.canonical_suffixes()) {
     new_cache->addCanonicalSuffix(suffix);

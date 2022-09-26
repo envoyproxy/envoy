@@ -86,7 +86,8 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithCanonicalEntry) {
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 
-  const HttpServerPropertiesCacheImpl::Origin origin = {"https", "second.example.com", entry->port()};
+  const HttpServerPropertiesCacheImpl::Origin origin = {"https", "second.example.com",
+                                                        entry->port()};
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 

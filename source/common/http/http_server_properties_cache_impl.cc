@@ -306,7 +306,8 @@ absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string
   return "";
 }
 
-absl::optional<HttpServerPropertiesCache::Origin> HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
+absl::optional<HttpServerPropertiesCache::Origin>
+HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
   absl::string_view suffix = getCanonicalSuffix(hostname);
   if (suffix.empty()) {
     return {};
