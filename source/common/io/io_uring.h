@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/network/address_impl.h"
@@ -105,10 +106,9 @@ public:
   virtual ~IoUringFactory() = default;
 
   /**
-   * Returns an instance of IoUring and creates it if needed for the current
-   * thread.
+   * Returns an instance of IoUring for the current thread.
    */
-  virtual IoUring& getOrCreate() const PURE;
+  virtual OptRef<IoUring> get() const PURE;
 
   /**
    * Initializes a factory upon server readiness. For example this method can be

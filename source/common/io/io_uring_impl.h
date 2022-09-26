@@ -44,7 +44,8 @@ public:
                      ThreadLocal::SlotAllocator& tls);
 
   // IoUringFactory
-  IoUring& getOrCreate() const override;
+  // TODO (soulxu): rename this method, it only about `get`.
+  OptRef<IoUring> get() const override;
   void onServerInitialized() override;
   bool currentThreadRegistered() override;
 

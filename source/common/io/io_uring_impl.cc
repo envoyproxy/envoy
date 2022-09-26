@@ -22,8 +22,12 @@ IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submissi
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
       tls_(tls) {}
 
-IoUring& IoUringFactoryImpl::getOrCreate() const {
-  return const_cast<IoUringImpl&>(tls_.get().ref());
+OptRef<IoUring> IoUringFactoryImpl::get() const {
+  auto ret = tls_.get();
+  if (ret == absl::nullopt) {
+    return absl::nullopt;
+  }
+  return ret.ref();
 }
 
 void IoUringFactoryImpl::onServerInitialized() {
