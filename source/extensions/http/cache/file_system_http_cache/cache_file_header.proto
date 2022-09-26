@@ -21,7 +21,7 @@ import "source/extensions/filters/http/cache/key.proto";
 //
 // The CacheFileHeader is at the end of the file to allow it to be easily replaced during
 // updateHeaders. To avoid races, the CacheFileHeader is kept in memory during ordinary
-// usage, and only loaded from disk as part of populateFromDisk during cache warmup.
+// usage, and only loaded from disk as part of populateFromDisk during cache warm-up.
 //
 // One slightly special case is the cache file for an entry with 'vary' headers involved
 // - for this case at the 'hub' entry there is no trailer or body, and the only header

@@ -22,7 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#not-implemented-hide:]
 // [#extension: envoy.extensions.http.cache.file_system_http_cache]
 //
-// Configuration for a cache implementation that caches in the local filesystem.
+// Configuration for a cache implementation that caches in the local file system.
 //
 // By default this cache uses a least-recently-used eviction strategy.
 //
@@ -61,10 +61,10 @@ message FileSystemHttpCacheConfig {
 
   // A number of folders into which to subdivide the cache.
   //
-  // Setting this can help with performance in filesystems where a large number of inodes
+  // Setting this can help with performance in file systems where a large number of inodes
   // in a single branch degrades performance. The optimal value in that case would be
   // ``sqrt(expected_cache_entry_count)``.
   //
-  // On filesystems that perform well with many inodes, the default value of 1 should be used.
+  // On file systems that perform well with many inodes, the default value of 1 should be used.
   uint32 cache_subdivisions = 6;
 }

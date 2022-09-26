@@ -192,6 +192,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblack
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
+/*/extensions/http/cache/file_system_http_cache @mattklein123 @ravenblack
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution

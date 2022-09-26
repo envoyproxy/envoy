@@ -129,7 +129,7 @@ void InsertOperationQueue::insertHeaders(std::shared_ptr<InsertOperationQueue> p
     if (vary_identifier.has_value()) {
       key_.add_custom_fields(vary_identifier.value());
     } else {
-      // No error for this cancel, it's just a non-insertable entry.
+      // No error for this cancel, it's just an entry that's ineligible for insertion.
       cancelInsert(p);
       insert_complete(false);
       return;
@@ -253,7 +253,7 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
                                                   callback(false);
                                                   return;
                                                 }
-                                                // Mark the cache entry as useable.
+                                                // Mark the cache entry as usable.
                                                 cache_->updateEntryToFile(key_,
                                                                           std::move(cache_entry_));
                                                 cancel_action_in_flight_ = nullptr;

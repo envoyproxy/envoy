@@ -13,7 +13,7 @@ namespace FileSystemHttpCache {
 
 namespace {
 // in-place byte order swap for a uint64.
-// Optimization in clang or gcc can recognize this as a single bswap instruction.
+// Optimization in clang or gcc can recognize this as a single `bswap` instruction.
 void flip64(uint64_t& n) {
   n = ((n & 0xFF00000000000000u) >> 56u) | ((n & 0x00FF000000000000u) >> 40u) |
       ((n & 0x0000FF0000000000u) >> 24u) | ((n & 0x000000FF00000000u) >> 8u) |

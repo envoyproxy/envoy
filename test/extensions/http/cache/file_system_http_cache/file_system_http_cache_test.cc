@@ -205,7 +205,7 @@ public:
       inserter->insertTrailers(response_trailers_, expect_true_callback_);
       mock_async_file_manager_->nextActionCompletes(
           absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
-      // Empty preheader
+      // Empty pre-header
       mock_async_file_manager_->nextActionCompletes(
           absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
       // Body
@@ -214,7 +214,7 @@ public:
       mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
       // Headers
       mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
-      // Updated preheader
+      // Updated pre-header
       mock_async_file_manager_->nextActionCompletes(
           absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
       // createHardLink
@@ -345,7 +345,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   // Open file
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>{mock_async_file_handle_});
-  // Empty preheader
+  // Empty pre-header
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
   // Body1
@@ -356,7 +356,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
   // Headers
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(headers_size_));
-  // Updated preheader (which triggers createHardLink)
+  // Updated pre-header (which triggers createHardLink)
   EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
@@ -496,7 +496,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToWriteBodyChu
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
-  // Intentionally undersized write of body chunk.
+  // Intentionally undersaddized write of body chunk.
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(1));
   EXPECT_EQ(testLookupResult().cache_entry_status_, CacheEntryStatus::Unusable);
   EXPECT_EQ(false_callbacks_called_, 1);
