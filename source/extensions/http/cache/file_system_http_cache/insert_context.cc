@@ -58,8 +58,8 @@ void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
                     [this, p, sz, callback](absl::StatusOr<size_t> write_result) {
                       absl::MutexLock lock(&mu_);
                       if (!write_result.ok() || write_result.value() != sz) {
-                        callback(false);
                         cancelInsert(p, writeFailureMessage("trailer chunk", write_result, sz));
+                        callback(false);
                         return;
                       }
                       header_block_.setTrailersSize(sz);
@@ -75,8 +75,8 @@ void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
                     [this, p, sz, callback, end_stream](absl::StatusOr<size_t> write_result) {
                       absl::MutexLock lock(&mu_);
                       if (!write_result.ok() || write_result.value() != sz) {
-                        callback(false);
                         cancelInsert(p, writeFailureMessage("body chunk", write_result, sz));
+                        callback(false);
                         return;
                       }
                       write_pos_ += sz;
@@ -216,8 +216,8 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
                   [this, callback, p, sz](absl::StatusOr<size_t> write_result) {
                     absl::MutexLock lock(&mu_);
                     if (!write_result.ok() || write_result.value() != sz) {
-                      callback(false);
                       cancelInsert(p, writeFailureMessage("headers", write_result, sz));
+                      callback(false);
                       return;
                     }
                     // Write the file header block.
@@ -230,10 +230,10 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
                                   absl::MutexLock lock(&mu_);
                                   if (!write_result.ok() ||
                                       write_result.value() != CacheFileFixedBlock::size()) {
-                                    callback(false);
                                     cancelInsert(p,
                                                  writeFailureMessage("header block", write_result,
                                                                      CacheFileFixedBlock::size()));
+                                    callback(false);
                                     return;
                                   }
                                   absl::string_view path = cache_->cachePath();
@@ -245,12 +245,12 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
                                               [this, callback, p](absl::Status link_result) {
                                                 absl::MutexLock lock(&mu_);
                                                 if (!link_result.ok()) {
-                                                  callback(false);
                                                   cancelInsert(
                                                       p, absl::StrCat("failed to link file (",
                                                                       link_result.ToString(),
                                                                       "): ", cache_->cachePath(),
                                                                       cache_entry_->filename()));
+                                                  callback(false);
                                                   return;
                                                 }
                                                 // Mark the cache entry as useable.
