@@ -1303,5 +1303,29 @@ TEST_P(RedisProxyIntegrationTest, FullTransaction) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  std::string request = makeBulkStringArray({"set", "foo", "bar"});
+  ASSERT_TRUE(redis_client->write(request));
+
+  // The upstream will receive a MULTI command before the SET command.
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"});
+  std::string upstream_response = "";
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
 } // namespace
 } // namespace Envoy
