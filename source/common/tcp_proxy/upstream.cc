@@ -44,7 +44,9 @@ void TcpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb cb) {
 }
 
 bool TcpUpstream::startUpstreamSecureTransport() {
-  return upstream_conn_data_->connection().startSecureTransport();
+  return (upstream_conn_data_ == nullptr)
+             ? false
+             : upstream_conn_data_->connection().startSecureTransport();
 }
 
 Tcp::ConnectionPool::ConnectionData*
