@@ -443,15 +443,17 @@ void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
 void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& dispatcher,
                                                            Event::FileReadyCb cb,
                                                            Event::FileTriggerType trigger,
-                                                           uint32_t events) {
+                                                           uint32_t) {
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                  "file descriptor. This is not allowed.");
 
   cb_ = std::move(cb);
   Io::IoUring& uring = io_uring_factory_.get().ref();
   const os_fd_t event_fd = uring.registerEventfd();
+  // We only care about the read event of Eventfd, since we only receive the
+  // event here.
   file_event_ = dispatcher.createFileEvent(
-      event_fd, [this](uint32_t) { onFileEvent(); }, trigger, events);
+      event_fd, [this](uint32_t) { onFileEvent(); }, trigger, Event::FileReadyType::Read);
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest() {
