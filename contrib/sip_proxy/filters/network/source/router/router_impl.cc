@@ -551,7 +551,7 @@ FilterStatus Router::messageEnd() {
   ENVOY_STREAM_LOG(trace, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
                    transport_buffer.toString());
 
-  upstream_request_->write(transport_buffer, false);
+  upstream_connection_->write(transport_buffer, false);
   return FilterStatus::Continue;
 }
 
@@ -907,9 +907,9 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
   return FilterStatus::Continue;
 }
 
-DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
+DecoderEventHandler* UpstreamMessageDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
   UNREFERENCED_PARAMETER(metadata);
-  return *this;
+  return this;
 }
 
 std::shared_ptr<SipSettings> UpstreamMessageDecoder::settings() const { return parent_.settings(); }
