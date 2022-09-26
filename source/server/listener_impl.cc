@@ -1070,6 +1070,10 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     return false;
   }
 
+  if (!ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
+    return false;
+  }
+
   // The listener support listening on the zero port address for test. Multiple zero
   // port addresses are also supported. For comparing two listeners with multiple
   // zero port addresses, only need to ensure there are the same number of zero
@@ -1093,6 +1097,11 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   if (socket_type_ != other.socket_type_) {
     return false;
   }
+
+  if (!ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
+    return false;
+  }
+
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
   // sure we are not duplicating the address. This avoids ambiguity about which non-binding
   // listener is used or even worse for the binding to port != 0 and reuse port case multiple
@@ -1121,6 +1130,30 @@ void ListenerImpl::closeAllSockets() {
   for (auto& socket_factory : socket_factories_) {
     socket_factory->closeAllSockets();
   }
+}
+
+bool ListenerMessageUtil::compareSocketOptions(const envoy::config::listener::v3::Listener& lhs,
+                                               const envoy::config::listener::v3::Listener& rhs) {
+  if (lhs.socket_options_size() != rhs.socket_options_size()) {
+    return false;
+  }
+
+  for (auto i = 0; i < lhs.socket_options_size(); i++) {
+    auto& option = lhs.socket_options(i);
+    bool found = false;
+    for (auto j = 0; j < rhs.socket_options_size(); j++) {
+      auto& other_option = rhs.socket_options(j);
+      Protobuf::util::MessageDifferencer differencer;
+      if (differencer.Compare(option, other_option)) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

@@ -2073,6 +2073,90 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+// Update listener with different socket. Ensure a new socket will be created.
+TEST_P(ListenerManagerImplTest, UpdateListenerWithSocketOptions) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  // Update foo with different socket option value.
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  // Update foo with different numbers of socket options.
+  const std::string listener_foo_update2_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(listener_foo_update2->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update2_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 2, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update2, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
   InSequence s;
 
