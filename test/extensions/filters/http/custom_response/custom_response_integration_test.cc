@@ -75,7 +75,7 @@ public:
               // swap with router filter
               hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
                                                        hcm.mutable_http_filters()->size() - 1);
-              // swap with cer filter
+              // swap with custom response filter
               hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
                                                        cer_position);
               cer_position = hcm.mutable_http_filters()->size() - 2;
@@ -265,7 +265,7 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
-  // Make the remote respones for gateway_error policy return 401
+  // Make the remote response for gateway_error policy return 401
   auto fo1 = config_helper_.createVirtualHost("fo1.example");
   fo1.mutable_routes(0)->set_name("fo1");
   fo1.mutable_routes(0)->mutable_direct_response()->set_status(401);
