@@ -50,14 +50,15 @@ KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
       const std::string resource_key = constructKey(source_id, resource_name);
       if (const auto existing_resource = xds_config_store_->get(resource_key)) {
         envoy::service::discovery::v3::Resource r;
-        if (!r.ParseFromString(std::string(*existing_resource))) {
+        if (r.ParseFromString(std::string(*existing_resource))) {
+          resources.push_back(std::move(r));
+        } else {
           // Resource failed to parse; this shouldn't happen unless fields get removed from the
           // proto. Since the serialized resource in the KV store is no longer parseable into an
           // xDS resource, we'll remove it from the store and not use it in xDS processing.
           xds_config_store_->remove(resource_key);
           stats_.parse_failed_.inc();
         }
-        resources.push_back(std::move(r));
       } else {
         stats_.resource_missing_.inc();
       }
