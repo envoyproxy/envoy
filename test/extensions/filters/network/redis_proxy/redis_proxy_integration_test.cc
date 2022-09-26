@@ -1285,24 +1285,6 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
   redis_client->close();
 }
 
-// This tests a full redis transaction.
-
-TEST_P(RedisProxyIntegrationTest, FullTransaction) {
-  initialize();
-  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"set", "foo", "bar"}), "ddd", redis_client);
-  proxyResponseStep(makeBulkStringArray({
-                        "get",
-                        "foo",
-                    }),
-                    "aaa", redis_client);
-  proxyResponseStep(makeBulkStringArray({"exec"}), "vvv", redis_client);
-
-  redis_client->close();
-}
-
 TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
