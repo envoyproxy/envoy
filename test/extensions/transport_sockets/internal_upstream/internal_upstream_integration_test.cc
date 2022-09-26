@@ -190,7 +190,7 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
 TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTestDefault) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 65536",
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 1048576",
                       internalConnectionBufferSizeTest());
 }
 
