@@ -1285,6 +1285,9 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
   redis_client->close();
 }
 
+// This test verifies that a multi command is sent before the first
+// simple command of the transaction.
+
 TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));

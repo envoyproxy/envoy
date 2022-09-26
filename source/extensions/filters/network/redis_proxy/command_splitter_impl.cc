@@ -502,6 +502,8 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   // When we receive the first command with a key we will set this key as our transaction
   // key, and then send a MULTI command to the node that handles that key.
+  // The response for the MULTI command will be discarded since we pass the null_pool_callbacks
+  // to the handler.
   RouteSharedPtr route;
   if (transaction.key_.empty()) {
     transaction.key_ = incoming_request->asArray()[1].asString();
