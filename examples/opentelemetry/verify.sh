@@ -2,7 +2,7 @@
 
 export NAME=opentelemetry
 export PORT_PROXY="${OPENTELEMETRY_PORT_PROXY:-12000}"
-export PORT_COLLECTOR_ZPAGE="${OPENTELEMETRY_PORT_COLLECTOR_ZPAGE:-12001}"
+export PORT_UI="${OPENTELEMETRY_PORT_UI:-12001}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -20,4 +20,4 @@ responds_with \
 run_log "View the traces in OpenTelemetry UI"
 responds_with \
     "<!DOCTYPE html>" \
-    "http://localhost:${PORT_COLLECTOR_ZPAGE}/debug/tracez"
+    "http://localhost:${PORT_UI}/debug/tracez"

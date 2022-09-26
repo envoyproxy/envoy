@@ -71,4 +71,4 @@ services:
       start_period: 5s
     command: ["--config=/etc/otel-collector-config.yaml"]
     ports:
-    - "${PORT_COLLECTOR_ZPAGE:-55679}:55679"
+    - "${PORT_UI:-55679}:55679"
