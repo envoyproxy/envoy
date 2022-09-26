@@ -127,6 +127,7 @@ message UpstreamHttpProtocolOptions {
 // make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
 // HTTP Alternative Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
 // for the "HTTPS" DNS resource record.
+// [#next-free-field: 6]
 message AlternateProtocolsCacheOptions {
   // Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
   // This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
