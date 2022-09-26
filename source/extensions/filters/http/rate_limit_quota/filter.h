@@ -126,9 +126,7 @@ private:
 
   // Customized hash and equal struct for `BucketId` hash key.
   struct BucketIdHash {
-    size_t operator()(const BucketId& bucket_id) const {
-      return MessageUtil::hash(bucket_id);
-    }
+    size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
   };
 
   struct BucketIdEqual {
