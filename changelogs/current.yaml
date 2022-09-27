@@ -5,6 +5,10 @@ behavior_changes:
 - area: build
   change: |
     official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
+- area: listener
+  change: |
+    Previously the listener update with different `socket_options` will be ignored. Now, when the `socket_options` updated, a new socket will created for the listener and
+    apply the new `socket_options` to it.
 - area: stats http local_rate_limit
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
