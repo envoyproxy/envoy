@@ -27,6 +27,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/proxy_receive_before_connect.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
@@ -274,7 +275,17 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
-  read_callbacks_->connection().readDisable(true);
+  auto receive_before_connect = read_callbacks_->connection()
+                                    .streamInfo()
+                                    .filterState()
+                                    ->getDataReadOnly<Network::ProxyReceiveBeforeConnect>(
+                                        Network::ProxyReceiveBeforeConnect::key());
+  if (receive_before_connect && receive_before_connect->value()) {
+    receive_before_connect_ = true;
+  } else {
+    read_callbacks_->connection().readDisable(true);
+  }
+
   getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
@@ -512,8 +523,11 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     // cluster->trafficStats()->upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
+    return Network::FilterStatus::StopIteration;
   }
-  return Network::FilterStatus::StopIteration;
+  // Allow OnData() to receive data before connect if so configured
+  return receive_before_connect_ ? Network::FilterStatus::Continue
+                                 : Network::FilterStatus::StopIteration;
 }
 
 void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
@@ -756,12 +770,18 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   if (upstream_) {
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
+    resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
+  } else if (receive_before_connect_) {
+    // Buffer data received before upstream connection exists
+    early_data_buffer_.move(data);
+    if (!early_data_end_stream_) {
+      early_data_end_stream_ = end_stream;
+    }
   }
   // The upstream should consume all of the data.
   // Before there is an upstream the connection should be readDisabled. If the upstream is
   // destroyed, there should be no further reads as well.
   ASSERT(0 == data.length());
-  resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
@@ -887,7 +907,13 @@ void Filter::onUpstreamConnection() {
   connecting_ = false;
   // Re-enable downstream reads now that the upstream connection is established
   // so we have a place to send downstream data to.
-  read_callbacks_->connection().readDisable(false);
+  if (!receive_before_connect_) {
+    read_callbacks_->connection().readDisable(false);
+  } else if (early_data_buffer_.length() > 0) {
+    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
+    upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
+    ASSERT(0 == early_data_buffer_.length());
+  }
 
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
