@@ -173,7 +173,11 @@ message AlternateProtocolsCacheOptions {
   // Allows pre-populating the cache with entries, as described above.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 
-  // Optional list of hostnames suffixes for which Alt-Svc entries can be shared.
+  // Optional list of hostnames suffixes for which Alt-Svc entries can be shared. For example, if
+  // this list contained the value `.c.example.com`, then an Alt-Svc entry for `foo.c.example.com`
+  // could be shared with 'bar.c.example.com' but would not be shared with 'baz.example.com'. On
+  // the other hand, if the list contained the value '.youtube.com' then all three hosts could share
+  // Alt-Svc entries.
   repeated string canonical_suffixes = 5;
 }
 

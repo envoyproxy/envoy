@@ -74,9 +74,18 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithEntry) {
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 
-TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithCanonicalEntry) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithInvalidCanonicalEntry) {
   auto* suffixes = options1_.add_canonical_suffixes();
   *suffixes = "example.com";
+
+  initialize();
+  EXPECT_ENVOY_BUG(manager_->getCache(options1_, dispatcher_),
+                   "Suffix does not start with a leading '.': example.com");
+}
+
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithCanonicalEntry) {
+  auto* suffixes = options1_.add_canonical_suffixes();
+  *suffixes = ".example.com";
   auto* entry = options1_.add_prepopulated_entries();
   entry->set_hostname("first.example.com");
   entry->set_port(1);

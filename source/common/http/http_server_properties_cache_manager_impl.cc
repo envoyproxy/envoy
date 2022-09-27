@@ -55,6 +55,10 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
                                                                    options.max_entries().value());
 
   for (const std::string& suffix : options.canonical_suffixes()) {
+    if (!absl::StartsWith(suffix, ".")) {
+      IS_ENVOY_BUG(absl::StrCat("Suffix does not start with a leading '.': ", suffix));
+      continue;
+    }
     new_cache->addCanonicalSuffix(suffix);
   }
   for (const envoy::config::core::v3::AlternateProtocolsCacheOptions::AlternateProtocolsCacheEntry&
