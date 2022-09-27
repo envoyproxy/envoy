@@ -522,16 +522,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "proxy_receive_before_connect_lib",
-    srcs = ["proxy_receive_before_connect.cc"],
-    hdrs = ["proxy_receive_before_connect.h"],
-    deps = [
-        "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:macros",
-    ],
-)
-
-envoy_cc_library(
     name = "upstream_server_name_lib",
     srcs = ["upstream_server_name.cc"],
     hdrs = ["upstream_server_name.h"],

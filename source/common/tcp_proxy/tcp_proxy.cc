@@ -13,6 +13,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/bool_accessor.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -28,7 +29,6 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
-#include "source/common/network/proxy_receive_before_connect.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
@@ -254,11 +254,11 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
   // established.
-  auto receive_before_connect = read_callbacks_->connection()
-                                    .streamInfo()
-                                    .filterState()
-                                    ->getDataReadOnly<Network::ProxyReceiveBeforeConnect>(
-                                        Network::ProxyReceiveBeforeConnect::key());
+  auto receive_before_connect =
+      read_callbacks_->connection()
+          .streamInfo()
+          .filterState()
+          ->getDataReadOnly<StreamInfo::BoolAccessor>(ReceiveBeforeConnectKey);
   if (receive_before_connect && receive_before_connect->value()) {
     receive_before_connect_ = true;
   } else {
