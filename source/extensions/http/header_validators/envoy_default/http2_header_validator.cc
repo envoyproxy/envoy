@@ -212,7 +212,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   std::vector<absl::string_view> drop_headers;
 
   // TODO(ameily) - Add tests for duplicate headers. This would most likely need to occur within
-  // the H2 codec because, at this point, duplciate headers have been concatenated into a list.
+  // the H2 codec because, at this point, duplicate headers have been concatenated into a list.
   header_map.iterate(
       [this, &reject_details, &allowed_headers, &drop_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
