@@ -43,6 +43,14 @@ namespace TcpProxy {
 
 constexpr absl::string_view PerConnectionIdleTimeoutMs =
     "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
+
+constexpr absl::string_view PerConnectionIdleTimeoutMs =
+    "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
+
+constexpr absl::string_view PerConnectionIdleTimeoutMs =
+    "envoy.tcp_proxy.per_connection_idle_timeout_ms";
 
 /**
  * All tcp proxy stats. @see stats_macros.h

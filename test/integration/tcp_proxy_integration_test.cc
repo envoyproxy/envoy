@@ -11,8 +11,9 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/network/proxy_receive_before_connect.h"
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
@@ -1348,8 +1349,7 @@ public:
 
     // Tell TcpProxy to not disable read so that we can read headers
     read_callbacks_->connection().streamInfo().filterState()->setData(
-        Network::ProxyReceiveBeforeConnect::key(),
-        std::make_unique<Network::ProxyReceiveBeforeConnect>(true),
+        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
