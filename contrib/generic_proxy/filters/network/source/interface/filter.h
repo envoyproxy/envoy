@@ -151,10 +151,10 @@ public:
 };
 
 /**
- * A FilterChainFactory is used by a connection manager to create a connection level filter chain
- * when a new connection is created. Typically it would be implemented by a configuration engine
+ * A FilterChainFactory is used by a connection manager to create a stream level filter chain
+ * when a new stream is created. Typically it would be implemented by a configuration engine
  * that would install a set of filters that are able to process an application scenario on top of a
- * stream of Dubbo requests.
+ * stream of generic requests.
  */
 class FilterChainFactory {
 public:
