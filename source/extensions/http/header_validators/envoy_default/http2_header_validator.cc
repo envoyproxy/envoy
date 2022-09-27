@@ -51,6 +51,8 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
+  // TODO(ameily) - Add support for validating the :protocol pseudo header for extended CONNECT
+  // requests.
 
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
@@ -159,8 +161,6 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //  * The ":authority" pseudo-header field contains the host and port to connect to (equivalent
     //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
     //    [HTTP/1.1]).
-    //
-    // TODO - Add support for extended CONNECT requests: envoy.reloadable_features.use_rfc_connect
     absl::string_view details;
     if (!path.empty()) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
@@ -211,6 +211,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 
+  // TODO(ameily) - Add tests for duplicate headers. This would most likely need to occur within
+  // the H2 codec because, at this point, duplciate headers have been concatenated into a list.
   header_map.iterate(
       [this, &reject_details, &allowed_headers, &drop_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
@@ -360,8 +362,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores =
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
+  const auto& underscore_action = config_.headers_with_underscores_action();
 
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
@@ -377,6 +378,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   bool is_valid = true;
   char c = '\0';
+  bool has_underscore = false;
 
   // Verify that the header name is all lowercase. From RFC 9113,
   // https://www.rfc-editor.org/rfc/rfc9113#section-8.2.1:
@@ -386,18 +388,21 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // (0x20), and uppercase characters ('A' to 'Z', ASCII 0x41 to 0x5a).
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
-    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&
-                (c < 'A' || c > 'Z');
+    if (c != '_') {
+      is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
+    } else {
+      has_underscore = true;
+    }
   }
 
-  if (!is_valid && c == '_' &&
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
+  if (!is_valid || (has_underscore && underscore_action == HeaderValidatorConfig::REJECT_REQUEST)) {
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidNameCharacters};
+  }
+
+  if (has_underscore && underscore_action == HeaderValidatorConfig::DROP_HEADER) {
     return {HeaderEntryValidationResult::Action::DropHeader,
             UhvResponseCodeDetail::get().InvalidUnderscore};
-  } else if (!is_valid) {
-    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
-                            : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {HeaderEntryValidationResult::Action::Reject, details};
   }
 
   return HeaderEntryValidationResult::success();

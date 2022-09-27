@@ -44,6 +44,8 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
+  // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
+  // submitting the header map for validation in UHV.
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
       {":method", &Http1HeaderValidator::validateMethodHeader},
       {":authority", &Http1HeaderValidator::validateHostHeader},
@@ -123,8 +125,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
-  // Step 1: verify that required pseudo headers are present. Pseudo headers in HTTP/1.1 are
-  // synthesized by the codec from the request line and HTTP/1.1 requests requires the
+  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
   // :method header based on RFC 9112
   // https://www.rfc-editor.org/rfc/rfc9112.html#section-3:
   //

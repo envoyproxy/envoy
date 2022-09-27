@@ -31,7 +31,6 @@ public:
 
   /*
    * Validate the :status response pseudo header based on the range of valid response statuses.
-   * TODO: add RFC reference
    */
   virtual HeaderValueValidationResult
   validateStatusHeader(const ::Envoy::Http::HeaderString& value);
@@ -139,7 +138,8 @@ protected:
 };
 
 struct UhvResponseCodeDetailValues {
-  const std::string InvalidCharacters = "uhv.invalid_characters";
+  const std::string InvalidNameCharacters = "uhv.invalid_name_characters";
+  const std::string InvalidValueCharacters = "uhv.invalid_value_characters";
   const std::string InvalidUrl = "uhv.invalid_url";
   const std::string InvalidHost = "uhv.invalid_host";
   const std::string InvalidScheme = "uhv.invalid_scheme";

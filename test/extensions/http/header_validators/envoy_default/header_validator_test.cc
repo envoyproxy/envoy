@@ -131,7 +131,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     if (testChar(kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
     }
   }
 }
@@ -141,7 +141,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
   auto uhv = createBase(reject_headers_with_underscores_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
+                             UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
@@ -161,6 +161,14 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
+  HeaderString invalid_with_underscore{"x_fo<o"};
+  auto uhv = createBase(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(invalid_with_underscore);
+  EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
+}
+
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
   auto uhv = createBase(empty_config);
   std::string name{"aaaaa"};
@@ -175,7 +183,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     if (testChar(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);
     }
   }
 }

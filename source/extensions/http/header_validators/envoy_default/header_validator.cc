@@ -165,8 +165,6 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores =
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
   // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
     return {HeaderEntryValidationResult::Action::Reject,
@@ -174,21 +172,27 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   }
 
   bool is_valid = true;
+  bool has_underscore = false;
   char c = '\0';
+  const auto& underscore_action = config_.headers_with_underscores_action();
 
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
-    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
+    if (c != '_') {
+      is_valid &= testChar(kGenericHeaderNameCharTable, c);
+    } else {
+      has_underscore = true;
+    }
   }
 
-  if (!is_valid && c == '_' &&
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
+  if (!is_valid || (has_underscore && underscore_action == HeaderValidatorConfig::REJECT_REQUEST)) {
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidNameCharacters};
+  }
+
+  if (has_underscore && underscore_action == HeaderValidatorConfig::DROP_HEADER) {
     return {HeaderEntryValidationResult::Action::DropHeader,
             UhvResponseCodeDetail::get().InvalidUnderscore};
-  } else if (!is_valid) {
-    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
-                            : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {HeaderEntryValidationResult::Action::Reject, details};
   }
 
   return HeaderEntryValidationResult::success();
@@ -218,7 +222,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
 
   if (!is_valid) {
     return {HeaderValueValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidCharacters};
+            UhvResponseCodeDetail::get().InvalidValueCharacters};
   }
 
   return HeaderValueValidationResult::success();
@@ -253,6 +257,8 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   //
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
+  //
+  // TODO(ameily) - Fully mplement IPv6 address validation (issues #22859).
   const auto host = value.getStringView();
   if (host.empty()) {
     return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
