@@ -315,7 +315,7 @@ public:
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
-  // Check whether a new listener changed buildin socket options.
+  // Check whether a new listener changed build-in socket options.
   void checkBuildinSocketOption(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
