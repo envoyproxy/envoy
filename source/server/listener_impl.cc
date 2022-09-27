@@ -1094,11 +1094,14 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
-  if (socket_type_ != other.socket_type_) {
+  // Skip the duplicate address check if this is the case of a listener update with new socket
+  // options.
+  if ((name_ == other.name_) &&
+      !ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
     return false;
   }
 
-  if (!ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
+  if (socket_type_ != other.socket_type_) {
     return false;
   }
 
