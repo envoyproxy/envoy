@@ -13,6 +13,7 @@
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_helper.h"
+#include "source/common/network/socket_impl.h"
 #include "source/common/stats/timespan_impl.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -56,7 +57,8 @@ public:
         stats_(
             HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."),
                                                   POOL_HISTOGRAM_PREFIX(scope, "http.client."))}),
-        address_(std::make_shared<Network::Address::SyntheticAddressImpl>()), random_(random) {}
+        address_provider_(std::make_shared<Network::Address::SyntheticAddressImpl>(), nullptr),
+        random_(random) {}
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -229,8 +231,8 @@ private:
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason) override;
-    const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.address_;
+    Network::ConnectionInfoProvider& connectionInfoProvider() override {
+      return parent_.address_provider_;
     }
     absl::string_view responseDetails() override { return response_details_; }
     // This is called any time upstream buffers exceed the configured flow
@@ -341,8 +343,8 @@ private:
   // The set of closed streams, where end stream has been received from upstream
   // but not yet communicated to the mobile library.
   absl::flat_hash_map<envoy_stream_t, DirectStreamSharedPtr> closed_streams_;
-  // Shared synthetic address across DirectStreams.
-  Network::Address::InstanceConstSharedPtr address_;
+  // Shared synthetic address providers across DirectStreams.
+  Network::ConnectionInfoSetterImpl address_provider_;
   Random::RandomGenerator& random_;
 };
 
