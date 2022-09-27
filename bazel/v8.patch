@@ -7,13 +7,15 @@
 # 7. Fix build errors in SIMD IndexOf/includes (https://crrev.com/c/3749192).
 # 8. Fix build on arm64.
 # 9. Fix build on older versions of Linux.
+# 10. Fix MemoryAllocator::PartialFreeMemory() which shouldn't try to change permissions of RWX pages,
+#     mainly affecting macOS on Apple silicon (https://chromium-review.googlesource.com/c/v8/v8/+/3700352).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 13f2a5bebf..2197568c48 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
- 
+
  load("@bazel_skylib//lib:selects.bzl", "selects")
  load("@rules_python//python:defs.bzl", "py_binary")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
@@ -28,7 +30,7 @@ index 13f2a5bebf..2197568c48 100644
 -    default = "none",
 +    default = "False",
  )
- 
+
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 index e957c0fad3..eee285ab60 100644
@@ -60,11 +62,11 @@ index 6db6698d7e..b56d31085f 100644
 +++ b/src/snapshot/snapshot-utils.cc
 @@ -5,7 +5,7 @@
  #include "src/snapshot/snapshot-utils.h"
- 
+
  #include "src/base/sanitizer/msan.h"
 -#include "third_party/zlib/zlib.h"
 +#include "zlib.h"
- 
+
  namespace v8 {
  namespace internal {
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
@@ -72,17 +74,17 @@ index ce3f569fd5..dc8a4c4f6a 100644
 --- a/src/wasm/c-api.cc
 +++ b/src/wasm/c-api.cc
 @@ -2238,6 +2238,8 @@ auto Instance::exports() const -> ownvec<Extern> {
- 
+
  }  // namespace wasm
- 
+
 +#if 0
 +
  // BEGIN FILE wasm-c.cc
- 
+
  extern "C" {
 @@ -3257,3 +3259,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
  #undef WASM_DEFINE_SHARABLE_REF
- 
+
  }  // extern "C"
 +
 +#endif
@@ -91,9 +93,9 @@ index 8f7fba765f..a7f5bf80cf 100644
 --- a/src/execution/clobber-registers.cc
 +++ b/src/execution/clobber-registers.cc
 @@ -5,19 +5,22 @@
- 
+
  #include "src/base/build_config.h"
- 
+
 -#if V8_HOST_ARCH_ARM
 +// Check both {HOST_ARCH} and {TARGET_ARCH} to disable the functionality of this
 +// file for cross-compilation. The reason is that the inline assembly code below
@@ -119,19 +121,19 @@ index 8f7fba765f..a7f5bf80cf 100644
 +#elif V8_HOST_ARCH_MIPS64 && V8_TARGET_ARCH_MIPS64
  #include "src/codegen/mips64/register-mips64.h"
  #endif
- 
+
 @@ -26,14 +29,15 @@ namespace internal {
- 
+
  #if V8_CC_MSVC
  // msvc only support inline assembly on x86
 -#if V8_HOST_ARCH_IA32
 +#if V8_HOST_ARCH_IA32 && V8_TARGET_ARCH_IA32
  #define CLOBBER_REGISTER(R) __asm xorps R, R
- 
+
  #endif
- 
+
  #else  // !V8_CC_MSVC
- 
+
 -#if V8_HOST_ARCH_X64 || V8_HOST_ARCH_IA32
 +#if (V8_HOST_ARCH_X64 && V8_TARGET_ARCH_X64) || \
 +    (V8_HOST_ARCH_IA32 && V8_TARGET_ARCH_IA32)
@@ -141,29 +143,29 @@ index 8f7fba765f..a7f5bf80cf 100644
 @@ -42,20 +46,19 @@ namespace internal {
        "%%" #R ::            \
            :);
- 
+
 -#elif V8_HOST_ARCH_ARM64
 +#elif V8_HOST_ARCH_ARM64 && V8_TARGET_ARCH_ARM64
  #define CLOBBER_REGISTER(R) __asm__ volatile("fmov " #R ",xzr" :::);
- 
+
 -#elif V8_HOST_ARCH_LOONG64
 +#elif V8_HOST_ARCH_LOONG64 && V8_TARGET_ARCH_LOONG64
  #define CLOBBER_REGISTER(R) __asm__ volatile("movgr2fr.d $" #R ",$zero" :::);
- 
+
 -#elif V8_HOST_ARCH_MIPS
 +#elif V8_HOST_ARCH_MIPS && V8_TARGET_ARCH_MIPS
  #define CLOBBER_USE_REGISTER(R) __asm__ volatile("mtc1 $zero,$" #R :::);
- 
+
 -#elif V8_HOST_ARCH_MIPS64
 +#elif V8_HOST_ARCH_MIPS64 && V8_TARGET_ARCH_MIPS64
  #define CLOBBER_USE_REGISTER(R) __asm__ volatile("dmtc1 $zero,$" #R :::);
- 
+
 -#endif  // V8_HOST_ARCH_X64 || V8_HOST_ARCH_IA32 || V8_HOST_ARCH_ARM64 ||
 -        // V8_HOST_ARCH_LOONG64 || V8_HOST_ARCH_MIPS || V8_HOST_ARCH_MIPS64
 +#endif  // V8_HOST_ARCH_XXX && V8_TARGET_ARCH_XXX
- 
+
  #endif  // V8_CC_MSVC
- 
+
 diff --git a/src/objects/simd.cc b/src/objects/simd.cc
 index 0a73b9c686..be6b72d157 100644
 --- a/src/objects/simd.cc
@@ -190,7 +192,7 @@ index d3cedfe330..0a73b9c686 100644
 +++ b/src/objects/simd.cc
 @@ -95,24 +95,21 @@ inline int extract_first_nonzero_index(T v) {
  }
- 
+
  template <>
 -inline int extract_first_nonzero_index(int32x4_t v) {
 -  int32x4_t mask = {4, 3, 2, 1};
@@ -199,7 +201,7 @@ index d3cedfe330..0a73b9c686 100644
    mask = vandq_u32(mask, v);
    return 4 - vmaxvq_u32(mask);
  }
- 
+
  template <>
 -inline int extract_first_nonzero_index(int64x2_t v) {
 -  int32x4_t mask = {2, 0, 1, 0};  // Could also be {2,2,1,1} or {0,2,0,1}
@@ -209,7 +211,7 @@ index d3cedfe330..0a73b9c686 100644
 +  mask = vandq_u32(mask, vreinterpretq_u32_u64(v));
    return 2 - vmaxvq_u32(mask);
  }
- 
+
 -template <>
 -inline int extract_first_nonzero_index(float64x2_t v) {
 -  int32x4_t mask = {2, 0, 1, 0};  // Could also be {2,2,1,1} or {0,2,0,1}
@@ -219,7 +221,7 @@ index d3cedfe330..0a73b9c686 100644
 +  return vmaxvq_u32(vreinterpretq_u32_u64(v));
  }
  #endif
- 
+
 @@ -204,14 +201,14 @@ inline uintptr_t fast_search_noavx(T* array, uintptr_t array_len,
    }
  #elif defined(NEON64)
@@ -259,11 +261,11 @@ index be6b72d157..a71968fd10 100644
 +      sizeof(T) == sizeof(double) && std::is_floating_point<T>::value;
 +
 +  static_assert(is_uint32 || is_uint64 || is_double);
- 
+
  #if !(defined(__SSE3__) || defined(NEON64))
    // No SIMD available.
 @@ -178,14 +183,14 @@ inline uintptr_t fast_search_noavx(T* array, uintptr_t array_len,
- 
+
    // Inserting one of the vectorized loop
  #ifdef __SSE3__
 -  if constexpr (std::is_same<T, uint32_t>::value) {
@@ -319,12 +321,12 @@ index be6b72d157..a71968fd10 100644
 +      sizeof(T) == sizeof(double) && std::is_floating_point<T>::value;
 +
 +  static_assert(is_uint32 || is_uint64 || is_double);
- 
+
    const int target_align = 32;
    // Scalar loop to reach desired alignment
 @@ -256,21 +266,21 @@ TARGET_AVX2 inline uintptr_t fast_search_avx(T* array, uintptr_t array_len,
    }
- 
+
    // Generating vectorized loop
 -  if constexpr (std::is_same<T, uint32_t>::value) {
 +  if constexpr (is_uint32) {
@@ -363,3 +365,37 @@ index 131ff9614e..6455f8757d 100644
      char filename[] = "/tmp/v8_tmp_file_for_testing_XXXXXX";
      fd = mkstemp(filename);
      if (fd != -1) CHECK_EQ(0, unlink(filename));
+diff --git a/src/heap/memory-allocator.cc b/src/heap/memory-allocator.cc
+index de143d8ea7..cca4dfe5dd 100644
+--- a/src/heap/memory-allocator.cc
++++ b/src/heap/memory-allocator.cc
+@@ -416,8 +416,14 @@ void MemoryAllocator::PartialFreeMemory(BasicMemoryChunk* chunk,
+     DCHECK_EQ(0, chunk->area_end() % static_cast<Address>(page_size));
+     DCHECK_EQ(chunk->address() + chunk->size(),
+               chunk->area_end() + MemoryChunkLayout::CodePageGuardSize());
+-    reservation->SetPermissions(chunk->area_end(), page_size,
+-                                PageAllocator::kNoAccess);
++
++    if (V8_HEAP_USE_PTHREAD_JIT_WRITE_PROTECT && !isolate_->jitless()) {
++      DCHECK(isolate_->RequiresCodeRange());
++      reservation->DiscardSystemPages(chunk->area_end(), page_size);
++    } else {
++      reservation->SetPermissions(chunk->area_end(), page_size,
++                                  PageAllocator::kNoAccess);
++    }
+   }
+   // On e.g. Windows, a reservation may be larger than a page and releasing
+   // partially starting at |start_free| will also release the potentially
+@@ -686,10 +692,10 @@ bool MemoryAllocator::SetPermissionsOnExecutableMemoryChunk(VirtualMemory* vm,
+   const Address code_area = start + code_area_offset;
+   const Address post_guard_page = start + chunk_size - guard_size;
+
+-  bool jitless = unmapper_.heap_->isolate()->jitless();
++  bool jitless = isolate_->jitless();
+
+   if (V8_HEAP_USE_PTHREAD_JIT_WRITE_PROTECT && !jitless) {
+-    DCHECK(unmapper_.heap_->isolate()->RequiresCodeRange());
++    DCHECK(isolate_->RequiresCodeRange());
+     // Commit the header, from start to pre-code guard page.
+     // We have to commit it as executable becase otherwise we'll not be able
+     // to change permissions to anything else.
