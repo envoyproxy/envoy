@@ -65,7 +65,7 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure(ControlPlaneStats& control_plane_stats) override;
+  void onEstablishmentFailure() override;
 
   void onWriteable() override;
 

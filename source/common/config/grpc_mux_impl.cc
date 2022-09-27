@@ -108,8 +108,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 }
 
 void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
-                                         const std::vector<std::string>& resource_names,
-                                         ControlPlaneStats& control_plane_stats) {
+                                         const std::vector<std::string>& resource_names) {
   if (!xds_resources_delegate_.has_value()) {
     return;
   }
@@ -119,10 +118,10 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
     return;
   }
 
+  const XdsConfigSourceId source_id{target_xds_authority_, type_url};
   TRY_ASSERT_MAIN_THREAD {
     std::vector<envoy::service::discovery::v3::Resource> resources =
-        xds_resources_delegate_->getResources(XdsConfigSourceId{target_xds_authority_, type_url},
-                                              resource_names);
+        xds_resources_delegate_->getResources(source_id, resource_names);
     if (resources.empty()) {
       // There are no persisted resources, so nothing to process.
       return;
@@ -138,8 +137,12 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
         ASSERT(resource.version() == version_info);
       }
 
-      decoded_resources.emplace_back(
-          std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
+      try {
+        decoded_resources.emplace_back(
+            std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
+      } catch (const EnvoyException& e) {
+        xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
+      }
     }
 
     processDiscoveryResources(decoded_resources, api_state, type_url, version_info,
@@ -147,10 +150,9 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
   }
   END_TRY
   catch (const EnvoyException& e) {
-    // TODO(abeyad): do something more than just logging the error and incrementing a counter?
-    control_plane_stats.xds_local_load_failed_.inc();
-    ENVOY_LOG(warn, "Failed to load locally-persisted xDS configuration for {}, type url {}: {}",
-              target_xds_authority_, type_url, e.what());
+    // TODO(abeyad): do something else here?
+    ENVOY_LOG_MISC(warn, "Failed to load config from delegate for {}: {}", source_id.toKey(),
+                   e.what());
   }
 }
 
@@ -376,7 +378,7 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure(ControlPlaneStats& control_plane_stats) {
+void GrpcMuxImpl::onEstablishmentFailure() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second->watches_) {
       watch->callbacks_.onConfigUpdateFailed(
@@ -389,8 +391,7 @@ void GrpcMuxImpl::onEstablishmentFailure(ControlPlaneStats& control_plane_stats)
       loadConfigFromDelegate(
           /*type_url=*/api_state.first,
           std::vector<std::string>{api_state.second->request_.resource_names().begin(),
-                                   api_state.second->request_.resource_names().end()},
-          control_plane_stats);
+                                   api_state.second->request_.resource_names().end()});
     }
   }
   previously_fetched_data_ = true;

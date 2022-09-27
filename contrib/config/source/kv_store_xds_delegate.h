@@ -13,6 +13,8 @@ namespace Config {
 #define ALL_XDS_KV_STORE_STATS(COUNTER)                                                            \
   /* Number of times a resource failed to serialize for persistence in the KV store. */            \
   COUNTER(serialization_failed)                                                                    \
+  /* Number of times a resource failed to load due to parsing/validation issues. */                \
+  COUNTER(xds_load_failed)                                                                         \
   /* Number of times resources were loaded successfully from the KV store. */                      \
   COUNTER(load_success)                                                                            \
   /* Number of times no resources were found for a load attempt from the KV store. */              \
@@ -46,6 +48,10 @@ public:
 
   void onConfigUpdated(const Envoy::Config::XdsSourceId& source_id,
                        const std::vector<Envoy::Config::DecodedResourceRef>& resources) override;
+
+  void onResourceLoadFailed(const Envoy::Config::XdsSourceId& source_id,
+                            const std::string& resource_name,
+                            const absl::optional<EnvoyException>& exception) override;
 
 private:
   // Gets all the resources present in the KeyValueStore for the given source_id. This is the

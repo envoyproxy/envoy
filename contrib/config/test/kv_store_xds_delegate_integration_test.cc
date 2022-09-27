@@ -515,7 +515,7 @@ TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
   initialize();
 
   // Make sure that the proto parsing of a serialized resource with an invalid enum value fails.
-  test_server_->waitForCounterEq("cluster_manager.cds.control_plane.xds_local_load_failed", 1);
+  test_server_->waitForCounterEq("xds.kv_store.xds_load_failed", 1);
 }
 
 } // namespace

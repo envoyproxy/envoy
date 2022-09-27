@@ -57,6 +57,10 @@ public:
     return resources;
   }
 
+  void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
+                            const std::string& /*resource_name*/,
+                            const absl::optional<EnvoyException>& /*exception*/) override {}
+
   static std::atomic<int> OnConfigUpdatedCount;
   static std::map<std::string, envoy::service::discovery::v3::Resource> ResourcesMap;
 

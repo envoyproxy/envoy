@@ -124,6 +124,17 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
   }
 }
 
+void KeyValueStoreXdsDelegate::onResourceLoadFailed(
+    const XdsSourceId& source_id, const std::string& resource_name,
+    const absl::optional<EnvoyException>& exception) {
+  // The resource failed to load, so remove it from the store.
+  xds_config_store_->remove(constructKey(source_id, resource_name));
+  stats_.xds_load_failed_.inc();
+  ENVOY_LOG_MISC(warn, "Failed to load locally-persisted xDS resource(s) for {}, {}: {}",
+                 source_id.toKey(), resource_name,
+                 (exception.has_value() ? exception->what() : "no exception"));
+}
+
 Envoy::ProtobufTypes::MessagePtr KeyValueStoreXdsDelegateFactory::createEmptyConfigProto() {
   return std::make_unique<KeyValueStoreXdsDelegateConfig>();
 }
