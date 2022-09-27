@@ -39,6 +39,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
+
 /**
  * All tcp proxy stats. @see stats_macros.h
  */
