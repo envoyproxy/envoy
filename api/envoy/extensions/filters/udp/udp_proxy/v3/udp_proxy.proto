@@ -66,13 +66,13 @@ message UdpProxyConfig {
 
     // The match tree to use when resolving route actions for incoming requests.
     // See :ref:`Routing <config_udp_listener_filters_udp_proxy_routing>` for more information.
-    xds.type.matcher.v3.Matcher matcher = 9
+    xds.type.matcher.v3.Matcher matcher = 3
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by
   // the session. The default if not specified is 1 minute.
-  google.protobuf.Duration idle_timeout = 3;
+  google.protobuf.Duration idle_timeout = 4;
 
   // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
   // This option requires Envoy to be run with the ``CAP_NET_ADMIN`` capability on Linux.
@@ -88,25 +88,25 @@ message UdpProxyConfig {
   // all packets back to Envoy and configure iptables rules on the host running Envoy to
   // forward all packets from upstream hosts to the Envoy process so that Envoy can forward the packets to the downstream.
   // If the platform does not support this option, Envoy will raise a configuration error.
-  bool use_original_src_ip = 4;
+  bool use_original_src_ip = 5;
 
   // Optional configuration for UDP proxy hash policies. If hash_policies is not set, the hash-based
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
-  repeated HashPolicy hash_policies = 5 [(validate.rules).repeated = {max_items: 1}];
+  repeated HashPolicy hash_policies = 6 [(validate.rules).repeated = {max_items: 1}];
 
   // UDP socket configuration for upstream sockets. The default for
   // :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is true for upstream
   // sockets as the assumption is datagrams will be received from a single source.
-  config.core.v3.UdpSocketConfig upstream_socket_config = 6;
+  config.core.v3.UdpSocketConfig upstream_socket_config = 7;
 
   // Perform per packet load balancing (upstream host selection) on each received data chunk.
   // The default if not specified is false, that means each data chunk is forwarded
   // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
-  bool use_per_packet_load_balancing = 7;
+  bool use_per_packet_load_balancing = 8;
 
   // Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
-  repeated config.accesslog.v3.AccessLog sess_access_log = 8;
+  repeated config.accesslog.v3.AccessLog session_access_log = 9;
 
   // Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog proxy_access_log = 10;

@@ -90,9 +90,10 @@ public:
           "is not running with the CAP_NET_ADMIN capability.");
     }
 
-    sess_access_logs_.reserve(config.sess_access_log_size());
-    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.sess_access_log()) {
-      sess_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+    session_access_logs_.reserve(config.session_access_log_size());
+    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.session_access_log()) {
+      session_access_logs_.emplace_back(
+          AccessLog::AccessLogFactory::fromProto(log_config, context));
     }
 
     proxy_access_logs_.reserve(config.proxy_access_log_size());
@@ -122,7 +123,7 @@ public:
     return upstream_socket_config_;
   }
   const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const {
-    return sess_access_logs_;
+    return session_access_logs_;
   }
   const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const {
     return proxy_access_logs_;
@@ -145,7 +146,7 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  std::vector<AccessLog::InstanceSharedPtr> sess_access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   Random::RandomGenerator& random_;
 };
@@ -250,7 +251,7 @@ private:
     const Network::SocketPtr socket_;
 
     UdpProxySessionStats session_stats_{};
-    absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
+    absl::optional<StreamInfo::StreamInfoImpl> udp_session_stats_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;

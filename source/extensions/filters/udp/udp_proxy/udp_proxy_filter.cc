@@ -248,7 +248,7 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
       //       is bound until the first packet is sent to the upstream host.
       socket_(cluster.filter_.createSocket(host)) {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
-    udp_sess_stats_.emplace(
+    udp_session_stats_.emplace(
         StreamInfo::StreamInfoImpl(cluster_.filter_.config_->timeSource(), nullptr));
   }
 
@@ -297,7 +297,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
   if (!cluster_.filter_.config_->sessionAccessLogs().empty()) {
     fillSessionStreamInfo();
     for (const auto& access_log : cluster_.filter_.config_->sessionAccessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, udp_sess_stats_.value());
+      access_log->log(nullptr, nullptr, nullptr, udp_session_stats_.value());
     }
   }
 }
@@ -314,7 +314,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   fields_map["datagrams_received"] =
       ValueUtil::numberValue(session_stats_.downstream_sess_rx_datagrams_);
 
-  udp_sess_stats_.value().setDynamicMetadata("udp.proxy.session", stats_obj);
+  udp_session_stats_.value().setDynamicMetadata("udp.proxy.session", stats_obj);
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
@@ -334,7 +334,7 @@ void UdpProxyFilter::fillProxyStreamInfo() {
       ValueUtil::numberValue(config_->stats().downstream_sess_rx_datagrams_.value());
   fields_map["no_route"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_no_route_.value());
-  fields_map["sess_total"] =
+  fields_map["session_total"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_total_.value());
   fields_map["idle_timeout"] = ValueUtil::numberValue(config_->stats().idle_timeout_.value());
 

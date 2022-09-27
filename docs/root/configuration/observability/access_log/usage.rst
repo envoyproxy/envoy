@@ -650,7 +650,7 @@ The following command operators are supported:
 
   UDP
     For :ref:`UDP Proxy <config_udp_listener_filters_udp_proxy>`,
-    if NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
+    when NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
 
     * ``cluster_name``: Name of the cluster.
     * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
@@ -663,14 +663,14 @@ The following command operators are supported:
 
     .. code-block:: none
 
-      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy:cluster_name)%
+      [%START_TIME%] %DYNAMIC_METADATA(udp.proxy.session:cluster_name)%
       %DYNAMIC_METADATA(udp.proxy.session:bytes_sent)%
       %DYNAMIC_METADATA(udp.proxy.session:bytes_received)%
       %DYNAMIC_METADATA(udp.proxy.session:errors_sent)%
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%
       %DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%\n
 
-    if NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
+    when NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
 
     * ``bytes_sent``: Total number of downstream bytes sent to the upstream in UDP proxy.
     * ``bytes_received``: Total number of downstream bytes received from the upstream in UDP proxy.
@@ -679,7 +679,7 @@ The following command operators are supported:
     * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in UDP proxy.
     * ``datagrams_received``: Number of datagrams received from the upstream successfully in UDP proxy.
     * ``no_route``: Number of times that no upstream cluster found in UDP proxy.
-    * ``sess_total``: Total number of sessions in UDP proxy.
+    * ``session_total``: Total number of sessions in UDP proxy.
     * ``idle_timeout``: Number of times that sessions idle timeout occurred in UDP proxy.
 
     Recommended proxy access log format for UDP proxy:
@@ -693,7 +693,7 @@ The following command operators are supported:
       %DYNAMIC_METADATA(udp.proxy.proxy:errors_received)%
       %DYNAMIC_METADATA(udp.proxy.proxy:datagrams_sent)%
       %DYNAMIC_METADATA(udp.proxy.proxy:datagrams_received)%
-      %DYNAMIC_METADATA(udp.proxy.proxy:sess_total)%\n
+      %DYNAMIC_METADATA(udp.proxy.proxy:session_total)%\n
 
   THRIFT
     For :ref:`Thrift Proxy <config_network_filters_thrift_proxy>`,
