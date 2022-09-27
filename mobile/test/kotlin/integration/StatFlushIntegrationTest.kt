@@ -28,7 +28,7 @@ class StatFlushIntegrationTest {
   fun `concurrent flushes with histograms`() {
     val countDownLatch = CountDownLatch(1)
     engine = EngineBuilder()
-      .addLogLevel(LogLevel.INFO)
+      .addLogLevel(LogLevel.DEBUG)
       .addStatsFlushSeconds(1)
       .setOnEngineRunning { countDownLatch.countDown() }
       .build()
@@ -45,13 +45,28 @@ class StatFlushIntegrationTest {
   }
 
   @Test
+  fun `multiple stat sinks configured`() {
+    val countDownLatch = CountDownLatch(1)
+    engine = EngineBuilder()
+      .addLogLevel(LogLevel.DEBUG)
+      // Really high flush interval so it won't trigger during test execution.
+      .addStatsFlushSeconds(100)
+      .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
+      .addGrpcStatsDomain("example.com")
+      .setOnEngineRunning { countDownLatch.countDown() }
+      .build()
+
+    assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
+  }
+
+  @Test
   fun `flush flushes to stats sink`() {
     val countDownLatch = CountDownLatch(1)
     engine = EngineBuilder()
       .addLogLevel(LogLevel.DEBUG)
-      .addStatsDPort(8125)
       // Really high flush interval so it won't trigger during test execution.
       .addStatsFlushSeconds(100)
+      .addStatsSinks(listOf(statsdSinkConfig(8125), statsdSinkConfig(5000)))
       .setOnEngineRunning { countDownLatch.countDown() }
       .build()
 
@@ -59,11 +74,22 @@ class StatFlushIntegrationTest {
 
     engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
 
-    val statsdServer = TestStatsdServer()
-    statsdServer.runAsync(8125)
+    val statsdServer1 = TestStatsdServer()
+    statsdServer1.runAsync(8125)
+
+    val statsdServer2 = TestStatsdServer()
+    statsdServer2.runAsync(5000)
 
     engine!!.flushStats()
 
-    statsdServer.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer1.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+    statsdServer2.awaitStatMatching { s -> s == "envoy.pulse.foo.bar:1|c" }
+  }
+
+  private fun statsdSinkConfig(port: Int): String {
+return """{ name: envoy.stat_sinks.statsd,
+      typed_config: {
+        "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
+        address: { socket_address: { address: 127.0.0.1, port_value: $port } } } }"""
   }
 }

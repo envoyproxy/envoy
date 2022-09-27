@@ -43,7 +43,8 @@
                                           stringAccessors
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
-                                           keyValueStores {
+                                           keyValueStores
+                                       statsSinks:(NSArray<NSString *> *)statsSinks {
   self = [super init];
   if (!self) {
     return nil;
@@ -83,6 +84,7 @@
   self.httpPlatformFilterFactories = httpPlatformFilterFactories;
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
+  self.statsSinks = statsSinks;
   return self;
 }
 
@@ -198,11 +200,20 @@
                             self.appVersion, self.appId];
   [definitions appendFormat:@"- &virtual_clusters %@\n", self.virtualClusters];
 
+  [definitions
+      appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
+
+  NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
+
   if (self.grpcStatsDomain != nil) {
     [definitions appendFormat:@"- &stats_domain %@\n", self.grpcStatsDomain];
-    [definitions
-        appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
-    [definitions appendString:@"- &stats_sinks [ *base_metrics_service ]\n"];
+    [stat_sinks_config addObject:@"*base_metrics_service"];
+  }
+
+  if (stat_sinks_config.count > 0) {
+    [definitions appendString:@"- &stats_sinks ["];
+    [definitions appendString:[stat_sinks_config componentsJoinedByString:@","]];
+    [definitions appendString:@"]\n"];
   }
 
   if (self.adminInterfaceEnabled) {

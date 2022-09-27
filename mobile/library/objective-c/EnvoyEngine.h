@@ -379,6 +379,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
+@property (nonatomic, strong) NSArray<NSString *> *statsSinks;
 
 /**
  Create a new instance of the configuration.
@@ -422,7 +423,8 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                                           stringAccessors
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
-                                           keyValueStores;
+                                           keyValueStores
+                                       statsSinks:(NSArray<NSString *> *)statsSinks;
 
 /**
  Resolves the provided configuration template using properties on this configuration.
