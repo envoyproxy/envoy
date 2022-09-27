@@ -488,6 +488,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
+      new_listener->checkBuildinSocketOption(**existing_warming_listener);
       new_listener->cloneSocketFactoryFrom(**existing_warming_listener);
     }
     *existing_warming_listener = std::move(new_listener);
@@ -497,6 +498,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
+      new_listener->checkBuildinSocketOption(**existing_active_listener);
       new_listener->cloneSocketFactoryFrom(**existing_active_listener);
     }
     if (workers_started_) {

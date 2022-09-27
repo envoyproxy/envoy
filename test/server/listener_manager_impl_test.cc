@@ -30,7 +30,6 @@
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -2133,6 +2132,223 @@ filter_chains:
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
   EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(3);
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortWithCompatibleAddressFailed) {
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expect_msg = "listener foo: enable_reuse_port can't be updated";
+  testWithUpdateListenerWithBuildInSocketOptions(listener_foo_yaml, listener_foo_update1_yaml,
+                                                 expect_msg);
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerFreebindWithCompatibleAddressFailed) {
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+freebind: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expect_msg = "listener foo: freebind can't be updated";
+  testWithUpdateListenerWithBuildInSocketOptions(listener_foo_yaml, listener_foo_update1_yaml,
+                                                 expect_msg);
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerTransparentWithCompatibleAddressFailed) {
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+transparent: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expect_msg = "listener foo: transparent can't be updated";
+  testWithUpdateListenerWithBuildInSocketOptions(listener_foo_yaml, listener_foo_update1_yaml,
+                                                 expect_msg);
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerTcpFastOpenQueueLengthWithCompatibleAddressFailed) {
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+tcp_fast_open_queue_length: 20
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expect_msg = "listener foo: tcp_fast_open_queue_length can't be updated";
+  testWithUpdateListenerWithBuildInSocketOptions(listener_foo_yaml, listener_foo_update1_yaml,
+                                                 expect_msg);
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortWithoutCompatibleAddress) {
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.2
+    port_value: 4567
+transparent: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
+
+  // Should be both active and warming now.
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+  EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+  EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithBuildinSocketOptionsDeprecatedBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.reject_buildin_socket_options", "false"}});
+  InSequence s;
+
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+  // Add and initialize foo listener.
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+  EXPECT_CALL(*worker_, addListener(_, _, _, _));
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  const std::string listener_foo_update1_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_factory_.socket_, duplicate());
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
 

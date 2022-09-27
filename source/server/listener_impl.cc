@@ -410,7 +410,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   validateFilterChains();
   buildFilterChains();
   if (socket_type_ != Network::Socket::Type::Datagram) {
-    buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
     buildInternalListener();
@@ -476,8 +475,6 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildFilterChains();
   buildInternalListener();
   if (socket_type_ == Network::Socket::Type::Stream) {
-    // Apply the options below only for TCP.
-    buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
     open_connections_ = origin.open_connections_;
@@ -670,6 +667,11 @@ void ListenerImpl::buildListenSocketOptions() {
     ASSERT(udp_listener_config_->listener_factory_ != nullptr,
            "buildUdpListenerFactory() must run first");
     addListenSocketOptions(udp_listener_config_->listener_factory_->socketOptions());
+  } else {
+    if (config_.has_tcp_fast_open_queue_length()) {
+      addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
+          config_.tcp_fast_open_queue_length().value()));
+    }
   }
 }
 
@@ -779,13 +781,6 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
                                     std::make_shared<Network::NopConnectionBalancerImpl>());
     }
 #endif
-  }
-}
-
-void ListenerImpl::buildSocketOptions() {
-  if (config_.has_tcp_fast_open_queue_length()) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
-        config_.tcp_fast_open_queue_length().value()));
   }
 }
 
@@ -989,7 +984,11 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
-  return ListenerMessageUtil::filterChainOnlyChange(config_, config);
+  if (ListenerMessageUtil::filterChainOnlyChange(config_, config)) {
+    return reuse_port_ == getReusePortOrDefault(parent_.server_, config, socket_type_);
+  }
+
+  return false;
 }
 
 ListenerImplPtr
@@ -1063,6 +1062,27 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 #endif
 
   return initial_reuse_port_value;
+}
+
+void ListenerImpl::checkBuildinSocketOption(const ListenerImpl& other) const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_buildin_socket_options")) {
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false) !=
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(other.config_, transparent, false)) {
+      throw EnvoyException(fmt::format("listener {}: transparent can't be updated", name_));
+    }
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false) !=
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(other.config_, freebind, false)) {
+      throw EnvoyException(fmt::format("listener {}: freebind can't be updated", name_));
+    }
+    if (reuse_port_ != other.reuse_port_) {
+      throw EnvoyException(fmt::format("listener {}: enable_reuse_port can't be updated", name_));
+    }
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, tcp_fast_open_queue_length, 0) !=
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(other.config_, tcp_fast_open_queue_length, 0)) {
+      throw EnvoyException(
+          fmt::format("listener {}: tcp_fast_open_queue_length can't be updated", name_));
+    }
+  }
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {

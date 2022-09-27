@@ -315,7 +315,8 @@ public:
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
-
+  // Check whether a new listener changed buildin socket options.
+  void checkBuildinSocketOption(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.
@@ -444,7 +445,6 @@ private:
   void validateFilterChains();
   void buildFilterChains();
   void buildConnectionBalancer(const Network::Address::Instance& address);
-  void buildSocketOptions();
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
