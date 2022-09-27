@@ -137,10 +137,12 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
         ASSERT(resource.version() == version_info);
       }
 
-      try {
+      TRY_ASSERT_MAIN_THREAD {
         decoded_resources.emplace_back(
             std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
-      } catch (const EnvoyException& e) {
+      }
+      END_TRY
+      catch (const EnvoyException& e) {
         xds_resources_delegate_->onResourceLoadFailed(source_id, resource.name(), e);
       }
     }
