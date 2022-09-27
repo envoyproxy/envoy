@@ -33,7 +33,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private boolean mAdminInterfaceEnabled = false;
   private String mGrpcStatsDomain = null;
-  private Integer mStatsDPort = null;
   private int mConnectTimeoutSeconds = 30;
   private int mDnsRefreshSeconds = 60;
   private int mDnsFailureRefreshSecondsBase = 2;
@@ -100,21 +99,21 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
 
   private EnvoyConfiguration createEnvoyConfiguration() {
     List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
-    List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
+    List<EnvoyNativeFilterConfig> nativeFilterChain = Collections.emptyList();
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
+    List<String> statSinks = Collections.emptyList();
 
     return new EnvoyConfiguration(
-        mAdminInterfaceEnabled, mGrpcStatsDomain, mStatsDPort, mConnectTimeoutSeconds,
-        mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
-        mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames,
-        mDnsFallbackNameservers, mEnableDnsFilterUnroutableFamilies, mDnsUseSystemResolver,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag,
-        mEnableHappyEyeballs, mEnableInterfaceBinding,
-        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
-        mH2ExtendKeepaliveTimeout, mH2RawDomains, mMaxConnectionsPerHost, mStatsFlushSeconds,
-        mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
-        mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
-        stringAccessors, keyValueStores);
+        mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
+        mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
+        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mDnsFallbackNameservers,
+        mEnableDnsFilterUnroutableFamilies, mDnsUseSystemResolver, mEnableDrainPostDnsRefresh,
+        quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
+        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
+        mH2ConnectionKeepaliveTimeoutSeconds, mH2ExtendKeepaliveTimeout, mH2RawDomains,
+        mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
+        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters,
+        nativeFilterChain, platformFilterChain, stringAccessors, keyValueStores, statSinks);
   }
 }

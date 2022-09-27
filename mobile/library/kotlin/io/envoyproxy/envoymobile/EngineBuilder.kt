@@ -43,7 +43,6 @@ open class EngineBuilder(
   private var logLevel = LogLevel.INFO
   private var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
-  private var statsDPort: Int? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
@@ -77,6 +76,7 @@ open class EngineBuilder(
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
+  private var statsSinks = listOf<String>()
 
   /**
    * Add a log level to use with Envoy.
@@ -91,12 +91,13 @@ open class EngineBuilder(
   }
 
   /**
-   * Add a domain to flush stats to.
-   * Passing nil disables stats emission via the gRPC stat sink.
+   * Specifies the domain (e.g. `example.com`) to use in the default gRPC stat sink to flush
+   * stats.
    *
-   * Only one of the statsd and gRPC stat sink can be enabled.
+   * Setting this value enables the gRPC stat sink, which periodically flushes stats via the gRPC
+   * MetricsService API. The flush interval is specified via addStatsFlushSeconds.
    *
-   * @param grpcStatsDomain The domain to use for stats.
+   * @param grpcStatsDomain The domain to use for the gRPC stats sink.
    *
    * @return this builder.
    */
@@ -106,17 +107,16 @@ open class EngineBuilder(
   }
 
   /**
-   * Add a loopback port to emit statsD stats to.
-   * Passing nil disables stats emission via the statsD stat sink.
+   * Adds additional stats sinks, in the form of the raw YAML/JSON configuration.
+   * Sinks added in this fashion will be included in addition to the gRPC stats sink
+   * that may be enabled via addGrpcStatsDomain.
    *
-   * Only one of the statsD and gRPC stat sink can be enabled.
-   *
-   * @param port The port to send statsD UDP packets to via loopback
+   * @param statsSinks Configurations of stat sinks to add.
    *
    * @return this builder.
    */
-  fun addStatsDPort(port: Int): EngineBuilder {
-    this.statsDPort = port
+  fun addStatsSinks(statsSinks: List<String>): EngineBuilder {
+    this.statsSinks = statsSinks
     return this
   }
 
@@ -616,7 +616,6 @@ open class EngineBuilder(
     val engineConfiguration = EnvoyConfiguration(
       adminInterfaceEnabled,
       grpcStatsDomain,
-      statsDPort,
       connectTimeoutSeconds,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
@@ -649,7 +648,8 @@ open class EngineBuilder(
       nativeFilterChain,
       platformFilterChain,
       stringAccessors,
-      keyValueStores
+      keyValueStores,
+      statsSinks
     )
 
     return when (configuration) {

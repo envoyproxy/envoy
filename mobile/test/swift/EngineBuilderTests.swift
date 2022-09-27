@@ -506,7 +506,8 @@ final class EngineBuilderTests: XCTestCase {
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
       ],
       stringAccessors: [:],
-      keyValueStores: [:]
+      keyValueStores: [:],
+      statsSinks: []
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&connect_timeout 200s"))
@@ -594,7 +595,8 @@ final class EngineBuilderTests: XCTestCase {
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
       ],
       stringAccessors: [:],
-      keyValueStores: [:]
+      keyValueStores: [:],
+      statsSinks: []
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
@@ -643,7 +645,8 @@ final class EngineBuilderTests: XCTestCase {
       nativeFilterChain: [],
       platformFilterChain: [],
       stringAccessors: [:],
-      keyValueStores: [:]
+      keyValueStores: [:],
+      statsSinks: []
     )
     XCTAssertNil(config.resolveTemplate("{{ missing }}"))
   }

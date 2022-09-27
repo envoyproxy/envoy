@@ -115,8 +115,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &stats_domain 127.0.0.1
 - &stats_flush_interval 60s
 - &stats_sinks []
-- &statsd_host 127.0.0.1
-- &statsd_port 8125
 - &stream_idle_timeout 15s
 - &per_try_idle_timeout 15s
 - &trust_chain_verification VERIFY_TRUST_CHAIN
@@ -133,12 +131,6 @@ R"(- &enable_drain_post_dns_refresh false
       grpc_service:
         envoy_grpc:
           cluster_name: stats
-  base_statsd: &base_statsd
-    name: envoy.stat_sinks.statsd
-    typed_config:
-      "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
-      address:
-        socket_address: { address: *statsd_host, port_value: *statsd_port }
 
 !ignore admin_interface_defs: &admin_interface
     address:
