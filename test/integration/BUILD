@@ -1860,6 +1860,7 @@ envoy_cc_test(
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:proxy_receive_before_connect_lib",
         "//source/common/network:utility_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
