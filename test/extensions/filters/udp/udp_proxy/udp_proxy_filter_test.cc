@@ -284,11 +284,11 @@ use_original_src_ip: true
       envoy::config::accesslog::v3::AccessLog* session_access_log =
           config.mutable_session_access_log()->Add();
       session_access_log->set_name("envoy.access_loggers.file");
-      envoy::extensions::access_loggers::file::v3::FileAccessLog sess_file_access_log;
-      sess_file_access_log.set_path("unused");
-      sess_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+      envoy::extensions::access_loggers::file::v3::FileAccessLog session_file_access_log;
+      session_file_access_log.set_path("unused");
+      session_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
           session_access_log_format);
-      session_access_log->mutable_typed_config()->PackFrom(sess_file_access_log);
+      session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
     }
 
     if (!proxy_access_log_format.empty()) {
