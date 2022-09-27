@@ -621,6 +621,13 @@ envoy.filters.thrift.header_to_metadata:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata
+envoy.filters.thrift.payload_to_metadata:
+  categories:
+  - envoy.thrift_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata
 envoy.filters.thrift.rate_limit:
   categories:
   - envoy.thrift_proxy.filters
