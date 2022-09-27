@@ -555,24 +555,5 @@ TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPromisedUrlFromHeaders) {
-  spdy::Http2HeaderBlock headers;
-  EXPECT_EQ("", SpdyServerPushUtils::GetPromisedUrlFromHeaders(headers));
-}
-
-TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPromisedHostNameFromHeaders) {
-  spdy::Http2HeaderBlock headers;
-  EXPECT_EQ("", SpdyServerPushUtils::GetPromisedHostNameFromHeaders(headers));
-}
-
-TEST(SpdyPlatformTest, SpdyServerPushUtils_PromisedUrlIsValid) {
-  spdy::Http2HeaderBlock headers;
-  EXPECT_FALSE(SpdyServerPushUtils::PromisedUrlIsValid(headers));
-}
-
-TEST(SpdyPlatformTest, SpdyServerPushUtils_GetPushPromiseUrl) {
-  EXPECT_EQ("", SpdyServerPushUtils::GetPushPromiseUrl("https", "www.example.com", "/"));
-}
-
 } // namespace
 } // namespace quic
