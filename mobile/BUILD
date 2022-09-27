@@ -2,11 +2,8 @@ load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load(
-    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:experimental.bzl",
-    "device_and_simulator",
-)
-load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl",
+    "top_level_target",
     "xcode_schemes",
     "xcodeproj",
 )
@@ -103,23 +100,8 @@ genrule(
     tools = ["@kotlin_formatter//file"],
 )
 
-device_and_simulator(
-    name = "ios_examples",
-    tags = ["manual"],
-    targets = [
-        # TODO(jpsim): Fix Objective-C app support
-        # "//examples/objective-c/hello_world:app",
-        "//examples/swift/async_await:app",
-        "//examples/swift/hello_world:app",
-        "//test/swift/apps/baseline:app",
-        "//test/swift/apps/experimental:app",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 xcodeproj(
     name = "xcodeproj",
-    archived_bundles_allowed = True,
     bazel_path = "./bazelw",
     build_mode = "bazel",
     project_name = "Envoy",
@@ -133,11 +115,10 @@ xcodeproj(
             name = "Hello World App",
             launch_action = xcode_schemes.launch_action("//examples/swift/hello_world:app"),
         ),
-        # TODO(jpsim): Fix Objective-C app support
-        # xcode_schemes.scheme(
-        #     name = "Hello World App (ObjC)",
-        #     launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
-        # ),
+        xcode_schemes.scheme(
+            name = "Hello World App (ObjC)",
+            launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
+        ),
         xcode_schemes.scheme(
             name = "Baseline App",
             launch_action = xcode_schemes.launch_action("//test/swift/apps/baseline:app"),
@@ -153,24 +134,58 @@ xcodeproj(
         xcode_schemes.scheme(
             name = "iOS Tests",
             test_action = xcode_schemes.test_action([
-                "//experimental/swift:quic_stream_test.__internal__.__test_bundle",
-                "//test/objective-c:envoy_bridge_utility_test.__internal__.__test_bundle",
-                "//test/swift/integration:flatbuffer_test.__internal__.__test_bundle",
-                "//test/swift/integration:test.__internal__.__test_bundle",
-                "//test/swift/stats:test.__internal__.__test_bundle",
-                "//test/swift:test.__internal__.__test_bundle",
+                "//experimental/swift:quic_stream_test",
+                "//test/objective-c:envoy_bridge_utility_test",
+                "//test/swift/integration:flatbuffer_test",
+                "//test/swift/integration:test",
+                "//test/swift/stats:test",
+                "//test/swift:test",
             ]),
         ),
         xcode_schemes.scheme(
             name = "Objective-C Library",
             build_action = xcode_schemes.build_action(["//library/objective-c:envoy_engine_objc_lib"]),
-            test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test.__internal__.__test_bundle"]),
+            test_action = xcode_schemes.test_action(["//test/objective-c:envoy_bridge_utility_test"]),
         ),
     ],
     tags = ["manual"],
     top_level_targets = [
         # Apps
-        "//:ios_examples",
+        top_level_target(
+            "//examples/objective-c/hello_world:app",
+            target_environments = [
+                "device",
+                "simulator",
+            ],
+        ),
+        top_level_target(
+            "//examples/swift/async_await:app",
+            target_environments = [
+                "device",
+                "simulator",
+            ],
+        ),
+        top_level_target(
+            "//examples/swift/hello_world:app",
+            target_environments = [
+                "device",
+                "simulator",
+            ],
+        ),
+        top_level_target(
+            "//test/swift/apps/baseline:app",
+            target_environments = [
+                "device",
+                "simulator",
+            ],
+        ),
+        top_level_target(
+            "//test/swift/apps/experimental:app",
+            target_environments = [
+                "device",
+                "simulator",
+            ],
+        ),
         # Tests
         "//experimental/swift:quic_stream_test",
         "//test/objective-c:envoy_bridge_utility_test",

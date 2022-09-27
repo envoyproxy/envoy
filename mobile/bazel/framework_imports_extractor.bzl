@@ -36,7 +36,8 @@ def _framework_imports_extractor(ctx):
     ctx.actions.run_shell(
         inputs = [framework_zip],
         outputs = outputs,
-        command = "unzip -qq {} -d {}".format(framework_zip.path, ctx.bin_dir.path),
+        # Workaround for https://github.com/bazelbuild/rules_apple/issues/1489
+        command = "unzip -qq {} -d {} || true".format(framework_zip.path, ctx.bin_dir.path),
         progress_message = "Extracting framework",
     )
 

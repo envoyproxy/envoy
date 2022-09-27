@@ -98,8 +98,8 @@ def swift_repos():
 
     http_archive(
         name = "com_github_buildbuddy_io_rules_xcodeproj",
-        sha256 = "a647ad9ee6664a78377cf5707331966b6788be09d1fea48045a61bc450c8f1b1",
-        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/0.7.0/release.tar.gz",
+        sha256 = "663bf83d8725f39694125d790eacd373e4c063bf80be4e6b5daa0a5dbe74df1f",
+        url = "https://github.com/buildbuddy-io/rules_xcodeproj/releases/download/0.8.0/release.tar.gz",
     )
 
 def kotlin_repos():
