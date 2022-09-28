@@ -320,7 +320,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -369,7 +369,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -422,7 +422,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
-  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -471,7 +471,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   HttpTestUtility::addDefaultHeaders(headers);
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span_1));
-  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -513,7 +513,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
 
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span_2));
-  EXPECT_CALL(callbacks_, tracingConfig());
+  EXPECT_CALL(callbacks_, tracingConfig()).Times(2);
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().RetryCount), Eq("1")));
 
   router_.retry_state_->callback_();

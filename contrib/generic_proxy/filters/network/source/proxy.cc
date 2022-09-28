@@ -33,11 +33,11 @@ FilterConfig::routeMatcherFromProto(const RouteConfiguration& route_config,
   return std::make_unique<RouteMatcherImpl>(route_config, context);
 }
 
-std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
+std::vector<NamedFilterFactoryCb> FilterConfig::filtersFactoryFromProto(
     const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
     const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
 
-  std::vector<FilterFactoryCb> factories;
+  std::vector<NamedFilterFactoryCb> factories;
   bool has_terminal_filter = false;
   std::string terminal_filter_name;
   for (const auto& filter : filters) {
@@ -53,7 +53,8 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
     Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
                                                   context.messageValidationVisitor(), *message);
 
-    factories.push_back(factory.createFilterFactoryFromProto(*message, stats_prefix, context));
+    factories.push_back(
+        {filter.name(), factory.createFilterFactoryFromProto(*message, stats_prefix, context)});
 
     if (factory.isTerminalFilter()) {
       terminal_filter_name = filter.name();
@@ -72,13 +73,13 @@ ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
 
 ActiveStream::~ActiveStream() {
   for (auto& filter : decoder_filters_) {
-    filter->onDestroy();
+    filter->filter_->onDestroy();
   }
   for (auto& filter : encoder_filters_) {
     if (filter->isDualFilter()) {
       continue;
     }
-    filter->onDestroy();
+    filter->filter_->onDestroy();
   }
 }
 
@@ -117,8 +118,8 @@ void ActiveStream::continueDecoding() {
 
   ASSERT(downstream_request_stream_ != nullptr);
   for (; next_decoder_filter_index_ < decoder_filters_.size();) {
-    auto status =
-        decoder_filters_[next_decoder_filter_index_]->onStreamDecoded(*downstream_request_stream_);
+    auto status = decoder_filters_[next_decoder_filter_index_]->filter_->onStreamDecoded(
+        *downstream_request_stream_);
     next_decoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
       break;
@@ -143,7 +144,7 @@ void ActiveStream::continueEncoding() {
 
   ASSERT(local_or_upstream_response_stream_ != nullptr);
   for (; next_encoder_filter_index_ < encoder_filters_.size();) {
-    auto status = encoder_filters_[next_encoder_filter_index_]->onStreamEncoded(
+    auto status = encoder_filters_[next_encoder_filter_index_]->filter_->onStreamEncoded(
         *local_or_upstream_response_stream_);
     next_encoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
