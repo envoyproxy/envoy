@@ -7,6 +7,9 @@
 # 7. Fix build errors in SIMD IndexOf/includes (https://crrev.com/c/3749192).
 # 8. Fix build on arm64.
 # 9. Fix build on older versions of Linux.
+# 10. Fix MemoryAllocator::PartialFreeMemory() which shouldn't try to change permissions of RWX pages,
+#     mainly affecting macOS on Apple silicon (https://crrev.com/c/3700352). This can be removed
+#     when we adopt 10.5 or higher (https://github.com/envoyproxy/envoy/issues/23258).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 13f2a5bebf..2197568c48 100644
