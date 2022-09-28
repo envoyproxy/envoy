@@ -34,7 +34,7 @@ TEST(HeaderBasedSessionStateFactoryConfigTest, MissingHeaderName) {
 
   HeaderBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-        name: '' 
+        name: ''
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
