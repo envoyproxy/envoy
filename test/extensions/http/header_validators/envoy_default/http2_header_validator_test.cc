@@ -377,18 +377,12 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderName) {
     auto result = uhv->validateGenericHeaderName(header_string);
     if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
-    } else {
+    } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidUnderscore);
     }
   }
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
-  HeaderString invalid_underscore{"x_foo"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
-                             UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {

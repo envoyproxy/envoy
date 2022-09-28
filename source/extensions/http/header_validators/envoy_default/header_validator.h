@@ -112,7 +112,7 @@ protected:
     absl::string_view address() const { return std::get<2>(result_); }
 
     // The port component of the URI path, including the leading ":" delimiter.
-    absl::string_view port() const { return std::get<3>(result_); }
+    absl::string_view portAndDelimiter() const { return std::get<3>(result_); }
 
   private:
     std::tuple<RejectAction, std::string, absl::string_view, absl::string_view> result_;

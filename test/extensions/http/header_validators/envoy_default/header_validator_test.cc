@@ -130,18 +130,12 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     auto result = uhv->validateGenericHeaderName(header_string);
     if (testChar(kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
-    } else {
+    } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
+    } else {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidUnderscore);
     }
   }
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
-  HeaderString invalid_underscore{"x_foo"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
-                             UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {

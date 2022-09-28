@@ -211,7 +211,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 
-  // TODO(#23290) - Add support for detecting and validating duplicate headers. This would most 
+  // TODO(#23290) - Add support for detecting and validating duplicate headers. This would most
   // likely need to occur within the H2 codec because, at this point, duplicate headers have been
   // concatenated into a list.
   header_map.iterate(
@@ -396,14 +396,19 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
     }
   }
 
-  if (!is_valid || (has_underscore && underscore_action == HeaderValidatorConfig::REJECT_REQUEST)) {
+  if (!is_valid) {
     return {HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidNameCharacters};
   }
 
-  if (has_underscore && underscore_action == HeaderValidatorConfig::DROP_HEADER) {
-    return {HeaderEntryValidationResult::Action::DropHeader,
-            UhvResponseCodeDetail::get().InvalidUnderscore};
+  if (has_underscore) {
+    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      return {HeaderEntryValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      return {HeaderEntryValidationResult::Action::DropHeader,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    }
   }
 
   return HeaderEntryValidationResult::success();

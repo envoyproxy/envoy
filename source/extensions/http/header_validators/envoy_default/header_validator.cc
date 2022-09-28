@@ -185,14 +185,19 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
     }
   }
 
-  if (!is_valid || (has_underscore && underscore_action == HeaderValidatorConfig::REJECT_REQUEST)) {
+  if (!is_valid) {
     return {HeaderEntryValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidNameCharacters};
   }
 
-  if (has_underscore && underscore_action == HeaderValidatorConfig::DROP_HEADER) {
-    return {HeaderEntryValidationResult::Action::DropHeader,
-            UhvResponseCodeDetail::get().InvalidUnderscore};
+  if (has_underscore) {
+    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      return {HeaderEntryValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      return {HeaderEntryValidationResult::Action::DropHeader,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    }
   }
 
   return HeaderEntryValidationResult::success();
@@ -283,7 +288,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     return {HeaderValueValidationResult::Action::Reject, result.details()};
   }
 
-  const auto port_string = result.port();
+  const auto port_string = result.portAndDelimiter();
   if (!port_string.empty()) {
     // Validate the port, which will be in the form of ":<uint16_t>"
     bool is_valid = true;
