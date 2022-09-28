@@ -1986,6 +1986,11 @@ ConnectionImpl::Http2Options::Http2Options(
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
 
+  // RFC9113 invalidates trailing whitespace in header values but this is a new validation which
+  // can break existing deployments.
+  // Disable this validation for now.
+  nghttp2_option_set_no_rfc9113_leading_and_trailing_ws_validation(options_, 1);
+
   // The max send header block length is configured to an arbitrarily high number so as to never
   // trigger the check within nghttp2, as we check request headers length in
   // codec_impl::saveHeader.
