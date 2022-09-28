@@ -356,15 +356,15 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {
-  const quic::CryptoHandshakeMessage message;
+  const quic::CryptoHandshakeMessage crypto_message;
   const quic::QuicSocketAddress client_address;
   const quic::QuicSocketAddress peer_address;
   const quic::QuicSocketAddress self_address;
 
   EnvoyQuicCryptoServerStreamHelper helper;
-  EXPECT_ENVOY_BUG(
-      helper.CanAcceptClientHello(message, client_address, peer_address, self_address, nullptr),
-      "Unexpected call to CanAcceptClientHello");
+  EXPECT_ENVOY_BUG(helper.CanAcceptClientHello(crypto_message, client_address, peer_address,
+                                               self_address, nullptr),
+                   "Unexpected call to CanAcceptClientHello");
 }
 
 } // namespace Quic
