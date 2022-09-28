@@ -332,7 +332,8 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
-bool BaseIntegrationTest::getSocketOption(const std::string listener_name, int level, int optname, void* optval, socklen_t* optlen) {
+bool BaseIntegrationTest::getSocketOption(const std::string listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen) {
   bool listeners_ready = false;
   absl::Mutex l;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
@@ -350,7 +351,7 @@ bool BaseIntegrationTest::getSocketOption(const std::string listener_name, int l
     if (listener.get().name() == listener_name) {
       for (auto& socket_factory : listener.get().listenSocketFactories()) {
         auto socket = socket_factory->getListenSocket(0);
-        if(socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+        if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
           ENVOY_LOG_MISC(debug, "######### failed");
           return false;
         }
