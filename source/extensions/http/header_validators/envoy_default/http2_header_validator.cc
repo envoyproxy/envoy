@@ -51,7 +51,7 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
-  // TODO(ameily) - Add support for validating the :protocol pseudo header for extended CONNECT
+  // TODO(#23286) - Add support for validating the :protocol pseudo header for extended CONNECT
   // requests.
 
   const auto& key_string_view = key.getStringView();
@@ -193,8 +193,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
-    // Normalize the path
-    // TODO(meilya) - this will be something like:
+    // TODO(#6589) - Validate and normalize the path, which must be a valid URI. This will be
+    // similar to:
     //
     // auto path_result = normalizePathUri(header_map);
     // if (!path_result) {
@@ -211,8 +211,9 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 
-  // TODO(ameily) - Add tests for duplicate headers. This would most likely need to occur within
-  // the H2 codec because, at this point, duplicate headers have been concatenated into a list.
+  // TODO(#23290) - Add support for detecting and validating duplicate headers. This would most 
+  // likely need to occur within the H2 codec because, at this point, duplicate headers have been
+  // concatenated into a list.
   header_map.iterate(
       [this, &reject_details, &allowed_headers, &drop_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {

@@ -281,7 +281,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       R"({"id":"20","theme":"Children"})");
 
 #ifndef ENVOY_ENABLE_UHV
-  // TODO - UHV disallows square brackets, per RFC.
+  // TODO(#23291) - UHV validate JSON-encoded gRPC query parameters
   // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},

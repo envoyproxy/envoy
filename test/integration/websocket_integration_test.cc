@@ -179,7 +179,7 @@ void WebsocketIntegrationTest::sendBidirectionalData() {
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif
@@ -207,7 +207,7 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   }
 
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - add web socket support for H2 UHV
+  // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
 
@@ -278,7 +278,7 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif
@@ -309,7 +309,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif
@@ -344,7 +344,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif
@@ -381,7 +381,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif

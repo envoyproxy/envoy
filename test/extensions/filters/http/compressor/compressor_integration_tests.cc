@@ -194,7 +194,7 @@ void WebsocketWithCompressorIntegrationTest::sendBidirectionalData() {
 TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO - add web socket support for H2 UHV
+    // TODO(#23286) - add web socket support for H2 UHV
     return;
   }
 #endif

@@ -1659,7 +1659,7 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
   if (skipForH2Uhv()) {
-    // TODO - UHV upstream support
+    // TODO(#23288) - UHV upstream response support
     return;
   }
 
@@ -1692,7 +1692,7 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
   if (skipForH2Uhv()) {
-    // TODO - UHV upstream upstream
+    // TODO(#23288) - UHV upstream response support
     return;
   }
 

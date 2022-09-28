@@ -166,7 +166,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // field-value for Host that is identical to that authority component,
   // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
   //
-  // TODO(meilya) - This needs to be implemented after we have path normalization so that we can
+  // TODO(#6589) - This needs to be implemented after we have path normalization so that we can
   // parse the :path form and compare the authority component of the path against the :authority
   // header.
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
@@ -289,9 +289,8 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     }
   } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
              path_is_absolute) {
-    // Validate and normalize the path, which must be a valid URI
-    //
-    // TODO(meilya) - this will be something like:
+    // TODO(#6589) - Validate and normalize the path, which must be a valid URI. This will be
+    // similar to:
     //
     // auto path_result = normalizePathUri(header_map);
     // if (path_result != RequestHeaderMapValidationResult::Accept) {

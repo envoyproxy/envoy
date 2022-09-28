@@ -277,7 +277,7 @@ typed_config:
 // Regression test for https://github.com/envoyproxy/envoy/issues/18066
 TEST_P(AccessLogIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 

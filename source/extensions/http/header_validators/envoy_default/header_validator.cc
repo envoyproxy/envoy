@@ -258,7 +258,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
   //
-  // TODO(ameily) - Fully implement IPv6 address validation (issues #22859).
+  // TODO(#22859) - Fully implement IPv6 address validation
   const auto host = value.getStringView();
   if (host.empty()) {
     return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};

@@ -314,7 +314,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - add legacy extended CONNECT validation to UHV.
+  // TODO(#23286) - add web socket support for H2 UHV
   return;
 #endif
 
