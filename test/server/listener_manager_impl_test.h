@@ -19,6 +19,7 @@
 #include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
+#include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -28,6 +29,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -335,6 +337,37 @@ protected:
       TestUtility::loadFromYaml(filter_chain_matcher, *listener.mutable_filter_chain_matcher());
     }
     return manager_->addOrUpdateListener(listener, version_info, added_via_api);
+  }
+
+  void testListenerUpdateWithSocketOptionsChange(const std::string origin, const std::string updated) {
+    InSequence s;
+
+    EXPECT_CALL(*worker_, start(_, _));
+    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+    ListenerHandle* listener_origin = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    EXPECT_CALL(listener_origin->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
+    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    listener_origin->target_.ready();
+    worker_->callAddCompletion();
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+    ListenerHandle* listener_updated = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    EXPECT_CALL(listener_updated->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
+
+    // Should be both active and warming now.
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+    checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+    EXPECT_CALL(*listener_updated, onDestroy());
+    EXPECT_CALL(*listener_origin, onDestroy());
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
