@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/cors/cors_filter.h"
 
+#include <algorithm>
+
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
@@ -8,7 +10,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include <algorithm>
 
 namespace Envoy {
 namespace Extensions {

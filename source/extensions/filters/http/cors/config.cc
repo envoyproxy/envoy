@@ -1,15 +1,13 @@
 #include "source/extensions/filters/http/cors/config.h"
 
-#include "envoy/registry/registry.h"
-
-#include "source/extensions/filters/http/cors/cors_filter.h"
-
-#include "source/common/router/config_impl.h"
-#include "envoy/router/router.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "envoy/router/router.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/extensions/filters/http/cors/cors_filter.h"
 
 namespace Envoy {
 namespace Extensions {

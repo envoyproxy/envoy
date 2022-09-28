@@ -40,6 +40,7 @@ envoy_cc_extension(
         "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/cors:cors_filter_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",
     ],
 )

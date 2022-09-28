@@ -81,7 +81,7 @@ public:
 
 TEST_F(CorsFilterTest, initializePoliciesTest) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "get"}};
-  // Cors plocies in the 'typed_per_filter_config'.
+  // Cors policies in the 'typed_per_filter_config'.
   {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
     EXPECT_EQ(false, IsCorsRequest());
