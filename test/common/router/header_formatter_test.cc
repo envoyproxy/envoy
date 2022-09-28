@@ -1271,6 +1271,7 @@ TEST(HeaderParser, TestMetadataTranslator) {
       {"%DYNAMIC_METADATA([\"a\", \"b\",\"c\"])%", "%DYNAMIC_METADATA(a:b:c)%"},
       {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %DYNAMIC_METADATA([\"d\", \"e\"])%",
        "%UPSTREAM_METADATA(a:b:c)% %DYNAMIC_METADATA(d:e)%"},
+      {"%UPSTREAM_METADATA(\t [ \t\t ] \t)%", "%UPSTREAM_METADATA(\t [ \t\t ] \t)%"},
       {"nothing to translate", "nothing to translate"}};
 
   for (const auto& test_case : test_cases) {
