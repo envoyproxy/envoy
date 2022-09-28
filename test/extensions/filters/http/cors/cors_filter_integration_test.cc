@@ -7,11 +7,119 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Cors {
+namespace {
 
-class CorsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public HttpIntegrationTest {
+const std::string CORS_CONFIG_YAML = R"EOF(
+name: test-cors-host
+virtual_hosts:
+- name: test-host
+  domains: ["*"]
+  typed_per_filter_config:
+    envoy.filters.http.cors:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+      allow_origin_string_match:
+      - safe_regex:
+          regex: ".*"
+      allow_headers: "content-type,x-grpc-web"
+      allow_methods: "GET,POST"
+  routes:
+  - match:
+      prefix: "/cors-vhost-config"
+    route:
+      cluster: "cluster_0"
+  - match:
+      prefix: "/no-cors"
+    route:
+      cluster: "cluster_0"
+    typed_per_filter_config:
+      envoy.filters.http.cors:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+        filter_enabled:
+          default_value:
+            numerator: 0
+  - match:
+      prefix: "/cors-route-config"
+    route:
+      cluster: "cluster_0"
+    typed_per_filter_config:
+      envoy.filters.http.cors:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+        allow_origin_string_match:
+        - exact: test-origin-1
+        - exact: test-host-2
+        allow_headers: content-type
+        allow_methods: POST
+        max_age: "100"
+  - match:
+      prefix: "/cors-credentials-allowed"
+    route:
+      cluster: "cluster_0"
+    typed_per_filter_config:
+      envoy.filters.http.cors:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+        allow_origin_string_match:
+        - exact: test-origin-1
+        allow_credentials: true
+  - match:
+      prefix: "/cors-allow-origin-regex"
+    route:
+      cluster: "cluster_0"
+    typed_per_filter_config:
+      envoy.filters.http.cors:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+        allow_origin_string_match:
+        - safe_regex:
+            regex: ".*\\.envoyproxy\\.io"
+  - match:
+      prefix: "/cors-expose-headers"
+    route:
+      cluster: "cluster_0"
+    typed_per_filter_config:
+      envoy.filters.http.cors:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.CorsPolicy
+        allow_origin_string_match:
+        - exact: test-origin-1
+        expose_headers: "custom-header-1,custom-header-2"
+)EOF";
+
+struct TestParam {
+  Network::Address::IpVersion ip_version{};
+  bool cors_policy_from_per_filter_config{};
+};
+
+std::vector<TestParam> testParams() {
+  std::vector<TestParam> params;
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    params.push_back({ip_version, true});
+    params.push_back({ip_version, false});
+  }
+  return params;
+}
+
+std::string testParamsToString(const ::testing::TestParamInfo<TestParam>& params) {
+  std::string param_string;
+  if (params.param.ip_version == Network::Address::IpVersion::v4) {
+    param_string.append("IPv4");
+  } else {
+    param_string.append("IPv6");
+  }
+
+  if (params.param.cors_policy_from_per_filter_config) {
+    param_string.append("_cors_policy_from_per_filter_config");
+  } else {
+    param_string.append("_cors_policy_from_route_vh_cors_field");
+  }
+  return param_string;
+}
+
+class CorsFilterIntegrationTest : public testing::TestWithParam<TestParam>,
+                                  public Envoy::HttpIntegrationTest {
 public:
-  CorsFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  CorsFilterIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void initialize() override {
     config_helper_.prependFilter("name: envoy.filters.http.cors");
@@ -19,6 +127,12 @@ public:
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
+          if (GetParam().cors_policy_from_per_filter_config) {
+            route_config->Clear();
+            TestUtility::loadFromYaml(CORS_CONFIG_YAML, *route_config);
+            return;
+          }
+
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
             auto* cors = virtual_host->mutable_cors();
@@ -116,9 +230,8 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndConfig, CorsFilterIntegrationTest,
+                         testing::ValuesIn(testParams()), testParamsToString);
 
 TEST_P(CorsFilterIntegrationTest, TestVHostConfigSuccess) {
   testPreflight(
@@ -265,4 +378,9 @@ TEST_P(CorsFilterIntegrationTest, TestExposeHeaders) {
           {":status", "200"},
       });
 }
+
+} // namespace
+} // namespace Cors
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
