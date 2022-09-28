@@ -89,6 +89,8 @@ public:
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
+  bool getSocketOption(const std::string listener_name, int level, int optname, void* optval, socklen_t* optlen);
+
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   absl::optional<uint64_t> waitForNextRawUpstreamConnection(

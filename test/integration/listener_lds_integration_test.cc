@@ -1366,10 +1366,11 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   });
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
     auto* socket_option = listener_config_.add_socket_options();
-    socket_option->set_level(0);
-    socket_option->set_name(1);
-    socket_option->set_int_value(64);
+    socket_option->set_level(IPPROTO_IP);
+    socket_option->set_name(IP_TOS);
+    socket_option->set_int_value(8); // IPTOS_THROUGHPUT
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
     ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
@@ -1402,11 +1403,17 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
   tcp_client->close();
 
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(8, opt_value);
+
   // We want to test update listener with same address but different socket options. But
   // the test is using zero port address. It turns out when create a new socket on zero
   // port address, kernel will generate new port for it. So we have to register the
-  // port again here.
-  listener_config_.mutable_socket_options(0)->set_int_value(32);
+  // port again here. IPTOS_RELIABILITY	= 4.
+  listener_config_.mutable_socket_options(0)->set_int_value(4);
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
@@ -1418,6 +1425,12 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
   tcp_client2->close();
+
+  int opt_value2 = 0;
+  socklen_t opt_len2 = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value2, &opt_len2));
+  EXPECT_EQ(opt_len2, sizeof(opt_value2));
+  EXPECT_EQ(4, opt_value2);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
