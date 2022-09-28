@@ -1271,7 +1271,6 @@ TEST(HeaderParser, TestMetadataTranslator) {
       {"%DYNAMIC_METADATA([\"a\", \"b\",\"c\"])%", "%DYNAMIC_METADATA(a:b:c)%"},
       {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %DYNAMIC_METADATA([\"d\", \"e\"])%",
        "%UPSTREAM_METADATA(a:b:c)% %DYNAMIC_METADATA(d:e)%"},
-      {"%UPSTREAM_METADATA(\t [ \t\t ] \t)%", "%UPSTREAM_METADATA(\t [ \t\t ] \t)%"},
       {"nothing to translate", "nothing to translate"}};
 
   for (const auto& test_case : test_cases) {
@@ -1284,6 +1283,7 @@ TEST(HeaderParser, TestMetadataTranslator) {
 TEST(HeaderParser, TestMetadataTranslatorExceptions) {
   static const std::string test_cases[] = {
       "%UPSTREAM_METADATA([\"a\" - \"b\"])%",
+      "%UPSTREAM_METADATA(\t [ \t\t ] \t)%",
   };
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case, HeaderParser::translateMetadataFormat(test_case));
