@@ -48,7 +48,7 @@ class CorsFilter : public Http::StreamFilter {
 public:
   CorsFilter(CorsFilterConfigSharedPtr config);
 
-  void initilaizeCorsPolicy();
+  void initializeCorsPolicies();
 
   // Http::StreamFilterBase
   void onDestroy() override {}

@@ -79,7 +79,7 @@ public:
   Router::MockDirectResponseEntry direct_response_entry_;
 };
 
-TEST_F(CorsFilterTest, initializePoliciesTest) {
+TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "get"}};
   // Cors policies in the 'typed_per_filter_config'.
   {

@@ -52,7 +52,7 @@ CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope
 
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
-void CorsFilter::initilaizeCorsPolicy() {
+void CorsFilter::initializeCorsPolicies() {
   decoder_callbacks_->traversePerFilterConfig([this](const Router::RouteSpecificFilterConfig& cfg) {
     const auto* typed_cfg = dynamic_cast<const Router::CorsPolicy*>(&cfg);
     if (typed_cfg != nullptr) {
@@ -85,7 +85,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  initilaizeCorsPolicy();
+  initializeCorsPolicies();
 
   if (!enabled() && !shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;
