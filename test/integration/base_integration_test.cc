@@ -332,7 +332,7 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
-bool BaseIntegrationTest::getSocketOption(const std::string listener_name, int level, int optname,
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
                                           void* optval, socklen_t* optlen) {
   bool listeners_ready = false;
   absl::Mutex l;
