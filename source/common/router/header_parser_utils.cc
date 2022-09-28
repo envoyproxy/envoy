@@ -28,7 +28,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(m.str(2));
 
       // The given json string may be an invalid object.
-      if (!parsed_params) {
+      if (parsed_params == nullptr || parsed_params->asObjectArray().size() == 0) {
         // return original value
         return new_header_value;
       }
