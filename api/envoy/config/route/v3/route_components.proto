@@ -649,6 +649,14 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
+// Cors policy configuration.
+//
+// .. attention::
+//
+//   This message has been deprecated. Please use
+//   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+//   as as alternative.
+//
 // [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
