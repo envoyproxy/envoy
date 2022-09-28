@@ -23,6 +23,7 @@ MockRouterFilterInterface::MockRouterFilterInterface()
   ON_CALL(*this, route()).WillByDefault(Return(&route_));
   ON_CALL(callbacks_, connection())
       .WillByDefault(Return(OptRef<const Network::Connection>{client_connection_}));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   route_.route_entry_.connect_config_.emplace(RouteEntry::ConnectConfig());
 }
 

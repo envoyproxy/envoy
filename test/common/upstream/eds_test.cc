@@ -672,6 +672,42 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
+TEST_F(EdsTest, UseAddressForHealthChecks) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  auto* health_check_config_address =
+      endpoint->mutable_health_check_config()->mutable_address()->mutable_socket_address();
+  health_check_config_address->set_address("4.3.2.1");
+  health_check_config_address->set_port_value(4321);
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->healthCheckAddress()->asString(), "4.3.2.1:4321");
+}
+
+TEST_F(EdsTest, MalformedIPForHealthChecks) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  auto* health_check_config_address =
+      endpoint->mutable_health_check_config()->mutable_address()->mutable_socket_address();
+  health_check_config_address->set_address("foo.bar.com");
+  health_check_config_address->set_port_value(4321);
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException, "malformed IP address: foo.bar.com");
+}
+
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
 // fails active HC.
 TEST_F(EdsTest, EndpointRemovalAfterHcFail) {

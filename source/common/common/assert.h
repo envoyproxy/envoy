@@ -265,7 +265,7 @@ void resetEnvoyBugCountersForTest();
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,    \
                           "envoy bug failure: {}.{}{}", CONDITION_STR,                             \
                           details.empty() ? "" : " Details: ", details);                           \
-      Assert::EnvoyBugStackTrace st;                                                               \
+      Envoy::Assert::EnvoyBugStackTrace st;                                                        \
       st.capture();                                                                                \
       st.logStackTrace();                                                                          \
       ACTION;                                                                                      \

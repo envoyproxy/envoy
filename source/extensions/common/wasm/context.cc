@@ -749,7 +749,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -824,7 +824,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     map->addCopy(lower_key, std::string(p.second));
   }
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -837,7 +837,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -851,7 +851,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }

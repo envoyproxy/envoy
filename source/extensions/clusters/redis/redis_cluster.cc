@@ -276,6 +276,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   parent_.info_->stats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {
+    ENVOY_LOG(debug, "redis cluster slot request is already in progress for '{}'",
+              parent_.info_->name());
     return;
   }
 
@@ -302,7 +304,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
                                              parent_.auth_password_);
     client->client_->addConnectionCallbacks(*client);
   }
-
+  ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
@@ -344,7 +346,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
            hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
                                              std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
-            ENVOY_LOG(debug, "async DNS resolution complete for {}", slot.primary_hostname_);
+            ENVOY_LOG(
+                debug,
+                "async DNS resolution complete for primary slot address {} at index location {}",
+                slot.primary_hostname_, slot_idx);
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
             // the timer.
@@ -398,7 +403,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
                                            std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
-          ENVOY_LOG(debug, "async DNS resolution complete for {}", replica.first);
+          ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
           // We log a warn message.
@@ -426,6 +431,7 @@ void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' succeeded", parent_.info_->name());
   current_request_ = nullptr;
 
   const uint32_t SlotRangeStart = 0;
@@ -557,6 +563,7 @@ void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
 }
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' failed", parent_.info_->name());
   current_request_ = nullptr;
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);

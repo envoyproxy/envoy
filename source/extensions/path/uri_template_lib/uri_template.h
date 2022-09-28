@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "source/extensions/path/uri_template_lib/proto/rewrite_segments.pb.h"
 #include "source/extensions/path/uri_template_lib/uri_template_internal.h"
 
 #include "absl/status/statusor.h"
@@ -29,6 +28,12 @@ struct ParsedSegment {
   RewriteStringKind kind_;
 };
 
+// Stores string literals and regex capture indexes for rewriting paths
+using RewriteSegment = absl::variant<int, std::string>;
+
+// Stores all segments in left to right order for a path rewrite
+using RewriteSegments = std::vector<RewriteSegment>;
+
 /**
  * Returns the safe regex that Envoy understands that is equivalent to the given pattern.
  */
@@ -43,8 +48,8 @@ absl::StatusOr<std::vector<ParsedSegment>> parseRewritePattern(absl::string_view
 /**
  * Returns the parsed path rewrite pattern and processes variables.
  */
-absl::StatusOr<envoy::extensions::uri_template::RewriteSegments>
-parseRewritePattern(absl::string_view pattern, absl::string_view capture_regex);
+absl::StatusOr<RewriteSegments> parseRewritePattern(absl::string_view pattern,
+                                                    absl::string_view capture_regex);
 
 /**
  * Returns true if provided rewrite pattern is valid.
@@ -65,18 +70,6 @@ absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_vi
  * Validation attempts to parse pattern into literals and variables.
  */
 absl::Status isValidMatchPattern(absl::string_view match_pattern);
-
-/**
- * Concatenates literals and extracts variable values to form the final rewritten path.
- * For example:
- * rewrite_pattern: [capture_index=2, literal="cat"]
- * path: "/bar/var"
- * capture_regex: "(1)/(2)"
- * Rewrite would result in rewrite of "/var/cat".
- */
-absl::StatusOr<std::string>
-rewritePathTemplatePattern(absl::string_view path, absl::string_view capture_regex,
-                           const envoy::extensions::uri_template::RewriteSegments& rewrite_pattern);
 
 } // namespace UriTemplate
 } // namespace Extensions

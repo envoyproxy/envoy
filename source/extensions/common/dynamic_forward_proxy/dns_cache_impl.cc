@@ -496,7 +496,7 @@ void DnsCacheImpl::addCacheEntry(
                             seconds_since_epoch);
     }
   }
-  key_value_store_->addOrUpdate(host, value);
+  key_value_store_->addOrUpdate(host, value, absl::nullopt);
 }
 
 void DnsCacheImpl::removeCacheEntry(const std::string& host) {

@@ -472,7 +472,7 @@ be disabled by specifying local execution. Example command line with
 
 ```
 bazel test -c dbg //test/server:backtrace_test
---run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=local
+--run_under=//tools:stack_decode --strategy=TestRunner=local
 --cache_test_results=no --test_output=all
 ```
 

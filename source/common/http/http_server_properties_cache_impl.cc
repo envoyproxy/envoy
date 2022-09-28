@@ -155,7 +155,8 @@ void HttpServerPropertiesCacheImpl::setAlternatives(const Origin& origin,
   data.protocols = protocols;
   auto it = setPropertiesImpl(origin, data);
   if (key_value_store_) {
-    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
+    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second),
+                                  absl::nullopt);
   }
 }
 
@@ -164,7 +165,8 @@ void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::m
   data.srtt = srtt;
   auto it = setPropertiesImpl(origin, data);
   if (key_value_store_) {
-    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
+    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second),
+                                  absl::nullopt);
   }
 }
 
@@ -182,7 +184,8 @@ void HttpServerPropertiesCacheImpl::setConcurrentStreams(const Origin& origin,
   data.concurrent_streams = concurrent_streams;
   auto it = setPropertiesImpl(origin, data);
   if (key_value_store_) {
-    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second));
+    key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second),
+                                  absl::nullopt);
   }
 }
 
@@ -260,7 +263,7 @@ HttpServerPropertiesCacheImpl::findAlternatives(const Origin& origin) {
   }
   if (key_value_store_ && original_size != protocols.size()) {
     key_value_store_->addOrUpdate(originToString(origin),
-                                  originDataToStringForCache(entry_it->second));
+                                  originDataToStringForCache(entry_it->second), absl::nullopt);
   }
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }

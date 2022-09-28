@@ -21,7 +21,8 @@ class SotwSubscriptionState
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        Event::Dispatcher& dispatcher, OpaqueResourceDecoder& resource_decoder);
+                        Event::Dispatcher& dispatcher,
+                        OpaqueResourceDecoderSharedPtr resource_decoder);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -46,7 +47,7 @@ private:
   void setResourceTtl(const DecodedResourceImpl& decoded_resource);
   bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
 
-  OpaqueResourceDecoder& resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.
@@ -68,7 +69,7 @@ public:
   ~SotwSubscriptionStateFactory() override = default;
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoder& resource_decoder) override {
+                        OpaqueResourceDecoderSharedPtr resource_decoder) override {
     return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
                                                    resource_decoder);
   }

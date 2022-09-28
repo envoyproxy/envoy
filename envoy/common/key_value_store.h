@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
@@ -21,8 +23,11 @@ public:
    * Adds or updates a key:value pair in the store.
    * @param key supplies a key to add or update.
    * @param value supplies the value to set for that key.
+   * @param ttl optionally specifies a lifetime after which this entry will be removed.
+   * ttl must be greater than 0.
    */
-  virtual void addOrUpdate(absl::string_view key, absl::string_view value) PURE;
+  virtual void addOrUpdate(absl::string_view key, absl::string_view value,
+                           absl::optional<std::chrono::seconds> ttl) PURE;
 
   /**
    * Removes a key:value pair from the store. This is a no-op if the key is not present.

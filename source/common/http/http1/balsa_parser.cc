@@ -93,12 +93,15 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
 } // anonymous namespace
 
-BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length)
+BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
+                         bool enable_trailers)
     : connection_(connection) {
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
-  framer_.set_balsa_trailer(&trailers_);
+  if (enable_trailers) {
+    framer_.set_balsa_trailer(&trailers_);
+  }
   framer_.set_balsa_visitor(this);
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);

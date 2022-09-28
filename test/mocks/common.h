@@ -124,7 +124,8 @@ public:
 
 class MockKeyValueStore : public KeyValueStore {
 public:
-  MOCK_METHOD(void, addOrUpdate, (absl::string_view, absl::string_view));
+  MOCK_METHOD(void, addOrUpdate,
+              (absl::string_view, absl::string_view, absl::optional<std::chrono::seconds> ttl));
   MOCK_METHOD(void, remove, (absl::string_view));
   MOCK_METHOD(absl::optional<absl::string_view>, get, (absl::string_view));
   MOCK_METHOD(void, flush, ());

@@ -27,13 +27,9 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
-    const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-    Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-    const Server::Options& options) {
+    Stats::Store& stats, Network::DnsResolverSharedPtr dns_resolver,
+    Ssl::ContextManager& ssl_context_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
@@ -73,10 +69,9 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(
-      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
-      dispatcher, log_manager, local_info, admin, singleton_manager,
-      std::move(outlier_event_logger), added_via_api, validation_visitor, api, options);
+  ClusterFactoryContextImpl context(server_context, cluster_manager, stats, std::move(dns_resolver),
+                                    ssl_context_manager, std::move(outlier_event_logger),
+                                    added_via_api, validation_visitor);
   return factory->create(server_context, cluster, context);
 }
 

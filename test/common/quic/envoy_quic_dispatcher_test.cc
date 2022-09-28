@@ -20,6 +20,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -233,7 +234,7 @@ protected:
   EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
-  const quic::QuicConnectionId connection_id_;
+  quic::QuicConnectionId connection_id_;
   QuicServerTransportSocketFactory transport_socket_factory_;
 };
 
@@ -246,51 +247,60 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
-  Network::MockFilterChainManager filter_chain_manager;
-  std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
-  Network::MockConnectionCallbacks network_connection_callbacks;
-  testing::StrictMock<Stats::MockCounter> read_total;
-  testing::StrictMock<Stats::MockGauge> read_current;
-  testing::StrictMock<Stats::MockCounter> write_total;
-  testing::StrictMock<Stats::MockGauge> write_current;
+  for (const std::string& value : {"true", "false"}) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.quic_defer_send_in_response_to_packet", value}});
+    Network::MockFilterChainManager filter_chain_manager;
+    std::shared_ptr<Network::MockReadFilter> read_filter(new Network::MockReadFilter());
+    Network::MockConnectionCallbacks network_connection_callbacks;
+    testing::StrictMock<Stats::MockCounter> read_total;
+    testing::StrictMock<Stats::MockGauge> read_current;
+    testing::StrictMock<Stats::MockCounter> write_total;
+    testing::StrictMock<Stats::MockGauge> write_current;
 
-  std::vector<Network::FilterFactoryCb> filter_factory(
-      {[&](Network::FilterManager& filter_manager) {
-        filter_manager.addReadFilter(read_filter);
-        read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks);
-        read_filter->callbacks_->connection().setConnectionStats(
-            {read_total, read_current, write_total, write_current, nullptr, nullptr});
-        // This will not close connection right away, but after it processes the first packet.
-        read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      }});
-  EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
-  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
-      .WillOnce(Return(&proof_source_->filterChain()));
-  EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
-      .WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(listener_config_, filterChainFactory());
-  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
-        EXPECT_EQ(1u, filter_factories.size());
-        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
-        return true;
-      }));
-  EXPECT_CALL(*read_filter, onNewConnection())
-      // Stop iteration to avoid calling getRead/WriteBuffer().
-      .WillOnce(Return(Network::FilterStatus::StopIteration));
+    std::vector<Network::FilterFactoryCb> filter_factory(
+        {[&](Network::FilterManager& filter_manager) {
+          filter_manager.addReadFilter(read_filter);
+          read_filter->callbacks_->connection().addConnectionCallbacks(
+              network_connection_callbacks);
+          read_filter->callbacks_->connection().setConnectionStats(
+              {read_total, read_current, write_total, write_current, nullptr, nullptr});
+          // This will not close connection right away, but during processing the first packet.
+          read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+        }});
 
-  EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
-  quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
-                                        ? quic::QuicIpAddress::Loopback4()
-                                        : quic::QuicIpAddress::Loopback6(),
-                                    54321);
-  // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
-  // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
-  // processed immediately.
-  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+    EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
+    EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+        .WillOnce(Return(&proof_source_->filterChain()));
+    EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
+        .WillOnce(ReturnRef(filter_factory));
+    EXPECT_CALL(listener_config_, filterChainFactory());
+    EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
+        .WillOnce(Invoke([](Network::Connection& connection,
+                            const std::vector<Network::FilterFactoryCb>& filter_factories) {
+          EXPECT_EQ(1u, filter_factories.size());
+          Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
+          return true;
+        }));
+    EXPECT_CALL(*read_filter, onNewConnection())
+        // Stop iteration to avoid calling getRead/WriteBuffer().
+        .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  processValidChloPacket(peer_addr);
+    EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+    // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
+    // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
+    // processed immediately.
+    envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
+    quic::QuicSocketAddress peer_addr(version_ == Network::Address::IpVersion::v4
+                                          ? quic::QuicIpAddress::Loopback4()
+                                          : quic::QuicIpAddress::Loopback6(),
+                                      54321);
+
+    processValidChloPacket(peer_addr);
+    connection_id_ =
+        quic::test::TestConnectionId(quic::test::TestConnectionIdToUInt64(connection_id_) + 1);
+  }
 }
 
 TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {

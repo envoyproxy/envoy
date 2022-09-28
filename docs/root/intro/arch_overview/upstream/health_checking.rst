@@ -47,6 +47,7 @@ of each defined :ref:`LocalityLbEndpoints<envoy_v3_api_msg_config.endpoint.v3.Lo
 
 An example of setting up :ref:`health check config<envoy_v3_api_msg_config.endpoint.v3.Endpoint.HealthCheckConfig>`
 to set a :ref:`cluster member<envoy_v3_api_msg_config.endpoint.v3.Endpoint>`'s alternative health check
+:ref:`address<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.address>` and
 :ref:`port<envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.port_value>` is:
 
 .. code-block:: yaml
@@ -57,6 +58,10 @@ to set a :ref:`cluster member<envoy_v3_api_msg_config.endpoint.v3.Endpoint>`'s a
       - endpoint:
           health_check_config:
             port_value: 8080
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 80
           address:
             socket_address:
               address: localhost

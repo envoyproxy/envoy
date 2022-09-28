@@ -125,7 +125,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // that an insert has failed. If an insert fails partway, it's better not to send additional
     // chunks to the cache if we're already in a failure state and should abort, but we can only do
     // that if we can communicate failures back to the filter, so we should fix this.
-    insert_->insertHeaders(headers, metadata, end_stream);
+    insert_->insertHeaders(
+        headers, metadata, [](bool) {}, end_stream);
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
@@ -175,7 +176,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   response_has_trailers_ = !trailers.empty();
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers);
+    insert_->insertTrailers(trailers, [](bool) {});
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 

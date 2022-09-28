@@ -180,6 +180,125 @@ enum class LocalErrorStatus {
   ContinueAndResetStream,
 };
 
+// These are events that upstream filters can register for, via the addUpstreamCallbacks function.
+class UpstreamCallbacks {
+public:
+  virtual ~UpstreamCallbacks() = default;
+
+  // Called when the upstream connection is established and
+  // UpstreamStreamFilterCallbacks::upstream should be available.
+  //
+  // This indicates that data may begin flowing upstream.
+  virtual void onUpstreamConnectionEstablished() PURE;
+};
+
+// These are filter callbacks specific to upstream filters, accessible via
+// StreamFilterCallbacks::upstreamCallbacks()
+class UpstreamStreamFilterCallbacks {
+public:
+  virtual ~UpstreamStreamFilterCallbacks() = default;
+
+  // Returns a handle to the upstream stream's stream info.
+  virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
+
+  // Returns a handle to the generic upstream.
+  virtual OptRef<Router::GenericUpstream> upstream() PURE;
+
+  // Dumps state for the upstream request.
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a CONNECT upgrade. These should only be used by the upstream codec filter.
+  // TODO(alyssawilk) after deprecating the classic path, move this logic to the
+  // upstream codec filter and remove these APIs
+  virtual bool pausedForConnect() const PURE;
+  virtual void setPausedForConnect(bool value) PURE;
+
+  // Return the upstreamStreamOptions for this stream.
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
+
+  // Adds the supplied UpstreamCallbacks to the list of callbacks to be called
+  // as various upstream events occur. Callbacks should persist for the lifetime
+  // of the upstream stream.
+  virtual void addUpstreamCallbacks(UpstreamCallbacks& callbacks) PURE;
+
+  // This should only be called by the UpstreamCodecFilter, and is used to let the
+  // UpstreamCodecFilter supply the interface used by the GenericUpstream to receive
+  // response data from the upstream stream once it is established.
+  virtual void
+  setUpstreamToDownstream(Router::UpstreamToDownstream& upstream_to_downstream_interface) PURE;
+};
+
+/**
+ * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
+ * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
+ * request was originated can be destroyed before a response to an on-demand update request is
+ * received and updates are propagated. To handle this:
+ *
+ * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
+ * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
+ * above in an Envoy::Router::UpdateOnDemandCallback struct
+ *
+ * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
+ * verify if the callback is still available.
+ */
+using RouteConfigUpdatedCallback = std::function<void(bool)>;
+using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
+
+class DownstreamStreamFilterCallbacks {
+public:
+  virtual ~DownstreamStreamFilterCallbacks() = default;
+
+  /**
+   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
+   *
+   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
+   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
+   * of the filter chain.
+   *
+   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
+   * attempted and failing to find a route. An example of when this happens is when
+   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
+   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
+   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
+   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
+   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
+   * absl::optional ptrs instead of null ptrs.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
+   * Invokes callback with a matched route, callback can choose to accept this route by returning
+   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
+   * Router::RouteMatchStatus::Continue, if there are more routes available.
+   *
+   * Returns route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
+   *
+   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
+   * be returned directly to the caller and the callback will not be invoked.
+   *
+   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
+   * subsequent filters. We may want to persist callbacks so they always participate in later route
+   * resolution or make it an independent entity like filters that gets called on route resolution.
+   */
+  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+
+  /**
+   * Clears the route cache for the current request. This must be called when a filter has modified
+   * the headers in a way that would affect routing.
+   */
+  virtual void clearRouteCache() PURE;
+
+  /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
+   */
+  virtual void
+  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+};
+
 /**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
@@ -210,46 +329,8 @@ public:
    * Returns the route for the current request. The assumption is that the implementation can do
    * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
    * a way that affects routing, clearRouteCache() must be called to clear the cache.
-   *
-   * NOTE: In the future we want to split route() into 2 methods, one that just
-   * returns current route and another that actually resolve the route.
    */
   virtual Router::RouteConstSharedPtr route() PURE;
-
-  /**
-   * Invokes callback with a matched route, callback can choose to accept this route by returning
-   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
-   * Router::RouteMatchStatus::Continue, if there are more routes available.
-   *
-   * Returns route accepted by the callback or nullptr if no match found or none of route is
-   * accepted by the callback.
-   *
-   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
-   * be returned directly to the caller and the callback will not be invoked.
-   *
-   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
-   * subsequent filters. We may want to persist callbacks so they always participate in later route
-   * resolution or make it an independent entity like filters that gets called on route resolution.
-   */
-  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
-
-  /**
-   * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
-   *
-   * Similar to route(const Router::RouteCallback& cb), this route that is set will be
-   * overridden by clearRouteCache() in subsequent filters. Usage is intended for filters at the end
-   * of the filter chain.
-   *
-   * NOTE: Passing nullptr in as the route parameter is equivalent to route resolution being
-   * attempted and failing to find a route. An example of when this happens is when
-   * RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers, const
-   * StreamInfo::StreamInfo& stream_info, uint64_t random_value) returns nullptr during a
-   * refreshCachedRoute. It is important to note that setRoute(nullptr) is different from a
-   * clearRouteCache(), because clearRouteCache() wants route resolution to be attempted again.
-   * clearRouteCache() achieves this by setting cached_route_ and cached_cluster_info_ to
-   * absl::optional ptrs instead of null ptrs.
-   */
-  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
   /**
    * Returns the clusterInfo for the cached route.
@@ -258,12 +339,6 @@ public:
    * NOTE: Cached clusterInfo and route will be updated the same time.
    */
   virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
-
-  /**
-   * Clears the route cache for the current request. This must be called when a filter has modified
-   * the headers in a way that would affect routing.
-   */
-  virtual void clearRouteCache() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -327,23 +402,19 @@ public:
    * absl::nullopt.
    */
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
-};
 
-/**
- * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
- * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
- * request was originated can be destroyed before a response to an on-demand update request is
- * received and updates are propagated. To handle this:
- *
- * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
- * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
- * above in an Envoy::Router::UpdateOnDemandCallback struct
- *
- * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
- * verify if the callback is still available.
- */
-using RouteConfigUpdatedCallback = std::function<void(bool)>;
-using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
+  /**
+   * Return a handle to the upstream callbacks. This is valid for upstream filters, and nullopt for
+   * downstream filters.
+   */
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
+
+  /**
+￼   * Return a handle to the downstream callbacks. This is valid for downstream filters, and nullopt
+    * for upstream filters.
+    */
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
+};
 
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
@@ -628,14 +699,6 @@ public:
    * @return The socket options to be applied to the upstream request.
    */
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
-
-  /**
-   * Schedules a request for a RouteConfiguration update from the management server.
-   * @param route_config_updated_cb callback to be called when the configuration update has been
-   * propagated to the worker thread.
-   */
-  virtual void
-  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    * Set override host to be used by the upstream load balancing. If the target host exists in the

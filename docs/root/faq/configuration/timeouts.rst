@@ -14,6 +14,8 @@ This page summarizes the most important timeouts used in various scenarios.
 HTTP/gRPC
 ---------
 
+.. _faq_configuration_connection_timeouts:
+
 Connection timeouts
 ^^^^^^^^^^^^^^^^^^^
 

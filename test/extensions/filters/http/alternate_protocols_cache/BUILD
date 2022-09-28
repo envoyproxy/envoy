@@ -37,6 +37,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:header_to_proxy_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",

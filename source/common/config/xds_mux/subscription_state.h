@@ -121,9 +121,9 @@ template <class T> class SubscriptionStateFactory {
 public:
   virtual ~SubscriptionStateFactory() = default;
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
-  virtual std::unique_ptr<T> makeSubscriptionState(const std::string& type_url,
-                                                   UntypedConfigUpdateCallbacks& callbacks,
-                                                   OpaqueResourceDecoder& resource_decoder) PURE;
+  virtual std::unique_ptr<T>
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        OpaqueResourceDecoderSharedPtr resource_decoder) PURE;
 };
 
 } // namespace XdsMux

@@ -43,7 +43,8 @@ enum class LegacyOrUnified { Legacy, Unified };
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.thread_local_cluster_.async_client_),
+      : resource_decoder_(std::make_shared<MockOpaqueResourceDecoder>()),
+        http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
                               /*xds_resources_delegate=*/XdsResourcesDelegateOptRef()) {}
@@ -68,7 +69,7 @@ public:
   Event::MockDispatcher dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   MockSubscriptionCallbacks callbacks_;
-  MockOpaqueResourceDecoder resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

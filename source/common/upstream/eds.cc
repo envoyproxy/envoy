@@ -282,7 +282,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   ProtobufWkt::Any any_resource;
   any_resource.PackFrom(resource);
   auto decoded_resource =
-      Config::DecodedResourceImpl::fromResource(resource_decoder_, any_resource, "");
+      Config::DecodedResourceImpl::fromResource(*resource_decoder_, any_resource, "");
   std::vector<Config::DecodedResourceRef> resource_refs = {*decoded_resource};
   onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.

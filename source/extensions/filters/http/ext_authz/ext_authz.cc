@@ -250,7 +250,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
          !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
          !response->query_parameters_to_remove.empty())) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
-      decoder_callbacks_->clearRouteCache();
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
 
     ENVOY_STREAM_LOG(trace,

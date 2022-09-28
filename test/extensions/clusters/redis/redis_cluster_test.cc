@@ -145,9 +145,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_,
-        dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
-        std::move(outlier_event_logger), false, validation_visitor_, api, options_);
+        server_context_, cm, stats_store_, std::move(dns_resolver_), ssl_context_manager_,
+        std::move(outlier_event_logger), false, validation_visitor_);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(server_context_, cluster_config, config,

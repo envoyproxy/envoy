@@ -289,6 +289,10 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   PANIC_DUE_TO_CORRUPT_ENUM
 }
 
+Http::Protocol HttpHealthCheckerImpl::protocol() const {
+  return codecClientTypeToProtocol(codec_client_type_);
+}
+
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent),

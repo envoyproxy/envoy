@@ -133,6 +133,7 @@ private:
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
+  bool case_insensitive_enum_parsing_{false};
 
   bool disabled_;
 };
@@ -216,6 +217,9 @@ private:
   bool error_{false};
   bool has_body_{false};
   bool http_body_response_headers_set_{false};
+
+  // Don't buffer unary response data in the `FilterManager` buffer.
+  Buffer::OwnedImpl response_out_;
 };
 
 } // namespace GrpcJsonTranscoder

@@ -641,7 +641,11 @@ def _com_github_ncopa_suexec():
     )
 
 def _com_google_googletest():
-    external_http_archive("com_google_googletest")
+    external_http_archive(
+        "com_google_googletest",
+        patches = ["@envoy//bazel:googletest.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "googletest",
         actual = "@com_google_googletest//:gtest",
@@ -1236,7 +1240,7 @@ filegroup(
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during interation tests.
+    # during integration tests.
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,

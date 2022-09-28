@@ -218,7 +218,7 @@ public:
                                std::string_view details) override;
   void clearRouteCache() override {
     if (decoder_callbacks_) {
-      decoder_callbacks_->clearRouteCache();
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
 

@@ -6,6 +6,10 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+  issues: write # required to open/close dependency issues
+
 jobs:
   build:
     runs-on: ubuntu-latest

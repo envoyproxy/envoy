@@ -62,7 +62,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
+                           OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -92,8 +92,9 @@ private:
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
-                     SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                     const std::string& type_url, GrpcMuxImpl& parent)
+                     SubscriptionCallbacks& callbacks,
+                     OpaqueResourceDecoderSharedPtr resource_decoder, const std::string& type_url,
+                     GrpcMuxImpl& parent)
         : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
           parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
       std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
@@ -122,7 +123,7 @@ private:
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;
-    OpaqueResourceDecoder& resource_decoder_;
+    OpaqueResourceDecoderSharedPtr resource_decoder_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
 
@@ -167,6 +168,13 @@ private:
   void queueDiscoveryRequest(absl::string_view queue_item);
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
+  // Must be invoked from the main or test thread.
+  void loadConfigFromDelegate(const std::string& type_url,
+                              const std::vector<std::string>& resource_names);
+  // Must be invoked from the main or test thread.
+  void processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
+                                 ApiState& api_state, const std::string& type_url,
+                                 const std::string& version_info, bool call_delegate);
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>
@@ -177,6 +185,7 @@ private:
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;
+  bool previously_fetched_data_{false};
 
   // Helper function for looking up and potentially allocating a new ApiState.
   ApiState& apiStateFor(absl::string_view type_url);
@@ -215,7 +224,7 @@ public:
   }
 
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                            const SubscriptionOptions&) override {
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }

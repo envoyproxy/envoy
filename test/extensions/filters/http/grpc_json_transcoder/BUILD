@@ -81,3 +81,21 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "transcoder_async_inject_body_test",
+    srcs = ["transcoder_async_inject_body_test.cc"],
+    data = [
+        "//test/proto:bookstore.proto",
+        "//test/proto:bookstore_proto_descriptor",
+    ],
+    extension_names = ["envoy.filters.http.grpc_json_transcoder"],
+    deps = [
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/grpc_json_transcoder:config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:async_inject_body_at_end_stream_filter_lib",
+        "//test/proto:bookstore_proto_cc_proto",
+    ],
+)

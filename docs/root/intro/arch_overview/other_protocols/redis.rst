@@ -132,6 +132,7 @@ For details on each command's usage see the official
 
   AUTH, Authentication
   PING, Connection
+  QUIT, Connection
   DEL, Generic
   DUMP, Generic
   EXISTS, Generic

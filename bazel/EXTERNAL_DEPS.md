@@ -65,7 +65,7 @@ is:
 1. Define a `pip_install()` pointing at your target `requirements.txt` in
    [`bazel/repositories_extra.bzl`](repositories_extra.bzl)
 
-2. Add a `requirements("<package name")` in the `BUILD` file that depends on
+2. Add a `requirements("<package name>")` in the `BUILD` file that depends on
    this package.
 
 You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) as an example

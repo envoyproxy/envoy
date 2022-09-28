@@ -105,7 +105,7 @@ public:
             [this, &leds_config](const xds::core::v3::ResourceLocator& locator_url,
                                  const envoy::config::core::v3::ConfigSource&, absl::string_view,
                                  Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                                 Envoy::Config::OpaqueResourceDecoder&) {
+                                 Envoy::Config::OpaqueResourceDecoderSharedPtr) {
               // Verify that the locator is correct.
               Config::XdsResourceIdentifier::EncodeOptions encode_options;
               encode_options.sort_context_params_ = true;

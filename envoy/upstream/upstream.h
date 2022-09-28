@@ -29,6 +29,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
@@ -36,6 +37,16 @@ class FilterChainManager;
 }
 
 namespace Upstream {
+
+/**
+ * RAII handle for tracking the host usage by the connection pools.
+ **/
+class HostHandle {
+public:
+  virtual ~HostHandle() = default;
+};
+
+using HostHandlePtr = std::unique_ptr<HostHandle>;
 
 /**
  * An upstream host.
@@ -185,14 +196,15 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @return the current boolean value of host being in use.
+   * @return the current boolean value of host being in use by any connection pool.
    */
   virtual bool used() const PURE;
 
   /**
-   * @param new_used supplies the new value of host being in use to be stored.
+   * Creates a handle for a host. Deletion of the handle signals that the
+   * connection pools no longer need this host.
    */
-  virtual void used(bool new_used) PURE;
+  virtual HostHandlePtr acquireHandle() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -1143,3 +1155,18 @@ using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>
 
 } // namespace Upstream
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+    absl::string_view out =
+        host.hostname().empty() ? host.hostname() : host.address()->asStringView();
+    return formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace fmt

@@ -14,6 +14,8 @@
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
+#include "fmt/ostream.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -136,3 +138,9 @@ private:
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to format opentracing::string_view
+template <> struct formatter<opentracing::string_view> : ostream_formatter {};
+} // namespace fmt

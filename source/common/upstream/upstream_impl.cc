@@ -17,6 +17,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/dns.h"
@@ -303,10 +304,7 @@ HostDescriptionImpl::HostDescriptionImpl(
     throw EnvoyException(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
   }
-  health_check_address_ =
-      health_check_config.port_value() == 0
-          ? dest_address
-          : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+  health_check_address_ = resolveHealthCheckAddress(health_check_config, dest_address);
 }
 
 Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFactory(
@@ -323,15 +321,6 @@ Network::UpstreamTransportSocketFactory& HostDescriptionImpl::resolveTransportSo
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  // If the transport socket options indicate the connection should be
-  // redirected to a proxy, create the TCP connection to the proxy's address not
-  // the host's address.
-  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
-    return createConnection(
-        dispatcher, cluster(), transport_socket_options->http11ProxyInfo()->proxy_address,
-        {transport_socket_options->http11ProxyInfo()->proxy_address}, transportSocketFactory(),
-        options, transport_socket_options, shared_from_this());
-  }
   return createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(),
                           options, transport_socket_options, shared_from_this());
 }
@@ -398,15 +387,27 @@ Host::CreateConnectionData HostImpl::createConnection(
 
   auto source_address_fn = cluster.sourceAddressFn();
 
-  Network::ClientConnectionPtr connection =
-      address_list.size() > 1
-          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
-                dispatcher, address_list, source_address_fn, socket_factory,
-                transport_socket_options, host, connection_options)
-          : dispatcher.createClientConnection(
-                address, source_address_fn ? source_address_fn(address) : nullptr,
-                socket_factory.createTransportSocket(transport_socket_options, host),
-                connection_options, transport_socket_options);
+  Network::ClientConnectionPtr connection;
+  // If the transport socket options indicate the connection should be
+  // redirected to a proxy, create the TCP connection to the proxy's address not
+  // the host's address.
+  if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
+    ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
+    connection = dispatcher.createClientConnection(
+        transport_socket_options->http11ProxyInfo()->proxy_address,
+        source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  } else if (address_list.size() > 1) {
+    connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
+        dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
+        connection_options);
+  } else {
+    connection = dispatcher.createClientConnection(
+        address, source_address_fn ? source_address_fn(address) : nullptr,
+        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
+        transport_socket_options);
+  }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(
       cluster.setLocalInterfaceNameOnUpstreamConnections());
@@ -916,7 +917,7 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
-      upstream_context_(server_context, init_manager) {
+      upstream_context_(server_context, init_manager, *stats_scope_) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -1024,19 +1025,28 @@ ClusterInfoImpl::ClusterInfoImpl(
     filter_factories_.push_back(std::move(callback));
   }
 
-  if (http_protocol_options_ && !http_protocol_options_->http_filters_.empty()) {
+  if (http_protocol_options_) {
+    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+    if (http_filters.empty()) {
+      auto* codec_filter = http_filters.Add();
+      codec_filter->set_name("envoy.filters.http.upstream_codec");
+      codec_filter->mutable_typed_config()->PackFrom(
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    }
+    if (http_filters[http_filters.size() - 1].name() != "envoy.filters.http.upstream_codec") {
+      throw EnvoyException(
+          fmt::format("The codec filter is the only valid terminal upstream filter"));
+    }
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             upstream_context_.getServerFactoryContext());
-    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
 
     std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
     Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, upstream_context_.getServerFactoryContext(),
                upstream_context_, prefix);
-    // TODO(alyssawilk) make sure we have easy to debug logs about what filters are set up.
-    helper.processFilters(http_filters, "http", "http", http_filter_factories_, false);
+    helper.processFilters(http_filters, "upstream http", "upstream http", http_filter_factories_);
   }
 }
 
@@ -1187,7 +1197,8 @@ ClusterImplBase::ClusterImplBase(
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
 #if defined(ENVOY_ENABLE_QUIC)
-    if (cluster.transport_socket().name() != "envoy.transport_sockets.quic") {
+    if (cluster.transport_socket().DebugString().find("envoy.transport_sockets.quic") ==
+        std::string::npos) {
       throw EnvoyException(
           fmt::format("HTTP3 requires a QuicUpstreamTransport transport socket: {}", cluster.name(),
                       cluster.DebugString()));
@@ -1954,6 +1965,23 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
   } else {
     host->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
   }
+}
+
+Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    Network::Address::InstanceConstSharedPtr host_address) {
+  Network::Address::InstanceConstSharedPtr health_check_address;
+  const auto& port_value = health_check_config.port_value();
+  if (health_check_config.has_address()) {
+    auto address = Network::Address::resolveProtoAddress(health_check_config.address());
+    health_check_address =
+        port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+  } else {
+    health_check_address = port_value == 0
+                               ? host_address
+                               : Network::Utility::getAddressWithPort(*host_address, port_value);
+  }
+  return health_check_address;
 }
 
 } // namespace Upstream

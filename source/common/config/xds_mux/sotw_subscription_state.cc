@@ -9,7 +9,7 @@ namespace XdsMux {
 SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              Event::Dispatcher& dispatcher,
-                                             OpaqueResourceDecoder& resource_decoder)
+                                             OpaqueResourceDecoderSharedPtr resource_decoder)
     : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher),
       resource_decoder_(resource_decoder) {}
 
@@ -59,7 +59,7 @@ void SotwSubscriptionState::handleGoodResponse(
       }
 
       auto decoded_resource =
-          DecodedResourceImpl::fromResource(resource_decoder_, any, message.version_info());
+          DecodedResourceImpl::fromResource(*resource_decoder_, any, message.version_info());
       setResourceTtl(*decoded_resource);
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
@@ -71,6 +71,7 @@ void SotwSubscriptionState::handleGoodResponse(
   // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
   // support passing of decoded resources. This would also avoid a resource copy above.
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
+  // TODO(abeyad): Add support for calling the Config::UpdateListener registered listeners.
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
