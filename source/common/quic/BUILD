@@ -58,7 +58,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_clock_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
-        "@com_github_google_quiche//:quic_core_crypto_random_lib",
+        "@com_github_google_quiche//:quiche_common_random_lib",
     ],
 )
 
