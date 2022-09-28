@@ -221,6 +221,7 @@ message FilterChain {
   reserved "tls_context";
 
   // The criteria to use when matching a connection to this filter chain.
+  // If omitted, the filter is matched always/unconditionally.
   FilterChainMatch filter_chain_match = 1;
 
   // A list of individual network filters that make up the filter chain for
