@@ -116,9 +116,10 @@ HttpServerPropertiesCacheImpl::alternateProtocolsFromString(absl::string_view al
 }
 
 HttpServerPropertiesCacheImpl::HttpServerPropertiesCacheImpl(
-    Event::Dispatcher& dispatcher, std::unique_ptr<KeyValueStore>&& key_value_store,
-    size_t max_entries)
-    : dispatcher_(dispatcher), max_entries_(max_entries > 0 ? max_entries : 1024) {
+    Event::Dispatcher& dispatcher, std::vector<std::string>&& canonical_suffixes,
+    std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
+    : dispatcher_(dispatcher), canonical_suffixes_(canonical_suffixes),
+      max_entries_(max_entries > 0 ? max_entries : 1024) {
   if (key_value_store) {
     KeyValueStore::ConstIterateCb load_protocols = [this](const std::string& key,
                                                           const std::string& value) {
@@ -158,7 +159,6 @@ void HttpServerPropertiesCacheImpl::setAlternatives(const Origin& origin,
     key_value_store_->addOrUpdate(originToString(origin), originDataToStringForCache(it->second),
                                   absl::nullopt);
   }
-  maybeSetCanonicalOrigin(origin);
 }
 
 void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::microseconds srtt) {
@@ -202,6 +202,7 @@ HttpServerPropertiesCacheImpl::ProtocolsMap::iterator
 HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
                                                  OriginDataWithOptRef& origin_data) {
   if (origin_data.protocols.has_value()) {
+    maybeSetCanonicalOrigin(origin);
     std::vector<AlternateProtocol>& protocols = *origin_data.protocols;
     static const size_t max_protocols = 10;
     if (protocols.size() > max_protocols) {
@@ -291,10 +292,6 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
   auto it = setPropertiesImpl(origin, data);
   return *it->second.h3_status_tracker;
-}
-
-void HttpServerPropertiesCacheImpl::addCanonicalSuffix(std::string suffix) {
-  canonical_suffixes_.push_back(suffix);
 }
 
 absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {

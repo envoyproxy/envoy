@@ -174,10 +174,14 @@ message AlternateProtocolsCacheOptions {
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 
   // Optional list of hostnames suffixes for which Alt-Svc entries can be shared. For example, if
-  // this list contained the value `.c.example.com`, then an Alt-Svc entry for `foo.c.example.com`
-  // could be shared with 'bar.c.example.com' but would not be shared with 'baz.example.com'. On
-  // the other hand, if the list contained the value '.youtube.com' then all three hosts could share
-  // Alt-Svc entries.
+  // this list contained the value ``.c.example.com``, then an Alt-Svc entry for ``foo.c.example.com``
+  // could be shared with ``bar.c.example.com`` but would not be shared with ``baz.example.com``. On
+  // the other hand, if the list contained the value ``.example.com`` then all three hosts could share
+  // Alt-Svc entries. Each entry must start with ``.``.  If a hostname matches multiple suffixes, the
+  // first listed suffix will be used.
+  //
+  // Since lookup in this list is O(n), it is recommended that the number of suffixes be limited.
+  // [#not-implemented-hide:]
   repeated string canonical_suffixes = 5;
 }
 

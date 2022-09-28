@@ -30,6 +30,7 @@ class HttpServerPropertiesCacheImpl : public HttpServerPropertiesCache,
                                       Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
   HttpServerPropertiesCacheImpl(Event::Dispatcher& dispatcher,
+                                std::vector<std::string>&& canonical_suffixes,
                                 std::unique_ptr<KeyValueStore>&& store, size_t max_entries);
   ~HttpServerPropertiesCacheImpl() override;
 
@@ -90,9 +91,6 @@ public:
   size_t size() const override;
   HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
-
-  // Adds `suffix` to the list of canonical suffixes.
-  void addCanonicalSuffix(std::string suffix);
 
 private:
   // Time source used to check expiration of entries.
