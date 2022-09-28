@@ -339,7 +339,8 @@ protected:
     return manager_->addOrUpdateListener(listener, version_info, added_via_api);
   }
 
-  void testListenerUpdateWithSocketOptionsChange(const std::string origin, const std::string updated) {
+  void testListenerUpdateWithSocketOptionsChange(const std::string origin,
+                                                 const std::string updated) {
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
