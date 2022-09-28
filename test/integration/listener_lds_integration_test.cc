@@ -1356,6 +1356,7 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   tcp_client3->close();
 }
 
+#if !defined(__APPLE__) && !defined(WIN32)
 TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Add the static cluster to serve LDS.
@@ -1432,6 +1433,7 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   EXPECT_EQ(opt_len2, sizeof(opt_value2));
   EXPECT_EQ(4, opt_value2);
 }
+#endif
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
