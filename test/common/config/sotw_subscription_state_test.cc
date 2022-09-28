@@ -33,7 +33,8 @@ protected:
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), callbacks_,
-        dispatcher_, resource_decoder_);
+        dispatcher_, resource_decoder_, /*xds_resources_delegate=*/absl::nullopt,
+        /*target_xds_authority=*/"");
     state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
