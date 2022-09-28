@@ -2462,7 +2462,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   {
     // Test additional_source_addresses from bootstrap.
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
+    cm_.bind_config_.add_additional_source_addresses()->mutable_source_address()->set_address(
+        "2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2498,7 +2499,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     // Test two same IP version addresses.
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     cm_.bind_config_.clear_additional_source_addresses();
-    cm_.bind_config_.add_additional_source_addresses()->set_address("1.2.3.6");
+    cm_.bind_config_.add_additional_source_addresses()->mutable_source_address()->set_address(
+        "1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2517,8 +2519,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     // Test more than two multiple source addresses
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     cm_.bind_config_.clear_additional_source_addresses();
-    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
-    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::2");
+    cm_.bind_config_.add_additional_source_addresses()->mutable_source_address()->set_address(
+        "2001::1");
+    cm_.bind_config_.add_additional_source_addresses()->mutable_source_address()->set_address(
+        "2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2536,7 +2540,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     // Test non IP address case.
     cm_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     cm_.bind_config_.clear_additional_source_addresses();
-    cm_.bind_config_.add_additional_source_addresses()->set_address("2001::1");
+    cm_.bind_config_.add_additional_source_addresses()->mutable_source_address()->set_address(
+        "2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2569,10 +2574,14 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   {
     // Test cluster config has more than two multiple source addresses
     config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
-    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
-        "2001::1");
-    config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
-        "2001::2");
+    config.mutable_upstream_bind_config()
+        ->add_additional_source_addresses()
+        ->mutable_source_address()
+        ->set_address("2001::1");
+    config.mutable_upstream_bind_config()
+        ->add_additional_source_addresses()
+        ->mutable_source_address()
+        ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
