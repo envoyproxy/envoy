@@ -10,7 +10,7 @@ behavior_changes:
     Previously a listener update with different :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` was ignored.
     Now, when the :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` are updated, a new socket will be created for
     the listener and the new :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` applied to it. This only happens when reuse_port is true.
-    Otherwise if socket options change the update is NACKd. New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is added for revert this behavior.
+    Otherwise if socket options change the update is rejected. New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is added for revert this behavior.
 - area: stats http local_rate_limit
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
