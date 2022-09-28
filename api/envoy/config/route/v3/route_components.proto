@@ -151,7 +151,7 @@ message VirtualHost {
   //   This option has been deprecated. Please use
   //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
   //   to configure the CORS HTTP filter.
-  CorsPolicy cors = 8 [deprecated = true];
+  CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
@@ -1270,7 +1270,7 @@ message RouteAction {
   //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
   //   :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
   //   to configure the CORS HTTP filter.
-  CorsPolicy cors = 17 [deprecated = true];
+  CorsPolicy cors = 17 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the
