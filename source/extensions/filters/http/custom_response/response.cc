@@ -63,9 +63,9 @@ Response::getStatusCodeForLocalReply(const Http::ResponseHeaderMap& response_hea
   return code;
 }
 
-void Response::formatBody(Http::RequestHeaderMap& request_headers,
-                          Http::ResponseHeaderMap& response_headers,
-                          StreamInfo::StreamInfo& stream_info, std::string& body) const {
+void Response::formatBody(const Http::RequestHeaderMap& request_headers,
+                          const Http::ResponseHeaderMap& response_headers,
+                          const StreamInfo::StreamInfo& stream_info, std::string& body) const {
 
   if (local_body_.has_value()) {
     body = local_body_.value();

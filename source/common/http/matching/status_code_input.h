@@ -15,7 +15,7 @@ namespace Matching {
 class HttpResponseStatusCodeInput : public Matcher::DataInput<HttpMatchingData> {
 public:
   HttpResponseStatusCodeInput() = default;
-  ~HttpResponseStatusCodeInput() = default;
+  ~HttpResponseStatusCodeInput() override = default;
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.responseHeaders();
@@ -37,7 +37,7 @@ public:
 class HttpResponseStatusCodeClassInput : public Matcher::DataInput<HttpMatchingData> {
 public:
   HttpResponseStatusCodeClassInput() = default;
-  ~HttpResponseStatusCodeClassInput() = default;
+  ~HttpResponseStatusCodeClassInput() override = default;
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = data.responseHeaders();

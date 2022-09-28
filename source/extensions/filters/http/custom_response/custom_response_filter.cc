@@ -151,8 +151,10 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // Handle local body
   std::string body;
   Http::Code code = custom_response->getStatusCodeForLocalReply(headers);
-  custom_response->formatBody(*downstream_headers_, headers, encoder_callbacks_->streamInfo(),
-                              body);
+  if (encoder_callbacks_->streamInfo().getRequestHeaders() != nullptr) {
+    custom_response->formatBody(*encoder_callbacks_->streamInfo().getRequestHeaders(), headers,
+                                encoder_callbacks_->streamInfo(), body);
+  }
 
   const auto mutate_headers = [custom_response = custom_response,
                                this](Http::ResponseHeaderMap& headers) {

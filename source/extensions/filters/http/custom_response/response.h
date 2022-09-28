@@ -30,9 +30,9 @@ public:
            Server::Configuration::CommonFactoryContext& context);
 
   // Rewrite the response body for locally specified bodies.
-  void formatBody(Http::RequestHeaderMap& request_headers,
-                  Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
-                  std::string& body) const;
+  void formatBody(const Http::RequestHeaderMap& request_headers,
+                  const Http::ResponseHeaderMap& response_headers,
+                  const StreamInfo::StreamInfo& stream_info, std::string& body) const;
 
   void mutateHeaders(Http::ResponseHeaderMap& response_headers,
                      StreamInfo::StreamInfo& stream_info) const;

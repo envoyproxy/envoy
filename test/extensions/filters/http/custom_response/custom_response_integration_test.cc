@@ -92,8 +92,7 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  CustomResponseIntegrationTest()
-      : HttpProtocolIntegrationTest(), custom_response_filter_config_{kDefaultConfig} {}
+  CustomResponseIntegrationTest() : custom_response_filter_config_{kDefaultConfig} {}
 
   void setPerRouteConfig(Route* route, const CustomResponse& cfg) {
     Any cfg_any;
