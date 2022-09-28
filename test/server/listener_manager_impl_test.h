@@ -371,11 +371,11 @@ protected:
     EXPECT_CALL(*listener_origin, onDestroy());
   }
 
-    void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(const std::string origin,
-                                                 const std::string updated) {
+  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(const std::string origin,
+                                                                   const std::string updated) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
+        {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
@@ -393,7 +393,7 @@ protected:
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
     ListenerHandle* listener_updated = expectListenerCreate(true, true);
-    EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(1);
+    EXPECT_CALL(*listener_factory_.socket_, duplicate());
     EXPECT_CALL(listener_updated->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
 
