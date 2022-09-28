@@ -234,6 +234,7 @@ envoy.filters.http.cors:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.cors.v3.Cors
+  - envoy.extensions.filters.http.cors.v3.CorsPolicy
 envoy.filters.http.csrf:
   categories:
   - envoy.filters.http
