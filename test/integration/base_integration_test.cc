@@ -347,19 +347,16 @@ bool BaseIntegrationTest::getSocketOption(const std::string listener_name, int l
   l.Unlock();
 
   for (auto& listener : listeners) {
-    ENVOY_LOG_MISC(debug, "######### check {}", listener.get().name());
     if (listener.get().name() == listener_name) {
       for (auto& socket_factory : listener.get().listenSocketFactories()) {
         auto socket = socket_factory->getListenSocket(0);
         if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
-          ENVOY_LOG_MISC(debug, "######### failed");
           return false;
         }
       }
       return true;
     }
   }
-  ENVOY_LOG_MISC(debug, "######### didn't find");
   return false;
 }
 
