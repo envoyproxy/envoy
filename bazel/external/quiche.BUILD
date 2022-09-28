@@ -5357,6 +5357,55 @@ envoy_cc_test(
 )
 
 envoy_cc_library(
+    name = "quic_load_balancer_server_id_lib",
+    srcs = ["src/quic/load_balancer/load_balancer_server_id.cc"],
+    hdrs = ["src/quic/load_balancer/load_balancer_server_id.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_load_balancer_config_lib",
+    srcs = ["src/quic/load_balancer/load_balancer_config.cc"],
+    hdrs = ["src/quic/load_balancer/load_balancer_config.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_load_balancer_server_id_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_load_balancer_encoder_lib",
+    srcs = ["src/quic/load_balancer/load_balancer_encoder.cc"],
+    hdrs = ["src/quic/load_balancer/load_balancer_encoder.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_connection_id_generator_interface_lib",
+        ":quic_core_crypto_random_lib",
+        ":quic_core_data_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_load_balancer_config_lib",
+        ":quic_load_balancer_server_id_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
     name = "quiche_common_platform_lower_case_string",
     hdrs = ["quiche/common/platform/api/quiche_lower_case_string.h"],
     repository = "@envoy",
