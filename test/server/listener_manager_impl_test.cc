@@ -2073,6 +2073,37 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
+}
+
 TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptions) {
   const std::string listener_origin = R"EOF(
 name: foo
