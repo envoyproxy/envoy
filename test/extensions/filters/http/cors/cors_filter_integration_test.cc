@@ -95,7 +95,11 @@ std::vector<TestParam> testParams() {
   std::vector<TestParam> params;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     params.push_back({ip_version, true});
+
+    // Ignore the 'cors' field tests if the deprecated feature is disabled by compile time flag.
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
     params.push_back({ip_version, false});
+#endif
   }
   return params;
 }
@@ -123,8 +127,6 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
-
     config_helper_.prependFilter("name: envoy.filters.http.cors");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
