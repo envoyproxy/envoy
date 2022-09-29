@@ -25,8 +25,7 @@ namespace OpenTelemetry {
 // Note: OpenTelemetry protos are extra flexible and used also in the OT collector for batching and
 // so forth. As a result, some fields are repeated, but for our use case we assume the following
 // structure:
-// ExportLogsServiceRequest -> (single) ResourceLogs -> (single) InstrumentationLibraryLogs ->
-// (repeated) LogRecord.
+// ExportLogsServiceRequest -> (single) ResourceLogs -> (single) ScopeLogs -> (repeated) LogRecord.
 class GrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<
           opentelemetry::proto::logs::v1::LogRecord,
@@ -55,7 +54,7 @@ private:
   void initMessage() override;
   void clearMessage() override;
 
-  opentelemetry::proto::logs::v1::InstrumentationLibraryLogs* root_;
+  opentelemetry::proto::logs::v1::ScopeLogs* root_;
 };
 
 class GrpcAccessLoggerCacheImpl
