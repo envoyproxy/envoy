@@ -1,7 +1,8 @@
 #include "source/common/common/key_value_store_base.h"
 
-#include <algorithm>
 #include <bits/chrono.h>
+
+#include <algorithm>
 #include <chrono>
 
 #include "absl/cleanup/cleanup.h"
@@ -73,7 +74,8 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       auto token = getToken(contents, error);
       if (token.has_value()) {
         if (absl::SimpleAtoi(token.value(), &ttlInt)) {
-          ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::seconds(ttlInt) - std::chrono::system_clock::now().time_since_epoch()));
+          ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
+              std::chrono::seconds(ttlInt) - std::chrono::system_clock::now().time_since_epoch()));
         }
       }
     }
