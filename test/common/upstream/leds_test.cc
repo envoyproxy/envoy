@@ -32,8 +32,6 @@ namespace {
 
 class LedsTest : public testing::Test {
 public:
-  LedsTest() : api_(Api::createApiForTest(stats_)) {}
-
   // Builds an LbEndpoint proto object.
   static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(const std::string& address,
                                                                  uint32_t port) {
@@ -87,15 +85,15 @@ public:
   void initialize() { initialize(makeLedsConfiguration(DEFAULT_LEDS_CONFIG_YAML)); }
 
   void initialize(const envoy::config::endpoint::v3::LedsClusterLocalityConfig& leds_config) {
-    local_info_.node_.mutable_locality()->set_zone("us-east-1a");
+    server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
 
     cluster_scope_ = stats_.createScope("cluster.xds_cluster.");
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *cluster_scope_, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *cluster_scope_, server_context_.cluster_manager_,
+        stats_, validation_visitor_);
 
     // Setup LEDS subscription.
-    EXPECT_CALL(cm_.subscription_factory_,
+    EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
                 collectionSubscriptionFromUrl(
                     _, _,
                     Eq(envoy::config::endpoint::v3::LbEndpoint().GetDescriptor()->full_name()), _,
@@ -151,23 +149,15 @@ public:
   )EOF"};
 
   // Number of times the LEDS subscription callback was called.
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   uint32_t callbacks_called_counter_{0};
   Stats::TestUtil::TestStore stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<MockClusterManager> cm_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   Envoy::Stats::ScopeSharedPtr cluster_scope_;
   LedsSubscriptionPtr leds_subscription_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-  Server::MockOptions options_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   Config::SubscriptionCallbacks* leds_callbacks_{};
 };
