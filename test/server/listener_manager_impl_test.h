@@ -339,8 +339,8 @@ protected:
     return manager_->addOrUpdateListener(listener, version_info, added_via_api);
   }
 
-  void testListenerUpdateWithSocketOptionsChange(const std::string origin,
-                                                 const std::string updated) {
+  void testListenerUpdateWithSocketOptionsChange(const std::string& origin,
+                                                 const std::string& updated) {
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
@@ -375,8 +375,38 @@ protected:
     EXPECT_CALL(*listener_origin, onDestroy());
   }
 
-  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(const std::string origin,
-                                                                   const std::string updated) {
+  void testListenerUpdateWithSocketOptionsChangeRejected(const std::string& origin,
+                                                         const std::string& updated,
+                                                         const std::string& message) {
+    InSequence s;
+
+    EXPECT_CALL(*worker_, start(_, _));
+    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+    auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
+
+    ListenerHandle* listener_origin = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+        .WillOnce(Return(socket));
+    EXPECT_CALL(listener_origin->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
+    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    listener_origin->target_.ready();
+    worker_->callAddCompletion();
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+    ListenerHandle* listener_updated = expectListenerCreate(true, true);
+    EXPECT_CALL(*listener_updated, onDestroy());
+    EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(updated)), EnvoyException,
+                              message);
+
+    EXPECT_CALL(*listener_origin, onDestroy());
+  }
+
+  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(const std::string& origin,
+                                                                   const std::string& updated) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});

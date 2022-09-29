@@ -2236,13 +2236,8 @@ filter_chains:
 }
 
 TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
-  InSequence s;
-
-  EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
-
   // Add and initialize foo listener.
-  const std::string listener_foo_yaml = R"EOF(
+  const std::string listener_origin = R"EOF(
 name: foo
 address:
   socket_address:
@@ -2256,19 +2251,8 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
-  EXPECT_CALL(listener_foo->target_, initialize());
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
-  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-  EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  listener_foo->target_.ready();
-  worker_->callAddCompletion();
-  EXPECT_EQ(1UL, manager_->listeners().size());
-  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
   // Add new listener bar with same address as foo, but with different socket options
-  const std::string listener_bar_update1_yaml = R"EOF(
+  const std::string listener_updated = R"EOF(
 name: bar
 address:
   socket_address:
@@ -2282,23 +2266,15 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_bar_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_bar_update1, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(
-      addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_update1_yaml)), EnvoyException,
-      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener");
-
-  EXPECT_CALL(*listener_foo, onDestroy());
+  const std::string expected_error_message =
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
-  InSequence s;
-
-  EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
-
   // Add and initialize foo listener and the default value of enable_reuse_port is true.
-  const std::string listener_foo_yaml = R"EOF(
+  const std::string listener_origin = R"EOF(
 name: foo
 address:
   socket_address:
@@ -2308,19 +2284,8 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
-  EXPECT_CALL(listener_foo->target_, initialize());
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
-  checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
-  EXPECT_CALL(*worker_, addListener(_, _, _, _));
-  listener_foo->target_.ready();
-  worker_->callAddCompletion();
-  EXPECT_EQ(1UL, manager_->listeners().size());
-  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
-
   // update listener foo, with enable_reuse_port as false.
-  const std::string listener_bar_update1_yaml = R"EOF(
+  const std::string listener_updated = R"EOF(
 name: foo
 address:
   socket_address:
@@ -2331,12 +2296,9 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ListenerHandle* listener_bar_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_bar_update1, onDestroy());
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_update1_yaml)),
-                            EnvoyException, "Listener foo: reuse port doesn't support change");
-
-  EXPECT_CALL(*listener_foo, onDestroy());
+  const std::string expected_error_message = "Listener foo: reuse port doesn't support change";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
