@@ -994,7 +994,7 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     // We need to calculate the reuse port's default value then ensure whether it is changed or not.
     // Since reuse port's default value isn't the YAML bool field default value. When
     // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
-    // default value to do the comparion.
+    // default value to do the comparison.
     return reuse_port_ == getReusePortOrDefault(parent_.server_, config, socket_type_);
   }
 
