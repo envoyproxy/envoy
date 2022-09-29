@@ -19,10 +19,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message Thrift {
-  reserved 1, 5;
-
-  reserved "service_name", "request_headers_to_add";
-
   // Specifies the method name that will be set on each health check request dispatched to an upstream host.
   // Note that method name is case sensitive.
   string method_name = 2 [(validate.rules).string = {min_len: 1}];

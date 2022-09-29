@@ -33,7 +33,8 @@ ThriftHealthChecker::ThriftHealthChecker(
   if (transport_ == TransportType::Auto || protocol_ == ProtocolType::Auto ||
       protocol_ == ProtocolType::Twitter) {
     throw EnvoyException(
-        fmt::format("Invalid thrift health check configuration: {}", thrift_config.DebugString()));
+        fmt::format("Unsupported transport or protocol in thrift health check configuration: {}",
+                    thrift_config.DebugString()));
   }
 }
 
