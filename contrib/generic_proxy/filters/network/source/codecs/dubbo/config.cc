@@ -73,10 +73,10 @@ StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
 } // namespace
 
 void DubboRequest::forEach(IterateCallback callback) const {
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
-         nullptr);
   const auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
+  ASSERT(typed_request != nullptr);
+
   // TODO(wbpcode): better attachment structure is necessary to simplify these code the improve
   // performance.
   typed_request->attachment().headers().iterate(
@@ -94,10 +94,9 @@ absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) 
     return inner_metadata_->request().serviceVersion();
   }
 
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
-         nullptr);
   const auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
+  ASSERT(typed_request != nullptr);
 
   const auto* result = typed_request->attachment().lookup(std::string(key));
   if (result == nullptr) {
@@ -106,10 +105,10 @@ absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) 
   return absl::make_optional<absl::string_view>(*result);
 }
 void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
-  ASSERT(dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest()) !=
-         nullptr);
   auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
+  ASSERT(typed_request != nullptr);
+
   typed_request->mutableAttachment()->insert(std::string(key), std::string(val));
 }
 
@@ -140,8 +139,8 @@ void DubboResponse::refreshGenericStatus() {
 DubboCodecBase::DubboCodecBase(Common::Dubbo::DubboCodecPtr codec) : codec_(std::move(codec)) {}
 
 ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_request) {
-  ASSERT(dynamic_cast<const DubboRequest*>(&origin_request) != nullptr);
-  const auto* type_request = static_cast<const DubboRequest*>(&origin_request);
+  const auto* typed_request = dynamic_cast<const DubboRequest*>(&origin_request);
+  ASSERT(typed_request != nullptr);
 
   Common::Dubbo::ResponseStatus response_status;
   absl::optional<Common::Dubbo::RpcResponseType> optional_type;
@@ -156,7 +155,7 @@ ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_r
   }
 
   return std::make_unique<DubboResponse>(Common::Dubbo::DirectResponseUtil::localResponse(
-      *type_request->inner_metadata_, response_status, optional_type, content));
+      *typed_request->inner_metadata_, response_status, optional_type, content));
 }
 
 CodecFactoryPtr
