@@ -322,6 +322,8 @@ public:
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
 
+  // Compare whether two listeners have diffrent socket options.
+  bool compareSocketOptions(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.

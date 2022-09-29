@@ -458,7 +458,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
           *origin.filter_chain_manager_)),
-      reuse_port_(origin.reuse_port_),
+      reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
                             ASSERT(workers_started_);
@@ -1065,14 +1065,12 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
+bool ListenerImpl::compareSocketOptions(const ListenerImpl& other) const {
+  return ListenerMessageUtil::compareSocketOptions(config_, other.config_);
+}
+
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
-    return false;
-  }
-
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_update_listener_socket_options") &&
-      !ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
     return false;
   }
 
@@ -1108,7 +1106,6 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   if (socket_type_ != other.socket_type_) {
     return false;
   }
-
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
   // sure we are not duplicating the address. This avoids ambiguity about which non-binding
   // listener is used or even worse for the binding to port != 0 and reuse port case multiple
