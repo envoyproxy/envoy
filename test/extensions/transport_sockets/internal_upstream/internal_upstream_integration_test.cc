@@ -30,7 +30,7 @@ public:
     if (buffer_size_specified_) {
       config.mutable_buffer_size()->set_value(buffer_size_);
     }
-    auto * boostrap_extension = bootstrap.add_bootstrap_extensions();
+    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
     boostrap_extension->mutable_typed_config()->PackFrom(config);
     boostrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
@@ -123,16 +123,21 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  // Send bidirectional data through the internal connection.
   void internalConnectionBufferSizeTest() {
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    // Send HTTP request with 10 KiB data.
+    // Send HTTP request with 10 KiB payload.
     auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10240);
     waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    // Send HTTP response with 20 KiB payload.
+    upstream_request_->encodeData(20480, true);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(10240U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(20480U, response->body().size());
     cleanupUpstreamAndDownstream();
   }
 
