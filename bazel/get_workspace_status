@@ -45,7 +45,8 @@ git_branch=$(git rev-parse --abbrev-ref HEAD)
 echo "BUILD_SCM_BRANCH ${git_branch}"
 
 git_remote=$(git remote get-url origin)
-if [[ $? == 0 ]]; then
+git_remote_code=$?
+if [[ git_remote_code == 0 ]]; then
     echo "BUILD_SCM_REMOTE ${git_remote}"
 fi
 
