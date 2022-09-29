@@ -123,6 +123,8 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
+
     config_helper_.prependFilter("name: envoy.filters.http.cors");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -205,10 +207,6 @@ public:
 protected:
   void testPreflight(Http::TestRequestHeaderMapImpl&& request_headers,
                      Http::TestResponseHeaderMapImpl&& expected_response_headers) {
-    // Ensure the deprecated 'cors' field could be initialized correctly.
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
-
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -219,10 +217,6 @@ protected:
 
   void testNormalRequest(Http::TestRequestHeaderMapImpl&& request_headers,
                          Http::TestResponseHeaderMapImpl&& expected_response_headers) {
-    // Ensure the deprecated 'cors' field could be initialized correctly.
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
-
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
