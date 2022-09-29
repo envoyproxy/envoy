@@ -377,25 +377,6 @@ absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectRespons
   return ret;
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
-                               Runtime::Loader& loader)
-    : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
-      allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-      max_age_(config.max_age()) {
-  for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            string_match));
-  }
-  if (config.has_allow_credentials()) {
-    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
-  }
-  if (config.has_allow_private_network_access()) {
-    allow_private_network_access_ =
-        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
-  }
-}
-
 void validateMirrorClusterSpecifier(
     const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {

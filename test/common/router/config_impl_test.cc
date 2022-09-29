@@ -6671,7 +6671,7 @@ virtual_hosts:
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-TEST_F(RoutePropertyTest, TestVHostCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
@@ -6733,7 +6733,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
-TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"

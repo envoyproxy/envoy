@@ -267,3 +267,11 @@ deprecated:
     deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted
     clusters. The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
     will be used as the total weight.
+- area: cors
+  change: |
+    deprecated :ref:`cors field of virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.cors>` and
+    :ref:`cors field of route action <envoy_v3_api_field_config.route.v3.RouteAction.cors>`. Please use
+    :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`,
+    :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+    :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+    to configure the CORS HTTP filter by the type :ref:`CorsPolicy in filter <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`.

@@ -146,10 +146,27 @@ private:
 
 /**
  * Implementation of CorsPolicy that reads from the proto route and virtual host config.
+ * TODO(wbpcode): move all cors interfaces and implementation to 'extensions/filters/http/cors'.
  */
-class CorsPolicyImpl : public CorsPolicy {
+template <class ProtoType> class CorsPolicyImplBase : public CorsPolicy {
 public:
-  CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config, Runtime::Loader& loader);
+  CorsPolicyImplBase(const ProtoType& config, Runtime::Loader& loader)
+      : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
+        allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
+        max_age_(config.max_age()) {
+    for (const auto& string_match : config.allow_origin_string_match()) {
+      allow_origins_.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              string_match));
+    }
+    if (config.has_allow_credentials()) {
+      allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
+    }
+    if (config.has_allow_private_network_access()) {
+      allow_private_network_access_ =
+          PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
+    }
+  }
 
   // Router::CorsPolicy
   const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
@@ -181,7 +198,7 @@ public:
   };
 
 private:
-  const envoy::config::route::v3::CorsPolicy config_;
+  const ProtoType config_;
   Runtime::Loader& loader_;
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
@@ -191,6 +208,7 @@ private:
   absl::optional<bool> allow_credentials_{};
   absl::optional<bool> allow_private_network_access_{};
 };
+using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
 class ConfigImpl;
 /**
