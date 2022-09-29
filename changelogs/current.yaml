@@ -11,7 +11,12 @@ behavior_changes:
     :ref:`tcp_fast_open_queue_length <envoy_v3_api_field_config.listener.v3.Listener.tcp_fast_open_queue_length>` or :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` was ignored.
     Now, when those fields are updated, a new socket will be created for
     the listener and the new value of those fields applied to it. This only happens when reuse_port is true.
-    Otherwise if those fields change the update is rejected. New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is added for revert this behavior.
+    Otherwise if those fields change the update is rejected.
+    New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is added for revert this behavior.
+- area: listener
+  change: |
+    Previously a listener update with different :ref:<enable_reuse_port `envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port`> value will be ignored. Now,
+    this kind of update will be rejected. Also the runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
 - area: stats http local_rate_limit
   change: |
     Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
