@@ -25,8 +25,18 @@ public:
     setUpstreamCount(1);
   }
 
+  void setupBootstrapExtension(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
+    if (buffer_size_specified_) {
+      config.mutable_buffer_size()->set_value(buffer_size_);
+    }
+    auto * boostrap_extension = bootstrap.add_bootstrap_extensions();
+    boostrap_extension->mutable_typed_config()->PackFrom(config);
+    boostrap_extension->set_name("envoy.bootstrap.internal_listener");
+  }
   void initialize() override {
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      setupBootstrapExtension(bootstrap);
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters()->Add();
       cluster->set_name("internal_upstream");
@@ -102,13 +112,6 @@ public:
           auto* route = virtual_host->mutable_routes(0);
           route->mutable_route()->set_cluster("internal_upstream");
         });
-    config_helper_.addBootstrapExtension(fmt::format(R"EOF(
-    name: envoy.bootstrap.internal_listener
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
-      buffer_size: {}
-    )EOF",
-                                                     buffer_size_));
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
@@ -121,8 +124,15 @@ public:
   }
 
   void internalConnectionBufferSizeTest() {
-    auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    // Send HTTP request with 10 KiB data.
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10240);
     waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
     cleanupUpstreamAndDownstream();
   }
 
@@ -135,6 +145,7 @@ public:
   }};
   bool add_metadata_{true};
   bool use_transport_socket_{true};
+  bool buffer_size_specified_{false};
   uint32_t buffer_size_{0};
 };
 
@@ -189,24 +200,39 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
 
 TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTestDefault) {
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
   EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 1048576",
                       internalConnectionBufferSizeTest());
 }
 
 TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest128KB) {
+  buffer_size_specified_ = true;
   buffer_size_ = 128;
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
   EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 131072",
                       internalConnectionBufferSizeTest());
 }
 
 TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest8MB) {
+  buffer_size_specified_ = true;
   buffer_size_ = 8192;
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
   EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 8388608",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest1KB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 1;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 1024",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest5KB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 5;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 5120",
                       internalConnectionBufferSizeTest());
 }
 

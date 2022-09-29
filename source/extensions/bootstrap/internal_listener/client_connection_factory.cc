@@ -15,7 +15,8 @@ namespace InternalListener {
 
 ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
-uint32_t InternalClientConnectionFactory::buffer_size_ = INTERNAL_CONNECTION_DEFAULT_BUFFER_SIZE;
+// The default buffer size is 1024 KiB.
+uint32_t InternalClientConnectionFactory::buffer_size_ = 1024;
 
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
     Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
@@ -32,8 +33,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
 
   ENVOY_LOG(debug, "Internal client connection buffer size {}.", buffer_size_);
   auto [io_handle_client, io_handle_server] =
-      Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(
-          buffer_size_);
+      Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(buffer_size_);
 
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
       dispatcher,

@@ -17,12 +17,9 @@ InternalListenerExtension::InternalListenerExtension(
     const envoy::extensions::bootstrap::internal_listener::v3::InternalListener& config)
     : server_context_(server_context),
       tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {
-  // Convert buffer size proto config to KB. If configuration is zero or not specified,
-  // assign default buffer size to be 1MB.
-  buffer_size_ = config.buffer_size().value() * 1024;
-  if (buffer_size_ == 0) {
-    buffer_size_ = INTERNAL_CONNECTION_DEFAULT_BUFFER_SIZE;
-  }
+  // Get buffer size config in K bytes. The default buffer size is 1024 KiB.
+  buffer_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size, 1024) * 1024;
+
   // Initialize this singleton before the listener manager potentially load a static internal
   // listener.
   server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
@@ -50,10 +47,8 @@ void InternalListenerExtension::onServerInitialized() {
   // ``InternalClientConnectionFactory``.
   // Note that the per silo ``ConnectionHandler`` will add internal listeners into the per silo
   // registry.
-  Extensions::Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
-      tls_registry_->tls_slot_.get();
-  Extensions::Bootstrap::InternalListener::InternalClientConnectionFactory::buffer_size_ =
-      buffer_size_;
+  InternalClientConnectionFactory::registry_tls_slot_ = tls_registry_->tls_slot_.get();
+  InternalClientConnectionFactory::buffer_size_ = buffer_size_;
 }
 
 Server::BootstrapExtensionPtr InternalListenerFactory::createBootstrapExtension(

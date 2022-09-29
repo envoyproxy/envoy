@@ -15,8 +15,6 @@ namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
 
-#define INTERNAL_CONNECTION_DEFAULT_BUFFER_SIZE (1024 * 1024)
-
 // This factory creates the client connection to an envoy internal address.
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
