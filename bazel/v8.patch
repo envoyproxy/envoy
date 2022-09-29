@@ -7,6 +7,9 @@
 # 7. Fix build errors in SIMD IndexOf/includes (https://crrev.com/c/3749192).
 # 8. Fix build on arm64.
 # 9. Fix build on older versions of Linux.
+# 10. Fix MemoryAllocator::PartialFreeMemory() which shouldn't try to change permissions of RWX pages,
+#     mainly affecting macOS on Apple silicon (https://crrev.com/c/3700352). This can be removed
+#     when we adopt 10.5 or higher (https://github.com/envoyproxy/envoy/issues/23258).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 13f2a5bebf..2197568c48 100644
@@ -363,3 +366,37 @@ index 131ff9614e..6455f8757d 100644
      char filename[] = "/tmp/v8_tmp_file_for_testing_XXXXXX";
      fd = mkstemp(filename);
      if (fd != -1) CHECK_EQ(0, unlink(filename));
+diff --git a/src/heap/memory-allocator.cc b/src/heap/memory-allocator.cc
+index de143d8ea7..cca4dfe5dd 100644
+--- a/src/heap/memory-allocator.cc
++++ b/src/heap/memory-allocator.cc
+@@ -416,8 +416,14 @@ void MemoryAllocator::PartialFreeMemory(BasicMemoryChunk* chunk,
+     DCHECK_EQ(0, chunk->area_end() % static_cast<Address>(page_size));
+     DCHECK_EQ(chunk->address() + chunk->size(),
+               chunk->area_end() + MemoryChunkLayout::CodePageGuardSize());
+-    reservation->SetPermissions(chunk->area_end(), page_size,
+-                                PageAllocator::kNoAccess);
++
++    if (V8_HEAP_USE_PTHREAD_JIT_WRITE_PROTECT && !isolate_->jitless()) {
++      DCHECK(isolate_->RequiresCodeRange());
++      reservation->DiscardSystemPages(chunk->area_end(), page_size);
++    } else {
++      reservation->SetPermissions(chunk->area_end(), page_size,
++                                  PageAllocator::kNoAccess);
++    }
+   }
+   // On e.g. Windows, a reservation may be larger than a page and releasing
+   // partially starting at |start_free| will also release the potentially
+@@ -686,10 +692,10 @@ bool MemoryAllocator::SetPermissionsOnExecutableMemoryChunk(VirtualMemory* vm,
+   const Address code_area = start + code_area_offset;
+   const Address post_guard_page = start + chunk_size - guard_size;
+
+-  bool jitless = unmapper_.heap_->isolate()->jitless();
++  bool jitless = isolate_->jitless();
+
+   if (V8_HEAP_USE_PTHREAD_JIT_WRITE_PROTECT && !jitless) {
+-    DCHECK(unmapper_.heap_->isolate()->RequiresCodeRange());
++    DCHECK(isolate_->RequiresCodeRange());
+     // Commit the header, from start to pre-code guard page.
+     // We have to commit it as executable becase otherwise we'll not be able
+     // to change permissions to anything else.
