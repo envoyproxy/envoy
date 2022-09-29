@@ -376,6 +376,10 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
+  if (!metadata->validate(settings()->traServiceConfig().has_grpc_service())) {
+    ENVOY_LOG(error, "Invalid message received. Dropping message.");
+    return nullptr;
+  }
   std::string&& k = std::string(metadata->transactionId().value());
   if ((!settings()->UpstreamTransactionsEnabled()) &&
       (metadata->msgType() == MsgType::Response)) {
