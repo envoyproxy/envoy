@@ -2204,6 +2204,60 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Test that we drain or close all HTTP or TCP connection pool connections when there is a host
+// health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
+TEST_F(ClusterManagerImplTest,
+       CloseConnectionsOnHealthFailureWithCloseConnectionsOnHostHealthFailure) {
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(*cluster1->info_, features())
+      .WillRepeatedly(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
+  cluster1->info_->name_ = "some_cluster";
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+  MockHealthChecker health_checker;
+  ON_CALL(*cluster1, healthChecker()).WillByDefault(Return(&health_checker));
+
+  Outlier::MockDetector outlier_detector;
+  ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+  Http::ConnectionPool::MockInstance* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+  Tcp::ConnectionPool::MockInstance* cp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+
+  InSequence s;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+  EXPECT_CALL(*cluster1, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  create(parseBootstrapFromV3Json(json));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->tcpConnPool(ResourcePriority::Default, nullptr);
+
+  // Order of these calls is implementation dependent, so can't sequence them!
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, closeConnections());
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 // Test that we close all HTTP connection pool connections when there is a host health failure.
 // Verify that the pool gets deleted if it is idle, and that a crash does not occur due to
 // deleting a container while iterating through it (see `do_not_delete_` in

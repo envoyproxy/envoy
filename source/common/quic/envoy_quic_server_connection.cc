@@ -56,6 +56,8 @@ EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
 
 quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(
     const quic::QuicConnectionId& old_connection_id) const {
+  // Deprecate the class once the QUICHE flag is deprecated.
+  ASSERT(!GetQuicReloadableFlag(quic_connection_uses_abstract_connection_id_generator));
   quic::QuicConnectionId new_connection_id =
       quic::QuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(old_connection_id);
   adjustNewConnectionIdForRoutine(new_connection_id, old_connection_id);

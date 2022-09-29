@@ -64,4 +64,10 @@ CONTRIB_EXTENSIONS = {
     #
     "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
     "envoy.generic_proxy.codecs.dubbo":                          "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
 }
