@@ -17,12 +17,42 @@
 using testing::An;
 using testing::IsSubstring;
 using testing::NiceMock;
+using testing::SizeIs;
 using testing::Throw;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Config {
 namespace {
+
+constexpr char RESOURCE_VERSION[] = "555";
+
+// A test implementation of the XdsResourcesDelegate for the purposes of this test.
+class TestXdsResourcesDelegate : public XdsResourcesDelegate {
+  void onConfigUpdated(const XdsSourceId& /*source_id*/,
+                       const std::vector<DecodedResourceRef>& /*resources*/) override {}
+
+  void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
+                            const std::string& /*resource_name*/,
+                            const absl::optional<EnvoyException>& /*exception*/) override {}
+
+  std::vector<envoy::service::discovery::v3::Resource>
+  getResources(const Config::XdsSourceId& /*source_id*/,
+               const std::vector<std::string>& resource_names) const override {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
+    resources.reserve(resource_names.size());
+    for (const std::string& resource_name : resource_names) {
+      envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+      cla.set_cluster_name(resource_name);
+      envoy::service::discovery::v3::Resource resource;
+      resource.mutable_resource()->PackFrom(cla);
+      resource.set_name(cla.cluster_name());
+      resource.set_version(RESOURCE_VERSION);
+      resources.emplace_back(std::move(resource));
+    }
+    return resources;
+  }
+};
 
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
@@ -31,10 +61,11 @@ protected:
             std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                 envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
+    xds_resources_delegate_ = std::make_unique<TestXdsResourcesDelegate>();
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), callbacks_,
-        dispatcher_, resource_decoder_, /*xds_resources_delegate=*/absl::nullopt,
-        /*target_xds_authority=*/"");
+        dispatcher_, resource_decoder_, *xds_resources_delegate_,
+        /*target_xds_authority=*/"some_random_xds_server");
     state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
@@ -111,6 +142,7 @@ protected:
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* ttl_timer_;
+  std::unique_ptr<XdsResourcesDelegate> xds_resources_delegate_;
   // We start out interested in three resources: name1, name2, and name3.
   std::unique_ptr<XdsMux::SotwSubscriptionState> state_;
 };
@@ -257,6 +289,12 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
   // the WatchMap, which then calls GrpcSubscriptionImpl(s). It is the GrpcSubscriptionImpl
   // that will decline to pass on an onConfigUpdateFailed(ConnectionFailure).
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // The XdsResourcesDelegate supplies the 3 requested resources, so we expect an onConfigUpdate
+  // callback.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(SizeIs(3)),
+                             std::string(RESOURCE_VERSION)));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleEstablishmentFailure();
 }
 
