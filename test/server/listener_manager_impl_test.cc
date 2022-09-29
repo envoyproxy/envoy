@@ -2162,7 +2162,6 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
 
-#ifdef IP_TRANSPARENT
 TEST_P(ListenerManagerImplTest, UpdateListenerWithTransparentChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2186,9 +2185,7 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
-#endif
 
-#ifdef IP_FREEBIND
 TEST_P(ListenerManagerImplTest, UpdateListenerWithFreeBindChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2212,9 +2209,7 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
-#endif
 
-#ifdef TCP_FASTOPEN
 TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpFastOpenQueueLengthChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2239,7 +2234,6 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
-#endif
 
 TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
   InSequence s;

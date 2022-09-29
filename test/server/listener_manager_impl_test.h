@@ -346,8 +346,11 @@ protected:
     EXPECT_CALL(*worker_, start(_, _));
     manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
+    auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
+
     ListenerHandle* listener_origin = expectListenerCreate(true, true);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+        .WillOnce(Return(socket));
     EXPECT_CALL(listener_origin->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
     checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -358,7 +361,8 @@ protected:
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
     ListenerHandle* listener_updated = expectListenerCreate(true, true);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+        .WillOnce(Return(socket));
     EXPECT_CALL(listener_updated->target_, initialize());
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
 
