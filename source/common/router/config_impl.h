@@ -237,7 +237,7 @@ public:
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const;
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
@@ -248,6 +248,10 @@ public:
     return hedge_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
+
+  void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
 private:
   enum class SslRequirements { None, ExternalOnly, All };
@@ -649,7 +653,7 @@ public:
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const override {
     auto* config = per_filter_configs_.get(name);
-    return config ? config : vhost_.perFilterConfig(name);
+    return config ? config : vhost_.mostSpecificPerFilterConfig(name);
   }
   void traversePerFilterConfig(
       const std::string& filter_name,
@@ -1322,6 +1326,10 @@ public:
     return route_matcher_->findVirtualHost(headers) != nullptr;
   }
 
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const {
+    return per_filter_configs_.get(name);
+  }
+
   // Router::Config
   RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info,
@@ -1370,6 +1378,7 @@ private:
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   const bool ignore_path_parameters_in_path_matching_;
+  PerFilterConfigs per_filter_configs_;
 };
 
 /**
