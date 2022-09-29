@@ -9,6 +9,7 @@ proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/config/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
