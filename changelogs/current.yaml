@@ -15,7 +15,7 @@ behavior_changes:
     New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is added for revert this behavior.
 - area: listener
   change: |
-    Previously a listener update with different :ref:<enable_reuse_port `envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port`> value will be ignored. Now,
+    Previously a listener update with different :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` value will be ignored. Now,
     this kind of update will be rejected. Also the runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
 - area: stats http local_rate_limit
   change: |
