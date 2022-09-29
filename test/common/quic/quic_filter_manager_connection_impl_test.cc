@@ -89,15 +89,6 @@ TEST_F(QuicFilterManagerConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
                    "Unexpected call to detectEarlyCloseWhenReadDisabled");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoSetter) {
-  /*
-  impl_.connectionInfoSetter();
-  impl_.closeNow();
-  EXPECT_ENVOY_BUG(impl_.connectionInfoSetter(), "No connection socket.");
-  impl_.closeNow();
-  */
-}
-
 TEST_F(QuicFilterManagerConnectionImplTest, UnixSocketPeerCredentials) {
   // This is a no-op, but call it for test coverage.
   EXPECT_FALSE(impl_.unixSocketPeerCredentials().has_value());
