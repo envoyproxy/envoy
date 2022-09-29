@@ -81,6 +81,7 @@ void SotwSubscriptionState::handleGoodResponse(
   if (xds_resources_delegate_.has_value()) {
     XdsConfigSourceId source_id{target_xds_authority_, message.type_url()};
     std::vector<DecodedResourceRef> resource_refs;
+    resource_refs.reserve(non_heartbeat_resources.size());
     for (const DecodedResourcePtr& r : non_heartbeat_resources) {
       resource_refs.emplace_back(*r);
     }
