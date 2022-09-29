@@ -81,13 +81,16 @@ Similar example for header based configuration would be:
 
 .. literalinclude:: _include/stateful-header-session.yaml
     :language: yaml
-    :lines: 28-44
-    :emphasize-lines: 4-14
+    :lines: 28-41
+    :emphasize-lines: 4-11
     :linenos:
     :lineno-start: 28
     :caption: :download:`stateful-header-session.yaml <_include/stateful-header-session.yaml>`
 
-Note:
-1. The header based implementation assumes that the client will use the last supplied value for the session
-header and will pass it with every subsequent request.
-2. StatefulSessionPerRoute should be used if path match is required.
+Note
+___________
+
+* The header based implementation assumes that a client will use the last supplied value for the session
+  header and will pass it with every subsequent request.
+* StatefulSessionPerRoute should be used if path match is required.
+
