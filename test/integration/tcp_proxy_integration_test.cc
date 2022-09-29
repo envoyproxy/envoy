@@ -19,6 +19,7 @@
 #include "test/integration/tcp_proxy_integration_test.pb.h"
 #include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
@@ -164,6 +165,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnectBytesMeter) {
 }
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
+  Envoy::LogLevelSetter save_levels(spdlog::level::trace);
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* static_resources = bootstrap.mutable_static_resources();
@@ -175,14 +177,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
     }
   });
   initialize();
-// The large number of connection is meant to regression test
-// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
-// TODO(alyssawilk) debug.
-#if defined(__APPLE__)
-  const int num_connections = 50;
-#else
+  // The large number of connection is meant to regression test
+  // https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
   const int num_connections = 1026;
-#endif
   std::vector<IntegrationTcpClientPtr> clients(num_connections);
 
   for (int i = 0; i < num_connections; ++i) {
