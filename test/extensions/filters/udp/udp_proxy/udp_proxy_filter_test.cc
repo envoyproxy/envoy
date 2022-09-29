@@ -618,13 +618,16 @@ matcher:
 TEST_F(UdpProxyFilterTest, ConnectErrorHandling) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:cluster_name)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)%";
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:errors_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:errors_received)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:session_total)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -636,7 +639,7 @@ matcher:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
   )EOF",
-                        access_log_format));
+                        session_access_log_format, proxy_access_log_format));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true, 1);
@@ -650,7 +653,9 @@ matcher:
              ->value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 5 0 0 0 1");
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "0 1");
+  EXPECT_EQ(output_.back(), "fake_cluster 0 5 0 0 1");
 }
 
 // No upstream host handling.
