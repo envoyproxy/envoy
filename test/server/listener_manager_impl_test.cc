@@ -2106,6 +2106,9 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptions) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2138,7 +2141,11 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
+#endif
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentNumberOfSocketOptions) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2167,7 +2174,11 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
+#endif
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerWithTransparentChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2193,7 +2204,11 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
+#endif
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerWithFreeBindChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2219,7 +2234,11 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
+#endif
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpFastOpenQueueLengthChange) {
   const std::string listener_origin = R"EOF(
 name: foo
@@ -2246,6 +2265,7 @@ filter_chains:
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
 }
+#endif
 
 TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
   // Add and initialize foo listener.
@@ -2284,6 +2304,9 @@ filter_chains:
                                                     expected_error_message);
 }
 
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
 TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
   // Add and initialize foo listener and the default value of enable_reuse_port is true.
   const std::string listener_origin = R"EOF(
@@ -2313,6 +2336,7 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
 }
+#endif
 
 // The deprecated behavior is the update of `enable_reuse_port` will be ignored and
 // listener update success.
