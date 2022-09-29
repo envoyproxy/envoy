@@ -2,6 +2,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -204,6 +205,10 @@ public:
 protected:
   void testPreflight(Http::TestRequestHeaderMapImpl&& request_headers,
                      Http::TestResponseHeaderMapImpl&& expected_response_headers) {
+    // Ensure the deprecated 'cors' field could be initialized correctly.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
+
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -214,6 +219,10 @@ protected:
 
   void testNormalRequest(Http::TestRequestHeaderMapImpl&& request_headers,
                          Http::TestResponseHeaderMapImpl&& expected_response_headers) {
+    // Ensure the deprecated 'cors' field could be initialized correctly.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.features.enable_all_deprecated_features", "true"}});
+
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
