@@ -1410,15 +1410,15 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   EXPECT_EQ(opt_len, sizeof(opt_value));
   EXPECT_EQ(8, opt_value);
 
-  // We want to test update listener with same address but different socket options. But
-  // the test is using zero port address. It turns out when create a new socket on zero
-  // port address, kernel will generate new port for it. So we have to register the
-  // port again here. IPTOS_RELIABILITY	= 4.
   listener_config_.mutable_socket_options(0)->set_int_value(4);
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 
+  // We want to test update listener with same address but different socket options. But
+  // the test is using zero port address. It turns out when create a new socket on zero
+  // port address, kernel will generate new port for it. So we have to register the
+  // port again here. IPTOS_RELIABILITY	= 4.
   registerTestServerPorts({"test_listener"});
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
   ASSERT_TRUE(tcp_client2->write(data));
@@ -1487,6 +1487,13 @@ TEST_P(ListenerFilterIntegrationTest,
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
