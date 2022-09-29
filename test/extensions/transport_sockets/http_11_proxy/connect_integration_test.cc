@@ -387,8 +387,6 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
 }
 #endif
 
-// TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in
-// case DNS to those endpoints is disallowed.
 TEST_P(Http11ConnectHttpIntegrationTest, DfpNoProxyAddress) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   addDfpConfig();
