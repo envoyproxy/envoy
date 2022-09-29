@@ -55,11 +55,12 @@
 #include "source/server/admin/utils.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/connection_handler_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/ssl_context_manager.h"
+
 #ifdef ENVOY_ENABLE_GUARDDOG
 #include "source/server/guarddog_impl.h"
 #endif
-#include "source/server/listener_hooks.h"
-#include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
