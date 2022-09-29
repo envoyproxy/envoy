@@ -2301,6 +2301,35 @@ filter_chains:
                                                     expected_error_message);
 }
 
+// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
+// listener update success.
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
+}
+
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
   InSequence s;
 
