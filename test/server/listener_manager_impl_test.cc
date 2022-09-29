@@ -2080,6 +2080,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 socket_options:
     - level: 1
       name: 9
@@ -2094,6 +2095,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 socket_options:
     - level: 1
       name: 9
@@ -2111,6 +2113,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 socket_options:
     - level: 1
       name: 9
@@ -2125,6 +2128,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 socket_options:
     - level: 1
       name: 9
@@ -2142,6 +2146,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 socket_options:
     - level: 1
       name: 9
@@ -2156,6 +2161,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 filter_chains:
 - filters: []
   )EOF";
@@ -2169,6 +2175,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 filter_chains:
 - filters: []
   )EOF";
@@ -2179,6 +2186,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 transparent: true
 filter_chains:
 - filters: []
@@ -2193,6 +2201,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 filter_chains:
 - filters: []
   )EOF";
@@ -2203,6 +2212,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 freebind: true
 filter_chains:
 - filters: []
@@ -2217,6 +2227,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 tcp_fast_open_queue_length: 10
 filter_chains:
 - filters: []
@@ -2228,6 +2239,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 1234
+enable_reuse_port: true
 tcp_fast_open_queue_length: 20
 filter_chains:
 - filters: []
@@ -2280,6 +2292,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 filter_chains:
 - filters: []
   )EOF";
@@ -2311,6 +2324,7 @@ address:
   socket_address:
       address: 127.0.0.1
       port_value: 1234
+enable_reuse_port: true
 filter_chains:
 - filters: []
   )EOF";
