@@ -109,7 +109,8 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // The validation mode controls whether uppercase letters are permitted.
   absl::string_view scheme = value.getStringView();
 
-  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
+  if (scheme != "http" && scheme != "https") {
+    // TODO(#23313) - Honor config setting for mixed case.
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidScheme};
   }
@@ -238,6 +239,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6:
   //
   // Content-Length = 1*DIGIT
+  // TODO(#23315) - Validate multiple Content-Length values
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
@@ -263,7 +265,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
   //
-  // TODO(#22859) - Fully implement IPv6 address validation
+  // TODO(#22859, #23314) - Fully implement IPv6 address validation
   const auto host = value.getStringView();
   if (host.empty()) {
     return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
