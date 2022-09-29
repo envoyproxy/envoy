@@ -458,7 +458,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
           *origin.filter_chain_manager_)),
-      reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
+      reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
                             ASSERT(workers_started_);
@@ -989,7 +989,16 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
-  return ListenerMessageUtil::filterChainOnlyChange(config_, config);
+
+  if (ListenerMessageUtil::filterChainOnlyChange(config_, config)) {
+    // We need to calculate the reuse port's default value then ensure whether it is changed or not.
+    // Since reuse port's default value isn't the YAML bool field default value. When
+    // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
+    // default value to do the comparion.
+    return reuse_port_ == getReusePortOrDefault(parent_.server_, config, socket_type_);
+  }
+
+  return false;
 }
 
 ListenerImplPtr

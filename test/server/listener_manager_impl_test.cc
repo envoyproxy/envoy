@@ -2337,7 +2337,8 @@ filter_chains:
 - filters: []
   )EOF";
 
-  EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+  ListenerHandle* listener_bar_update1 = expectListenerCreate(true, true);
+  EXPECT_CALL(*listener_bar_update1, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_update1_yaml)),
                             EnvoyException, "Listener foo: reuse port doesn't support change");
 
