@@ -423,8 +423,10 @@ private:
 
   /**
    * Process a stream that is ending due to upstream response or reset.
+   * If check_for_deferred_close is true, the ConnectionManager will check to
+   * see if the connection was drained and should be closed if no streams remain.
    */
-  void doEndStream(ActiveStream& stream);
+  void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
                        absl::string_view details);

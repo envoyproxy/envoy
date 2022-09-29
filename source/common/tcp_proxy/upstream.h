@@ -47,7 +47,8 @@ class HttpConnPool : public GenericConnPool, public Http::ConnectionPool::Callba
 public:
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfigHelper& config,
-               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type,
+               StreamInfo::StreamInfo& downstream_info);
   ~HttpConnPool() override;
 
   bool valid() const { return conn_pool_data_.has_value(); }
@@ -71,7 +72,7 @@ public:
     virtual ~Callbacks() = default;
     virtual void onSuccess(Http::RequestEncoder& request_encoder) {
       ASSERT(conn_pool_ != nullptr);
-      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionLocalAddress(),
+      conn_pool_->onGenericPoolReady(host_, request_encoder.getStream().connectionInfoProvider(),
                                      ssl_info_);
     }
     virtual void onFailure() {
@@ -91,7 +92,7 @@ public:
 
 private:
   void onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
-                          const Network::Address::InstanceConstSharedPtr& local_address,
+                          const Network::ConnectionInfoProvider& address_provider,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfigHelper& config_;
   Http::CodecType type_;
@@ -100,7 +101,7 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
-  const StreamInfo::StreamInfo& downstream_info_;
+  StreamInfo::StreamInfo& downstream_info_;
 };
 
 class TcpUpstream : public GenericUpstream {
@@ -149,7 +150,7 @@ public:
 
 protected:
   HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-               const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+               const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   // The encoder offered by the upstream http client.
@@ -157,7 +158,7 @@ protected:
   // The config object that is owned by the downstream network filter chain factory.
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
-  const StreamInfo::StreamInfo& downstream_info_;
+  StreamInfo::StreamInfo& downstream_info_;
 
 private:
   class DecoderShim : public Http::ResponseDecoder {
@@ -169,6 +170,8 @@ private:
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
+        parent_.config_.propagateResponseHeaders(std::move(headers),
+                                                 parent_.downstream_info_.filterState());
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
         parent_.conn_pool_callbacks_.reset();
       }
@@ -201,7 +204,7 @@ private:
 class Http1Upstream : public HttpUpstream {
 public:
   Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
 
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -211,7 +214,7 @@ public:
 class Http2Upstream : public HttpUpstream {
 public:
   Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                const TunnelingConfigHelper& config, const StreamInfo::StreamInfo& downstream_info);
+                const TunnelingConfigHelper& config, StreamInfo::StreamInfo& downstream_info);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;

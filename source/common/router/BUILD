@@ -280,6 +280,7 @@ envoy_cc_library(
         ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
+        ":upstream_codec_filter_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/grpc:status",
@@ -332,6 +333,38 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_codec_filter_lib",
+    srcs = [
+        "upstream_codec_filter.cc",
+    ],
+    hdrs = [
+        "upstream_codec_filter.h",
+    ],
+    deps = [
+        ":config_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "router_ratelimit_lib",
     srcs = ["router_ratelimit.cc"],
     hdrs = ["router_ratelimit.h"],
@@ -368,7 +401,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "header_parser_lib",
-    srcs = ["header_parser.cc"],
+    srcs = [
+        "header_parser.cc",
+        "header_parser_utils.cc",
+    ],
     hdrs = ["header_parser.h"],
     deps = [
         ":header_formatter_lib",

@@ -341,10 +341,10 @@ public:
   virtual absl::string_view responseDetails() { return ""; }
 
   /**
-   * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
-   * with the stream.
+   * @return const Network::ConnectionInfoProvider& the adderess provider  of the connection
+   * associated with the stream.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
 
   /**
    * Set the flush timeout for the stream. At the codec level this is used to bound the amount of

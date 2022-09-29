@@ -928,6 +928,11 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
+  if (parser_impl_ == ParserImpl::BalsaParser) {
+    // BalsaParser only validates trailers if `enable_trailers_` is set.
+    codec_settings_.enable_trailers_ = true;
+  }
+
   initialize();
 
   MockRequestDecoder decoder;
@@ -951,6 +956,69 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_HEADER_TOKEN");
+}
+
+TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailersIgnored) {
+  if (parser_impl_ == ParserImpl::HttpParser) {
+    // HttpParser signals error even if `enable_trailers_` is false.
+    return;
+  }
+
+  initialize();
+  StrictMock<MockRequestDecoder> decoder;
+
+  // First request contains invalid trailers.
+  // Trailers are ignored by default, therefore processing can continue.
+  {
+    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
+                             "Host: www.somewhere.com\r\n"
+                             "connection: keep-alive\r\n"
+                             "Transfer-Encoding: chunked\r\n\r\n"
+                             "5\r\ndata1\r\n"
+                             "0\r\n"
+                             "invalid-trailer\r\n\r\n");
+
+    Http::ResponseEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data1"), false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+
+    std::string output;
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+    TestResponseHeaderMapImpl headers{{":status", "200"}};
+    response_encoder->encodeHeaders(headers, true);
+    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+  }
+
+  testing::Mock::VerifyAndClearExpectations(&decoder);
+
+  // Second request is successfully parsed.
+  {
+    Buffer::OwnedImpl buffer("POST /foobar HTTP/1.1\r\n"
+                             "Host: www.somewhere.com\r\n"
+                             "connection: keep-alive\r\n"
+                             "Transfer-Encoding: chunked\r\n\r\n"
+                             "5\r\ndata2\r\n"
+                             "0\r\n\r\n");
+
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+    EXPECT_CALL(decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual("data2"), false));
+    EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
@@ -2945,11 +3013,6 @@ TEST_P(Http1ServerConnectionImplTest, ManyTrailersRejected) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
@@ -2957,11 +3020,6 @@ TEST_P(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, LargeTrailerFieldRejectedIgnored) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   // Default limit of 60 KiB
   std::string long_string = "bigfield" + std::string(60 * 1024, 'q') + ": value\r\n\r\n\r\n";
   testTrailersExceedLimit(long_string, "http/1.1 protocol error: trailers size exceeds limit",
@@ -3282,36 +3340,37 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
   Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
 #ifdef ENVOY_ENABLE_UHV
-  // permissive
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  TestRequestHeaderMapImpl expected_headers{
-      {":path", "/δ¶/δt/pope?q=1#narf"},
-      {":method", "GET"},
-  };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-  EXPECT_EQ(0U, buffer.length());
+  bool strict = false;
 #else
-  // strict
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
+  bool strict = true;
 #endif
+
+  if (parser_impl_ == ParserImpl::BalsaParser) {
+    strict = true;
+  }
+
+  if (strict) {
+    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(isCodecProtocolError(status));
+  } else {
+    TestRequestHeaderMapImpl expected_headers{
+        {":path", "/δ¶/δt/pope?q=1#narf"},
+        {":method", "GET"},
+    };
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0U, buffer.length());
+  }
 }
 
 // Tests that incomplete response headers of 80 kB header value fails.

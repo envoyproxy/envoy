@@ -19,8 +19,8 @@ static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-
+    const std::string& stats_prefix, DualInfo dual_info,
+    Server::Configuration::ServerFactoryContext& context) {
   if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {
     throw EnvoyException("Success rate threshold cannot be less than 1.0%.");
   }
@@ -47,7 +47,7 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
 
   AdmissionControlFilterConfigSharedPtr filter_config =
       std::make_shared<AdmissionControlFilterConfig>(
-          config, context.runtime(), context.api().randomGenerator(), context.scope(),
+          config, context.runtime(), context.api().randomGenerator(), dual_info.scope,
           std::move(tls), std::move(response_evaluator));
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -60,6 +60,8 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
  */
 REGISTER_FACTORY(AdmissionControlFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAdmissionControlFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace AdmissionControl
 } // namespace HttpFilters

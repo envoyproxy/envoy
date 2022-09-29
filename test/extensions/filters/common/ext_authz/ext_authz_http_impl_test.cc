@@ -404,7 +404,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
                           expected_header.second);
 
   StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
+  EXPECT_CALL(stream_info, getRequestHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info);

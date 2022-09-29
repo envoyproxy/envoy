@@ -142,8 +142,16 @@ message VirtualHost {
     items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
-  // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
+  // Indicates that the virtual host has a CORS policy. This field is ignored if related cors policy is
+  // found in the
+  // :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
@@ -386,10 +394,10 @@ message WeightedCluster {
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
-    // An integer between 0 and :ref:`total_weight
-    // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
-    // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
+    // The weight of the cluster. This value is relative to the other clusters'
+    // weights. When a request matches the route, the choice of an upstream cluster
+    // is determined by its weight. The sum of weights across all
+    // entries in the clusters array must be greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -459,7 +467,10 @@ message WeightedCluster {
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, if this is greater than 0.
-  google.protobuf.UInt32Value total_weight = 3;
+  // This field is now deprecated, and the client will use the sum of all
+  // cluster weights. It is up to the management server to supply the correct weights.
+  google.protobuf.UInt32Value total_weight = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the ``runtime_key_prefix`` is
@@ -638,6 +649,14 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
+// Cors policy configuration.
+//
+// .. attention::
+//
+//   This message has been deprecated. Please use
+//   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+//   as as alternative.
+//
 // [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
@@ -1249,8 +1268,17 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
+  // Indicates that the route has a CORS policy. This field is ignored if related cors policy is
+  // found in the :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  // :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  //   :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 17 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the

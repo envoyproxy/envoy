@@ -64,7 +64,7 @@ public:
 private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
-  bool enable_ja3_fingerprinting_;
+  const bool enable_ja3_fingerprinting_;
   const uint32_t max_client_hello_size_;
 };
 
@@ -75,7 +75,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const ConfigSharedPtr config);
+  Filter(const ConfigSharedPtr& config);
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
