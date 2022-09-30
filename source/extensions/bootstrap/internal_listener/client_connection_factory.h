@@ -40,6 +40,8 @@ public:
   // client connection. Thus the ownership is not followed - client factory needs to
   // access buffer_size config of listener registry.
   static uint32_t buffer_size_;
+  // The default buffer is 1024 K bytes.
+  static constexpr uint32_t default_buffer_size_ = 1024;
 };
 
 } // namespace InternalListener
