@@ -26,5 +26,5 @@ message InternalListener {
   // For example, if buffer_size is set to 5, then the actual buffer size is
   // 5 KiB = 5 * 1024 bytes.
   // If the buffer_size is not specified, the buffer size is set to 1024 KiB.
-  google.protobuf.UInt32Value buffer_size = 1 [(validate.rules).uint32 = {gte: 1 lte: 8192}];
+  google.protobuf.UInt32Value buffer_size = 1 [(validate.rules).uint32 = {lte: 8192 gte: 1}];
 }
