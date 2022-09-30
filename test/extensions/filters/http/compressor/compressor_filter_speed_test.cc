@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
@@ -19,34 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Compressor {
-
-class MockBrotliCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
-public:
-  MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
-
-  Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
-    return std::make_unique<Compression::Brotli::Compressor::BrotliCompressorImpl>(
-        quality_, window_bits_, input_block_bits_, disable_literal_context_modeling_, mode_,
-        chunk_size_);
-  }
-
-  const std::string& statsPrefix() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string, "brotli.");
-  }
-  const std::string& contentEncoding() const override {
-    return Http::CustomHeaders::get().ContentEncodingValues.Brotli;
-  }
-
-private:
-  const uint64_t chunk_size_{4096};
-  const Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode mode_{
-      Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Generic};
-  const uint32_t input_block_bits_{24};
-  const uint32_t quality_;
-  const uint32_t window_bits_{18};
-  const bool disable_literal_context_modeling_{false};
-};
-
 class MockGzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
   MockGzipCompressorFactory(
@@ -99,22 +73,34 @@ private:
   const uint64_t chunk_size_{4096};
 };
 
+class MockBrotliCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
+public:
+  MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
+
+  Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
+    return std::make_unique<Compression::Brotli::Compressor::BrotliCompressorImpl>(
+        quality_, window_bits_, input_block_bits_, disable_literal_context_modeling_, mode_,
+        chunk_size_);
+  }
+
+  const std::string& statsPrefix() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "brotli.");
+  }
+  const std::string& contentEncoding() const override {
+    return Http::CustomHeaders::get().ContentEncodingValues.Brotli;
+  }
+
+private:
+  const uint64_t chunk_size_{4096};
+  const Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode mode_{
+      Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Generic};
+  const uint32_t input_block_bits_{24};
+  const uint32_t quality_;
+  const uint32_t window_bits_{18};
+  const bool disable_literal_context_modeling_{false};
+};
+
 using CompressionParams = std::tuple<int64_t, uint64_t, int64_t, uint64_t>;
-
-CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
-                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
-                                                 CompressionParams params) {
-
-  envoy::extensions::filters::http::compressor::v3::Compressor compressor;
-
-  const auto quality = std::get<0>(params);
-  Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
-      std::make_unique<MockBrotliCompressorFactory>(quality);
-  CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
-
-  return config;
-}
 
 CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
@@ -154,11 +140,46 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
   return config;
 }
 
-static constexpr uint64_t TestDataSize = 122880;
+CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
+                                                 testing::NiceMock<Runtime::MockLoader>& runtime,
+                                                 CompressionParams params) {
+
+  envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+
+  const auto quality = std::get<0>(params);
+  Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
+      std::make_unique<MockBrotliCompressorFactory>(quality);
+  CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
+      compressor, "test.", stats, runtime, std::move(compressor_factory));
+
+  return config;
+}
+
+static uint64_t TestDataSize = 122880;
 
 Buffer::OwnedImpl generateTestData() {
   Buffer::OwnedImpl data;
-  TestUtility::feedBufferWithRandomCharacters(data, TestDataSize);
+  std::string filename = std::to_string(TestDataSize) + ".data";
+  std::ifstream input_file(filename, std::ios::in | std::ios::binary);
+  if (!input_file) {
+    printf("Failed to find data file: %s\n", filename.c_str());
+    TestUtility::feedBufferWithRandomCharacters(data, TestDataSize);
+
+    std::ofstream output_file(filename, std::ios::trunc);
+    if (!output_file.is_open()) {
+      printf("Error create file: %s\n", filename.c_str());
+    }
+    output_file << data.toString();
+    output_file.close();
+  } else {
+    std::stringstream buf;
+    buf << input_file.rdbuf();
+    input_file.close();
+    data.add(absl::string_view(buf.str()));
+
+    TestDataSize = data.length();
+    printf("TestDataSize: %ld\n", TestDataSize);
+  }
   return data;
 }
 
