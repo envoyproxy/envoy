@@ -121,6 +121,7 @@ message ExtraSourceAddress {
   SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
 }
 
+// [#next-free-field: 6]
 message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
@@ -142,7 +143,7 @@ message BindConfig {
 
   // Deprecated by :ref:`extra_source_addresses <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.extra_source_addresses>`
   repeated SocketAddress additional_source_addresses = 4
-    [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Extra source addresses appended to the address specified in the `source_address`
   // field. This enables to specify multiple source addresses. Currently, only one extra
