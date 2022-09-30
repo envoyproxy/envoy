@@ -924,7 +924,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && ads_mux_) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     const uint64_t previous_warming = cm_stats_.warming_clusters_.value();
-    if (previous_warming == 0 && !warming_clusters_.empty()) {
+    if (!warming_clusters_.empty()) {
       resume_cds_ = ads_mux_->pause(type_url);
     } else if (previous_warming > 0 && warming_clusters_.empty()) {
       ASSERT(resume_cds_ != nullptr);
