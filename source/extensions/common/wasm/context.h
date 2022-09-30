@@ -27,7 +27,6 @@ namespace Wasm {
 
 using proxy_wasm::BufferInterface;
 using proxy_wasm::CloseType;
-using proxy_wasm::ContextBase;
 using proxy_wasm::Pairs;
 using proxy_wasm::PairsWithStringValues;
 using proxy_wasm::PluginBase;
