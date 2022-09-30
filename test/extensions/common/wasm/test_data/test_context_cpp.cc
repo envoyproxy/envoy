@@ -13,11 +13,6 @@
 
 START_WASM_PLUGIN(CommonWasmTestContextCpp)
 
-class TestContext : public EnvoyContext {
-public:
-  explicit TestContext(uint32_t id, RootContext* root) : EnvoyContext(id, root) {}
-};
-
 class TestRootContext : public EnvoyRootContext {
 public:
   explicit TestRootContext(uint32_t id, std::string_view root_id) : EnvoyRootContext(id, root_id) {}
@@ -28,8 +23,20 @@ public:
   void onQueueReady(uint32_t) override;
   void onResolveDns(uint32_t token, uint32_t results_size) override;
 
+  std::string test_;
+
 private:
   uint32_t dns_token_;
+};
+
+class TestContext : public EnvoyContext {
+public:
+  explicit TestContext(uint32_t id, RootContext* root) : EnvoyContext(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
+
+private:
+  TestRootContext* root() { return static_cast<TestRootContext*>(Context::root()); }
 };
 
 static RegisterContextFactory register_TestContext(CONTEXT_FACTORY(TestContext),
@@ -37,8 +44,24 @@ static RegisterContextFactory register_TestContext(CONTEXT_FACTORY(TestContext),
 static RegisterContextFactory register_EmptyTestContext(CONTEXT_FACTORY(EnvoyContext),
                                                         ROOT_FACTORY(EnvoyRootContext), "empty");
 
-bool TestRootContext::onStart(size_t) {
-  envoy_resolve_dns("example.com", sizeof("example.com") - 1, &dns_token_);
+FilterDataStatus TestContext::onRequestBody(size_t, bool) {
+  auto test = root()->test_;
+  if (test == "duplicate_local_reply") {
+    sendLocalResponse(200, "ok", "body", {});
+    sendLocalResponse(200, "fail", "body", {});
+  }
+  return FilterDataStatus::Continue;
+}
+
+FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
+  return FilterHeadersStatus::Continue;
+}
+
+bool TestRootContext::onStart(size_t configuration_size) {
+  test_ = getBufferBytes(WasmBufferType::VmConfiguration, 0, configuration_size)->toString();
+  if (test_ == "dns_resolve") {
+    envoy_resolve_dns("example.com", sizeof("example.com") - 1, &dns_token_);
+  }
   return true;
 }
 
@@ -58,24 +81,29 @@ bool TestRootContext::onDone() {
 
 // Null VM fails on nullptr.
 void TestRootContext::onTick() {
-  if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
-    logInfo("resolve_dns should report invalid memory access");
-  }
-  if (envoy_resolve_dns("example.com", sizeof("example.com") - 1, nullptr) !=
-      WasmResult::InvalidMemoryAccess) {
-    logInfo("resolve_dns should report invalid memory access");
+  if (test_ == "dns_resolve") {
+    if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
+      logInfo("resolve_dns should report invalid memory access");
+    }
+    if (envoy_resolve_dns("example.com", sizeof("example.com") - 1, nullptr) !=
+        WasmResult::InvalidMemoryAccess) {
+      logInfo("resolve_dns should report invalid memory access");
+    }
   }
 }
 
 // V8 fails on pointer too large.
 void TestRootContext::onQueueReady(uint32_t) {
-  if (envoy_resolve_dns(reinterpret_cast<char*>(INT_MAX), 0, &dns_token_) !=
-      WasmResult::InvalidMemoryAccess) {
-    logInfo("resolve_dns should report invalid memory access");
-  }
-  if (envoy_resolve_dns("example.com", sizeof("example.com") - 1,
-                        reinterpret_cast<uint32_t*>(INT_MAX)) != WasmResult::InvalidMemoryAccess) {
-    logInfo("resolve_dns should report invalid memory access");
+  if (test_ == "dns_resolve") {
+    if (envoy_resolve_dns(reinterpret_cast<char*>(INT_MAX), 0, &dns_token_) !=
+        WasmResult::InvalidMemoryAccess) {
+      logInfo("resolve_dns should report invalid memory access");
+    }
+    if (envoy_resolve_dns("example.com", sizeof("example.com") - 1,
+                          reinterpret_cast<uint32_t*>(INT_MAX)) !=
+        WasmResult::InvalidMemoryAccess) {
+      logInfo("resolve_dns should report invalid memory access");
+    }
   }
 }
 

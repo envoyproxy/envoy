@@ -1349,7 +1349,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
       .WillRepeatedly(
           testing::DoAll(testing::SaveArg<2>(&dns_callback), Return(&active_dns_query)));
 
-  setup(code, "context");
+  setup(code, "dns_resolve");
   setupContext();
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 1")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 2")));
@@ -1390,13 +1390,71 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "context", "empty");
+  setup(code, "dns_resolve", "empty");
   setupContext();
 
   root_context_->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Success, {});
   NiceMock<Envoy::Stats::MockMetricSnapshot> stats_snapshot;
   root_context_->onStatsUpdate(stats_snapshot);
   root_context_->validateConfiguration("", plugin_);
+}
+
+class TestFilter : public Envoy::Extensions::Common::Wasm::Context {
+public:
+  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+      : Envoy::Extensions::Common::Wasm::Context(wasm, root_context_id, plugin_handle) {}
+  using ::Envoy::Extensions::Common::Wasm::Context::log;
+  proxy_wasm::WasmResult log(uint32_t, std::string_view message) override {
+    std::cerr << message << "\n";
+    return proxy_wasm::WasmResult::Ok;
+  }
+};
+
+class WasmCommonHttpContextTest
+    : public Common::Wasm::WasmHttpFilterTestBase<
+          testing::TestWithParam<std::tuple<std::string, std::string>>> {
+public:
+  WasmCommonHttpContextTest() = default;
+
+  void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
+    setRootId(root_id);
+    setVmConfiguration(vm_configuration);
+    setupBase(std::get<0>(GetParam()), code,
+              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
+                return new NiceMock<TestContext>(wasm, plugin);
+              });
+  }
+  void setupFilter() { setupFilterBase<TestFilter>(); }
+
+  TestContext& rootContext() { return *static_cast<TestContext*>(root_context_); }
+
+  TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
+};
+
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonHttpContextTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
+
+TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestContextCpp";
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "duplicate_local_reply");
+  setupFilter();
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
+      .WillOnce([this](Http::ResponseHeaderMap&, bool) { filter().onResponseHeaders(0, false); });
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(1);
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onRequestBody(0, false));
 }
 
 } // namespace Wasm
