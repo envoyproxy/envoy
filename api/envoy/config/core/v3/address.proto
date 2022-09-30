@@ -141,10 +141,6 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
-  // Deprecated by :ref:`extra_source_addresses <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.extra_source_addresses>`
-  repeated SocketAddress additional_source_addresses = 4
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
-
   // Extra source addresses appended to the address specified in the `source_address`
   // field. This enables to specify multiple source addresses. Currently, only one extra
   // address can be supported, and the extra address should have a different IP version
@@ -154,6 +150,11 @@ message BindConfig {
   // returned. If there is no same IP version address found, the address in the `source_address`
   // will be returned.
   repeated ExtraSourceAddress extra_source_addresses = 5;
+
+  // Deprecated by
+  // :ref:`extra_source_addresses <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.extra_source_addresses>`
+  repeated SocketAddress additional_source_addresses = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Addresses specify either a logical or physical address and port, which are
