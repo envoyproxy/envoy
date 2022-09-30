@@ -1449,8 +1449,7 @@ TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
   setupFilter();
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
       .WillOnce([this](Http::ResponseHeaderMap&, bool) { filter().onResponseHeaders(0, false); });
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(1);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, "body", _, _, "ok"));
 
   // Create in-VM context.
   filter().onCreate();
