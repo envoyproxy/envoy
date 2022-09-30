@@ -17,7 +17,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Thrift health checker :ref:`configuration overview <config_health_checkers_thrift>`.
 // [#extension: envoy.health_checkers.thrift]
 
-// [#next-free-field: 4]
 message Thrift {
   // Specifies the method name that will be set on each health check request dispatched to an upstream host.
   // Note that method name is case sensitive.
