@@ -65,6 +65,21 @@ namespace {
 AddressSelectFn
 getSourceAddressFnFromBindConfig(const std::string& cluster_name,
                                  const envoy::config::core::v3::BindConfig& bind_config) {
+  if (bind_config.additional_source_addresses_size() > 0 &&
+      bind_config.extra_source_addresses_size() > 0) {
+    throw EnvoyException(
+        fmt::format("Can't specify both `extra_source_addresses` and `additional_source_addresses` "
+                    "in the {}'s upstream binding config",
+                    cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  }
+
+  if (bind_config.extra_source_addresses_size() > 1) {
+    throw EnvoyException(fmt::format(
+        "{}'s upstream binding config has more than one extra source addresses. Only one "
+        "extra source can be supported in BindConfig's extra_source_addresses field",
+        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  }
+
   if (bind_config.additional_source_addresses_size() > 1) {
     throw EnvoyException(fmt::format(
         "{}'s upstream binding config has more than one additional source addresses. Only one "
@@ -75,9 +90,22 @@ getSourceAddressFnFromBindConfig(const std::string& cluster_name,
   std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
   source_address_list.emplace_back(
       Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
-  if (bind_config.additional_source_addresses_size() == 1) {
+
+  if (bind_config.extra_source_addresses_size() == 1) {
     source_address_list.emplace_back(Network::Address::resolveProtoSocketAddress(
-        bind_config.additional_source_addresses(0).source_address()));
+        bind_config.extra_source_addresses(0).source_address()));
+    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has two same IP version source addresses. Only two "
+          "different IP version source addresses can be supported in BindConfig's source_address "
+          "and extra_source_addresses fields",
+          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+    }
+  }
+
+  if (bind_config.additional_source_addresses_size() == 1) {
+    source_address_list.emplace_back(
+        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
     if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
       throw EnvoyException(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "
@@ -85,6 +113,8 @@ getSourceAddressFnFromBindConfig(const std::string& cluster_name,
           "and additional_source_addresses fields",
           cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
     }
+    ENVOY_LOG_MISC(warn, "The `additional_source_addresses` field is already deprecated by "
+                         "`extra_source_addresses`.");
   }
 
   return [source_address_list = std::move(source_address_list)](

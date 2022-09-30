@@ -6,6 +6,7 @@ import "envoy/config/core/v3/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -115,9 +116,9 @@ message TcpKeepalive {
   google.protobuf.UInt32Value keepalive_interval = 3;
 }
 
-message AdditionalSourceAddress {
+message ExtraSourceAddress {
   // The additional address to bind.
-  SocketAddress source_address = 1;
+  SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
 }
 
 message BindConfig {
@@ -139,6 +140,10 @@ message BindConfig {
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
 
+  // Deprecated by :ref:`extra_source_addresses <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.extra_source_addresses>`
+  repeated SocketAddress additional_source_addresses = 4
+    [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
   // Additional source addresses appended to the address specified in the `source_address`
   // field. This enables to specify multiple source addresses. Currently, only one additional
   // address can be supported, and the additional address should have a different IP version
@@ -147,7 +152,7 @@ message BindConfig {
   // than one additional address specified, only the first address matched IP version will be
   // returned. If there is no same IP version address found, the address in the `source_address`
   // will be returned.
-  repeated AdditionalSourceAddress additional_source_addresses = 4;
+  repeated ExtraSourceAddress extra_source_addresses = 5;
 }
 
 // Addresses specify either a logical or physical address and port, which are
