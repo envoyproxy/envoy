@@ -1317,5 +1317,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransa
   redis_client->close();
 }
 
+// TODO: Add full transaction test.
+
 } // namespace
 } // namespace Envoy

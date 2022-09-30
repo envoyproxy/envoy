@@ -235,9 +235,8 @@ public:
   }
 };
 
-// A class representing a Redis transaction.
-class Transaction {
-public:
+// A struct representing a Redis transaction.
+struct Transaction {
   Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
   ~Transaction() {
     if (connection_established_) {
