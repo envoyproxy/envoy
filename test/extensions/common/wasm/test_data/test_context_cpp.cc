@@ -46,9 +46,13 @@ static RegisterContextFactory register_EmptyTestContext(CONTEXT_FACTORY(EnvoyCon
 
 FilterDataStatus TestContext::onRequestBody(size_t, bool) {
   auto test = root()->test_;
-  if (test == "duplicate_local_reply") {
+  if (test == "send local reply twice") {
     sendLocalResponse(200, "ok", "body", {});
-    sendLocalResponse(200, "fail", "body", {});
+    sendLocalResponse(200, "not send", "body", {});
+  } else if (test == "panic after sending local reply") {
+    sendLocalResponse(200, "not send", "body", {});
+    int* badptr = nullptr;
+    *badptr = 0;
   }
   return FilterDataStatus::Continue;
 }

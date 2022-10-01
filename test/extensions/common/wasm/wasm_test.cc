@@ -1434,6 +1434,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonHttpContextTest,
                          Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
 
+// test that we don't send the local reply twice, even though it's specified in the wasm code
 TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
@@ -1445,11 +1446,38 @@ TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "duplicate_local_reply");
+  setup(code, "send local reply twice");
   setupFilter();
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
       .WillOnce([this](Http::ResponseHeaderMap&, bool) { filter().onResponseHeaders(0, false); });
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, "body", _, _, "ok"));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, _, testing::Eq("ok")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onRequestBody(0, false));
+}
+
+// test that we don't send the local reply twice when the wasm code panics
+TEST_P(WasmCommonHttpContextTest, LocalReplyWhenPanic) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // no need test the Null VM plugin.
+    return;
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "panic after sending local reply");
+  setupFilter();
+  // In the case of VM failure, failStream is called, so we need to make sure that we don't send the
+  // local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
 
   // Create in-VM context.
   filter().onCreate();
