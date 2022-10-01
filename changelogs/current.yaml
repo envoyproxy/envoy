@@ -94,6 +94,9 @@ bug_fixes:
 - area: http
   change: |
     fixed a bug with internal redirects not being performed for drained connections.
+- area: jwt_authn
+  change: |
+    fixed a bug where a negative "exp", "iat", or "nbf" integer in JWT token readed as a large positive value.
 - area: listener
   change: |
     fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
@@ -195,6 +198,9 @@ new_features:
 - area: health check
   change: |
     added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
+- area: health check
+  change: |
+    added :ref:`thrift health check <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>` as a :ref:`custom health check <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`.
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
@@ -231,6 +237,10 @@ new_features:
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
     by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
+- area: zipkin
+  change: |
+    added :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>` to make Envoy appear
+    as an independent hop for zipkin tracing.
 - area: cluster
   change: |
     added support to override original destination port via setting :ref:`upstream_port_override <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.upstream_port_override>`.
@@ -240,6 +250,11 @@ new_features:
 - area: redis
   change: |
     added support for quit command to the redis proxy.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response headers in :ref:`TunnelingConfig
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers>` to
+    the downstream info filter state.
 - area: access_log
   change: |
     log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
@@ -247,6 +262,9 @@ new_features:
 - area: grpc_json_transcoder
   change: |
     added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
+- area: grpc_json_transcoder
+  change: |
+    added support for newline-delimited streams in :ref:`stream_newline_delimited <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
 
 deprecated:
 - area: http
@@ -258,3 +276,11 @@ deprecated:
     deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted
     clusters. The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
     will be used as the total weight.
+- area: cors
+  change: |
+    deprecated :ref:`cors field of virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.cors>` and
+    :ref:`cors field of route action <envoy_v3_api_field_config.route.v3.RouteAction.cors>`. Please use
+    :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`,
+    :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+    :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+    to configure the CORS HTTP filter by the type :ref:`CorsPolicy in filter <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`.

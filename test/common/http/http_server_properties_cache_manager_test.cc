@@ -74,6 +74,32 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithEntry) {
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithInvalidCanonicalEntry) {
+  auto* suffixes = options1_.add_canonical_suffixes();
+  *suffixes = "example.com";
+
+  initialize();
+  EXPECT_ENVOY_BUG(manager_->getCache(options1_, dispatcher_),
+                   "Suffix does not start with a leading '.': example.com");
+}
+
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithCanonicalEntry) {
+  auto* suffixes = options1_.add_canonical_suffixes();
+  *suffixes = ".example.com";
+  auto* entry = options1_.add_prepopulated_entries();
+  entry->set_hostname("first.example.com");
+  entry->set_port(1);
+
+  initialize();
+  HttpServerPropertiesCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
+  EXPECT_NE(nullptr, cache);
+  EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
+
+  const HttpServerPropertiesCacheImpl::Origin origin = {"https", "second.example.com",
+                                                        entry->port()};
+  EXPECT_TRUE(cache->findAlternatives(origin).has_value());
+}
+
 TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
   options1_.mutable_key_value_store_config();

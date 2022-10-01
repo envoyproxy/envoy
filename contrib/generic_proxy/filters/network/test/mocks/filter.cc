@@ -21,6 +21,14 @@ MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, configTypes()).WillByDefault(Return(std::set<std::string>{}));
 }
 
+MockFilterChainManager::MockFilterChainManager() {
+  ON_CALL(*this, applyFilterFactoryCb(_, _))
+      .WillByDefault(Invoke([this](FilterContext context, FilterFactoryCb& factory) {
+        contexts_.push_back(context);
+        factory(callbacks_);
+      }));
+}
+
 MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, onStreamDecoded(_)).WillByDefault(Return(FilterStatus::Continue));
 }

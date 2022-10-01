@@ -1,0 +1,7 @@
+FROM envoyproxy/envoy-dev:latest
+
+ARG ENVOY_CONFIG=envoy-front-proxy.yaml
+
+COPY ./${ENVOY_CONFIG} /etc/front-envoy.yaml
+RUN chmod go+r /etc/front-envoy.yaml
+CMD ["/usr/local/bin/envoy", "-c", "/etc/front-envoy.yaml"]
