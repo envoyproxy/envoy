@@ -63,7 +63,7 @@ FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
 
 bool TestRootContext::onStart(size_t configuration_size) {
   test_ = getBufferBytes(WasmBufferType::VmConfiguration, 0, configuration_size)->toString();
-  if (test_ == "dns_resolve") {
+  if (test_ == "resolve dns") {
     envoy_resolve_dns("example.com", sizeof("example.com") - 1, &dns_token_);
   }
   return true;
@@ -85,7 +85,7 @@ bool TestRootContext::onDone() {
 
 // Null VM fails on nullptr.
 void TestRootContext::onTick() {
-  if (test_ == "dns_resolve") {
+  if (test_ == "resolve dns") {
     if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
       logInfo("resolve_dns should report invalid memory access");
     }
@@ -98,7 +98,7 @@ void TestRootContext::onTick() {
 
 // V8 fails on pointer too large.
 void TestRootContext::onQueueReady(uint32_t) {
-  if (test_ == "dns_resolve") {
+  if (test_ == "resolve dns") {
     if (envoy_resolve_dns(reinterpret_cast<char*>(INT_MAX), 0, &dns_token_) !=
         WasmResult::InvalidMemoryAccess) {
       logInfo("resolve_dns should report invalid memory access");

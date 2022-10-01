@@ -1349,7 +1349,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
       .WillRepeatedly(
           testing::DoAll(testing::SaveArg<2>(&dns_callback), Return(&active_dns_query)));
 
-  setup(code, "dns_resolve");
+  setup(code, "resolve dns");
   setupContext();
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 1")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 2")));
@@ -1390,7 +1390,7 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "dns_resolve", "empty");
+  setup(code, "resolve dns", "empty");
   setupContext();
 
   root_context_->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Success, {});
