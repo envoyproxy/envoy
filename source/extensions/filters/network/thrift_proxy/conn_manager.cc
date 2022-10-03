@@ -840,7 +840,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   }
 
   // Filters could change cluster_header's value, which affect the routing decision.
-  // Therefore, we need to apply filter chain before the routing decision is made ad cached.
+  // Therefore, we need to apply filter chain before the routing decision is made and cached.
   auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 
   const auto& route_ptr = route();
