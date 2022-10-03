@@ -113,6 +113,7 @@ categories:
 - envoy.filters.http.upstream
 - envoy.path.match
 - envoy.path.rewrite
+- envoy.tls_handshakers
 
 status_values:
 - name: stable
