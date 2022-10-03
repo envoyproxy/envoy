@@ -1349,7 +1349,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
       .WillRepeatedly(
           testing::DoAll(testing::SaveArg<2>(&dns_callback), Return(&active_dns_query)));
 
-  setup(code, "resolve dns");
+  setup(code, "context");
   setupContext();
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 1")));
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onResolveDns 2")));
@@ -1390,7 +1390,7 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "resolve dns", "empty");
+  setup(code, "context", "empty");
   setupContext();
 
   root_context_->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Success, {});
@@ -1446,7 +1446,7 @@ TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "send local reply twice");
+  setup(code, "", "send local reply twice");
   setupFilter();
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
       .WillOnce([this](Http::ResponseHeaderMap&, bool) { filter().onResponseHeaders(0, false); });
@@ -1470,7 +1470,7 @@ TEST_P(WasmCommonHttpContextTest, LocalReplyWhenPanic) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "panic after sending local reply");
+  setup(code, "", "panic after sending local reply");
   setupFilter();
   // In the case of VM failure, failStream is called, so we need to make sure that we don't send the
   // local reply twice.

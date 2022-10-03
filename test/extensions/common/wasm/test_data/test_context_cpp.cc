@@ -13,6 +13,11 @@
 
 START_WASM_PLUGIN(CommonWasmTestContextCpp)
 
+class TestContext : public EnvoyContext {
+public:
+  explicit TestContext(uint32_t id, RootContext* root) : EnvoyContext(id, root) {}
+};
+
 class TestRootContext : public EnvoyRootContext {
 public:
   explicit TestRootContext(uint32_t id, std::string_view root_id) : EnvoyRootContext(id, root_id) {}
@@ -23,20 +28,8 @@ public:
   void onQueueReady(uint32_t) override;
   void onResolveDns(uint32_t token, uint32_t results_size) override;
 
-  std::string test_;
-
 private:
   uint32_t dns_token_;
-};
-
-class TestContext : public EnvoyContext {
-public:
-  explicit TestContext(uint32_t id, RootContext* root) : EnvoyContext(id, root) {}
-  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
-  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
-
-private:
-  TestRootContext* root() { return static_cast<TestRootContext*>(Context::root()); }
 };
 
 static RegisterContextFactory register_TestContext(CONTEXT_FACTORY(TestContext),
@@ -44,28 +37,8 @@ static RegisterContextFactory register_TestContext(CONTEXT_FACTORY(TestContext),
 static RegisterContextFactory register_EmptyTestContext(CONTEXT_FACTORY(EnvoyContext),
                                                         ROOT_FACTORY(EnvoyRootContext), "empty");
 
-FilterDataStatus TestContext::onRequestBody(size_t, bool) {
-  auto test = root()->test_;
-  if (test == "send local reply twice") {
-    sendLocalResponse(200, "ok", "body", {});
-    sendLocalResponse(200, "not send", "body", {});
-  } else if (test == "panic after sending local reply") {
-    sendLocalResponse(200, "not send", "body", {});
-    int* badptr = nullptr;
-    *badptr = 0;
-  }
-  return FilterDataStatus::Continue;
-}
-
-FilterHeadersStatus TestContext::onResponseHeaders(uint32_t, bool) {
-  return FilterHeadersStatus::Continue;
-}
-
-bool TestRootContext::onStart(size_t configuration_size) {
-  test_ = getBufferBytes(WasmBufferType::VmConfiguration, 0, configuration_size)->toString();
-  if (test_ == "resolve dns") {
-    envoy_resolve_dns("example.com", sizeof("example.com") - 1, &dns_token_);
-  }
+bool TestRootContext::onStart(size_t) {
+  envoy_resolve_dns("example.com", sizeof("example.com") - 1, &dns_token_);
   return true;
 }
 
@@ -85,30 +58,68 @@ bool TestRootContext::onDone() {
 
 // Null VM fails on nullptr.
 void TestRootContext::onTick() {
-  if (test_ == "resolve dns") {
-    if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
-      logInfo("resolve_dns should report invalid memory access");
-    }
-    if (envoy_resolve_dns("example.com", sizeof("example.com") - 1, nullptr) !=
-        WasmResult::InvalidMemoryAccess) {
-      logInfo("resolve_dns should report invalid memory access");
-    }
+  if (envoy_resolve_dns(nullptr, 1, &dns_token_) != WasmResult::InvalidMemoryAccess) {
+    logInfo("resolve_dns should report invalid memory access");
+  }
+  if (envoy_resolve_dns("example.com", sizeof("example.com") - 1, nullptr) !=
+      WasmResult::InvalidMemoryAccess) {
+    logInfo("resolve_dns should report invalid memory access");
   }
 }
 
 // V8 fails on pointer too large.
 void TestRootContext::onQueueReady(uint32_t) {
-  if (test_ == "resolve dns") {
-    if (envoy_resolve_dns(reinterpret_cast<char*>(INT_MAX), 0, &dns_token_) !=
-        WasmResult::InvalidMemoryAccess) {
-      logInfo("resolve_dns should report invalid memory access");
-    }
-    if (envoy_resolve_dns("example.com", sizeof("example.com") - 1,
-                          reinterpret_cast<uint32_t*>(INT_MAX)) !=
-        WasmResult::InvalidMemoryAccess) {
-      logInfo("resolve_dns should report invalid memory access");
-    }
+  if (envoy_resolve_dns(reinterpret_cast<char*>(INT_MAX), 0, &dns_token_) !=
+      WasmResult::InvalidMemoryAccess) {
+    logInfo("resolve_dns should report invalid memory access");
+  }
+  if (envoy_resolve_dns("example.com", sizeof("example.com") - 1,
+                        reinterpret_cast<uint32_t*>(INT_MAX)) != WasmResult::InvalidMemoryAccess) {
+    logInfo("resolve_dns should report invalid memory access");
   }
 }
+
+class TestCommonContext : public RootContext {
+public:
+  explicit TestCommonContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
+};
+
+class DupReplyContext : public Context {
+public:
+  explicit DupReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+
+private:
+  TestCommonContext* root() { return static_cast<TestCommonContext*>(Context::root()); }
+};
+
+FilterDataStatus DupReplyContext::onRequestBody(size_t, bool) {
+  sendLocalResponse(200, "ok", "body", {});
+  sendLocalResponse(200, "not send", "body", {});
+  return FilterDataStatus::Continue;
+}
+
+class PanicReplyContext : public Context {
+public:
+  explicit PanicReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+
+private:
+  TestCommonContext* root() { return static_cast<TestCommonContext*>(Context::root()); }
+};
+
+FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
+  sendLocalResponse(200, "not send", "body", {});
+  int* badptr = nullptr;
+  *badptr = 0;
+  return FilterDataStatus::Continue;
+}
+
+static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
+                                                       ROOT_FACTORY(TestCommonContext),
+                                                       "send local reply twice");
+static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicReplyContext),
+                                                         ROOT_FACTORY(TestCommonContext),
+                                                         "panic after sending local reply");
 
 END_WASM_PLUGIN
