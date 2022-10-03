@@ -2642,21 +2642,6 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
   }
 
   {
-    // If the cluster manager gets a source address from the bootstrap proto, use it.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
-                              false);
-    Network::Address::InstanceConstSharedPtr remote_address =
-        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
-  }
-
-  {
     // Test additional_source_addresses from bootstrap.
     server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
@@ -2753,21 +2738,6 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   const std::string cluster_address = "5.6.7.8";
   config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
-  {
-    // Verify source address from cluster config is used when present.
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
-                              false);
-    Network::Address::InstanceConstSharedPtr remote_address =
-        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
-  }
-
   {
     // Test cluster config has more than two multiple source addresses
     config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
