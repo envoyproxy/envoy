@@ -112,6 +112,9 @@ bug_fixes:
 - area: upstream
   change: |
     fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
+- area: tls
+  change: |
+    fixed a bug where, when runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` is set to false, the wrong TLS alerts would sometimes be sent in response to certificate validation failures.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
