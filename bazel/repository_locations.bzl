@@ -123,6 +123,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "BoringSSL (FIPS)",
         project_desc = "FIPS compliant BoringSSL",
         project_url = "https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md",
+        # When this is updated to a revision newer than 2022-08-12,
+        # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
         version = "fips-20190808",
         sha256 = "3b5fdf23274d4179c2077b5e8fa625d9debd7a390aac1d165b7e47234f648bb8",
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-fips/boringssl-ae223d6138807a13006342edfeef32e813246b39.tar.xz"],
