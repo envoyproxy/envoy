@@ -1,10 +1,15 @@
 #include "source/common/grpc/context_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <tuple>
+#include <utility>
 
 #include "source/common/grpc/common.h"
 #include "source/common/stats/utility.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -96,6 +101,19 @@ ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   Stats::Element service = Stats::DynamicSavedName(request_names->service_);
   Stats::Element method = Stats::DynamicSavedName(request_names->method_);
   return RequestStatNames{service, method};
+}
+
+std::pair<absl::optional<ContextImpl::RequestStatNames>, std::unique_ptr<std::string>>
+ContextImpl::resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) {
+  absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+  if (!request_names) {
+    return {};
+  }
+  auto service_name =
+      std::make_unique<std::string>(absl::StrReplaceAll(request_names->service_, {{".", "_"}}));
+  Stats::Element service = Stats::DynamicName(*service_name);
+  Stats::Element method = Stats::DynamicName(request_names->method_);
+  return std::make_pair(RequestStatNames{service, method}, std::move(service_name));
 }
 
 } // namespace Grpc

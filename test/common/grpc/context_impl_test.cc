@@ -111,5 +111,30 @@ TEST(GrpcContextTest, ResolvedServiceAndMethodOutliveChangesInRequestNames) {
   EXPECT_EQ("method1", absl::get<Stats::DynamicSavedName>(new_request_names->method_));
 }
 
+TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/foo.bar.zoo/method.name?a=b");
+  const Http::HeaderEntry* path = headers.Path();
+  Stats::TestUtil::TestSymbolTable symbol_table;
+  ContextImpl context(*symbol_table);
+  absl::optional<Context::RequestStatNames> request_names;
+  std::unique_ptr<std::string> service_name_without_dots_;
+  std::tie(request_names, service_name_without_dots_) =
+      context.resolveDynamicServiceAndMethodWithDotReplaced(path);
+  EXPECT_TRUE(request_names);
+  EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicName>(request_names->service_));
+  EXPECT_EQ("method.name", absl::get<Stats::DynamicName>(request_names->method_));
+  headers.setPath("");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  headers.setPath("/");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  headers.setPath("//");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  headers.setPath("/service_name");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  headers.setPath("/service_name/");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+}
+
 } // namespace Grpc
 } // namespace Envoy
