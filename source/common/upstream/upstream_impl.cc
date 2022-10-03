@@ -93,7 +93,7 @@ getSourceAddressFnFromBindConfig(const std::string& cluster_name,
 
   if (bind_config.extra_source_addresses_size() == 1) {
     source_address_list.emplace_back(Network::Address::resolveProtoSocketAddress(
-        bind_config.extra_source_addresses(0).source_address()));
+        bind_config.extra_source_addresses(0).address()));
     if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
       throw EnvoyException(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "

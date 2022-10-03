@@ -2458,7 +2458,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     // Test extra_source_addresses from bootstrap.
     server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2496,7 +2496,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2517,10 +2517,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::1");
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2540,7 +2540,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2576,11 +2576,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
     config.mutable_upstream_bind_config()
         ->add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::1");
     config.mutable_upstream_bind_config()
         ->add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2624,7 +2624,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
         "2001::1");
     server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
-        ->mutable_source_address()
+        ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));

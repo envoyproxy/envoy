@@ -118,7 +118,7 @@ message TcpKeepalive {
 
 message ExtraSourceAddress {
   // The additional address to bind.
-  SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
+  SocketAddress address = 1 [(validate.rules).message = {required: true}];
 }
 
 // [#next-free-field: 6]
