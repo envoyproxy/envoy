@@ -335,8 +335,6 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
-// TODO(alyssawilk) after landing this, remove all the duplicate getters and
-// setters from StreamInfo.
 class UpstreamInfo {
 public:
   virtual ~UpstreamInfo() = default;

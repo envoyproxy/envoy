@@ -377,25 +377,6 @@ absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectRespons
   return ret;
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
-                               Runtime::Loader& loader)
-    : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
-      allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-      max_age_(config.max_age()) {
-  for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            string_match));
-  }
-  if (config.has_allow_credentials()) {
-    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
-  }
-  if (config.has_allow_private_network_access()) {
-    allow_private_network_access_ =
-        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
-  }
-}
-
 void validateMirrorClusterSpecifier(
     const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
@@ -1409,10 +1390,7 @@ void RouteEntryImplBase::validateClusters(
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
-  if (maybe_vhost_config != nullptr) {
-    cb(*maybe_vhost_config);
-  }
+  vhost_.traversePerFilterConfig(filter_name, cb);
 
   auto maybe_route_config = per_filter_configs_.get(filter_name);
   if (maybe_route_config != nullptr) {
@@ -1775,8 +1753,24 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
-const RouteSpecificFilterConfig* VirtualHostImpl::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
+const RouteSpecificFilterConfig*
+VirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
+  auto* per_filter_config = per_filter_configs_.get(name);
+  return per_filter_config != nullptr ? per_filter_config
+                                      : global_route_config_.perFilterConfig(name);
+}
+void VirtualHostImpl::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  // Parent first.
+  if (auto* maybe_rc_config = global_route_config_.perFilterConfig(filter_name);
+      maybe_rc_config != nullptr) {
+    cb(*maybe_rc_config);
+  }
+  if (auto* maybe_vhost_config = per_filter_configs_.get(filter_name);
+      maybe_vhost_config != nullptr) {
+    cb(*maybe_vhost_config);
+  }
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
@@ -2022,7 +2016,9 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
-      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
+      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()),
+      per_filter_configs_(config.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator) {
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
