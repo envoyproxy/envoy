@@ -113,8 +113,6 @@ getSourceAddressFnFromBindConfig(const std::string& cluster_name,
           "and additional_source_addresses fields",
           cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
     }
-    ENVOY_LOG_MISC(warn, "The `additional_source_addresses` field is already deprecated by "
-                         "`extra_source_addresses`.");
   }
 
   return [source_address_list = std::move(source_address_list)](
