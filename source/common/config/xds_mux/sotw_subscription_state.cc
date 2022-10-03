@@ -127,6 +127,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
     }
 
     callbacks().onConfigUpdate(decoded_resources, version_info);
+    previously_fetched_data_ = true;
   }
   END_TRY
   catch (const EnvoyException& e) {
