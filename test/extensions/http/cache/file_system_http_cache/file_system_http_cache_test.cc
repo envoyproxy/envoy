@@ -157,6 +157,7 @@ public:
     request_headers_.setHost("example.com");
     request_headers_.setScheme("https");
     request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
+    request_headers_.setPath("/");
     expect_false_callback_ = [this](bool result) {
       EXPECT_FALSE(result);
       false_callbacks_called_++;
