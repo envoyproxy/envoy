@@ -45,6 +45,7 @@ protected:
   quiche::QuicheLinkedHashMap<std::string, std::chrono::seconds> ttl_store_;
   // Used for validation only.
   mutable bool under_iterate_{};
+  TimeSource& time_source_;
 };
 
 } // namespace Envoy

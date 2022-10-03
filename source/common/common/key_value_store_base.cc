@@ -50,7 +50,8 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
         flush_timer_->enableTimer(flush_interval);
       })),
       ttl_manager_([this](const std::vector<std::string>& expired) { onExpiredKeys(expired); },
-                   dispatcher, dispatcher.timeSource()) {
+                   dispatcher, dispatcher.timeSource()),
+      time_source_(dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
   }
@@ -75,7 +76,9 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       if (token.has_value()) {
         if (absl::SimpleAtoi(token.value(), &ttlInt)) {
           ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
-              std::chrono::seconds(ttlInt) - std::chrono::system_clock::now().time_since_epoch()));
+              std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttlInt)) -
+              time_source_.monotonicTime()));
+          std::cout << ttl.value().count();
         }
       }
     }
@@ -108,8 +111,8 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   }
   if (ttl) {
     ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
-    std::chrono::seconds absolute_ttl = std::chrono::duration_cast<std::chrono::seconds>(
-        ttl.value() + std::chrono::system_clock::now().time_since_epoch());
+    auto absolute_ttl = ttl.value() + std::chrono::duration_cast<std::chrono::seconds>(
+                                          time_source_.monotonicTime().time_since_epoch());
     if (!ttl_store_.emplace(key, absolute_ttl)
              .second) { // ttl_store_ should probably be merged with store_ as a tuple
       ttl_store_.erase(key);
