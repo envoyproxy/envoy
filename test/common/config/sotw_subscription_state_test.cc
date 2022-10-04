@@ -323,6 +323,10 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
                              std::string(RESOURCE_VERSION)));
   EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleEstablishmentFailure();
+  auto next_request = getNextDiscoveryRequestAckless();
+  EXPECT_EQ(next_request->version_info(), RESOURCE_VERSION);
+  // No nonce, since the version didn't come from an xDS server.
+  EXPECT_TRUE(next_request->response_nonce().empty());
 }
 
 TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithInvalidResource) {
@@ -340,6 +344,10 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithInvalidResource)
   state_->handleEstablishmentFailure();
   EXPECT_THAT(xds_resources_delegate_->failedResourceNames(),
               AllOf(SizeIs(1), Contains(bad_resource_name)));
+  auto next_request = getNextDiscoveryRequestAckless();
+  // There was an invalid resource, so the last known good version won't be set.
+  EXPECT_TRUE(next_request->version_info().empty());
+  EXPECT_TRUE(next_request->response_nonce().empty());
 }
 
 TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithDelegateThrowingException) {
@@ -351,6 +359,10 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithDelegateThrowing
               onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(), _))
       .Times(0);
   state_->handleEstablishmentFailure();
+  auto next_request = getNextDiscoveryRequestAckless();
+  // The xDS delegate threw an exception, so the last known good version won't be set.
+  EXPECT_TRUE(next_request->version_info().empty());
+  EXPECT_TRUE(next_request->response_nonce().empty());
 }
 
 TEST_F(SotwSubscriptionStateTest, ResourceTTL) {

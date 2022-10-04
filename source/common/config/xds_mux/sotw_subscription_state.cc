@@ -108,6 +108,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
     std::vector<DecodedResourcePtr> decoded_resources;
     const auto scoped_update = ttl_.scopedTtlUpdate();
     std::string version_info;
+    absl::flat_hash_set<std::string> unaccounted{names_tracked_.begin(), names_tracked_.end()};
     for (const auto& resource : resources) {
       if (version_info.empty()) {
         version_info = resource.version();
@@ -118,6 +119,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
       TRY_ASSERT_MAIN_THREAD {
         auto decoded_resource = DecodedResourceImpl::fromResource(*resource_decoder_, resource);
         setResourceTtl(*decoded_resource);
+        unaccounted.erase(decoded_resource->name());
         decoded_resources.emplace_back(std::move(decoded_resource));
       }
       END_TRY
@@ -128,6 +130,11 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
     callbacks().onConfigUpdate(decoded_resources, version_info);
     previously_fetched_data_ = true;
+    if (unaccounted.empty()) {
+      // All the requested resources were found and validated from the xDS delegate, so set the last
+      // known good version.
+      last_good_version_info_ = version_info;
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
