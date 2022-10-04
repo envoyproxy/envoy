@@ -447,6 +447,8 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
 }
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through_filter_chain) {
+  ENVOY_CONN_LOG(trace, "attempting to write {} bytes, end_stream {}", *this, data.length(),
+                 end_stream);
   ASSERT(!end_stream || enable_half_close_);
   ASSERT(dispatcher_.isThreadSafe());
 
