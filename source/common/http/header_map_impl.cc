@@ -38,8 +38,14 @@ absl::string_view delimiterByHeader(const LowerCaseString& key) {
 } // namespace
 
 // Initialize as a Type::Reference
-HeaderString::HeaderString(const LowerCaseString& ref_value)
+HeaderString::HeaderString(const LowerCaseString& ref_value) noexcept
     : UnionStringBase(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
+  ASSERT(valid());
+}
+
+HeaderString::HeaderString(UnionString&& move_value) noexcept {
+  buffer_ = std::move(move_value.storage());
+  move_value.clear();
   ASSERT(valid());
 }
 

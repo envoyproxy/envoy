@@ -10,7 +10,6 @@
 #include "absl/types/variant.h"
 
 namespace Envoy {
-namespace {
 
 /**
  * Convenient type for an inline vector that will be used by InlinedString.
@@ -45,8 +44,6 @@ inline const InlinedStringVector& getInVec(const VariantStringOrView& buffer) {
   return absl::get<InlinedStringVector>(buffer);
 }
 
-} // namespace
-
 /**
  * This is a string implementation that unified string reference and owned string. It is heavily
  * optimized for performance. It supports 2 different types of storage and can switch between them:
@@ -56,6 +53,8 @@ inline const InlinedStringVector& getInVec(const VariantStringOrView& buffer) {
  */
 template <class Validator> class UnionStringBase {
 public:
+  using Storage = VariantStringOrView;
+
   /**
    * Default constructor. Sets up for inline storage.
    */
@@ -246,6 +245,12 @@ public:
     getInVec(buffer_).assign(view.data(), view.data() + view.size());
   }
 
+  /**
+   * @return raw Storage for cross-class move. This method is used to tranfer ownership
+   * between UnionString with different Validator.
+   */
+  Storage& storage() { return buffer_; }
+
 protected:
   enum class Type { Reference, Inline };
 
@@ -265,7 +270,7 @@ protected:
     return Type(buffer_.index());
   }
 
-  VariantStringOrView buffer_;
+  Storage buffer_;
 };
 
 class EmptyStringValidator {

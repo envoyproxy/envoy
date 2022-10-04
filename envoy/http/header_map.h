@@ -113,13 +113,13 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const LowerCaseString& ref_value);
+  explicit HeaderString(const LowerCaseString& ref_value) noexcept;
 
   /**
    * Constructor for normal UnionString instance.
    * @param move_value moveable UnionString. The string value MUST be valid header string.
    */
-  explicit HeaderString(UnionString&& move_value);
+  explicit HeaderString(UnionString&& move_value) noexcept;
 };
 
 /**
