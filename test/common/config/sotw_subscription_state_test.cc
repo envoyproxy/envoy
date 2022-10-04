@@ -56,7 +56,7 @@ public:
       cla.set_cluster_name(resource_name);
       if (resource_name == std::string(BAD_CLA_RESOURCE_NAME)) {
         // If the bad resource is requested, set an invalid enum value (1000) for the Policy's
-        // Denominator drop percentage.
+        // drop percentage denominator.
         cla.mutable_policy()->add_drop_overloads()->mutable_drop_percentage()->set_denominator(
             static_cast<envoy::type::v3::FractionalPercent_DenominatorType>(1000));
       }
