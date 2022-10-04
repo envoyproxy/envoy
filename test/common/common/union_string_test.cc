@@ -21,7 +21,7 @@ TEST(UnionStringTest, All) {
     UnionString string1(static_string);
     UnionString string2(std::move(string1));
     EXPECT_EQ("HELLO", string2.getStringView());
-    EXPECT_EQ(static_string, string1.getStringView()); // NOLINT(bugprone-use-after-move)
+    EXPECT_EQ(static_string, string1.getStringView()); // NOLINT
     EXPECT_EQ(static_string, string2.getStringView());
     EXPECT_EQ(5U, string1.size());
     EXPECT_EQ(5U, string2.size());
@@ -33,8 +33,8 @@ TEST(UnionStringTest, All) {
     string.setCopy("hello");
     EXPECT_FALSE(string.isReference());
     UnionString string2(std::move(string));
-    EXPECT_TRUE(string.empty());        // NOLINT(bugprone-use-after-move)
-    EXPECT_FALSE(string.isReference()); // NOLINT(bugprone-use-after-move)
+    EXPECT_TRUE(string.empty());        // NOLINT
+    EXPECT_FALSE(string.isReference()); // NOLINT
     EXPECT_FALSE(string2.isReference());
     string.append("world", 5);
     EXPECT_EQ("world", string.getStringView());
@@ -50,8 +50,8 @@ TEST(UnionStringTest, All) {
     string.setCopy(large);
     EXPECT_FALSE(string.isReference());
     UnionString string2(std::move(string));
-    EXPECT_TRUE(string.empty());        // NOLINT(bugprone-use-after-move)
-    EXPECT_FALSE(string.isReference()); // NOLINT(bugprone-use-after-move)
+    EXPECT_TRUE(string.empty());        // NOLINT
+    EXPECT_FALSE(string.isReference()); // NOLINT
     EXPECT_FALSE(string2.isReference());
     string.append("b", 1);
     EXPECT_EQ("b", string.getStringView());
