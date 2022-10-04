@@ -157,7 +157,7 @@ bool hasRuntimePrefix(absl::string_view feature) {
   // Track Envoy reloadable and restart features, excluding synthetic QUIC flags
   // which are not tracked in the list below.
   return (absl::StartsWith(feature, "envoy.reloadable_features.") &&
-          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_quic")) ||
+          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_envoy_quic")) ||
          absl::StartsWith(feature, "envoy.restart_features.");
 }
 
