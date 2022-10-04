@@ -52,20 +52,24 @@ public:
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Init::Manager& init_manager) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Init::Manager& init_manager) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Init::Manager& init_manager) override;
 
   GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Init::Manager& init_manager) override;
 
 private:
   ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
@@ -77,7 +81,8 @@ private:
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
-                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+                 Init::Manager& init_manager) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
 
@@ -95,7 +100,8 @@ private:
       // It is important to add the init target to the manager regardless the secret provider is new
       // or existing. Different clusters / listeners can share same secret so they have to be marked
       // warming correctly.
-      secret_provider_context.initManager().add(*secret_provider->initTarget());
+
+      init_manager.add(*secret_provider->initTarget());
       return secret_provider;
     }
 
