@@ -6,7 +6,7 @@ Pending Release
 
 Breaking changes:
 
--
+- ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
 
 Bugfixes:
 

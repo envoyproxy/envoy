@@ -63,7 +63,6 @@ open class EngineBuilder(
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
   private var h2ExtendKeepaliveTimeout = false
-  private var h2RawDomains = listOf<String>()
   private var maxConnectionsPerHost = 7
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
@@ -385,18 +384,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Add a list of domains to which h2 connections will be established without protocol negotiation.
-   *
-   * @param h2RawDomains list of domains to which connections should be raw h2.
-   *
-   * @return this builder.
-   */
-  fun addH2RawDomains(h2RawDomains: List<String>): EngineBuilder {
-    this.h2RawDomains = h2RawDomains
-    return this
-  }
-
-  /**
    * Set the maximum number of connections to open to a single host. Default is 7.
    *
    * @param maxConnectionsPerHost the maximum number of connections per host.
@@ -636,7 +623,6 @@ open class EngineBuilder(
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
       h2ExtendKeepaliveTimeout,
-      h2RawDomains,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,

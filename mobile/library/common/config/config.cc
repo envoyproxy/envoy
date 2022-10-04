@@ -109,7 +109,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
 - &h2_delay_keepalive_timeout false
-- &h2_raw_domains []
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -330,25 +329,13 @@ static_resources:
           route_config:
             name: api_router
             virtual_hosts:
-            - name: h2_raw
-              include_attempt_count_in_response: true
-              virtual_clusters: *virtual_clusters
-              domains: *h2_raw_domains
-              routes:
-#{custom_routes}
-              - match: { prefix: "/" }
-                request_headers_to_remove:
-                - x-forwarded-proto
-                - x-envoy-mobile-cluster
-                route:
-                  cluster: base_h2
-                  timeout: 0s
-                  retry_policy:
-                    per_try_idle_timeout: *per_try_idle_timeout
-                    retry_back_off:
-                      base_interval: 0.25s
-                      max_interval: 60s
-            - name: primary
+)"
+// The list of virtual hosts impacts directly the number of virtual cluster stats.
+// That's because we create a separate set of virtual clusters stats for every
+// "virtual cluster" <> "virtual host" pair. Increasing the number of virtual hosts
+// from 1 to 2 doubles the number of virtual cluster stats.
+R"(
+            - name: api
               include_attempt_count_in_response: true
               virtual_clusters: *virtual_clusters
               domains: ["*"]

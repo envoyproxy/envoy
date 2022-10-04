@@ -47,7 +47,6 @@ public class EnvoyConfiguration {
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
   public final Integer h2ConnectionKeepaliveTimeoutSeconds;
   public final Boolean h2ExtendKeepaliveTimeout;
-  public final List<String> h2RawDomains;
   public final Integer maxConnectionsPerHost;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
@@ -93,7 +92,6 @@ public class EnvoyConfiguration {
    * @param h2ConnectionKeepaliveTimeoutSeconds rate in seconds to timeout h2 pings.
    * @param h2ExtendKeepaliveTimeout     Extend the keepalive timeout when *any* frame is received
    *                                     on the owning HTTP/2 connection.
-   * @param h2RawDomains                 list of domains to which connections should be raw h2.
    * @param maxConnectionsPerHost        maximum number of connections to open to a single host.
    * @param statsFlushSeconds            interval at which to flush Envoy stats.
    * @param streamIdleTimeoutSeconds     idle timeout for HTTP streams.
@@ -116,10 +114,10 @@ public class EnvoyConfiguration {
       boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
       boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      boolean h2ExtendKeepaliveTimeout, List<String> h2RawDomains, int maxConnectionsPerHost,
-      int statsFlushSeconds, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
-      String appVersion, String appId, TrustChainVerification trustChainVerification,
-      String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
+      boolean h2ExtendKeepaliveTimeout, int maxConnectionsPerHost, int statsFlushSeconds,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      TrustChainVerification trustChainVerification, String virtualClusters,
+      List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks) {
@@ -146,7 +144,6 @@ public class EnvoyConfiguration {
         h2ConnectionKeepaliveIdleIntervalMilliseconds;
     this.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
     this.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
-    this.h2RawDomains = h2RawDomains;
     this.maxConnectionsPerHost = maxConnectionsPerHost;
     this.statsFlushSeconds = statsFlushSeconds;
     this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -224,19 +221,6 @@ public class EnvoyConfiguration {
       dnsFallbackNameserversAsString = sb.toString();
     }
 
-    String h2RawDomainsAsString = "[]";
-    if (!h2RawDomains.isEmpty()) {
-      StringBuilder sb = new StringBuilder("[");
-      String separator = "";
-      for (String hostname : h2RawDomains) {
-        sb.append(separator);
-        separator = ",";
-        sb.append(String.format("\"%s\"", hostname));
-      }
-      sb.append("]");
-      h2RawDomainsAsString = sb.toString();
-    }
-
     String dnsResolverName = "";
     String dnsResolverConfig = "";
     if (dnsUseSystemResolver) {
@@ -276,7 +260,6 @@ public class EnvoyConfiguration {
                               h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0))
         .append(String.format("- &h2_connection_keepalive_timeout %ss\n",
                               h2ConnectionKeepaliveTimeoutSeconds))
-        .append(String.format("- &h2_raw_domains %s\n", h2RawDomainsAsString))
         .append(String.format("- &max_connections_per_host %s\n", maxConnectionsPerHost))
         .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
         .append(String.format("- &per_try_idle_timeout %ss\n", perTryIdleTimeoutSeconds))
