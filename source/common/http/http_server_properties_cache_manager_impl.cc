@@ -51,8 +51,17 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
         factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
   }
 
-  HttpServerPropertiesCacheSharedPtr new_cache = std::make_shared<HttpServerPropertiesCacheImpl>(
-      dispatcher, std::move(store), options.max_entries().value());
+  std::vector<std::string> canonical_suffixes;
+  for (const std::string& suffix : options.canonical_suffixes()) {
+    if (!absl::StartsWith(suffix, ".")) {
+      IS_ENVOY_BUG(absl::StrCat("Suffix does not start with a leading '.': ", suffix));
+      continue;
+    }
+    canonical_suffixes.push_back(suffix);
+  }
+
+  auto new_cache = std::make_shared<HttpServerPropertiesCacheImpl>(
+      dispatcher, std::move(canonical_suffixes), std::move(store), options.max_entries().value());
 
   for (const envoy::config::core::v3::AlternateProtocolsCacheOptions::AlternateProtocolsCacheEntry&
            entry : options.prepopulated_entries()) {

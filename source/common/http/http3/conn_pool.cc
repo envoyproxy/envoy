@@ -24,8 +24,8 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
-  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
-      .clientContextConfig();
+  ASSERT(transport_socket_factory.clientContextConfig().has_value());
+  return transport_socket_factory.clientContextConfig().value();
 }
 
 std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
@@ -119,8 +119,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::HttpServerPropertiesCache> rtt_cache,
                                           Stats::Scope& scope) {
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
-          .getCryptoConfig();
+      host_->transportSocketFactory().getCryptoConfig();
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
@@ -155,8 +154,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                             "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
-        ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
-        if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+        if (factory->sslCtx() == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool),
                                           warn,
                                           "Failed to create Http/3 client. Transport socket "

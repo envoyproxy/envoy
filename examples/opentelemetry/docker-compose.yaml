@@ -1,0 +1,74 @@
+version: "3.8"
+services:
+
+  envoy-front-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-front-proxy.yaml
+    depends_on:
+      opentelemetry:
+        condition: service_healthy
+      envoy-1:
+        condition: service_started
+      envoy-2:
+        condition: service_started
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+
+  envoy-1:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-1.yaml
+    depends_on:
+      opentelemetry:
+        condition: service_healthy
+      service-1:
+        condition: service_healthy
+      envoy-2:
+        condition: service_started
+
+  envoy-2:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-2.yaml
+    depends_on:
+      opentelemetry:
+        condition: service_healthy
+      service-2:
+        condition: service_healthy
+
+  service-1:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=1
+
+  service-2:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=2
+
+  opentelemetry:
+    build:
+      context: .
+      dockerfile: Dockerfile-opentelemetry
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:13133 || exit 1"]
+      interval: 1s
+      timeout: 120s
+      retries: 120
+      start_period: 5s
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+    - "${PORT_UI:-55679}:55679"

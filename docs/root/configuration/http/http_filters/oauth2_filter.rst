@@ -61,7 +61,7 @@ The following is an example configuring the filter.
       uri: oauth.com/token
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
-    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
       path:
         exact: /callback
@@ -118,7 +118,7 @@ Below is a complete code example of how we employ the filter as one of
                     uri: oauth.com/token
                     timeout: 3s
                   authorization_endpoint: https://oauth.com/oauth/authorize/
-                  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+                  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
                   redirect_path_matcher:
                     path:
                       exact: /callback

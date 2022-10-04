@@ -610,7 +610,7 @@ public:
             value: "%PROTOCOL%"
         - header:
             key: x-upstream-metadata
-            value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+            value: "%UPSTREAM_METADATA(namespace:key)%"
         - header:
             key: x-downstream-remote-address
             value: "%DOWNSTREAM_REMOTE_ADDRESS%"
@@ -4985,7 +4985,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
        {DOWNSTREAM_REMOTE_ADDRESS_KEY, "%DOWNSTREAM_REMOTE_ADDRESS%"},
        {DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT_KEY, "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
        {START_TIME_KEY, "%START_TIME(%s.%9f)%"},
-       {UPSTREAM_METADATA_KEY, "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"}});
+       {UPSTREAM_METADATA_KEY, "%UPSTREAM_METADATA(namespace:key)%"}});
 
   auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
       R"EOF(

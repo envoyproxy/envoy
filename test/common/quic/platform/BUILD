@@ -27,6 +27,7 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/common/memory:stats_lib",
+        "//source/common/quic:spdy_server_push_utils_for_envoy_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/common/buffer:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -35,48 +36,15 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_github_google_quiche//:epoll_server_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
-        "@com_github_google_quiche//:quic_core_quic_epoll_clock_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
         "@com_github_google_quiche//:quic_platform_expect_bug",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",
         "@com_github_google_quiche//:quic_platform_thread",
         "@com_github_google_quiche//:quiche_common_mem_slice_storage",
-        "@com_github_google_quiche//:quiche_common_platform_stream_buffer_allocator",
         "@com_github_google_quiche//:quiche_common_platform_system_event_loop",
     ],
-)
-
-envoy_quiche_platform_impl_cc_test_library(
-    name = "epoll_server_platform_impl_lib",
-    hdrs = [
-        "epoll_address_test_utils_impl.h",
-        "epoll_bug_impl.h",
-        "epoll_expect_bug_impl.h",
-        "epoll_export_impl.h",
-        "epoll_logging_impl.h",
-        "epoll_ptr_util_impl.h",
-        "epoll_test_impl.h",
-        "epoll_thread_impl.h",
-        "epoll_time_impl.h",
-    ],
-    external_deps = ["abseil_time"],
-    deps = [
-        ":quiche_expect_bug_impl_lib",
-        ":quiche_thread_impl_lib",
-        "//envoy/network:address_interface",
-        "//source/common/quic/platform:quic_base_impl_lib",
-        "//test/test_common:environment_lib",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_test_library(
-    name = "quiche_common_platform_epoll_impl_lib",
-    hdrs = ["quiche_epoll_impl.h"],
-    tags = ["nofips"],
-    deps = ["@com_github_google_quiche//:epoll_server_lib"],
 )
 
 envoy_quiche_platform_impl_cc_test_library(
