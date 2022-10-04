@@ -41,7 +41,9 @@ protected:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
   Config::TtlManager ttl_manager_;
-  quiche::QuicheLinkedHashMap<std::string, std::pair<std::string, absl::optional<std::chrono::seconds>>> store_;
+  quiche::QuicheLinkedHashMap<std::string,
+                              std::pair<std::string, absl::optional<std::chrono::seconds>>>
+      store_;
   // Used for validation only.
   mutable bool under_iterate_{};
   TimeSource& time_source_;

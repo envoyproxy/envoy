@@ -80,9 +80,8 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       } else {
         if (!token.has_value()) {
           ENVOY_LOG(warn, error);
-        }
-        else {
-          ENVOY_LOG(warn, "TTL was read from disk, but aoti() failed")
+        } else {
+          ENVOY_LOG(warn, "TTL was read from disk, but aoti() failed");
         }
       }
     }
