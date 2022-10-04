@@ -30,7 +30,8 @@ public:
       const envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceConfig&
           tra_service_config,
       bool operate_via,
-      const envoy::extensions::filters::network::sip_proxy::v3alpha::UpstreamTransactions& upstream_transactions)
+      const envoy::extensions::filters::network::sip_proxy::v3alpha::UpstreamTransactions&
+          upstream_transactions)
       : transaction_timeout_(transaction_timeout), tra_service_config_(tra_service_config),
         operate_via_(operate_via), upstream_transactions_enable_(upstream_transactions.enabled()) {
     for (const auto& service : local_services) {
@@ -59,7 +60,7 @@ public:
   traServiceConfig() {
     return tra_service_config_;
   }
-  bool UpstreamTransactionsEnabled() { return upstream_transactions_enable_; }
+  bool upstreamTransactionsEnabled() { return upstream_transactions_enable_; }
 
 private:
   std::chrono::milliseconds transaction_timeout_;
@@ -165,7 +166,8 @@ public:
   }
 
   static const std::string threadId(Server::Configuration::FactoryContext& context) {
-    return context.api().threadFactory().currentThreadId().debugString() + "@" + localAddress(context);
+    return context.api().threadFactory().currentThreadId().debugString() + "@" +
+           localAddress(context);
   }
 };
 

@@ -130,7 +130,7 @@ private:
       {HeaderType::RRoute, "Record-Route"},
       {HeaderType::Cseq, "CSeq"},
       {HeaderType::Route, "Route"},
-      {HeaderType::Path,"Path"},
+      {HeaderType::Path, "Path"},
       {HeaderType::Event, "Event"},
       {HeaderType::SRoute, "Service-Route"},
       {HeaderType::WAuth, "WWW-Authenticate"},
@@ -138,7 +138,6 @@ private:
       {HeaderType::TopLine, "TopLine"},
       {HeaderType::PCookieIPMap, "P-Nokia-Cookie-IP-Mapping"},
       {HeaderType::XEnvoyOriginIngress, "X-Envoy-Origin-Ingress"}};
-
 };
 
 using HeaderTypes = ConstSingleton<HeaderTypeMap>;

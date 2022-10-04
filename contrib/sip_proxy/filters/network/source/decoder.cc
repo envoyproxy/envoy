@@ -316,7 +316,7 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
 
   auto thread_start = header.find("thread=");
   if (thread_start == absl::string_view::npos) {
-    ENVOY_LOG(error, "Not found start of thread field for X-Envoy-origin-Ingress={}", header);    
+    ENVOY_LOG(error, "Not found start of thread field for X-Envoy-origin-Ingress={}", header);
     auto origin_ingress = std::make_unique<OriginIngress>("", "");
     metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
@@ -324,7 +324,7 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   thread_start += 7;
   auto thread_end = header.find(";", thread_start);
   if ((thread_end == absl::string_view::npos) || (thread_end <= thread_start)) {
-    ENVOY_LOG(error, "Not found end of thread field for X-Envoy-origin-Ingress={}", header);  
+    ENVOY_LOG(error, "Not found end of thread field for X-Envoy-origin-Ingress={}", header);
     auto origin_ingress = std::make_unique<OriginIngress>("", "");
     metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
@@ -334,7 +334,7 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   if (downstream_conn_start == absl::string_view::npos) {
     ENVOY_LOG(error,
               "Not found start of thread downstream-connection for X-Envoy-origin-Ingress={}",
-              header);  
+              header);
     auto origin_ingress = std::make_unique<OriginIngress>("", "");
     metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
@@ -343,7 +343,7 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   auto downstream_conn_end = header.length();
   if (downstream_conn_end <= downstream_conn_start) {
     ENVOY_LOG(error, "Not found end of thread downstream-connection for X-Envoy-origin-Ingress={}",
-              header);  
+              header);
     auto origin_ingress = std::make_unique<OriginIngress>("", "");
     metadata()->setOriginIngress(std::move(origin_ingress));
     return 0;
@@ -353,8 +353,8 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
   auto worker_thread_id = header.substr(thread_start, thread_end - thread_start);
   auto downstream_conn_id =
       header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
-  auto origin_ingress =
-      std::make_unique<OriginIngress>(std::string(worker_thread_id), std::string(downstream_conn_id));
+  auto origin_ingress = std::make_unique<OriginIngress>(std::string(worker_thread_id),
+                                                        std::string(downstream_conn_id));
   ENVOY_LOG(trace, "X-Envoy_origin-Ingress header processed: thread={}, downstream-connection={}",
             worker_thread_id, downstream_conn_id);
   metadata()->setOriginIngress(std::move(origin_ingress));

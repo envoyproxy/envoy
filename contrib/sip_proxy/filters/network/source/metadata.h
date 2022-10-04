@@ -240,7 +240,7 @@ private:
   absl::optional<absl::string_view> transaction_id_{};
   std::unique_ptr<OriginIngress> origin_ingress_;
   std::string destination_{};
-  
+
   std::string error_message_{};
 
   std::vector<AffinityEntry> affinity_{};

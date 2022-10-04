@@ -108,7 +108,9 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
   MOCK_METHOD(void, startUpstreamResponse, ());
-  MOCK_METHOD(ResponseStatus, upstreamData, (MessageMetadataSharedPtr, Router::RouteConstSharedPtr, const absl::optional<std::string>& return_destination));
+  MOCK_METHOD(ResponseStatus, upstreamData,
+              (MessageMetadataSharedPtr, Router::RouteConstSharedPtr,
+               const absl::optional<std::string>& return_destination));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, ());

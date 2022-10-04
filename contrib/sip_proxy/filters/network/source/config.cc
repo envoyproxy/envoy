@@ -5,7 +5,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "filters/filter.h"
 #include "source/common/config/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
@@ -16,6 +15,7 @@
 #include "contrib/sip_proxy/filters/network/source/filters/well_known_names.h"
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 #include "contrib/sip_proxy/filters/network/source/stats.h"
+#include "filters/filter.h"
 #include "router/router.h"
 
 namespace Envoy {
@@ -77,7 +77,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     // Map of upstream transactions per worker thread
     upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
         context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
-                                  proto_config.settings(), transaction_timeout, 32000)));
+                                   proto_config.settings(), transaction_timeout, 32000)));
     upstream_transaction_infos->init();
 
     // Map of downstream connections per worker thread

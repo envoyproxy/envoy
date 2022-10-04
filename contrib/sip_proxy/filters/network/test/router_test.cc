@@ -40,7 +40,7 @@ namespace Router {
 
 class SipRouterTest : public testing::Test {
 public:
-  SipRouterTest() = default;
+  SipRouterTest() : thread_factory_(Thread::threadFactoryForTest()) {}
   ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
@@ -104,12 +104,9 @@ public:
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
                 extensionProtocolOptions(_))
         .WillRepeatedly(Return(options));
-        
-    NiceMock<Api::MockApi> api_;
-    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
     EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
@@ -210,15 +207,6 @@ public:
   }
 
   void connectUpstream() {
-    NiceMock<Api::MockApi> api_;
-    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
-    EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
-    EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-
-    EXPECT_CALL(context_, getTransportSocketFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(factory_context_));
-    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
-
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
@@ -370,6 +358,8 @@ public:
   NiceMock<MockConfig> config_;
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore store_;
+  NiceMock<Api::MockApi> api_;
+  Thread::ThreadFactory& thread_factory_;
 
   std::shared_ptr<TransactionInfos> transaction_infos_;
   std::shared_ptr<SipSettings> sip_settings_;
@@ -670,13 +660,6 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
                 upstream_connection_);
             return nullptr;
           }));
-  NiceMock<Api::MockApi> api_;
-  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
-  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
-  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-  EXPECT_CALL(context_, getTransportSocketFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(factory_context_));
-  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
@@ -710,13 +693,6 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
                 upstream_connection_);
             return nullptr;
           }));
-  NiceMock<Api::MockApi> api_;
-  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
-  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
-  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-  EXPECT_CALL(context_, getTransportSocketFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(factory_context_));
-  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
@@ -756,13 +732,6 @@ TEST_F(SipRouterTest, NewConnectionFailure) {
                 upstream_connection_);
             return nullptr;
           }));
-  NiceMock<Api::MockApi> api_;
-  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
-  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
-  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-  EXPECT_CALL(context_, getTransportSocketFactoryContext())
-      .WillRepeatedly(testing::ReturnRef(factory_context_));
-  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
   initializeMetadata(MsgType::Response);
   startRequest(FilterStatus::Continue);
 }

@@ -261,7 +261,7 @@ bool MessageMetadata::validate(bool check_tra_context) {
     error_message_ = "Missing Via header";
     return false;
   }
-  // Check if it contains Transaction ID 
+  // Check if it contains Transaction ID
   if (!transactionId().has_value()) {
     error_message_ = "Missing Transaction ID";
     return false;

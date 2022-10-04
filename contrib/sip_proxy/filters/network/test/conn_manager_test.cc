@@ -48,7 +48,8 @@ class SipConnectionManagerTest : public testing::Test {
 public:
   SipConnectionManagerTest()
       : stats_(SipFilterStats::generateStats("test.", store_)),
-        transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
+        transaction_infos_(std::make_shared<Router::TransactionInfos>()),
+        thread_factory_(Thread::threadFactoryForTest()) {}
   ~SipConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
@@ -84,9 +85,6 @@ public:
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
 
-    // JONAH fixme: Probably should initialize these just once..
-    NiceMock<Api::MockApi> api_;
-    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
 
@@ -189,7 +187,8 @@ settings:
     filter_->decoder_->metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
     filter_->decoder_->decode();
     ConnectionManager::ActiveTransPtr trans =
-        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_, filter_->decoder_->metadata());
+        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_,
+                                                                   filter_->decoder_->metadata());
     trans->startUpstreamResponse();
     trans->upstreamData(filter_->decoder_->metadata_, nullptr, absl::nullopt);
 
@@ -286,7 +285,8 @@ settings:
     filter_->read_callbacks_->connection().setDelayedCloseTimeout(std::chrono::milliseconds(1));
     filter_->read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     ConnectionManager::ActiveTransPtr trans1 =
-        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_, filter_->decoder_->metadata());
+        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_,
+                                                                   filter_->decoder_->metadata());
     try {
       ConnectionManager::ResponseDecoder response_decoder(*trans1);
       response_decoder.newDecoderEventHandler(filter_->decoder_->metadata());
@@ -299,13 +299,15 @@ settings:
 
     // end_stream = false
     ConnectionManager::ActiveTransPtr trans2 =
-        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_, filter_->decoder_->metadata());
+        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_,
+                                                                   filter_->decoder_->metadata());
     trans2->sendLocalReply(AppException(AppExceptionType::ProtocolError, "End_stream is false"),
                            false);
 
     // route() with metadata=nullptr;
     ConnectionManager::ActiveTransPtr trans3 =
-        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_, filter_->decoder_->metadata());
+        std::make_unique<ConnectionManager::DownstreamActiveTrans>(*filter_,
+                                                                   filter_->decoder_->metadata());
     trans3->metadata_ = nullptr;
     EXPECT_EQ(nullptr, trans3->route());
 
@@ -476,6 +478,9 @@ settings:
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
   MessageMetadataSharedPtr metadata_;
+
+  NiceMock<Api::MockApi> api_;
+  Thread::ThreadFactory& thread_factory_;
 };
 
 /*TEST_F(SipConnectionManagerTest, OnDataHandlesSipCall) {

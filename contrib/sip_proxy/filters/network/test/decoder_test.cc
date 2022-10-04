@@ -85,7 +85,7 @@ public:
     Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
-    
+
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
     EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
@@ -93,7 +93,8 @@ public:
     downstream_connection_infos_ = std::make_shared<DownstreamConnectionInfos>(thread_local_);
     downstream_connection_infos_->init();
 
-    upstream_transaction_infos_ = std::make_shared<UpstreamTransactionInfos>(thread_local_, static_cast<std::chrono::seconds>(2));
+    upstream_transaction_infos_ = std::make_shared<UpstreamTransactionInfos>(
+        thread_local_, static_cast<std::chrono::seconds>(2));
     upstream_transaction_infos_->init();
 
     ON_CALL(random_, random()).WillByDefault(Return(42));

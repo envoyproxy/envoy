@@ -116,9 +116,7 @@ public:
     state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
   }
 
-  void complete() {
-    complete(true);
-  };
+  void complete() { complete(true); };
 
 private:
   friend class SipConnectionManagerTest;

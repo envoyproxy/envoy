@@ -228,7 +228,7 @@ public:
   }
 
   void insertUpstreamConnection(const std::string& host,
-                             std::shared_ptr<UpstreamConnection> upstream_connection) {
+                                std::shared_ptr<UpstreamConnection> upstream_connection) {
     tls_->getTyped<ThreadLocalTransactionInfo>().upstream_connection_map_.emplace(
         std::make_pair(host, upstream_connection));
   }
@@ -322,8 +322,8 @@ private:
 };
 
 class UpstreamMessageDecoder : public DecoderCallbacks,
-                        public DecoderEventHandler,
-                        public Logger::Loggable<Logger::Id::filter> {
+                               public DecoderEventHandler,
+                               public Logger::Loggable<Logger::Id::filter> {
 public:
   UpstreamMessageDecoder(UpstreamConnection& parent)
       : parent_(parent), decoder_(std::make_unique<Decoder>(*this)) {}
@@ -351,13 +351,13 @@ private:
 using UpstreamMessageDecoderPtr = std::unique_ptr<UpstreamMessageDecoder>;
 
 class UpstreamConnection : public Tcp::ConnectionPool::Callbacks,
-                        public Tcp::ConnectionPool::UpstreamCallbacks,
-                        public std::enable_shared_from_this<UpstreamConnection>,
-                        public Logger::Loggable<Logger::Id::connection> {
+                           public Tcp::ConnectionPool::UpstreamCallbacks,
+                           public std::enable_shared_from_this<UpstreamConnection>,
+                           public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool_data,
-                  std::shared_ptr<TransactionInfo> transaction_info,
-                  Server::Configuration::FactoryContext& context);
+                     std::shared_ptr<TransactionInfo> transaction_info,
+                     Server::Configuration::FactoryContext& context);
   ~UpstreamConnection() override;
   FilterStatus start();
   void resetStream();
