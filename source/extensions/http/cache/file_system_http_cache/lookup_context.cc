@@ -107,6 +107,7 @@ void FileLookupContext::onDestroy() {
   {
     absl::MutexLock lock(&mu_);
     cancel = std::move(action_in_flight_);
+    action_in_flight_ = nullptr;
     handle = file_handle_;
     file_handle_ = nullptr;
   }
@@ -119,6 +120,7 @@ void FileLookupContext::onDestroy() {
       // that happened, we must cancel that one too!
       absl::MutexLock lock(&mu_);
       cancel = std::move(action_in_flight_);
+      action_in_flight_ = nullptr;
       handle = file_handle_;
       file_handle_ = nullptr;
     }
