@@ -87,8 +87,12 @@ TokenType* TokenCacheImpl<TokenType>::validateTokenAndReturn(const std::string& 
   if constexpr (std::is_same<TokenType, JwtToken>::value) {
     ASSERT(found_token != nullptr);
     // Verify the validness of the token by checking its expiration time field.
-    if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
-        ::google::jwt_verify::Status::JwtExpired) {
+    // Note: verifyTimeConstraint() interface is correct to be used by token consumer. However, for
+    // the token producer here, we should instead include the clock skew as the part of the current
+    // time up front to account for the clock skew on the consumer side,
+    if (found_token->verifyTimeConstraint(
+            DateUtil::nowToSeconds(time_source_) + ::google::jwt_verify::kClockSkewInSecond,
+            /*clock_skew=*/0) == ::google::jwt_verify::Status::JwtExpired) {
       // Remove the expired entry.
       lru_cache_.remove(key);
     } else {
