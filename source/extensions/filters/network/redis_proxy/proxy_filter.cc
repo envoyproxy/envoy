@@ -53,7 +53,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
                          ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config) {
+      config_(config), transaction_(this) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
@@ -97,6 +97,7 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       }
       pending_requests_.pop_front();
     }
+    transaction_.close();
   }
 }
 
@@ -185,6 +186,11 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+
+  // Check if there is an active transaction that needs to be closed.
+  if (transaction_.should_close_) {
+    transaction_.close();
   }
 }
 

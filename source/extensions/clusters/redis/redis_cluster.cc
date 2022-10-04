@@ -301,7 +301,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
                                              parent_.info()->statsScope(), parent_.auth_username_,
-                                             parent_.auth_password_);
+                                             parent_.auth_password_, false);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
