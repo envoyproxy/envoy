@@ -1,7 +1,5 @@
 #include "source/common/common/key_value_store_base.h"
 
-#include <bits/chrono.h>
-
 #include <algorithm>
 #include <chrono>
 
