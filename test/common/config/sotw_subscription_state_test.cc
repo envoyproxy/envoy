@@ -70,7 +70,7 @@ public:
     return resources;
   }
 
-  std::vector<std::string>& failed_resource_names() { return failed_resource_names_; }
+  std::vector<std::string>& failedResourceNames() { return failed_resource_names_; }
 
   void setThrowsException() { throws_ex_ = true; }
 
@@ -338,7 +338,7 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithInvalidResource)
                              std::string(RESOURCE_VERSION)));
   EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleEstablishmentFailure();
-  EXPECT_THAT(xds_resources_delegate_->failed_resource_names(),
+  EXPECT_THAT(xds_resources_delegate_->failedResourceNames(),
               AllOf(SizeIs(1), Contains(bad_resource_name)));
 }
 
