@@ -155,7 +155,7 @@ TEST_F(KeyValueStoreTest, PersistWithTTL) {
   flush_timer_->invokeCallback(); // flush manually
   test_time_.setMonotonicTime(std::chrono::milliseconds(1000));
   // Keys should expire based on the absolute time.
-  // ee should expire on load because it's been 1 second.
+  // 'ee' should expire on load because it's been 1 second.
   createStore();
   EXPECT_EQ("bar", store_->get("foo").value());
   EXPECT_EQ(absl::nullopt, store_->get("ee"));
