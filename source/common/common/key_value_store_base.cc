@@ -32,7 +32,9 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 }
 
 bool checkForTtl(absl::string_view& contents) {
-  if (contents.size() > 3 && contents.substr(0, 3) == "TTL") {
+  constexpr absl::string_view ttl_string = "TTL";
+  if (contents.size() > ttl_string.length() &&
+      contents.substr(0, ttl_string.length()) == ttl_string) {
     contents.remove_prefix(3);
     return true;
   }
@@ -71,12 +73,16 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
     if (checkForTtl(contents)) {
       uint64_t ttlInt;
       auto token = getToken(contents, error);
-      if (token.has_value()) {
-        if (absl::SimpleAtoi(token.value(), &ttlInt)) {
-          ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
-              std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttlInt)) -
-              time_source_.monotonicTime()));
-          std::cout << ttl.value().count();
+      if (token.has_value() && absl::SimpleAtoi(token.value(), &ttlInt)) {
+        ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttlInt)) -
+            time_source_.monotonicTime()));
+      } else {
+        if (!token.has_value()) {
+          ENVOY_LOG(warn, error);
+        }
+        else {
+          ENVOY_LOG(warn, "TTL was read from disk, but aoti() failed")
         }
       }
     }
@@ -95,28 +101,27 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   if (ttl && ttl <= std::chrono::seconds(0)) {
     return;
   }
+  absl::optional<std::chrono::seconds> absolute_ttl = absl::nullopt;
+  if (ttl) {
+    absolute_ttl.emplace(ttl.value() + std::chrono::duration_cast<std::chrono::seconds>(
+                                           time_source_.monotonicTime().time_since_epoch()));
+  }
 
   // Attempt to insert the entry into the store. If it already exists, remove
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
-  if (!store_.emplace(key, value).second) {
+  if (!store_.emplace(key, std::pair(value, absolute_ttl)).second) {
     store_.erase(key);
-    store_.emplace(key, value);
+    store_.emplace(key, std::pair(value, absolute_ttl));
     ttl_manager_.clear(key);
+  }
+  if (ttl) {
+    ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
   }
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
   }
-  if (ttl) {
-    ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
-    auto absolute_ttl = ttl.value() + std::chrono::duration_cast<std::chrono::seconds>(
-                                          time_source_.monotonicTime().time_since_epoch());
-    if (!ttl_store_.emplace(key, absolute_ttl)
-             .second) { // ttl_store_ should probably be merged with store_ as a tuple
-      ttl_store_.erase(key);
-      ttl_store_.emplace(key, absolute_ttl);
-    }
-  }
+
   if (!flush_timer_->enabled()) {
     flush();
   }
@@ -126,7 +131,6 @@ void KeyValueStoreBase::onExpiredKeys(const std::vector<std::string>& keys) {
   ENVOY_BUG(!under_iterate_, "onExpiredKeys under the stack of iterate");
   for (const auto& key : keys) {
     store_.erase(std::string(key));
-    ttl_store_.erase(std::string(key));
   }
   if (!flush_timer_->enabled()) {
     flush();
@@ -137,7 +141,6 @@ void KeyValueStoreBase::remove(absl::string_view key) {
   ENVOY_BUG(!under_iterate_, "remove under the stack of iterate");
   ttl_manager_.clear(std::string(key));
   store_.erase(std::string(key));
-  ttl_store_.erase(std::string(key));
   if (!flush_timer_->enabled()) {
     flush();
   }
@@ -148,7 +151,7 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
   if (it == store_.end()) {
     return {};
   }
-  return it->second;
+  return it->second.first;
 }
 
 void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
@@ -156,7 +159,7 @@ void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
   absl::Cleanup restore_under_iterate = [this] { under_iterate_ = false; };
 
   for (const auto& [key, value] : store_) {
-    Iterate ret = cb(key, value);
+    Iterate ret = cb(key, value.first);
     if (ret == Iterate::Break) {
       return;
     }

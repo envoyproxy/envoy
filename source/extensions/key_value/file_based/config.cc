@@ -34,11 +34,10 @@ void FileBasedKeyValueStore::flush() {
   for (const auto& it : store_) {
     file->write(absl::StrCat(it.first.length(), "\n"));
     file->write(it.first);
-    file->write(absl::StrCat(it.second.length(), "\n"));
-    file->write(it.second);
-    auto ttl_it = ttl_store_.find(it.first);
-    if (ttl_it != ttl_store_.end()) {
-      std::string ttl = std::to_string(ttl_it->second.count());
+    file->write(absl::StrCat(it.second.first.length(), "\n"));
+    file->write(it.second.first);
+    if (it.second.second.has_value()) {
+      std::string ttl = std::to_string(it.second.second.value().count());
       file->write("TTL");
       file->write(absl::StrCat(ttl.length(), "\n"));
       file->write(ttl);
