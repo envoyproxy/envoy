@@ -50,7 +50,7 @@ public:
     EXPECT_CALL(*config, stats()).WillRepeatedly(ReturnRef(stat));
     auto context = std::make_shared<NiceMock<Server::Configuration::MockFactoryContext>>();
     auto filter = std::make_shared<NiceMock<MockConnectionManager>>(*config, random_, time_source_,
-                                                                    *context, nullptr);
+                                                                    *context, nullptr, nullptr, nullptr);
 
     auto tra_handler = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandlerDeep>>(
         *filter, dispatcher_, *tra_config, *context, stream_info_);

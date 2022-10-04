@@ -85,11 +85,21 @@ public:
     Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
     EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+    
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(factory_context_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+
+    downstream_connection_infos_ = std::make_shared<DownstreamConnectionInfos>(thread_local_);
+    downstream_connection_infos_->init();
+
+    upstream_transaction_infos_ = std::make_shared<UpstreamTransactionInfos>(thread_local_, static_cast<std::chrono::seconds>(2));
+    upstream_transaction_infos_->init();
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
-        transaction_infos_, downstream_connection_infos_);
+        transaction_infos_, downstream_connection_infos_, upstream_transaction_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -124,7 +134,11 @@ public:
   std::unique_ptr<ConnectionManager> filter_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 const std::string yaml = R"EOF(
@@ -137,6 +151,8 @@ route_config:
     route:
       cluster: "test"
 settings:
+  upstream_transactions:
+    enabled: true
   transaction_timeout: 32s
   local_services:
   - domain: pcsf-cfed.cncs.svc.cluster.local
@@ -173,7 +189,6 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
-      "X-Envoy-Origin-Ingress: abc123;downstream-connection=1234xyz\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims.com;term-ioi= ims.com\x0d\x0a"
       "P-Charging-Vector: orig-ioi=ims1.com;term-ioi= ims1.com\x0d\x0a"
       "P-Charging-Function-Addresses: ccf=0.0.0.0\x0d\x0a"

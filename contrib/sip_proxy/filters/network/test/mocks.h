@@ -55,7 +55,7 @@ public:
   MockDecoderCallbacks();
   ~MockDecoderCallbacks() override;
 
-  MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, (MessageMetadataSharedPtr));
+  MOCK_METHOD(DecoderEventHandler*, newDecoderEventHandler, (MessageMetadataSharedPtr));
   MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const));
 
   std::shared_ptr<SipProxy::SipSettings> settings_;
@@ -108,10 +108,12 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
   MOCK_METHOD(void, startUpstreamResponse, ());
-  MOCK_METHOD(ResponseStatus, upstreamData, (MessageMetadataSharedPtr));
+  MOCK_METHOD(ResponseStatus, upstreamData, (MessageMetadataSharedPtr, Router::RouteConstSharedPtr, const absl::optional<std::string>& return_destination));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, ());
+  MOCK_METHOD(std::shared_ptr<SipProxy::DownstreamConnectionInfos>, downstreamConnectionInfos, ());
+  MOCK_METHOD(std::shared_ptr<SipProxy::UpstreamTransactionInfos>, upstreamTransactionInfos, ());
   MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const));
   MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, ());
   MOCK_METHOD(void, onReset, ());
@@ -125,7 +127,7 @@ public:
   MOCK_METHOD(void, continueHandling, (const std::string&, bool));
   MOCK_METHOD(MessageMetadataSharedPtr, metadata, ());
   MOCK_METHOD(SipFilterStats&, stats, ());
-  MOCK_METHOD(OriginIngress, originIngress, ());
+  MOCK_METHOD(absl::optional<OriginIngress>, originIngress, ());
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
@@ -220,9 +222,10 @@ public:
       Config& config, Random::RandomGenerator& random_generator, TimeSource& time_system,
       Server::Configuration::FactoryContext& context,
       std::shared_ptr<Router::TransactionInfos> transaction_infos,
-      std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos)
+      std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos,
+      std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_info)
       : ConnectionManager(config, random_generator, time_system, context, transaction_infos,
-                          downstream_connection_infos) {}
+                          downstream_connection_infos, upstream_transaction_info) {}
 
   ~MockConnectionManager() override;
 

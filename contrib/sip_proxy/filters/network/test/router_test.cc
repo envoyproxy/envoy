@@ -64,6 +64,8 @@ public:
                route:
                 cluster: fake_cluster2
            settings:
+             upstream_transactions:
+               enabled: true
              transaction_timeout: 32s
              local_services:
              - domain: "pcsf-cfed.cncs.svc.cluster.local"
@@ -102,6 +104,11 @@ public:
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
                 extensionProtocolOptions(_))
         .WillRepeatedly(Return(options));
+        
+    NiceMock<Api::MockApi> api_;
+    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+    EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+    EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
 
     EXPECT_CALL(context_, getTransportSocketFactoryContext())
         .WillRepeatedly(testing::ReturnRef(factory_context_));
@@ -115,7 +122,7 @@ public:
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
 
     filter_ = new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, nullptr,
-                                                  nullptr);
+                                                  nullptr, nullptr);
     sip_settings_ = std::make_shared<SipSettings>(sip_proxy_config_.settings());
 
     EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));
@@ -146,6 +153,7 @@ public:
     router_ =
         std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(), context_);
 
+    EXPECT_CALL(callbacks_, settings()).WillRepeatedly(Return(sip_settings_));
     EXPECT_CALL(callbacks_, transactionInfos()).WillOnce(Return(transaction_infos_));
     router_->setDecoderFilterCallbacks(callbacks_);
 
@@ -202,6 +210,15 @@ public:
   }
 
   void connectUpstream() {
+    NiceMock<Api::MockApi> api_;
+    Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+    EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+    EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(factory_context_));
+    EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
@@ -653,6 +670,13 @@ TEST_F(SipRouterTest, CallWithExistingConnection) {
                 upstream_connection_);
             return nullptr;
           }));
+  NiceMock<Api::MockApi> api_;
+  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+  EXPECT_CALL(context_, getTransportSocketFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(factory_context_));
+  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
@@ -686,6 +710,14 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
                 upstream_connection_);
             return nullptr;
           }));
+  NiceMock<Api::MockApi> api_;
+  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+  EXPECT_CALL(context_, getTransportSocketFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(factory_context_));
+  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
+  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
   destroyRouter();
 }
@@ -724,6 +756,13 @@ TEST_F(SipRouterTest, NewConnectionFailure) {
                 upstream_connection_);
             return nullptr;
           }));
+  NiceMock<Api::MockApi> api_;
+  Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
+  EXPECT_CALL(api_, threadFactory()).WillRepeatedly(testing::ReturnRef(thread_factory_));
+  EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(api_));
+  EXPECT_CALL(context_, getTransportSocketFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(factory_context_));
+  EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
   initializeMetadata(MsgType::Response);
   startRequest(FilterStatus::Continue);
 }

@@ -392,8 +392,7 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSh
     ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
     return upstream_transaction_infos_->getTransaction(k).get();
   } else {
-    stats_.request_active_.inc();
-        stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+    stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
     // if (metadata->methodType() == MethodType::Ack) {
     if (transactions_.find(k) != transactions_.end()) {
       // ACK_4XX metadata will updated later.
