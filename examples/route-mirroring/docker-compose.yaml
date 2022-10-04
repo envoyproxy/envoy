@@ -1,10 +1,10 @@
 version: "3.8"
 services:
 
-  front-envoy:
+  envoy-front-proxy:
     build:
       context: .
-      dockerfile: Dockerfile-frontenvoy
+      dockerfile: Dockerfile-envoy
     ports:
     - "${PORT_PROXY:-8080}:8080"
     depends_on:
