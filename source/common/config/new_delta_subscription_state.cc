@@ -211,7 +211,8 @@ void NewDeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {
@@ -230,6 +231,24 @@ void NewDeltaSubscriptionState::handleGoodResponse(
 
   watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                             message.system_version_info());
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    if (requested_resource_state_.contains(Wildcard)) {
+      for (const auto& resource : message.resources()) {
+        addResourceStateFromServer(resource);
+      }
+    } else {
+      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
+      // and ignore the others.
+      for (const auto& resource : message.resources()) {
+        if (requested_resource_state_.contains(resource.name())) {
+          addResourceStateFromServer(resource);
+        }
+      }
+    }
+  }
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which
