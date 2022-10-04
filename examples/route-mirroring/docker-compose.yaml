@@ -1,57 +1,50 @@
 version: "3.8"
 services:
 
-  # base images
-  flask_service:
-    build:
-      context: ../shared/flask
-    restart: "no"
-    deploy:
-      replicas: 0
-
-  # front-proxy
   front-envoy:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
     - "${PORT_PROXY:-8080}:8080"
-    - "${PORT_HTTPS:-8443}:8443"
-    - "${PORT_STATS:-8001}:8001"
     depends_on:
-      - service1
-      - service1-mirror
-      - service2
-      - service2-mirror
+      service1:
+        condition: service_healthy
+      service1-mirror:
+        condition: service_healthy
+      service2:
+        condition: service_healthy
+      service2-mirror:
+        condition: service_healthy
 
   service1:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
     volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=1
 
   service1-mirror:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
     volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
-    - SERVICE_NAME=1-mirror
+    - SERVICE_NAME=1
 
   service2:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
     volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
     - SERVICE_NAME=2
 
   service2-mirror:
     build:
-      context: ../shared/tracing
+      context: ../shared/flask
     volumes:
-    - ./service-envoy.yaml:/etc/service-envoy.yaml
+    - ./service.py:/code/service.py
     environment:
-    - SERVICE_NAME=2-mirror
+    - SERVICE_NAME=2
