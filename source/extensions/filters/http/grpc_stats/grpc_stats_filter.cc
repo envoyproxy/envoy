@@ -25,7 +25,6 @@ namespace {
 // as long as it isn't being modified.
 class GrpcServiceMethodToRequestNamesMap {
 public:
-public:
   // Construct a map populated with the services/methods in method_list.
   GrpcServiceMethodToRequestNamesMap(Stats::SymbolTable& symbol_table,
                                      const envoy::config::core::v3::GrpcMethodList& method_list)

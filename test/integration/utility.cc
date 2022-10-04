@@ -230,8 +230,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   quic::DeterministicConnectionIdGenerator generator(quic::kQuicDefaultConnectionIdLength);
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
       *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
-      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
-                         static_cast<uint16_t>(addr->ip()->port())),
+      quic::QuicServerId(
+          quic_transport_socket_factory.clientContextConfig()->serverNameIndication(),
+          static_cast<uint16_t>(addr->ip()->port())),
       *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr,
       generator);
   connection->addConnectionCallbacks(connection_callbacks);

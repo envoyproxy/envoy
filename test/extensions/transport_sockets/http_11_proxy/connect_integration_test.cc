@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 
 #include "test/integration/http_integration.h"
@@ -23,13 +24,24 @@ public:
   }
 
   void initialize() override {
+    TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     config_helper_.addFilter("{ name: header-to-proxy-filter }");
-    if (use_http3_) {
+    if (try_http3_) {
       envoy::config::core::v3::AlternateProtocolsCacheOptions alt_cache;
       alt_cache.set_name("default_alternate_protocols_cache");
-      config_helper_.configureUpstreamTls(use_alpn_, use_http3_, alt_cache);
+      const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig config;
+      config.set_filename(filename);
+      config.mutable_flush_interval()->set_nanos(0);
+      envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
+      kv_config.mutable_config()->set_name("envoy.key_value.file_based");
+      kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
+      alt_cache.mutable_key_value_store_config()->set_name("envoy.common.key_value");
+      alt_cache.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
+
+      config_helper_.configureUpstreamTls(use_alpn_, try_http3_, alt_cache);
     } else if (upstream_tls_) {
-      config_helper_.configureUpstreamTls(use_alpn_, use_http3_);
+      config_helper_.configureUpstreamTls(use_alpn_, try_http3_);
     }
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* transport_socket =
@@ -67,6 +79,18 @@ public:
       addFakeUpstream(upstreamProtocol());
       addFakeUpstream(upstreamProtocol());
     }
+
+    if (try_http3_) {
+      uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
+      std::string key = absl::StrCat("https://sni.lyft.com:", port);
+
+      size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                           timeSystem().monotonicTime().time_since_epoch())
+                           .count();
+      std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds, "|0|0");
+      TestEnvironment::writeStringToFileForTest(
+          "alt_svc_cache.txt", absl::StrCat(key.length(), "\n", key, value.length(), "\n", value));
+    }
   }
 
   void stripConnectUpgradeAndRespond() {
@@ -79,7 +103,7 @@ public:
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
   }
   bool use_alpn_ = false;
-  bool use_http3_ = false;
+  bool try_http3_ = false;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
@@ -328,11 +352,12 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp2) {
 }
 
 #ifdef ENVOY_ENABLE_QUIC
-// Test Http3 failing to HTTP/2
-TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
+
+// Test Http3 failing to HTTP/2 if proxy settings are enabled.
+TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3Failover) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
   use_alpn_ = true;
-  use_http3_ = true;
+  try_http3_ = true;
   initialize();
 
   // Point at the second fake upstream. Envoy doesn't actually know about this one.
@@ -357,6 +382,28 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
+
+// Test HTTP/3 being used if proxy settings are not set.
+TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  use_alpn_ = true;
+  try_http3_ = true;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 0.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 #endif
 
 // TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in

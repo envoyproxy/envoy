@@ -1,5 +1,6 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -76,7 +77,7 @@ Config::Config(
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
+Filter::Filter(const ConfigSharedPtr& config) : config_(config), ssl_(config_->newSsl()) {
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
@@ -196,12 +197,7 @@ static constexpr std::array<uint16_t, 16> GREASE = {
 };
 
 bool isNotGrease(uint16_t id) {
-  for (size_t grease_id : GREASE) {
-    if (id == grease_id) {
-      return false;
-    }
-  }
-  return true;
+  return std::find(GREASE.begin(), GREASE.end(), id) == GREASE.end();
 }
 
 void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
