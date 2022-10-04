@@ -183,7 +183,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   // If the DNS request was simply to create a host endpoint in a Dynamic Forward Proxy cluster,
   // fast fail the look-up as the address is not needed.
   if (is_proxy_lookup) {
-    finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {}, {}, true);
+    finishResolve(host, Network::DnsResolver::ResolutionStatus::Success, {}, {}, true);
   } else {
     startResolve(host, *primary_host);
   }
