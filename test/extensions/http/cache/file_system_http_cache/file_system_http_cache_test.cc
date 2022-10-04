@@ -44,7 +44,7 @@ absl::string_view yaml_config = R"(
     manager_config:
       thread_pool:
         thread_count: 1
-    cache_path: /tmp/
+    cache_path: /tmp
 )";
 
 class FileSystemCacheTestContext {
@@ -118,7 +118,7 @@ TEST_F(FileSystemHttpCacheTest, IdenticalCacheConfigReturnsSameCacheInstance) {
 
 TEST_F(FileSystemHttpCacheTest, CacheConfigsWithDifferentPathsReturnDistinctCacheInstances) {
   ConfigProto cfg = testConfig();
-  cfg.set_cache_path(env_.temporaryDirectory());
+  cfg.set_cache_path("/tmp");
   auto second_cache = http_cache_factory_->getCache(cacheConfig(cfg), context_);
   EXPECT_NE(cache_, second_cache);
 }
@@ -687,6 +687,12 @@ TEST(Registration, GetCacheFromFactory) {
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");
+  // Verify that the config path got a / suffixed onto it.
+  EXPECT_EQ(std::dynamic_pointer_cast<FileSystemHttpCache>(
+                factory->getCache(cache_config, factory_context))
+                ->config()
+                .cache_path(),
+            "/tmp/");
 }
 
 } // namespace

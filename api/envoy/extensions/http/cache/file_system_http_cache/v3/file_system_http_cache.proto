@@ -38,10 +38,9 @@ message FileSystemHttpCacheConfig {
   // between different routes, or separate paths can be used to specify separate caches.
   //
   // If the same ``cache_path`` is used in more than one ``CacheConfig``, the rest of the
-  // ``FileSystemHttpCacheConfig`` must also match.
-  //
-  // The path must end with a path separator character (/ or \ per platform.)
-  string cache_path = 2 [(validate.rules).string = {pattern: "[/\\\\]$"}];
+  // ``FileSystemHttpCacheConfig`` must also match, and will refer to the same cache
+  // instance.
+  string cache_path = 2 [(validate.rules).string = {min_len: 1}];
 
   // The maximum size of the cache in bytes - when reached, another entry is removed.
   //

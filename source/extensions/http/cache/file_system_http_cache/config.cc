@@ -16,6 +16,14 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
+ConfigProto cleanConfig(const ConfigProto& original) {
+  ConfigProto config = original;
+  if (!absl::EndsWith(config.cache_path(), "/") && !absl::EndsWith(config.cache_path(), "\\")) {
+    config.set_cache_path(absl::StrCat(config.cache_path(), "/"));
+  }
+  return config;
+}
+
 class CacheSingleton : public Envoy::Singleton::Instance {
 public:
   CacheSingleton(
@@ -26,7 +34,8 @@ public:
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
                                            const ConfigProto& config) {
     std::shared_ptr<FileSystemHttpCache> cache;
-    auto& key = config.cache_path();
+    ConfigProto clean_config = cleanConfig(config);
+    auto& key = clean_config.cache_path();
     absl::MutexLock lock(&mu_);
     auto it = caches_.find(key);
     if (it != caches_.end()) {
@@ -34,7 +43,7 @@ public:
     }
     if (!cache) {
       cache = std::make_shared<FileSystemHttpCache>(
-          singleton, config, time_source_,
+          singleton, std::move(clean_config), time_source_,
           async_file_manager_factory_->getAsyncFileManager(config.manager_config()));
       cache->populateFromDisk();
       caches_[key] = cache;
