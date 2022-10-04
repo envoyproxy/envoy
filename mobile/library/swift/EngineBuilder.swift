@@ -32,7 +32,6 @@ open class EngineBuilder: NSObject {
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2ExtendKeepaliveTimeout: Bool = false
-  private var h2RawDomains: [String] = []
   private var maxConnectionsPerHost: UInt32 = 7
   private var statsFlushSeconds: UInt32 = 60
   private var streamIdleTimeoutSeconds: UInt32 = 15
@@ -294,19 +293,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Add a list of domains to which h2 connections will be established without protocol
-  /// negotiation.
-  ///
-  /// - parameter h2RawDomains: list of domains to which connections should be raw h2.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func addH2RawDomains(
-    _ h2RawDomains: [String]) -> Self {
-    self.h2RawDomains = h2RawDomains
-    return self
-  }
-
   /// Set the maximum number of connections to open to a single host. Default is 7.
   ///
   /// - parameter maxConnectionsPerHost: the maximum number of connections per host.
@@ -538,7 +524,6 @@ open class EngineBuilder: NSObject {
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
       h2ExtendKeepaliveTimeout: self.h2ExtendKeepaliveTimeout,
-      h2RawDomains: self.h2RawDomains,
       maxConnectionsPerHost: self.maxConnectionsPerHost,
       statsFlushSeconds: self.statsFlushSeconds,
       streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,

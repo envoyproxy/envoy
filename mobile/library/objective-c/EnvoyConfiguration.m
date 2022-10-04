@@ -24,7 +24,6 @@
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
                          h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
-                                     h2RawDomains:(NSArray<NSString *> *)h2RawDomains
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
@@ -70,7 +69,6 @@
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
   self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
-  self.h2RawDomains = h2RawDomains;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -134,14 +132,6 @@
         appendString:[[NSString alloc] initWithUTF8String:route_cache_reset_filter_insert]];
   }
 
-  NSMutableString *h2RawDomainsString = [[NSMutableString alloc] initWithString:@"["];
-  if (self.h2RawDomains.count > 0) {
-    [h2RawDomainsString appendString:@"\""];
-    [h2RawDomainsString appendString:[self.h2RawDomains componentsJoinedByString:@"\",\""]];
-    [h2RawDomainsString appendString:@"\""];
-  }
-  [h2RawDomainsString appendString:@"]"];
-
   templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{custom_clusters}"
                                                          withString:customClusters];
   templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{custom_listeners}"
@@ -189,7 +179,6 @@
                             (double)self.h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0];
   [definitions appendFormat:@"- &h2_connection_keepalive_timeout %lus\n",
                             (unsigned long)self.h2ConnectionKeepaliveTimeoutSeconds];
-  [definitions appendFormat:@"- &h2_raw_domains %@\n", h2RawDomainsString];
   [definitions
       appendFormat:@"- &max_connections_per_host %lu\n", (unsigned long)self.maxConnectionsPerHost];
   [definitions

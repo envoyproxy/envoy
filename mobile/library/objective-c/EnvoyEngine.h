@@ -365,7 +365,6 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) BOOL h2ExtendKeepaliveTimeout;
-@property (nonatomic, strong) NSArray<NSString *> *h2RawDomains;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
@@ -404,7 +403,6 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
                          h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
-                                     h2RawDomains:(NSArray<NSString *> *)h2RawDomains
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds

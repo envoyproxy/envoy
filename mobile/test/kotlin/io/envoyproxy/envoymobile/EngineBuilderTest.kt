@@ -171,16 +171,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `specifying h2 hostnames overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addH2RawDomains(listOf<String>("h2-raw.domain"))
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.h2RawDomains.size).isEqualTo(1)
-  }
-
-  @Test
   fun `specifying stats flush overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
