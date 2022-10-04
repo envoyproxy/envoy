@@ -14,7 +14,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AllOf;
 using testing::An;
+using testing::Contains;
 using testing::IsSubstring;
 using testing::NiceMock;
 using testing::SizeIs;
@@ -26,24 +28,39 @@ namespace Config {
 namespace {
 
 constexpr char RESOURCE_VERSION[] = "555";
+constexpr char BAD_CLA_RESOURCE_NAME[] = "bad_cla";
 
 // A test implementation of the XdsResourcesDelegate for the purposes of this test.
 class TestXdsResourcesDelegate : public XdsResourcesDelegate {
+public:
   void onConfigUpdated(const XdsSourceId& /*source_id*/,
                        const std::vector<DecodedResourceRef>& /*resources*/) override {}
 
   void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
-                            const std::string& /*resource_name*/,
-                            const absl::optional<EnvoyException>& /*exception*/) override {}
+                            const std::string& resource_name,
+                            const absl::optional<EnvoyException>& /*exception*/) override {
+    failed_resource_names_.push_back(resource_name);
+  }
 
   std::vector<envoy::service::discovery::v3::Resource>
   getResources(const Config::XdsSourceId& /*source_id*/,
                const std::vector<std::string>& resource_names) const override {
+    if (throws_ex_) {
+      throw EnvoyException("intended exception thrown");
+    }
+
     std::vector<envoy::service::discovery::v3::Resource> resources;
     resources.reserve(resource_names.size());
     for (const std::string& resource_name : resource_names) {
       envoy::config::endpoint::v3::ClusterLoadAssignment cla;
       cla.set_cluster_name(resource_name);
+      if (resource_name == std::string(BAD_CLA_RESOURCE_NAME)) {
+        // If the bad resource is requested, set an invalid enum value (1000) for the Policy's
+        // Denominator drop percentage.
+        cla.mutable_policy()->add_drop_overloads()->mutable_drop_percentage()->set_denominator(
+            static_cast<envoy::type::v3::FractionalPercent_DenominatorType>(1000));
+      }
+
       envoy::service::discovery::v3::Resource resource;
       resource.mutable_resource()->PackFrom(cla);
       resource.set_name(cla.cluster_name());
@@ -52,6 +69,14 @@ class TestXdsResourcesDelegate : public XdsResourcesDelegate {
     }
     return resources;
   }
+
+  std::vector<std::string>& failed_resource_names() { return failed_resource_names_; }
+
+  void setThrowsException() { throws_ex_ = true; }
+
+private:
+  std::vector<std::string> failed_resource_names_;
+  bool throws_ex_{false};
 };
 
 class SotwSubscriptionStateTest : public testing::Test {
@@ -138,11 +163,13 @@ protected:
     return state_->handleResponse(message);
   }
 
+  void throwExceptionInDelegate() { xds_resources_delegate_->setThrowsException(); }
+
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* ttl_timer_;
-  std::unique_ptr<XdsResourcesDelegate> xds_resources_delegate_;
+  std::unique_ptr<TestXdsResourcesDelegate> xds_resources_delegate_;
   // We start out interested in three resources: name1, name2, and name3.
   std::unique_ptr<XdsMux::SotwSubscriptionState> state_;
 };
@@ -295,6 +322,34 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailure) {
               onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(SizeIs(3)),
                              std::string(RESOURCE_VERSION)));
   EXPECT_CALL(*ttl_timer_, disableTimer());
+  state_->handleEstablishmentFailure();
+}
+
+TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithInvalidResource) {
+  // Add "bad_cla" to the subscribed resources, as it will return a ClusterLoadAssignment with an
+  // invalid enum from the xDS delegate.
+  const std::string bad_resource_name{BAD_CLA_RESOURCE_NAME};
+  state_->updateSubscriptionInterest({bad_resource_name}, {});
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // The XdsResourcesDelegate supplies 3 of the requested resources, but not the 4th "bad_cla"
+  // resource.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(SizeIs(3)),
+                             std::string(RESOURCE_VERSION)));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  state_->handleEstablishmentFailure();
+  EXPECT_THAT(xds_resources_delegate_->failed_resource_names(),
+              AllOf(SizeIs(1), Contains(bad_resource_name)));
+}
+
+TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithDelegateThrowingException) {
+  // Tell the test to throw an exception in the xDS delegate getResources() call.
+  throwExceptionInDelegate();
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // The XdsResourcesDelegate throws an exception, so onConfigUpdate is not called on the callbacks.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(), _))
+      .Times(0);
   state_->handleEstablishmentFailure();
 }
 
