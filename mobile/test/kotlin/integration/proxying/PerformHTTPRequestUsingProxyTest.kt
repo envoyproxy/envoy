@@ -1,7 +1,9 @@
 package test.kotlin.integration.proxying
 
+import android.content.Intent
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Proxy
 import android.net.ProxyInfo
 import androidx.test.core.app.ApplicationProvider
 
@@ -47,17 +49,16 @@ class PerformHTTPRequestUsingProxy {
   fun `performs an HTTP request through a proxy`() {
     val port = (10001..11000).random()
 
-    val mockContext = Mockito.mock(Context::class.java)
-    Mockito.`when`(mockContext.getApplicationContext()).thenReturn(mockContext)
-    val mockConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
-    Mockito.`when`(mockContext.getSystemService(Mockito.anyString())).thenReturn(mockConnectivityManager)
-    Mockito.`when`(mockConnectivityManager.getDefaultProxy()).thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", port))
+    val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
+    val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
+    Mockito.doReturn(connectivityManager).`when`(context).getSystemService(Context.CONNECTIVITY_SERVICE)
+    Mockito.`when`(connectivityManager.getDefaultProxy()).thenReturn(ProxyInfo.buildDirectProxy("127.0.0.1", port))
 
     val onProxyEngineRunningLatch = CountDownLatch(1)
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
 
-    val proxyEngineBuilder = Proxy(ApplicationProvider.getApplicationContext(), port)
+    val proxyEngineBuilder = Proxy(context, port)
       .http()
     val proxyEngine = proxyEngineBuilder
       .addLogLevel(LogLevel.DEBUG)
@@ -67,7 +68,9 @@ class PerformHTTPRequestUsingProxy {
     onProxyEngineRunningLatch.await(10, TimeUnit.SECONDS)
     assertThat(onProxyEngineRunningLatch.count).isEqualTo(0)
 
-    val builder = AndroidEngineBuilder(mockContext)
+    context.sendStickyBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
+
+    val builder = AndroidEngineBuilder(context)
     val engine = builder
       .addLogLevel(LogLevel.DEBUG)
       .enableProxying(true)
