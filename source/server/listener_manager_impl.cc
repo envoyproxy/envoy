@@ -429,14 +429,12 @@ void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listen
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_update_listener_socket_options")) {
     if (new_listener.reusePort() != existing_listener.reusePort()) {
-      incListenerCreateFailureStat();
       throw EnvoyException(
           fmt::format("Listener {}: reuse port doesn't support change", new_listener.name()));
     }
 
     same_socket_options = existing_listener.compareSocketOptions(new_listener);
     if (!same_socket_options && new_listener.reusePort() == false) {
-      incListenerCreateFailureStat();
       throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
                                        "when the reuse port isn't enabled",
                                        new_listener.name()));
