@@ -35,7 +35,7 @@ public:
                                            const ConfigProto& config) {
     std::shared_ptr<FileSystemHttpCache> cache;
     ConfigProto clean_config = cleanConfig(config);
-    auto& key = clean_config.cache_path();
+    auto key = clean_config.cache_path();
     absl::MutexLock lock(&mu_);
     auto it = caches_.find(key);
     if (it != caches_.end()) {
