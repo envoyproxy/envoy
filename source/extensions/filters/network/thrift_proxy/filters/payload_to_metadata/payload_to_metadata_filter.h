@@ -27,9 +27,12 @@ using KeyValuePair = envoy::extensions::filters::network::thrift_proxy::filters:
 using ValueType = envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::
     v3::PayloadToMetadata::ValueType;
 
+struct Trie;
+using TrieSharedPtr = std::shared_ptr<Trie>;
+
 class Rule {
 public:
-  Rule(const ProtoRule& rule, uint16_t id);
+  Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
@@ -51,12 +54,11 @@ private:
 
 using PayloadToMetadataRules = std::vector<Rule>;
 
-struct Trie;
-using TrieSharedPtr = std::shared_ptr<Trie>;
-
 struct Trie {
-  TrieSharedPtr parent_;
-  absl::node_hash_map<uint16_t, TrieSharedPtr> children_;
+  Trie(TrieSharedPtr parent = nullptr) : parent_(parent) {}
+  absl::string_view name_;
+  std::weak_ptr<Trie> parent_;
+  absl::node_hash_map<uint32_t, TrieSharedPtr> children_;
   OptRef<Rule> rule_;
 };
 

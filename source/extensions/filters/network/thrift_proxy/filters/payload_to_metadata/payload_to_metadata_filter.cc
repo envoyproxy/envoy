@@ -13,14 +13,13 @@ using namespace Envoy::Extensions::NetworkFilters;
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
                    payload_to_metadata::v3::PayloadToMetadata& config) {
+  trie_root_ = std::make_shared<Trie>();
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry, request_rules_.size());
+    request_rules_.emplace_back(entry, request_rules_.size(), trie_root_);
   }
-
-  // build trie
 }
 
-Rule::Rule(const ProtoRule& rule, uint16_t id) : rule_(rule), id_(id) {
+Rule::Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root) : rule_(rule), id_(id) {
   if (!rule.has_on_present() && !rule.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
   }
@@ -52,6 +51,23 @@ Rule::Rule(const ProtoRule& rule, uint16_t id) : rule_(rule), id_(id) {
   case ProtoRule::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
+
+  auto field_selector = rule.field_selector();
+  TrieSharedPtr node = root;
+  while (true) {
+    uint32_t id = field_selector.id().value();
+    if (node->children_.find(id) == node->children_.end()) {
+      node->children_[id] = std::make_shared<Trie>(node);
+    }
+    node = node->children_[id];
+    node->name_ = field_selector.name();
+    if (!field_selector.has_child()) {
+      break;
+    }
+    field_selector = field_selector.child();
+  }
+  ASSERT(node != root);
+  node->rule_ = *this;
 }
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
