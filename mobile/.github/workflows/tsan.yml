@@ -43,8 +43,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: steps.check_context.outputs.run_tests == 'true'
         run: |
-          ./bazelw test --test_output=all \
-          --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
-          --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-          --config=remote-ci-linux-tsan \
-          //test/common/...
+          ./bazelw test \
+            --test_output=all \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --config=remote-ci-linux-tsan \
+            //test/common/...
