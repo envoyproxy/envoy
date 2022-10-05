@@ -90,8 +90,11 @@ message PayloadToMetadata {
     // field name to log
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // field id to match
-    google.protobuf.UInt32Value id = 2 [(validate.rules).message = {required: true}];
+    // field id to match. Limit to the range of int16 to fit thrift format.
+    google.protobuf.Int32Value id = 2 [
+      (validate.rules).int32 = {lte: 32767 gte: -32768},
+      (validate.rules).message = {required: true}
+    ];
 
     // next node of the field selector
     FieldSelector child = 3;

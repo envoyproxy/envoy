@@ -19,7 +19,8 @@ Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters:
   }
 }
 
-Rule::Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root) : rule_(rule), id_(id) {
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
+    : rule_(rule), rule_id_(rule_id) {
   if (!rule.has_on_present() && !rule.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
   }
@@ -55,7 +56,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root) : rule_(rule)
   auto field_selector = rule.field_selector();
   TrieSharedPtr node = root;
   while (true) {
-    uint32_t id = field_selector.id().value();
+    int16_t id = static_cast<int16_t>(field_selector.id().value());
     if (node->children_.find(id) == node->children_.end()) {
       node->children_[id] = std::make_shared<Trie>(node);
     }
@@ -64,7 +65,11 @@ Rule::Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root) : rule_(rule)
     if (!field_selector.has_child()) {
       break;
     }
-    field_selector = field_selector.child();
+
+    // operation= hits protobuf compile-error on merging operand to the object,
+    // so use Swap to prevent the merge.
+    auto child = field_selector.child();
+    field_selector.Swap(&child);
   }
   ASSERT(node != root);
   node->rule_ = *this;
@@ -83,27 +88,145 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 
 FilterStatus TrieMatchHandler::messageEnd() {
   ENVOY_LOG(trace, "TrieMatchHandler messageEnd");
+  parent_.handleOnMissing();
   complete_ = true;
+  return FilterStatus::Continue;
+}
+
+// TODO
+FilterStatus TrieMatchHandler::structBegin(absl::string_view) { return FilterStatus::Continue; }
+
+FilterStatus TrieMatchHandler::structEnd() { return FilterStatus::Continue; }
+
+FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType& field_type,
+                                          int16_t& field_id) {
+  UNREFERENCED_PARAMETER(field_type);
+  UNREFERENCED_PARAMETER(field_id);
+  return FilterStatus::Continue;
+}
+
+FilterStatus TrieMatchHandler::fieldEnd() { return FilterStatus::Continue; }
+
+// TODO
+template <typename NumberType> FilterStatus TrieMatchHandler::handleNumber(NumberType value) {
+  UNREFERENCED_PARAMETER(value);
+  return FilterStatus::Continue;
+}
+
+FilterStatus TrieMatchHandler::handleString(absl::string_view value) {
+  UNREFERENCED_PARAMETER(value);
   return FilterStatus::Continue;
 }
 
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
+void PayloadToMetadataFilter::handleOnPresent(std::string&& value, const Rule& rule) {
+  if (matched_rule_ids_.find(rule.rule_id()) == matched_rule_ids_.end()) {
+    return;
+  }
+  matched_rule_ids_.erase(rule.rule_id());
+
+  applyKeyValue(std::move(value), rule, rule.rule().on_present());
+}
+
+void PayloadToMetadataFilter::handleOnMissing() {
+  for (uint16_t id : matched_rule_ids_) {
+    ASSERT(id < config_->requestRules().size());
+    const Rule& rule = config_->requestRules()[id];
+    applyKeyValue("", rule, rule.rule().on_missing());
+  }
+}
+
+const std::string& PayloadToMetadataFilter::decideNamespace(const std::string& nspace) const {
+  static const std::string& payloadToMetadata = "envoy.filters.thrift.payload_to_metadata";
+  return nspace.empty() ? payloadToMetadata : nspace;
+}
+
+bool PayloadToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
+                                          const std::string& key, std::string value,
+                                          ValueType type) const {
+  ProtobufWkt::Value val;
+  ASSERT(!value.empty());
+
+  if (value.size() >= MAX_PAYLOAD_VALUE_LEN) {
+    // Too long, go away.
+    ENVOY_LOG(debug, "metadata value is too long");
+    return false;
+  }
+
+  // Sane enough, add the key/value.
+  switch (type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
+      PayloadToMetadata::STRING:
+    val.set_string_value(std::move(value));
+    break;
+  case envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
+      PayloadToMetadata::NUMBER: {
+    double dval;
+    if (absl::SimpleAtod(StringUtil::trim(value), &dval)) {
+      val.set_number_value(dval);
+    } else {
+      ENVOY_LOG(debug, "value to number conversion failed");
+      return false;
+    }
+    break;
+  }
+  }
+
+  // Have we seen this namespace before?
+  auto namespace_iter = map.find(meta_namespace);
+  if (namespace_iter == map.end()) {
+    map[meta_namespace] = ProtobufWkt::Struct();
+    namespace_iter = map.find(meta_namespace);
+  }
+
+  auto& keyval = namespace_iter->second;
+  (*keyval.mutable_fields())[key] = val;
+
+  return true;
+}
+
+// add metadata['key']= value depending on payload present or missing case
+void PayloadToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
+                                            const KeyValuePair& keyval) const {
+  StructMap structs_by_namespace;
+
+  if (keyval.has_regex_value_rewrite()) {
+    const auto& matcher = rule.regexRewrite();
+    value = matcher->replaceAll(value, rule.regexSubstitution());
+  } else if (!keyval.value().empty()) {
+    value = keyval.value();
+  }
+  if (!value.empty()) {
+    const auto& nspace = decideNamespace(keyval.metadata_namespace());
+    addMetadata(structs_by_namespace, nspace, keyval.key(), value, keyval.type());
+  } else {
+    ENVOY_LOG(debug, "value is empty, not adding metadata");
+  }
+
+  if (!structs_by_namespace.empty()) {
+    for (auto const& entry : structs_by_namespace) {
+      decoder_callbacks_->streamInfo().setDynamicMetadata(entry.first, entry.second);
+    }
+  }
+}
+
 FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr metadata) {
   for (const auto& rule : config_->requestRules()) {
     if (rule.matches(*metadata)) {
-      matched_ids_.insert(rule.id());
+      matched_rule_ids_.insert(rule.rule_id());
     }
   }
 
-  ENVOY_LOG(trace, "{} rules matched", matched_ids_.size());
+  ENVOY_LOG(trace, "{} rules matched", matched_rule_ids_.size());
   return FilterStatus::Continue;
 }
 
 FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
-  if (!matched_ids_.empty()) {
+  if (!matched_rule_ids_.empty()) {
     ASSERT(!decoder_);
-    handler_ = std::make_unique<TrieMatchHandler>(config_->trieRoot());
+    handler_ = std::make_unique<TrieMatchHandler>(*this, config_->trieRoot());
     transport_ = createTransport(decoder_callbacks_->downstreamTransportType());
     protocol_ = createProtocol(decoder_callbacks_->downstreamProtocolType());
     decoder_ = std::make_unique<Decoder>(*transport_, *protocol_, *handler_);

@@ -36,7 +36,7 @@ public:
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
-  uint16_t id() const { return id_; }
+  uint16_t rule_id() const { return rule_id_; }
   bool matches(const ThriftProxy::MessageMetadata& metadata) const;
 
 private:
@@ -49,7 +49,7 @@ private:
   std::string regex_rewrite_substitution_{};
   std::string method_or_service_name_{};
   MatchType match_type_;
-  uint16_t id_;
+  uint16_t rule_id_;
 };
 
 using PayloadToMetadataRules = std::vector<Rule>;
@@ -76,11 +76,18 @@ private:
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
+class MetadataHandler {
+public:
+  virtual ~MetadataHandler() = default;
+  virtual void handleOnPresent(std::string&& value, const Rule& rule) PURE;
+  virtual void handleOnMissing() PURE;
+};
+
 class TrieMatchHandler : public DecoderCallbacks,
                          public PassThroughDecoderEventHandler,
                          protected Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  TrieMatchHandler(TrieSharedPtr root) : node_(root) {}
+  TrieMatchHandler(MetadataHandler& parent, TrieSharedPtr root) : parent_(parent), node_(root) {}
 
   // DecoderEventHandler
   FilterStatus messageEnd() override;
@@ -106,15 +113,19 @@ public:
 
 private:
   template <typename NumberType> FilterStatus handleNumber(NumberType value);
-
   FilterStatus handleString(absl::string_view value);
+
+  MetadataHandler& parent_;
   TrieSharedPtr node_;
   bool complete_{false};
 };
 
 using TrieMatchHandlerPtr = std::unique_ptr<TrieMatchHandler>;
 
-class PayloadToMetadataFilter : public ThriftProxy::ThriftFilters::PassThroughDecoderFilter,
+const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
+
+class PayloadToMetadataFilter : public MetadataHandler,
+                                public ThriftProxy::ThriftFilters::PassThroughDecoderFilter,
                                 protected Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   PayloadToMetadataFilter(const ConfigSharedPtr config);
@@ -122,6 +133,10 @@ public:
   // DecoderFilter
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus passthroughData(Buffer::Instance& data) override;
+
+  // MetadataHandler
+  void handleOnPresent(std::string&& value, const Rule& rule) override;
+  void handleOnMissing() override;
 
 private:
   static TransportPtr createTransport(TransportType transport) {
@@ -132,8 +147,14 @@ private:
     return NamedProtocolConfigFactory::getFactory(protocol).createProtocol();
   }
 
+  // TODO(kuochunghsu): extract the metadata handling logic form header/payload to metadata filters.
+  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  bool addMetadata(StructMap&, const std::string&, const std::string&, std::string,
+                   ValueType) const;
+  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&) const;
+  const std::string& decideNamespace(const std::string& nspace) const;
   const ConfigSharedPtr config_;
-  absl::flat_hash_set<uint16_t> matched_ids_;
+  absl::flat_hash_set<uint16_t> matched_rule_ids_;
   TrieMatchHandlerPtr handler_;
   TransportPtr transport_;
   ProtocolPtr protocol_;
