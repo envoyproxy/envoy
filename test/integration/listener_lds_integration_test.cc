@@ -1427,6 +1427,7 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
   tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
 
   int opt_value2 = 0;
   socklen_t opt_len2 = sizeof(opt_value);
@@ -1486,20 +1487,24 @@ TEST_P(ListenerFilterIntegrationTest,
   socket_option->set_int_value(8); // IPTOS_THROUGHPUT
   socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
   ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
-  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+
   EXPECT_LOG_CONTAINS(
       "warning",
       "gRPC config for type.googleapis.com/envoy.config.listener.v3.Listener rejected: Error "
       "adding/updating listener(s) listener_foo: Listener listener_foo: doesn't support update any "
       "socket options when the reuse port isn't enabled",
-      test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1));
-
-  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
-  ASSERT_TRUE(tcp_client2->write(data));
-  FakeRawConnectionPtr fake_upstream_connection2;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
-  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
-  tcp_client2->close();
+      {
+        sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+        test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+        IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+        ASSERT_TRUE(tcp_client2->write(data));
+        FakeRawConnectionPtr fake_upstream_connection2;
+        ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+        ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+        tcp_client2->close();
+        ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+      }
+  );
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
