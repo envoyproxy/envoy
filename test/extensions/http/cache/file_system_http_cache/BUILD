@@ -12,6 +12,7 @@ envoy_extension_cc_test(
     name = "file_system_http_cache_test",
     srcs = ["file_system_http_cache_test.cc"],
     extension_names = ["envoy.extensions.http.cache.file_system_http_cache"],
+    tags = ["skip_on_windows"],  # async_files does not yet support Windows.
     deps = [
         "//source/common/filesystem:directory_lib",
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",

@@ -1,7 +1,5 @@
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 
-#include <netinet/in.h>
-
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 
@@ -27,6 +25,20 @@ uint64_t ntohl64(uint64_t n) {
   return n;
 }
 uint64_t htonl64(uint64_t n) { return ntohl64(n); }
+
+// in-place byte order swap for a uint32.
+// Optimization in clang or gcc can recognize this as a single `bswap` instruction.
+void flip32(uint32_t& n) {
+  n = ((n & 0xFF000000u) >> 24u) | ((n & 0x00FF0000u) >> 8u) | ((n & 0x0000FF00u) << 8u) |
+      ((n & 0x000000FFu) << 24u);
+}
+uint32_t ntohl32(uint32_t n) {
+#if defined(ABSL_IS_LITTLE_ENDIAN)
+  flip32(n);
+#endif
+  return n;
+}
+uint64_t htonl32(uint32_t n) { return ntohl32(n); }
 } // namespace
 
 // Beginning of file should be "CACH".
@@ -54,9 +66,9 @@ void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   safeMemcpyUnsafeSrc(&contents_, s.begin());
 }
 
-uint32_t CacheFileFixedBlock::getUint32(const uint32_t& t) const { return ntohl(t); }
+uint32_t CacheFileFixedBlock::getUint32(const uint32_t& t) const { return ntohl32(t); }
 uint64_t CacheFileFixedBlock::getUint64(const uint64_t& t) const { return ntohl64(t); }
-void CacheFileFixedBlock::setUint32(uint32_t& t, uint32_t v) { t = htonl(v); }
+void CacheFileFixedBlock::setUint32(uint32_t& t, uint32_t v) { t = htonl32(v); }
 void CacheFileFixedBlock::setUint64(uint64_t& t, uint64_t v) { t = htonl64(v); }
 
 } // namespace FileSystemHttpCache

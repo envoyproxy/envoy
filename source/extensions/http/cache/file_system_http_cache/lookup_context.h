@@ -51,13 +51,10 @@ public:
         cache_entry_(std::move(cache_entry)) {}
 
   // From LookupContext
-  void getHeaders(LookupHeadersCallback&& cb) override;
-  void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
-  void getTrailers(LookupTrailersCallback&& cb) override;
-  void onDestroy() override;
-  // This shouldn't be necessary since onDestroy is supposed to always be called, but in some
-  // tests it is not.
-  ~FileLookupContext() override { onDestroy(); }
+  void getHeaders(LookupHeadersCallback&& cb) final;
+  void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) final;
+  void getTrailers(LookupTrailersCallback&& cb) final;
+  void onDestroy() final;
 
 private:
   // In the event that the cache failed to retrieve, remove the cache entry from the
