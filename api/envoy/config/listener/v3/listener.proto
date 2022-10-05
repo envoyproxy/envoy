@@ -302,9 +302,9 @@ message Listener {
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket. This field
-  // defaults to true. The update of this field can't be supported when the runtime flag
-  // ``envoy.reloadable_features.enable_update_listener_socket_options`` is enabled, otherwise, the update
-  // of this field will be ignored.
+  // defaults to true. The change of field will be rejected during an listener update when the
+  // runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is enabled.
+  // Otherwise, the update of this field will be ignored quietly.
   //
   // .. attention::
   //
