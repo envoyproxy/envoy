@@ -433,7 +433,7 @@ void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listen
           fmt::format("Listener {}: reuse port doesn't support change", new_listener.name()));
     }
 
-    same_socket_options = existing_listener.compareSocketOptions(new_listener);
+    same_socket_options = existing_listener.socketOptionsEqual(new_listener);
     if (!same_socket_options && new_listener.reusePort() == false) {
       throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
                                        "when the reuse port isn't enabled",

@@ -45,7 +45,7 @@ public:
   /**
    * @return true if listener message lhs and rhs have the same socket options.
    */
-  static bool compareSocketOptions(const envoy::config::listener::v3::Listener& lhs,
+  static bool socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
                                    const envoy::config::listener::v3::Listener& rhs);
 
   /**
@@ -323,7 +323,7 @@ public:
                                     Network::Socket::Type socket_type);
 
   // Compare whether two listeners have different socket options.
-  bool compareSocketOptions(const ListenerImpl& other) const;
+  bool socketOptionsEqual(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.

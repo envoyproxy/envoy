@@ -1074,8 +1074,8 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
-bool ListenerImpl::compareSocketOptions(const ListenerImpl& other) const {
-  return ListenerMessageUtil::compareSocketOptions(config_, other.config_);
+bool ListenerImpl::socketOptionsEqual(const ListenerImpl& other) const {
+  return ListenerMessageUtil::socketOptionsEqual(config_, other.config_);
 }
 
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
@@ -1108,7 +1108,7 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_update_listener_socket_options") &&
       (name_ == other.name_) &&
-      !ListenerMessageUtil::compareSocketOptions(config_, other.config_)) {
+      !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
     return false;
   }
 
@@ -1145,7 +1145,7 @@ void ListenerImpl::closeAllSockets() {
   }
 }
 
-bool ListenerMessageUtil::compareSocketOptions(const envoy::config::listener::v3::Listener& lhs,
+bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
                                                const envoy::config::listener::v3::Listener& rhs) {
   if ((PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, transparent, false) !=
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, transparent, false)) ||
@@ -1156,26 +1156,11 @@ bool ListenerMessageUtil::compareSocketOptions(const envoy::config::listener::v3
     return false;
   }
 
-  if (lhs.socket_options_size() != rhs.socket_options_size()) {
-    return false;
-  }
-
-  for (auto i = 0; i < lhs.socket_options_size(); i++) {
-    auto& option = lhs.socket_options(i);
-    bool found = false;
-    for (auto j = 0; j < rhs.socket_options_size(); j++) {
-      auto& other_option = rhs.socket_options(j);
-      Protobuf::util::MessageDifferencer differencer;
-      if (differencer.Compare(option, other_option)) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      return false;
-    }
-  }
-  return true;
+  return std::equal(lhs.socket_options().begin(), lhs.socket_options().end(), rhs.socket_options().begin(), rhs.socket_options().end(),
+  [](const ::envoy::config::core::v3::SocketOption& option, const ::envoy::config::core::v3::SocketOption& other_option) {
+    Protobuf::util::MessageDifferencer differencer;
+    return differencer.Compare(option, other_option);
+  });
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
