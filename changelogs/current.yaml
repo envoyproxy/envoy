@@ -93,6 +93,9 @@ minor_behavior_changes:
       envoy_listener_downstream_cx_total{} 2.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
+- area: dynamic_forward_proxy
+  change: |
+    No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
