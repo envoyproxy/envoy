@@ -102,7 +102,6 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
   const XdsConfigSourceId source_id{target_xds_authority_, type_url_};
   TRY_ASSERT_MAIN_THREAD {
     const std::vector<std::string> resource_names{names_tracked_.begin(), names_tracked_.end()};
-    std::cout << "=> AAB resources_names.size=" << resource_names.size() << std::endl;
     std::vector<envoy::service::discovery::v3::Resource> resources =
         xds_resources_delegate_->getResources(source_id, resource_names);
 
@@ -116,7 +115,6 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
       unaccounted.erase(Envoy::Config::Wildcard);
     }
 
-    std::cout << "=> AAB resources.size=" << resources.size() << std::endl;
     for (const auto& resource : resources) {
       if (version_info.empty()) {
         version_info = resource.version();
