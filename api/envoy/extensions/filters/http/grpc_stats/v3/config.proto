@@ -64,7 +64,7 @@ message FilterConfig {
 
   // If true, the filter will replace dots in the grpc_service_name with underscores before emitting
   // the metrics. Only works when :ref:`stats_for_all_methods
-  // <envoy_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
+  // <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
   // is set to true. It could cause metrics to be merged if the edited service name conflicts with
   // an existing service. For example there are both service "foo.bar" & "foo_bar" running.
   // By default this is set as false.
