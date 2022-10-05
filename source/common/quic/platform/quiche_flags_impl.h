@@ -71,7 +71,8 @@ namespace quiche {
 
 #define SetQuicheFlagImpl(flag, value) absl::SetFlag(&FLAGS_envoy_##flag, value)
 
-#define GetQuicheReloadableFlagImpl(module, flag) absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
+#define GetQuicheReloadableFlagImpl(module, flag)                                                  \
+  absl::GetFlag(FLAGS_envoy_quic_reloadable_flag_##flag)
 
 #define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
   absl::SetFlag(&FLAGS_envoy_quic_reloadable_flag_##flag, value)
