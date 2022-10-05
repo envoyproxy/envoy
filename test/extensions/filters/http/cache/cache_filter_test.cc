@@ -807,6 +807,8 @@ TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
   }
 }
 
+// Mark tests with EXPECT_ENVOY_BUG as death tests:
+// https://google.github.io/googletest/advanced.html#death-test-naming
 using CacheFilterDeathTest = CacheFilterTest;
 
 TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
