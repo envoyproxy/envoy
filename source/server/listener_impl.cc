@@ -1105,10 +1105,8 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   // Skip the duplicate address check if this is the case of a listener update with new socket
   // options.
-  if (Runtime::runtimeFeatureEnabled(
-          ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
-      (name_ == other.name_) &&
-      !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
+      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
     return false;
   }
 
@@ -1146,7 +1144,7 @@ void ListenerImpl::closeAllSockets() {
 }
 
 bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
-                                               const envoy::config::listener::v3::Listener& rhs) {
+                                             const envoy::config::listener::v3::Listener& rhs) {
   if ((PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, transparent, false) !=
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, transparent, false)) ||
       (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, freebind, false) !=
@@ -1156,11 +1154,13 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
-  return std::equal(lhs.socket_options().begin(), lhs.socket_options().end(), rhs.socket_options().begin(), rhs.socket_options().end(),
-  [](const ::envoy::config::core::v3::SocketOption& option, const ::envoy::config::core::v3::SocketOption& other_option) {
-    Protobuf::util::MessageDifferencer differencer;
-    return differencer.Compare(option, other_option);
-  });
+  return std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
+                    rhs.socket_options().begin(), rhs.socket_options().end(),
+                    [](const ::envoy::config::core::v3::SocketOption& option,
+                       const ::envoy::config::core::v3::SocketOption& other_option) {
+                      Protobuf::util::MessageDifferencer differencer;
+                      return differencer.Compare(option, other_option);
+                    });
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

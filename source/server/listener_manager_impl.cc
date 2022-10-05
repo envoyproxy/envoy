@@ -426,8 +426,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
 void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                         const ListenerImpl& existing_listener) {
   bool same_socket_options = true;
-  if (Runtime::runtimeFeatureEnabled(
-          ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
     if (new_listener.reusePort() != existing_listener.reusePort()) {
       throw EnvoyException(
           fmt::format("Listener {}: reuse port doesn't support change", new_listener.name()));

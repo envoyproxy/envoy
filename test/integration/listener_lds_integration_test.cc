@@ -1503,8 +1503,7 @@ TEST_P(ListenerFilterIntegrationTest,
         ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
         tcp_client2->close();
         ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
-      }
-  );
+      });
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
