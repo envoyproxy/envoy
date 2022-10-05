@@ -96,7 +96,7 @@ Terminal 1
 
 
 The above logs from the ``service1`` and ``service1-mirror`` containers show that
-both the ``service1` and ``service1-mirror`` services got the request.
+both the ``service1`` and ``service1-mirror`` services got the request.
 
 
 Step 4: Demonstrate mirror cluster via header
@@ -130,5 +130,5 @@ Terminal 1
   ...
 
 The above logs from the ``service2`` and ``service2-mirror`` containers show that
-both the ``service2` and ``service2-mirror`` services got the request.
+both the ``service2`` and ``service2-mirror`` services got the request.
 
