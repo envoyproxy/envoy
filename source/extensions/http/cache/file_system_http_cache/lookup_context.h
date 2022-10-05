@@ -55,6 +55,9 @@ public:
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) final;
   void getTrailers(LookupTrailersCallback&& cb) final;
   void onDestroy() final;
+  // This shouldn't be necessary since onDestroy is supposed to always be called, but in some
+  // tests it is not.
+  ~FileLookupContext() override { onDestroy(); }
 
 private:
   // In the event that the cache failed to retrieve, remove the cache entry from the
