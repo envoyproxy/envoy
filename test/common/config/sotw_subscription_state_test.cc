@@ -49,9 +49,18 @@ public:
       throw EnvoyException("intended exception thrown");
     }
 
+    // If we get a wildcard request, generate CLA resources for the default {"name1", "name2",
+    // "name3"}.
+    std::vector<std::string> resources_to_generate{resource_names.begin(), resource_names.end()};
+    if (resources_to_generate.empty() ||
+        (resources_to_generate.size() == 1 &&
+         resources_to_generate[0] == std::string(Envoy::Config::Wildcard))) {
+      resources_to_generate = {"name1", "name2", "name3"};
+    }
+
     std::vector<envoy::service::discovery::v3::Resource> resources;
     resources.reserve(resource_names.size());
-    for (const std::string& resource_name : resource_names) {
+    for (const std::string& resource_name : resources_to_generate) {
       envoy::config::endpoint::v3::ClusterLoadAssignment cla;
       cla.set_cluster_name(resource_name);
       if (resource_name == std::string(BAD_CLA_RESOURCE_NAME)) {
@@ -362,6 +371,38 @@ TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithDelegateThrowing
   auto next_request = getNextDiscoveryRequestAckless();
   // The xDS delegate threw an exception, so the last known good version won't be set.
   EXPECT_TRUE(next_request->version_info().empty());
+  EXPECT_TRUE(next_request->response_nonce().empty());
+}
+
+TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithEmptyRequestedResourceNames) {
+  // Make the request resource names list the empty set, to treat it like a wild card.
+  state_->updateSubscriptionInterest({}, {"name1", "name2", "name3"});
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // The XdsResourcesDelegate supplies the 3 resources it contains, since it's a wildcard request.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(SizeIs(3)),
+                             std::string(RESOURCE_VERSION)));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  state_->handleEstablishmentFailure();
+  auto next_request = getNextDiscoveryRequestAckless();
+  EXPECT_EQ(next_request->version_info(), RESOURCE_VERSION);
+  // No nonce, since the version didn't come from an xDS server.
+  EXPECT_TRUE(next_request->response_nonce().empty());
+}
+
+TEST_F(SotwSubscriptionStateTest, HandleEstablishmentFailureWithWildcardResourceName) {
+  // Make the request resource names list the wildcard entry only.
+  state_->updateSubscriptionInterest({"*"}, {"name1", "name2", "name3"});
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  // The XdsResourcesDelegate supplies the 3 resources it contains, since it's a wildcard request.
+  EXPECT_CALL(callbacks_,
+              onConfigUpdate(testing::Matcher<const std::vector<DecodedResourcePtr>&>(SizeIs(3)),
+                             std::string(RESOURCE_VERSION)));
+  EXPECT_CALL(*ttl_timer_, disableTimer());
+  state_->handleEstablishmentFailure();
+  auto next_request = getNextDiscoveryRequestAckless();
+  EXPECT_EQ(next_request->version_info(), RESOURCE_VERSION);
+  // No nonce, since the version didn't come from an xDS server.
   EXPECT_TRUE(next_request->response_nonce().empty());
 }
 
