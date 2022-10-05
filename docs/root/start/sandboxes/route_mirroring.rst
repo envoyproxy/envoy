@@ -76,10 +76,10 @@ Terminal 2
 
 
   $ pwd
-  envoy/examples/request-mirroring
+  envoy/examples/route-mirroring
   $ curl localhost:8080/service/1
 
-The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to 
+The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
 ``service1`` and also sends the request to the service 1 mirror, ``service1-mirror``.
 
 
@@ -95,7 +95,8 @@ Terminal 1
    route-mirroring-service1-mirror-1  | 127.0.0.1 - - [30/Sep/2022 00:41:27] "GET /service/1 HTTP/1.1" 200 -
 
 
-Both the ``service1` and ``service1-mirror`` services got the request.
+The above logs from the ``service1`` and ``service1-mirror`` containers show that
+both the ``service1` and ``service1-mirror`` services got the request.
 
 
 Step 4: Demonstrate mirror cluster via header
@@ -109,7 +110,7 @@ Terminal 2
 .. code-block:: console
 
   $ pwd
-  envoy/examples/request-mirroring
+  envoy/examples/route-mirroring
   $ curl --header "x-mirror-cluster: service2-mirror" localhost:8080/service/2
 
 The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
@@ -127,4 +128,7 @@ Terminal 1
   route-mirroring-service2-1         | 127.0.0.1 - - [30/Sep/2022 00:46:05] "GET /service/2 HTTP/1.1" 200 -
   route-mirroring-service2-mirror-1  | 127.0.0.1 - - [30/Sep/2022 00:46:05] "GET /service/2 HTTP/1.1" 200 -
   ...
+
+The above logs from the ``service2`` and ``service2-mirror`` containers show that
+both the ``service2` and ``service2-mirror`` services got the request.
 
