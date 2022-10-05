@@ -15,8 +15,8 @@ namespace PayloadToMetadataFilter {
  * Config registration for the header to metadata filter. @see NamedThriftFilterConfigFactory.
  */
 class PayloadToMetadataFilterConfig : public ThriftProxy::ThriftFilters::FactoryBase<
-                                         envoy::extensions::filters::network::thrift_proxy::
-                                             filters::payload_to_metadata::v3::PayloadToMetadata> {
+                                          envoy::extensions::filters::network::thrift_proxy::
+                                              filters::payload_to_metadata::v3::PayloadToMetadata> {
 public:
   PayloadToMetadataFilterConfig() : FactoryBase("envoy.filters.thrift.payload_to_metadata") {}
 
