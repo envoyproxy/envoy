@@ -130,7 +130,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
     callbacks().onConfigUpdate(decoded_resources, version_info);
     previously_fetched_data_ = true;
-    if (unaccounted.empty()) {
+    if (unaccounted.empty() && !version_info.empty()) {
       // All the requested resources were found and validated from the xDS delegate, so set the last
       // known good version.
       last_good_version_info_ = version_info;
