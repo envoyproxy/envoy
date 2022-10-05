@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-export NAME=front-proxy
+export NAME=route-mirroring
 export PORT_PROXY="${FRONT_PROXY_PORT_PROXY:-10600}"
 
 # shellcheck source=examples/verify-common.sh
