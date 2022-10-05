@@ -2332,7 +2332,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  const std::string expected_error_message = "Listener foo: reuse port doesn't support change";
+  const std::string expected_error_message = "Listener foo: reuse port cannot be changed during an update";
   testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
                                                     expected_error_message);
 }
