@@ -603,7 +603,7 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
   server_initialized_.waitReady();
 }
 
-FakeUpstream::~FakeUpstream() { cleanUp(); ENVOY_LOG_MISC(debug, "########## FakeUpstream::~FakeUpstream"); };
+FakeUpstream::~FakeUpstream() { cleanUp(); };
 
 void FakeUpstream::cleanUp() {
   if (thread_.get()) {
@@ -627,7 +627,6 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   }
   auto connection_wrapper = std::make_unique<SharedConnectionWrapper>(connection);
 
-  ENVOY_LOG_MISC(debug, "######### got new connection");
   LinkedList::moveIntoListBack(std::move(connection_wrapper), new_connections_);
 
   // Normally we don't associate a logical network connection with a FakeHttpConnection  until
@@ -885,7 +884,6 @@ FakeRawConnection::~FakeRawConnection() {
           connection.removeReadFilter(filter);
         }));
   }
-  ENVOY_LOG_MISC(debug, "########## FakeRawConnection::~FakeRawConnection");
 }
 
 void FakeRawConnection::initialize() {
