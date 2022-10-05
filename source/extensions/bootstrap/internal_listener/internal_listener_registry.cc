@@ -19,7 +19,7 @@ InternalListenerExtension::InternalListenerExtension(
       tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {
   // Get buffer size config in K bytes. The default buffer size is 1024 KiB.
   buffer_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                     config, buffer_size, InternalClientConnectionFactory::default_buffer_size_) *
+                     config, buffer_size, InternalClientConnectionFactory::DefaultBufferSize) *
                  1024;
 
   // Initialize this singleton before the listener manager potentially load a static internal

@@ -17,7 +17,7 @@ ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
     InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
 // The default buffer size is 1024 KiB.
 uint32_t InternalClientConnectionFactory::buffer_size_ =
-    InternalClientConnectionFactory::default_buffer_size_;
+    InternalClientConnectionFactory::DefaultBufferSize;
 
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
     Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
