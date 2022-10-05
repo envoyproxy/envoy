@@ -428,8 +428,8 @@ void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listen
   bool same_socket_options = true;
   if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
     if (new_listener.reusePort() != existing_listener.reusePort()) {
-      throw EnvoyException(
-          fmt::format("Listener {}: reuse port cannot be changed during an update", new_listener.name()));
+      throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
+                                       new_listener.name()));
     }
 
     same_socket_options = existing_listener.socketOptionsEqual(new_listener);
