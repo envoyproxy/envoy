@@ -821,8 +821,8 @@ envoy.request_id.uuid:
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
 envoy.resource_monitors.downstream_connections:
-  categories: []
-  # - envoy.resource_monitors
+  categories:
+  - envoy.resource_monitors
   security_posture: data_plane_agnostic
   status: wip
   type_urls:
