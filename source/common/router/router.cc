@@ -898,7 +898,8 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled());
+                       .setSampled(shadow_policy.traceSampled())
+                       .setIsShadow(true);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
       options.setFilterConfig(config_);
     }

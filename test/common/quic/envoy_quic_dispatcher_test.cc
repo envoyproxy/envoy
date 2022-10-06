@@ -355,5 +355,17 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   envoy_quic_dispatcher_.closeConnectionsWithFilterChain(&proof_source_->filterChain());
 }
 
+TEST_P(EnvoyQuicDispatcherTest, EnvoyQuicCryptoServerStreamHelper) {
+  const quic::CryptoHandshakeMessage crypto_message;
+  const quic::QuicSocketAddress client_address;
+  const quic::QuicSocketAddress peer_address;
+  const quic::QuicSocketAddress self_address;
+
+  EnvoyQuicCryptoServerStreamHelper helper;
+  EXPECT_ENVOY_BUG(helper.CanAcceptClientHello(crypto_message, client_address, peer_address,
+                                               self_address, nullptr),
+                   "Unexpected call to CanAcceptClientHello");
+}
+
 } // namespace Quic
 } // namespace Envoy
