@@ -38,6 +38,7 @@ using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
+using ::testing::UnorderedElementsAre;
 
 static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml) {
   envoy::config::route::v3::Route route;
@@ -2013,8 +2014,6 @@ response_headers_to_remove: ["x-foo-header"]
   resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
-
-using ::testing::UnorderedElementsAre;
 
 TEST(HeaderParserTest, GetHeaderTransformsWithFormatting) {
   const std::string yaml = R"EOF(
