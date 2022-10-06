@@ -103,17 +103,16 @@ ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   return RequestStatNames{service, method};
 }
 
-std::pair<absl::optional<ContextImpl::RequestStatNames>, std::unique_ptr<std::string>>
+absl::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) {
   absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
   if (!request_names) {
     return {};
   }
-  auto service_name =
-      std::make_unique<std::string>(absl::StrReplaceAll(request_names->service_, {{".", "_"}}));
-  Stats::Element service = Stats::DynamicName(*service_name);
-  Stats::Element method = Stats::DynamicName(request_names->method_);
-  return std::make_pair(RequestStatNames{service, method}, std::move(service_name));
+  Stats::Element service =
+      Stats::DynamicSavedName(absl::StrReplaceAll(request_names->service_, {{".", "_"}}));
+  Stats::Element method = Stats::DynamicSavedName(request_names->method_);
+  return RequestStatNames{service, method};
 }
 
 } // namespace Grpc

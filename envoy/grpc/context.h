@@ -37,16 +37,15 @@ public:
   /**
    * Parses out request grpc service-name and method from the path with dots
    * replaced by underscores in grpc service-name, returning a populated
-   * RequestStatName and the grpc service-name without dots if successful. See
+   * RequestStatName if successful. See
    * the implementation (source/common/grpc/common.h) for the definition of
    * RequestStatNames. It is hidden in the implementation since it references StatName, which is
    * defined only in the stats implementation.
    *
    * @param path the request path.
-   * @return a pair containing request names expressed StatName and a unique_ptr
-   * to the grpc service name with dots replaced.
+   * @return the request names, expressed as StatName.
    */
-  virtual std::pair<absl::optional<RequestStatNames>, std::unique_ptr<std::string>>
+  virtual absl::optional<RequestStatNames>
   resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) PURE;
 
   /**

@@ -157,7 +157,7 @@ public:
           // Get dynamically-allocated Context::RequestStatNames from the context.
           request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
           if (config_->replace_dots_in_grpc_service_name_) {
-            std::tie(request_names_without_dots_, service_name_without_dots_) =
+            request_names_ =
                 config_->context_.resolveDynamicServiceAndMethodWithDotReplaced(headers.Path());
           }
           do_stat_tracking_ = request_names_.has_value();
@@ -200,12 +200,7 @@ public:
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {
-          if (doServiceNameWithoutDots()) {
-            config_->context_.chargeRequestMessageStat(*cluster_, request_names_without_dots_,
-                                                       delta);
-          } else {
-            config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
-          }
+          config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
         }
       }
     }
@@ -216,14 +211,8 @@ public:
                                           bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
     if (doStatTracking()) {
-      if (doServiceNameWithoutDots()) {
-        config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc,
-                                     request_names_without_dots_, headers.GrpcStatus());
-      } else {
-        config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
-                                     headers.GrpcStatus());
-      }
-
+      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
+                                   headers.GrpcStatus());
       if (end_stream) {
         maybeChargeUpstreamStat();
       }
@@ -237,7 +226,7 @@ public:
       if (delta > 0) {
         maybeWriteFilterState();
         if (doStatTracking()) {
-          config_->context_.chargeResponseMessageStat(*cluster_, getRequestName(), delta);
+          config_->context_.chargeResponseMessageStat(*cluster_, request_names_, delta);
         }
       }
     }
@@ -246,7 +235,7 @@ public:
 
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     if (doStatTracking()) {
-      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, getRequestName(),
+      config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,
                                    trailers.GrpcStatus());
       maybeChargeUpstreamStat();
     }
@@ -254,8 +243,6 @@ public:
   }
 
   bool doStatTracking() const { return do_stat_tracking_; }
-
-  bool doServiceNameWithoutDots() const { return config_->replace_dots_in_grpc_service_name_; }
 
   void maybeWriteFilterState() {
     if (!config_->emit_filter_state_) {
@@ -284,15 +271,7 @@ public:
           std::chrono::duration_cast<std::chrono::milliseconds>(
               timing.lastUpstreamRxByteReceived().value() -
               timing.lastUpstreamTxByteSent().value());
-      config_->context_.chargeUpstreamStat(*cluster_, getRequestName(), chrono_duration);
-    }
-  }
-
-  absl::optional<Grpc::Context::RequestStatNames> getRequestName() const {
-    if (config_->replace_dots_in_grpc_service_name_) {
-      return request_names_without_dots_;
-    } else {
-      return request_names_;
+      config_->context_.chargeUpstreamStat(*cluster_, request_names_, chrono_duration);
     }
   }
 
@@ -306,8 +285,6 @@ private:
   Grpc::FrameInspector response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_names_;
-  absl::optional<Grpc::Context::RequestStatNames> request_names_without_dots_{};
-  std::unique_ptr<std::string> service_name_without_dots_;
 };
 
 } // namespace

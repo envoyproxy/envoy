@@ -119,21 +119,20 @@ TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
   ContextImpl context(*symbol_table);
   absl::optional<Context::RequestStatNames> request_names;
   std::unique_ptr<std::string> service_name_without_dots_;
-  std::tie(request_names, service_name_without_dots_) =
-      context.resolveDynamicServiceAndMethodWithDotReplaced(path);
+  request_names = context.resolveDynamicServiceAndMethodWithDotReplaced(path);
   EXPECT_TRUE(request_names);
-  EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicName>(request_names->service_));
-  EXPECT_EQ("method.name", absl::get<Stats::DynamicName>(request_names->method_));
+  EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicSavedName>(request_names->service_));
+  EXPECT_EQ("method.name", absl::get<Stats::DynamicSavedName>(request_names->method_));
   headers.setPath("");
-  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
   headers.setPath("/");
-  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
   headers.setPath("//");
-  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
   headers.setPath("/service_name");
-  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
   headers.setPath("/service_name/");
-  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path).first);
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
 }
 
 } // namespace Grpc

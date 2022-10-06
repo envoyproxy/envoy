@@ -60,7 +60,7 @@ public:
    * @return if both gRPC serve and method have been resolved successfully returns
    *   a populated RequestStatNames and an unique_ptr, otherwise returns an empty optional.
    */
-  std::pair<absl::optional<RequestStatNames>, std::unique_ptr<std::string>>
+  absl::optional<RequestStatNames>
   resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) override;
 
   Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
