@@ -68,7 +68,7 @@ protected:
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
     bool startUpstreamSecureTransport() override {
-      IS_ENVOY_BUG("Unexpected call to injectUpstreamConnectionEvent");
+      IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
       return false;
     }
     Upstream::HostDescriptionConstSharedPtr upstreamHost() override { return nullptr; }

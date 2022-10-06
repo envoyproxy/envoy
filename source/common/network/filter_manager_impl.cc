@@ -90,10 +90,7 @@ void FilterManagerImpl::onRead() {
 
 bool FilterManagerImpl::startUpstreamSecureTransport() {
   for (auto& filter : upstream_filters_) {
-    if (!(filter)->filter_) {
-      continue;
-    }
-    if (filter->filter_->startUpstreamSecureTransport()) {
+    if (filter->filter_ != nullptr && filter->filter_->startUpstreamSecureTransport()) {
       // Success. The filter converted upstream's transport socket to secure mode.
       return true;
     }
