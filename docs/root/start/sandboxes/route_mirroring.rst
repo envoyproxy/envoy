@@ -33,17 +33,13 @@ Step 1: Build the sandbox
 
 Change to the ``examples/route-mirroring`` directory.
 
-Terminal 1
-
 .. code-block:: console
 
     $ pwd
     envoy/examples/route-mirroring
     $ docker-compose build
-    $ docker-compose up
+    $ docker-compose up -d
 
-
-Terminal 2
 
 .. code-block:: console
 
@@ -70,34 +66,39 @@ Terminal 2
 Step 2: Demonstrate static mirror cluster name
 **********************************************
 
-Terminal 2
-
 .. code-block:: console
-
 
   $ pwd
   envoy/examples/route-mirroring
   $ curl localhost:8080/service/1
+  Hello from behind Envoy (service 1)!
 
 The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
 ``service1`` and also sends the request to the service 1 mirror, ``service1-mirror``.
 
-
 Step 3: See Logs
 ****************
 
-Terminal 1
-
 .. code-block:: console
 
-   ...
-   route-mirroring-service1-1         | 127.0.0.1 - - [30/Sep/2022 00:41:27] "GET /service/1 HTTP/1.1" 200 -
-   route-mirroring-service1-mirror-1  | 127.0.0.1 - - [30/Sep/2022 00:41:27] "GET /service/1 HTTP/1.1" 200 -
+   $ docker logs route-mirroring-service1-1
 
+   ...
+   Host: localhost:8080
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
+
+   $ docker logs route-mirroring-service1-mirror-1
+
+   ...
+   Host: localhost-shadow:8080
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
 The above logs from the ``service1`` and ``service1-mirror`` containers show that
 both the ``service1`` and ``service1-mirror`` services got the request.
 
+You can also see that for the request to the ``service1-mirror`` service, the
+``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
+hostname.
 
 Step 4: Demonstrate mirror cluster via header
 *********************************************
@@ -105,13 +106,12 @@ Step 4: Demonstrate mirror cluster via header
 In this step, we will see a demonstration where the request specifies via a header, ``x-mirror-cluster``,
 the cluster that envoy will mirror the request to.
 
-Terminal 2
-
 .. code-block:: console
 
   $ pwd
   envoy/examples/route-mirroring
   $ curl --header "x-mirror-cluster: service2-mirror" localhost:8080/service/2
+  Hello from behind Envoy (service 2)!
 
 The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
 ``service2`` and also mirrors the request to the cluster named, ``service2-mirror``.
@@ -120,15 +120,25 @@ The command above sends a request to the ``envoy-front-proxy`` service which for
 Step 4: See Logs
 ****************
 
-Terminal 1
-
 .. code-block:: console
 
-  ...
-  route-mirroring-service2-1         | 127.0.0.1 - - [30/Sep/2022 00:46:05] "GET /service/2 HTTP/1.1" 200 -
-  route-mirroring-service2-mirror-1  | 127.0.0.1 - - [30/Sep/2022 00:46:05] "GET /service/2 HTTP/1.1" 200 -
-  ...
+   $ docker logs route-mirroring-service2-1
 
-The above logs from the ``service2`` and ``service2-mirror`` containers show that
-both the ``service2`` and ``service2-mirror`` services got the request.
+   ...
+   Host: localhost:8080
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
+
+   $ docker logs route-mirroring-service2-mirror-1
+
+   ...
+   Host: localhost-shadow:8080
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
+
+The above logs from the ``service1`` and ``service1-mirror`` containers show that
+both the ``service1`` and ``service1-mirror`` services got the request.
+
+You can also see that for the request to the ``service2-mirror`` service, the
+``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
+hostname.
+
 
