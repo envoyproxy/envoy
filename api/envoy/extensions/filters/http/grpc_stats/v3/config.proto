@@ -67,7 +67,8 @@ message FilterConfig {
   // <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.stats_for_all_methods>`
   // is set to true. It could cause metrics to be merged if the edited service name conflicts with
   // an existing service. For example there are both service "foo.bar" & "foo_bar" running.
-  // By default this is set as false.
+  // This config can fix incorrect tokenization of gRPC metrics because the existing stats tokenizer
+  // assumes no dots in the gRPC service name. By default this is set as false.
   bool replace_dots_in_grpc_service_name = 5;
 }
 

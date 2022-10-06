@@ -155,10 +155,11 @@ public:
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.
-          request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
           if (config_->replace_dots_in_grpc_service_name_) {
             request_names_ =
                 config_->context_.resolveDynamicServiceAndMethodWithDotReplaced(headers.Path());
+          } else {
+            request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
           }
           do_stat_tracking_ = request_names_.has_value();
         } else {
