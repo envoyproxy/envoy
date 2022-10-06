@@ -1664,6 +1664,91 @@ request_headers_to_add:
   EXPECT_EQ(1, counts["x-request-start"]);
 }
 
+TEST(HeaderParserTest, EvaluateMultipleOverwriteHeadersWithTheSameKey) {
+  // Each next OVERWRITE_IF_EXISTS_OR_ADD should eclipse the previous one
+  // and the last one will determine the actual header value.
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "a"
+      value: "abcdefghijklmnopqrstwxyz"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "a"
+      value: "second-%REQ(a)%%REQ(a)%"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "a"
+      value: "third-%REQ(a)%%REQ(a)%%REQ(a)%"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}, {"a", "value-a"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&header_map));
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  std::vector<absl::string_view> header_values;
+  header_map.iterate([&header_values](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    if (header.key() == "a") {
+      header_values.push_back(header.value().getStringView());
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  EXPECT_EQ(1, header_values.size());
+  EXPECT_EQ("third-value-avalue-avalue-a", header_values[0]);
+}
+
+TEST(HeaderParserTest, EvaluateMultipleAppendAndOverwriteHeadersWithTheSameKey) {
+  // Append header should be added and two headers with OVERWRITE action
+  // should overwrite the original value.
+  // The first header with OVERWRITE action is basically no-op because it will
+  // be overwritten by the second OVERWRITE action.
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "a"
+      value: "second-%REQ(a)%%REQ(a)%"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: "a"
+      value: "abcdefghijklmnopqrstwxyz"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+  - header:
+      key: "a"
+      value: "third-%REQ(a)%%REQ(a)%%REQ(a)%"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add());
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}, {"a", "value-a"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&header_map));
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  std::vector<absl::string_view> header_values;
+  header_map.iterate([&header_values](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    if (header.key() == "a") {
+      header_values.push_back(header.value().getStringView());
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  EXPECT_EQ(2, header_values.size());
+  EXPECT_THAT(header_values, testing::UnorderedElementsAre("abcdefghijklmnopqrstwxyz",
+                                                           "third-value-avalue-avalue-a"));
+}
+
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
@@ -1929,6 +2014,8 @@ response_headers_to_remove: ["x-foo-header"]
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
+using ::testing::UnorderedElementsAre;
+
 TEST(HeaderParserTest, GetHeaderTransformsWithFormatting) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
@@ -1967,9 +2054,10 @@ response_headers_to_remove: ["x-baz-header"]
   auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
   EXPECT_THAT(transforms.headers_to_append_or_add,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
-                          Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
+  EXPECT_THAT(
+      transforms.headers_to_overwrite_or_add,
+      UnorderedElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                           Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 
@@ -2013,9 +2101,9 @@ response_headers_to_remove: ["x-baz-header"]
   EXPECT_THAT(transforms.headers_to_append_or_add,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
   EXPECT_THAT(transforms.headers_to_overwrite_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
-                          Pair(Http::LowerCaseString("x-per-request-header"),
-                               "%PER_REQUEST_STATE(testing)%")));
+              UnorderedElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                                   Pair(Http::LowerCaseString("x-per-request-header"),
+                                        "%PER_REQUEST_STATE(testing)%")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 

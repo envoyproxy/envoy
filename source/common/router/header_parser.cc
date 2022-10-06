@@ -342,6 +342,13 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
+  // Create local copy of headers to add and replace. This is required
+  // to execute all formatters using the original received headers.
+  // Only after all the formatters produced the new values of the headers, the headers are set.
+  std::vector<std::pair<const Http::LowerCaseString&, std::string>> headers_to_add;
+  absl::flat_hash_map<absl::string_view, std::pair<const Http::LowerCaseString&, std::string>>
+      headers_to_overwrite;
+
   for (const auto& [key, entry] : headers_to_add_) {
     const std::string value =
         stream_info != nullptr
@@ -351,18 +358,33 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       switch (entry.append_action_) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers.addReferenceKey(key, value);
+        headers_to_add.emplace_back(key, value);
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
         if (auto header_entry = headers.get(key); header_entry.empty()) {
-          headers.addReferenceKey(key, value);
+          headers_to_add.emplace_back(key, value);
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        headers.setReferenceKey(key, value);
+        // TODO(cpakulski): Hash map is used to track multiple OVERWRITE actions
+        // and store only the last one. It would be more efficient to do it
+        // when config is processed. All OVERWRITE actions for the same header could be dropped
+        // except the last one.
+        headers_to_overwrite.erase(key);
+        headers_to_overwrite.try_emplace(key, key, value);
         break;
       }
     }
+  }
+
+  // First overwrite all headers which need to be overwritten.
+  for (const auto& [key, value] : headers_to_overwrite) {
+    headers.setReferenceKey(value.first, value.second);
+  }
+
+  // Now add headers which should be added.
+  for (const auto& header : headers_to_add) {
+    headers.addReferenceKey(header.first, header.second);
   }
 }
 
