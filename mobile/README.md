@@ -19,7 +19,7 @@ Multiplatform client HTTP/networking library built on the [Envoy](https://www.en
 * [envoy-mobile-dev](https://groups.google.com/forum/#!forum/envoy-mobile-dev): Envoy Mobile
   developer discussion (APIs, feature design, etc.).
 * [Slack](https://envoyproxy.slack.com): Slack, to get invited go
-  [here](https://envoyslack.cncf.io). We can be found in the **#envoy-mobile** room.
+  [here](https://envoyproxy.io/slack). We can be found in the **#envoy-mobile** room.
 
 ## Contributing
 
