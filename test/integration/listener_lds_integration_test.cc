@@ -1020,6 +1020,16 @@ public:
     skip_tag_extraction_rule_check_ = true;
   }
 
+  ~ListenerFilterIntegrationTest() override {
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      lds_connection_.reset();
+    }
+  }
+
   void createLdsStream() {
     AssertionResult result =
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, lds_connection_);
