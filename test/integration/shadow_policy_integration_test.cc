@@ -175,8 +175,7 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
 
   std::string log1 = waitForAccessLog(log_file, 0, true);
   std::string log2 = waitForAccessLog(log_file, 1);
-  EXPECT_TRUE((absl::StrContains(log1, "4\n") && absl::StrContains(log2, "-\n")) ||
-              (absl::StrContains(log1, "-\n") && absl::StrContains(log2, "4\n")));
+  EXPECT_TRUE((log1 == "4" && log2 == "-") || (log1 == "-" && log2 == "4"));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total")->value());
