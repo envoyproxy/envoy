@@ -90,6 +90,7 @@ def _envoy_linkopts():
             "-pthread",
             "-lrt",
             "-ldl",
+            "-lresolv",
             "-Wl,-z,relro,-z,now",
             "-Wl,--hash-style=gnu",
         ],

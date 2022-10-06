@@ -69,7 +69,7 @@ def _envoy_test_linkopts():
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-lrt", "-ldl"],
+        "//conditions:default": ["-pthread", "-lrt", "-ldl", "-lresolv"],
     }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"]) + envoy_dbg_linkopts()
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
