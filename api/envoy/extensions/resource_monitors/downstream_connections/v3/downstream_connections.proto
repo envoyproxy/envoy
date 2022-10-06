@@ -11,11 +11,11 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/downstream_connections/v3;downstream_connectionsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Downstream connections]
 // [#extension: envoy.resource_monitors.downstream_connections]
 
 // The downstream connections resource monitor tracks the global number of open downstream connections.
-// [#not-implemented-hide:]
 message DownstreamConnectionsConfig {
   // Maximum threshold for global open active downstream connections, defaults to 0.
   // If monitor is configured via Overload manager api and has no value set, Envoy will reject all incoming connections.
