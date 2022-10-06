@@ -108,11 +108,10 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
     std::vector<DecodedResourcePtr> decoded_resources;
     const auto scoped_update = ttl_.scopedTtlUpdate();
     std::string version_info;
-    absl::flat_hash_set<std::string> unaccounted{names_tracked_.begin(), names_tracked_.end()};
-    if (unaccounted.size() == 1 && unaccounted.contains(Envoy::Config::Wildcard)) {
-      // Remove a single wildcard entry from the unaccounted set, as we can't correlate entries in
-      // the xDS delegate by name.
-      unaccounted.erase(Envoy::Config::Wildcard);
+    int unaccounted = names_tracked_.size();
+    if (names_tracked_.size() == 1 && names_tracked_.contains(Envoy::Config::Wildcard)) {
+      // For wildcard requests, there are no expectations for the number of resources returned.
+      unaccounted = 0;
     }
 
     for (const auto& resource : resources) {
@@ -125,7 +124,9 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
       TRY_ASSERT_MAIN_THREAD {
         auto decoded_resource = DecodedResourceImpl::fromResource(*resource_decoder_, resource);
         setResourceTtl(*decoded_resource);
-        unaccounted.erase(decoded_resource->name());
+        if (unaccounted > 0) {
+          --unaccounted;
+        }
         decoded_resources.emplace_back(std::move(decoded_resource));
       }
       END_TRY
@@ -136,7 +137,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
     callbacks().onConfigUpdate(decoded_resources, version_info);
     previously_fetched_data_ = true;
-    if (unaccounted.empty() && !version_info.empty()) {
+    if (unaccounted == 0 && !version_info.empty()) {
       // All the requested resources were found and validated from the xDS delegate, so set the last
       // known good version.
       last_good_version_info_ = version_info;
