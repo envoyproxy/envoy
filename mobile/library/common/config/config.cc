@@ -432,17 +432,21 @@ R"(
     lb_policy: CLUSTER_PROVIDED
     cluster_type: *base_cluster_type
     transport_socket:
-      name: envoy.transport_sockets.quic
+      name: envoy.transport_sockets.http_11_proxy
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
-        upstream_tls_context:
-          common_tls_context:
-            tls_params:
-              tls_maximum_protocol_version: TLSv1_3
-            validation_context:
-              trusted_ca:
-                inline_string: *tls_root_certs
-              trust_chain_verification: *trust_chain_verification
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.http_11_proxy.v3.Http11ProxyUpstreamTransport
+        transport_socket:
+          name: envoy.transport_sockets.quic
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+            upstream_tls_context:
+              common_tls_context:
+                tls_params:
+                  tls_maximum_protocol_version: TLSv1_3
+                validation_context:
+                  trusted_ca:
+                    inline_string: *tls_root_certs
+                  trust_chain_verification: *trust_chain_verification
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
     typed_extension_protocol_options: *h3_protocol_options
