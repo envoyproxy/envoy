@@ -13,7 +13,7 @@ This simple example demonstrates Envoy's request mirroring capability using
 Incoming requests are received by ``envoy-front-proxy`` service. The envoy instance running
 in this container is configured with two routes:
 
-.. literalinclude:: _include/route-mirroring/front-envoy.yaml
+.. literalinclude:: _include/route-mirror/front-envoy.yaml
    :language: yaml
    :lines: 7-37
    :linenos:
@@ -45,7 +45,7 @@ Change to the ``examples/route-mirror`` directory.
 
 
     $ pwd
-    envoy/examples/route-mirroring
+    envoy/examples/route-mirror
     $ docker-compose ps
 
     NAME                                COMMAND                  SERVICE             STATUS              PORTS
