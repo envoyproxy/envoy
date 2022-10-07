@@ -134,13 +134,13 @@ Step 4: See Logs
    Host: localhost-shadow:8080
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-The above logs show that both the ``service2`` and ``service2-mirror`` services 
+The above logs show that both the ``service2`` and ``service2-mirror`` services
 got the request.
 
 You can also see that for the request to the ``service2-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
 hostname.
 
-If you do not specify the ``x-mirror-cluster`` in the request to ``service2``, 
+If you do not specify the ``x-mirror-cluster`` in the request to ``service2``,
 ``service2-mirror`` will not receive the request.
 
