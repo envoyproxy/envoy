@@ -4,7 +4,6 @@
 
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
-#include "envoy/http/message.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
@@ -32,7 +31,8 @@ public:
 class MetadataCredentialsProviderBase : public CredentialsProvider,
                                         public Logger::Loggable<Logger::Id::aws> {
 public:
-  using MetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
+  using MetadataFetcher = std::function<absl::optional<std::string>(
+      const std::string& host, const std::string& path, const std::string& auth_token)>;
 
   MetadataCredentialsProviderBase(Api::Api& api, const MetadataFetcher& metadata_fetcher)
       : api_(api), metadata_fetcher_(metadata_fetcher) {}
@@ -68,8 +68,6 @@ public:
 private:
   bool needsRefresh() override;
   void refresh() override;
-  void extractCredentials(const std::string& credential_document_value);
-  void fetchCredentialFromInstanceRole(const std::string& instance_role);
 };
 
 /**
@@ -92,7 +90,6 @@ private:
 
   bool needsRefresh() override;
   void refresh() override;
-  void extractCredentials(const std::string& credential_document_value);
 };
 
 /**

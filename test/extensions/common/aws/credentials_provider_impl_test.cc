@@ -62,70 +62,35 @@ TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
-public:
-  explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
-      : expected_headers_(expected_headers) {}
-
-  bool MatchAndExplain(Http::RequestMessage& message,
-                       testing::MatchResultListener* result_listener) const override {
-    const bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_headers_);
-    if (!equal) {
-      *result_listener << "\n"
-                       << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
-                       << expected_headers_
-                       << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
-                       << "\n"
-                       << message.headers()
-                       << TestUtility::addLeftAndRightPadding("") // line full of padding
-                       << "\n";
-    }
-    return equal;
-  }
-
-  void DescribeTo(::std::ostream* os) const override { *os << "Message matches"; }
-
-  void DescribeNegationTo(::std::ostream* os) const override { *os << "Message does not match"; }
-
-private:
-  const Http::TestRequestHeaderMapImpl expected_headers_;
-};
-
-testing::Matcher<Http::RequestMessage&>
-messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
-  return testing::MakeMatcher(new MessageMatcher(expected_headers));
-}
-
 class InstanceProfileCredentialsProviderTest : public testing::Test {
 public:
   InstanceProfileCredentialsProviderTest()
       : api_(Api::createApiForTest(time_system_)),
-        provider_(*api_, [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-          return this->fetch_metadata_.fetch(message);
-        }) {}
+        provider_(*api_,
+                  [this](const std::string& host, const std::string& path,
+                         const std::string& auth_token) -> absl::optional<std::string> {
+                    return this->fetcher_.fetch(host, path, auth_token);
+                  }) {}
 
   void expectCredentialListing(const absl::optional<std::string>& listing) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
+    EXPECT_CALL(fetcher_,
+                fetch("169.254.169.254:80", "/latest/meta-data/iam/security-credentials", _))
+        .WillOnce(Return(listing));
   }
 
   void expectDocument(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
-        {":authority", "169.254.169.254:80"},
-        {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
+    EXPECT_CALL(fetcher_,
+                fetch("169.254.169.254:80", "/latest/meta-data/iam/security-credentials/doc1", _))
+        .WillOnce(Return(document));
   }
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-  NiceMock<MockFetchMetadata> fetch_metadata_;
+  NiceMock<MockMetadataFetcher> fetcher_;
   InstanceProfileCredentialsProvider provider_;
 };
 
-TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListing) {
+TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentailListing) {
   expectCredentialListing(absl::optional<std::string>());
   const auto credentials = provider_.getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
@@ -230,8 +195,9 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         provider_(
             *api_,
-            [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-              return this->fetch_metadata_.fetch(message);
+            [this](const std::string& host, const std::string& path,
+                   const absl::optional<std::string>& auth_token) -> absl::optional<std::string> {
+              return this->fetcher_.fetch(host, path, auth_token);
             },
             "169.254.170.2:80/path/to/doc", "auth_token") {
     // Tue Jan  2 03:04:05 UTC 2018
@@ -239,16 +205,12 @@ public:
   }
 
   void expectDocument(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/path/to/doc"},
-                                           {":authority", "169.254.170.2:80"},
-                                           {":method", "GET"},
-                                           {"authorization", "auth_token"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
+    EXPECT_CALL(fetcher_, fetch("169.254.170.2:80", "/path/to/doc", _)).WillOnce(Return(document));
   }
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-  NiceMock<MockFetchMetadata> fetch_metadata_;
+  NiceMock<MockMetadataFetcher> fetcher_;
   TaskRoleCredentialsProvider provider_;
 };
 

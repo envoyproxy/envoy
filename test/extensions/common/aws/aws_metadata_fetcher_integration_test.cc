@@ -79,12 +79,9 @@ public:
 };
 
 TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
-  const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
-                                     lookupPort("listener_0"));
-  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-      {":path", "/"}, {":authority", authority}, {":method", "GET"}}};
-  Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
+  const auto response = Utility::metadataFetcher(endpoint, "", "");
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE", *response);
@@ -94,15 +91,9 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
 }
 
 TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
-  const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
-                                     lookupPort("listener_0"));
-  auto headers = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{":path", "/"},
-                                         {":authority", authority},
-                                         {":method", "GET"},
-                                         {"authorization", "AUTH_TOKEN"}}};
-  Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
+  const auto response = Utility::metadataFetcher(endpoint, "", "AUTH_TOKEN");
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
@@ -112,15 +103,9 @@ TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
 }
 
 TEST_F(AwsMetadataIntegrationTestSuccess, Redirect) {
-  const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
-                                     lookupPort("listener_0"));
-  auto headers = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{":path", "/redirect"},
-                                         {":authority", authority},
-                                         {":method", "GET"},
-                                         {"authorization", "AUTH_TOKEN"}}};
-  Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
+  const auto response = Utility::metadataFetcher(endpoint, "redirect", "AUTH_TOKEN");
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
@@ -139,17 +124,11 @@ public:
 };
 
 TEST_F(AwsMetadataIntegrationTestFailure, Failure) {
-  const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
-                                     lookupPort("listener_0"));
-  auto headers = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{":path", "/"},
-                                         {":authority", authority},
-                                         {":method", "GET"},
-                                         {"authorization", "AUTH_TOKEN"}}};
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
 
-  Http::RequestMessageImpl message(std::move(headers));
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::metadataFetcher(endpoint, "", "");
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());
@@ -169,19 +148,16 @@ public:
 };
 
 TEST_F(AwsMetadataIntegrationTestTimeout, Timeout) {
-  const auto authority = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
-                                     lookupPort("listener_0"));
-  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-      {":path", "/"}, {":authority", authority}, {":method", "GET"}}};
-  Http::RequestMessageImpl message(std::move(headers));
+  const auto endpoint = fmt::format("{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                                    lookupPort("listener_0"));
 
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::metadataFetcher(endpoint, "", "");
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());
 
-  // We do not check http.metadata_test.downstream_rq_completed value here because it's
+  // We do now check http.metadata_test.downstream_rq_completed value here because it's
   // behavior is different between Linux and Mac when Curl disconnects on timeout. On Mac it is
   // incremented, while on Linux it is not.
 
