@@ -529,12 +529,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   } else if (end_stream) {
     request_in_.finish();
 
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->RequestOutput(), data);
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
-
-    Buffer::OwnedImpl data;
-    readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
       ENVOY_STREAM_LOG(debug, "adding initial data during decodeHeaders, transcoded data size={}",
