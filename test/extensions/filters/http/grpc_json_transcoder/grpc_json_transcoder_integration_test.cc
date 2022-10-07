@@ -831,14 +831,14 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
       "{}");
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatchWrongBindingType) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, WrongBindingType) {
   HttpIntegrationTest::initialize();
-  // Http tempplate is "/shelves/{shelf}/books/{book.id}" and field "book.id" is int64.
+  // Http template is "/shelves/{shelf}/books/{book.id}" and field "book.id" is int64.
   // But path is "/shelves/456/books/abc" and the {book.id} segment is a string.
   // The request should be rejected with 400.
 
   // The bug reported in https://github.com/envoyproxy/envoy/issues/22926 is:
-  // if the reqeust body is not empty, the request is rejected as expected.
+  // if the request body is not empty, the request is rejected as expected.
   // Buf if the request body is empty, the request is not rejected, the book.id field is ignored.
 
   // This test to verify the bug has been fixed. The request in both cases should be rejected.
@@ -847,23 +847,19 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatchWrongBindingType) {
   testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
       Http::TestRequestHeaderMapImpl{
           {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
-      "{}",
-      {}, {}, Status(),
+      "{}", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
-      "book.id: invalid value \"abc\" for type TYPE_INT64",
-      false);
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false);
 
   // The request with an empty request body.
-  // The request is rejected in decodeHeaders so upstream connection is not expected
-  // so need to pass "expect_connection_to_upstream=false".
+  // The request is rejected in decodeHeaders so upstream connection is not created.
+  // Here we need to pass "expect_connection_to_upstream=false".
   testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
       Http::TestRequestHeaderMapImpl{
           {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
-      "",
-      {}, {}, Status(),
+      "", {}, {}, Status(),
       Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
-      "book.id: invalid value \"abc\" for type TYPE_INT64",
-      false, false, "", false);
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false, false, "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
