@@ -79,18 +79,13 @@ void TestRootContext::onQueueReady(uint32_t) {
   }
 }
 
-class TestCommonContext : public RootContext {
-public:
-  explicit TestCommonContext(uint32_t id, std::string_view root_id) : RootContext(id, root_id) {}
-};
-
 class DupReplyContext : public Context {
 public:
   explicit DupReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
 
 private:
-  TestCommonContext* root() { return static_cast<TestCommonContext*>(Context::root()); }
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
 };
 
 FilterDataStatus DupReplyContext::onRequestBody(size_t, bool) {
@@ -105,7 +100,7 @@ public:
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
 
 private:
-  TestCommonContext* root() { return static_cast<TestCommonContext*>(Context::root()); }
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
 };
 
 FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
@@ -116,10 +111,10 @@ FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
 }
 
 static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
-                                                       ROOT_FACTORY(TestCommonContext),
+                                                       ROOT_FACTORY(EnvoyRootContext),
                                                        "send local reply twice");
 static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicReplyContext),
-                                                         ROOT_FACTORY(TestCommonContext),
+                                                         ROOT_FACTORY(EnvoyRootContext),
                                                          "panic after sending local reply");
 
 END_WASM_PLUGIN
