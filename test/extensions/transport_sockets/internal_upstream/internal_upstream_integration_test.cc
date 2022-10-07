@@ -28,7 +28,7 @@ public:
   void setupBootstrapExtension(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
     if (buffer_size_specified_) {
-      config.mutable_buffer_size()->set_value(buffer_size_);
+      config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
     auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
     boostrap_extension->mutable_typed_config()->PackFrom(config);
