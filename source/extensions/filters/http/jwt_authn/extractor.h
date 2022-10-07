@@ -84,6 +84,13 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   /**
+   * Remove headers that configures to send JWT Claims.
+   * 
+   * @param headers is the http request headers.
+   */
+  virtual void sanitizeClaimHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
    * Create an instance of Extractor for a given config.
    * @param from_headers header location config.
    * @param from_params query param location config.
