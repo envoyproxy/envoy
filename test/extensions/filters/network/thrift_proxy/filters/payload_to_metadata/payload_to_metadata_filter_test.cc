@@ -221,6 +221,70 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(PayloadToMetadataTest, MatchFirstLayerNumber) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: first_field
+      id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "1"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapNumEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MatchSecondLayerNumber) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f1
+        id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", 1}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapNumEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+
 // TODO
 // multiple rule tests
 // num -> string
