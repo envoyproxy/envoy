@@ -381,7 +381,6 @@ request_rules:
 )EOF";
 
   const std::string value = "hello !!!!";
-  std::map<std::string, std::string> expected = {{"present", value}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
@@ -444,16 +443,13 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-
-  std::map<std::string, int> expected = {{"number", 1}};
-
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   Buffer::OwnedImpl data;
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, "1");
+  writeMessage(*metadata, data, "invalid");
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
   filter_->onDestroy();
@@ -531,8 +527,6 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "two"}};
-
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -562,8 +556,6 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
-
-  std::map<std::string, std::string> expected = {{"present", "two"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);

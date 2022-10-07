@@ -96,12 +96,12 @@ public:
   FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
                           int16_t& field_id) override;
   FilterStatus fieldEnd() override;
-  FilterStatus byteValue(uint8_t& value) override { return handleNumber(value); }
-  FilterStatus int16Value(int16_t& value) override { return handleNumber(value); }
-  FilterStatus int32Value(int32_t& value) override { return handleNumber(value); }
-  FilterStatus int64Value(int64_t& value) override { return handleNumber(value); }
-  FilterStatus doubleValue(double& value) override { return handleNumber(value); }
-  FilterStatus stringValue(absl::string_view value) override { return handleString(value); }
+  FilterStatus byteValue(uint8_t& value) override { return numberValue(value); }
+  FilterStatus int16Value(int16_t& value) override { return numberValue(value); }
+  FilterStatus int32Value(int32_t& value) override { return numberValue(value); }
+  FilterStatus int64Value(int64_t& value) override { return numberValue(value); }
+  FilterStatus doubleValue(double& value) override { return numberValue(value); }
+  FilterStatus stringValue(absl::string_view value) override;
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
@@ -112,12 +112,14 @@ public:
   bool isComplete() const { return complete_; };
 
 private:
-  template <typename NumberType> FilterStatus handleNumber(NumberType value);
-  FilterStatus handleString(absl::string_view value);
+  template <typename NumberType> FilterStatus numberValue(NumberType value);
+  FilterStatus handleString(std::string value);
 
   MetadataHandler& parent_;
   TrieSharedPtr node_;
   bool complete_{false};
+  absl::optional<int16_t> last_field_id_;
+  uint16_t steps_{0};
 };
 
 using TrieMatchHandlerPtr = std::unique_ptr<TrieMatchHandler>;

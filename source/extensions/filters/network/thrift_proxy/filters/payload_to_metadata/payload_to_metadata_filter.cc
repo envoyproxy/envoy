@@ -100,40 +100,64 @@ FilterStatus TrieMatchHandler::messageEnd() {
   return FilterStatus::Continue;
 }
 
-// TODO
 FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
-  ENVOY_LOG(trace, "TrieMatchHandler structBegin");
+  ENVOY_LOG(trace, "TrieMatchHandler structBegin id:{}",
+            last_field_id_.has_value() ? std::to_string(last_field_id_.value()) : "no_id");
+  ASSERT(node_);
+  if (last_field_id_.has_value()) {
+    if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end()) {
+      node_ = node_->children_[last_field_id_.value()];
+    } else {
+      steps_++;
+    }
+  }
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::structEnd() {
   ENVOY_LOG(trace, "TrieMatchHandler structEnd");
+  ASSERT(node_);
+  if (steps_ > 0) {
+    steps_--;
+  } else if (node_->parent_.lock()) {
+    node_ = node_->parent_.lock();
+  } else {
+    // last decoder event
+    node_ = nullptr;
+  }
   return FilterStatus::Continue;
 }
 
-FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType& field_type,
-                                          int16_t& field_id) {
-  ENVOY_LOG(trace, "TrieMatchHandler fieldBegin");
-  UNREFERENCED_PARAMETER(field_type);
-  UNREFERENCED_PARAMETER(field_id);
+FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType&, int16_t& field_id) {
+  last_field_id_ = field_id;
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::fieldEnd() {
-  ENVOY_LOG(trace, "TrieMatchHandler fieldEnd");
+  last_field_id_.reset();
   return FilterStatus::Continue;
 }
 
-// TODO
-template <typename NumberType> FilterStatus TrieMatchHandler::handleNumber(NumberType value) {
-  ENVOY_LOG(trace, "TrieMatchHandler handleNumber");
-  UNREFERENCED_PARAMETER(value);
-  return FilterStatus::Continue;
+FilterStatus TrieMatchHandler::stringValue(absl::string_view value) {
+  ASSERT(last_field_id_.has_value());
+  ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", last_field_id_.value(), value);
+  return handleString(static_cast<std::string>(value));
 }
 
-FilterStatus TrieMatchHandler::handleString(absl::string_view value) {
-  ENVOY_LOG(trace, "TrieMatchHandler handleString");
-  UNREFERENCED_PARAMETER(value);
+template <typename NumberType> FilterStatus TrieMatchHandler::numberValue(NumberType value) {
+  ASSERT(last_field_id_.has_value());
+  ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", last_field_id_.value(), value);
+  return handleString(std::to_string(value));
+}
+
+FilterStatus TrieMatchHandler::handleString(std::string value) {
+  ASSERT(node_);
+  ASSERT(last_field_id_.has_value());
+  if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end() &&
+      node_->children_[last_field_id_.value()]->rule_.has_value()) {
+    parent_.handleOnPresent(std::move(value),
+                            node_->children_[last_field_id_.value()]->rule_.value());
+  }
   return FilterStatus::Continue;
 }
 
@@ -143,17 +167,24 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value, const Rule& r
   if (matched_rule_ids_.find(rule.rule_id()) == matched_rule_ids_.end()) {
     return;
   }
+  ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule.rule_id());
   matched_rule_ids_.erase(rule.rule_id());
 
-  applyKeyValue(std::move(value), rule, rule.rule().on_present());
+  if (!value.empty() && rule.rule().has_on_present()) {
+    applyKeyValue(std::move(value), rule, rule.rule().on_present());
+  }
 }
 
 void PayloadToMetadataFilter::handleOnMissing() {
   ENVOY_LOG(trace, "{} rules missing", matched_rule_ids_.size());
+
   for (uint16_t rule_id : matched_rule_ids_) {
     ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
     ASSERT(rule_id < config_->requestRules().size());
     const Rule& rule = config_->requestRules()[rule_id];
+    if (!rule.rule().has_on_missing()) {
+      continue;
+    }
     applyKeyValue("", rule, rule.rule().on_missing());
   }
 }
@@ -174,6 +205,8 @@ bool PayloadToMetadataFilter::addMetadata(StructMap& map, const std::string& met
     ENVOY_LOG(debug, "metadata value is too long");
     return false;
   }
+
+  ENVOY_LOG(trace, "add metadata ns:{} key:{} value:{}", meta_namespace, key, value);
 
   // Sane enough, add the key/value.
   switch (type) {
@@ -219,9 +252,10 @@ void PayloadToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rul
   } else if (!keyval.value().empty()) {
     value = keyval.value();
   }
+
   if (!value.empty()) {
     const auto& nspace = decideNamespace(keyval.metadata_namespace());
-    addMetadata(structs_by_namespace, nspace, keyval.key(), value, keyval.type());
+    addMetadata(structs_by_namespace, nspace, keyval.key(), std::move(value), keyval.type());
   } else {
     ENVOY_LOG(debug, "value is empty, not adding metadata");
   }
