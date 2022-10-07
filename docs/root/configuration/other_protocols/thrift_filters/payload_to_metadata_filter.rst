@@ -25,6 +25,19 @@ is triggered when corresponding the payload is present. Otherwise, :ref:`on_miss
 <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_missing>`
 is triggered.
 
+Note that if the corresponding payload for a :ref:`rule
+<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule>`
+is present but :ref:`on_present
+<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_present>`
+is missing, no metadata is added. If the corresponding payload for a :ref:`rule
+<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule>`
+is an empty string, neither :ref:`on_present
+<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_present>`
+nor :ref:`on_missing
+<envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule.on_missing>`
+is triggered. i.e., no metadata is added for this :ref:`rule
+<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule>`
+
 This filter is designed to support payload passthrough. By performing payload to metadata filter
 can do deserialization once, and pass the metadata to other filters. This means that load balancing
 decisions, consumed from log and routing could all use payload information with a single parse.
