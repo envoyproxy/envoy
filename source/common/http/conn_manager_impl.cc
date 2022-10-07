@@ -1766,6 +1766,11 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   // Make sure to not check for deferred close as we'll be immediately creating a new stream.
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
+  auto oldAccount = response_encoder->getStream().account();
+  if (oldAccount != nullptr) {
+    oldAccount->clearDownstream();
+  }
+
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
