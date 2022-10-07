@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-envoy
     ports:
-    - "${PORT_PROXY:-8080}:8080"
+    - "${PORT_PROXY:-10000}:10000"
     depends_on:
       service1:
         condition: service_healthy
