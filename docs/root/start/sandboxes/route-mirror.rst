@@ -1,4 +1,4 @@
-.. _install_sandboxes_route_mirroring:
+.. _install_sandboxes_route_mirror:
 
 Route mirroring policies
 ========================
@@ -31,12 +31,12 @@ the request will be forwarded to the ``service2-mirror`` cluster.
 Step 1: Build the sandbox
 *************************
 
-Change to the ``examples/route-mirroring`` directory.
+Change to the ``examples/route-mirror`` directory.
 
 .. code-block:: console
 
     $ pwd
-    envoy/examples/route-mirroring
+    envoy/examples/route-mirror
     $ docker-compose build
     $ docker-compose up -d
 
@@ -51,17 +51,17 @@ Change to the ``examples/route-mirroring`` directory.
     NAME                                COMMAND                  SERVICE             STATUS              PORTS
     ---------------------------------------------------------------------------------------------------------------------------
 
-    route-mirroring-front-envoy-1       "/docker-entrypoint.…"   front-envoy         running             0.0.0.0:8001->8001/tcp,
+    route-mirror-front-envoy-1       "/docker-entrypoint.…"   front-envoy         running             0.0.0.0:8001->8001/tcp,
                                                                                                          :::8001->8001/tcp,
                                                                                                          0.0.0.0:8080->8080/tcp,
                                                                                                          :::8080->8080/tcp,
                                                                                                          0.0.0.0:8443->8443/tcp,
                                                                                                          :::8443->8443/tcp,
                                                                                                          10000/tcp
-    route-mirroring-service1-1          "/usr/local/bin/star…"   service1            running (healthy)
-    route-mirroring-service1-mirror-1   "/usr/local/bin/star…"   service1-mirror     running (healthy)
-    route-mirroring-service2-1          "/usr/local/bin/star…"   service2            running (healthy)
-    route-mirroring-service2-mirror-1   "/usr/local/bin/star…"   service2-mirror     running (healthy)
+    route-mirror-service1-1          "/usr/local/bin/star…"   service1            running (healthy)
+    route-mirror-service1-mirror-1   "/usr/local/bin/star…"   service1-mirror     running (healthy)
+    route-mirror-service2-1          "/usr/local/bin/star…"   service2            running (healthy)
+    route-mirror-service2-mirror-1   "/usr/local/bin/star…"   service2-mirror     running (healthy)
 
 Step 2: Demonstrate static mirror cluster name
 **********************************************
@@ -69,7 +69,7 @@ Step 2: Demonstrate static mirror cluster name
 .. code-block:: console
 
   $ pwd
-  envoy/examples/route-mirroring
+  envoy/examples/route-mirror
   $ curl localhost:8080/service/1
   Hello from behind Envoy (service 1)!
 
@@ -81,19 +81,19 @@ Step 3: See Logs
 
 .. code-block:: console
 
-   $ docker logs route-mirroring-service1-1
+   $ docker-compose logs service1
 
    ...
    Host: localhost:8080
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
-   $ docker logs route-mirroring-service1-mirror-1
+   $ docker-compose logs service1-mirror
 
    ...
    Host: localhost-shadow:8080
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
-The above logs from the ``service1`` and ``service1-mirror`` containers show that
+The above logs from the ``service1`` and ``service1-mirror`` services show that
 both the ``service1`` and ``service1-mirror`` services got the request.
 
 You can also see that for the request to the ``service1-mirror`` service, the
@@ -109,7 +109,7 @@ the cluster that envoy will mirror the request to.
 .. code-block:: console
 
   $ pwd
-  envoy/examples/route-mirroring
+  envoy/examples/route-mirror
   $ curl --header "x-mirror-cluster: service2-mirror" localhost:8080/service/2
   Hello from behind Envoy (service 2)!
 
@@ -122,23 +122,25 @@ Step 4: See Logs
 
 .. code-block:: console
 
-   $ docker logs route-mirroring-service2-1
+   $ docker-compose logs service2
 
    ...
    Host: localhost:8080
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-   $ docker logs route-mirroring-service2-mirror-1
+   $ docker-compose logs service2-mirror
 
    ...
    Host: localhost-shadow:8080
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
-The above logs from the ``service1`` and ``service1-mirror`` containers show that
-both the ``service1`` and ``service1-mirror`` services got the request.
+The above logs show that both the ``service2`` and ``service2-mirror`` services 
+got the request.
 
 You can also see that for the request to the ``service2-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
 hostname.
 
+If you do not specify the ``x-mirror-cluster`` in the request to ``service2``, 
+``service2-mirror`` will not receive the request.
 

@@ -70,7 +70,7 @@ The following sandboxes are available:
     rbac
     redis
     skywalking
-    route_mirroring
+    route-mirror
     tls-inspector
     tls-sni
     tls
