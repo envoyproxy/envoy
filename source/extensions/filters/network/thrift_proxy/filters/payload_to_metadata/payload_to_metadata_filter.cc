@@ -101,26 +101,38 @@ FilterStatus TrieMatchHandler::messageEnd() {
 }
 
 // TODO
-FilterStatus TrieMatchHandler::structBegin(absl::string_view) { return FilterStatus::Continue; }
+FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
+  ENVOY_LOG(trace, "TrieMatchHandler structBegin");
+  return FilterStatus::Continue;
+}
 
-FilterStatus TrieMatchHandler::structEnd() { return FilterStatus::Continue; }
+FilterStatus TrieMatchHandler::structEnd() {
+  ENVOY_LOG(trace, "TrieMatchHandler structEnd");
+  return FilterStatus::Continue;
+}
 
 FilterStatus TrieMatchHandler::fieldBegin(absl::string_view, FieldType& field_type,
                                           int16_t& field_id) {
+  ENVOY_LOG(trace, "TrieMatchHandler fieldBegin");
   UNREFERENCED_PARAMETER(field_type);
   UNREFERENCED_PARAMETER(field_id);
   return FilterStatus::Continue;
 }
 
-FilterStatus TrieMatchHandler::fieldEnd() { return FilterStatus::Continue; }
+FilterStatus TrieMatchHandler::fieldEnd() {
+  ENVOY_LOG(trace, "TrieMatchHandler fieldEnd");
+  return FilterStatus::Continue;
+}
 
 // TODO
 template <typename NumberType> FilterStatus TrieMatchHandler::handleNumber(NumberType value) {
+  ENVOY_LOG(trace, "TrieMatchHandler handleNumber");
   UNREFERENCED_PARAMETER(value);
   return FilterStatus::Continue;
 }
 
 FilterStatus TrieMatchHandler::handleString(absl::string_view value) {
+  ENVOY_LOG(trace, "TrieMatchHandler handleString");
   UNREFERENCED_PARAMETER(value);
   return FilterStatus::Continue;
 }

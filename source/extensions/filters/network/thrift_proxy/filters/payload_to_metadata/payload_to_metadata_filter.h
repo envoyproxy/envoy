@@ -85,7 +85,7 @@ public:
 
 class TrieMatchHandler : public DecoderCallbacks,
                          public PassThroughDecoderEventHandler,
-                         protected Logger::Loggable<Envoy::Logger::Id::main> {
+                         protected Logger::Loggable<Envoy::Logger::Id::thrift> {
 public:
   TrieMatchHandler(MetadataHandler& parent, TrieSharedPtr root) : parent_(parent), node_(root) {}
 
@@ -105,8 +105,8 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
-  bool passthroughEnabled() const override { return true; }
-  bool isRequest() const override { return false; }
+  bool passthroughEnabled() const override { return false; }
+  bool isRequest() const override { return true; }
   bool headerKeysPreserveCase() const override { return false; }
 
   bool isComplete() const { return complete_; };
@@ -126,7 +126,7 @@ const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
 
 class PayloadToMetadataFilter : public MetadataHandler,
                                 public ThriftProxy::ThriftFilters::PassThroughDecoderFilter,
-                                protected Logger::Loggable<Envoy::Logger::Id::main> {
+                                protected Logger::Loggable<Envoy::Logger::Id::thrift> {
 public:
   PayloadToMetadataFilter(const ConfigSharedPtr config);
 
