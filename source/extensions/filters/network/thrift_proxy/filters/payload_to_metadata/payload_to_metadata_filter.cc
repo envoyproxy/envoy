@@ -3,6 +3,13 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/regex.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -130,9 +137,11 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value, const Rule& r
 }
 
 void PayloadToMetadataFilter::handleOnMissing() {
-  for (uint16_t id : matched_rule_ids_) {
-    ASSERT(id < config_->requestRules().size());
-    const Rule& rule = config_->requestRules()[id];
+  ENVOY_LOG(trace, "{} rules missing", matched_rule_ids_.size());
+  for (uint16_t rule_id : matched_rule_ids_) {
+    ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
+    ASSERT(rule_id < config_->requestRules().size());
+    const Rule& rule = config_->requestRules()[rule_id];
     applyKeyValue("", rule, rule.rule().on_missing());
   }
 }

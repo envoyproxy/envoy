@@ -27,6 +27,8 @@ envoy_cc_library(
     hdrs = ["payload_to_metadata_filter.h"],
     deps = [
         "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/network/thrift_proxy:auto_protocol_lib",
+        "//source/extensions/filters/network/thrift_proxy:auto_transport_lib",
         "//source/extensions/filters/network/thrift_proxy:decoder_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3:pkg_cc_proto",
