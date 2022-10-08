@@ -1017,59 +1017,6 @@ request_rules:
   filter_->onDestroy();
 }
 
-TEST_F(PayloadToMetadataTest, MultipleRulesTest) {
-  const std::string request_config_yaml = R"EOF(
-request_rules:
-  - method_name: foo
-    field_selector:
-      name: second_field
-      id: 2
-    on_present:
-      metadata_namespace: envoy.lb
-      key: present
-  - method_name: bar
-    field_selector:
-      name: first_field
-      id: 1
-    on_present:
-      metadata_namespace: envoy.lb
-      key: method_not_match
-  - method_name: foo
-    field_selector:
-      name: third_field
-      id: 3
-      child:
-        name: f6
-        id: 6
-    on_present:
-      metadata_namespace: envoy.lb
-      key: six
-  - method_name: foo
-    field_selector:
-      name: third_field
-      id: 3
-      child:
-        name: f7
-        id: 7
-    on_present:
-      metadata_namespace: envoy.lb
-      key: seven
-)EOF";
-
-  std::map<std::string, std::string> expected = {{"present", "two"}, {"six", "6"}, {"seven", "seven"}};
-
-  initializeFilter(request_config_yaml);
-  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
-  filter_->onDestroy();
-}
-
 } // namespace PayloadToMetadataFilter
 } // namespace ThriftFilters
 } // namespace Extensions
