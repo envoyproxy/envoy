@@ -36,3 +36,37 @@ static_resources:
                   metadata_namespace: envoy.lb
                   key: default
                   value: 'unknown'
+  clusters:
+  - name: versioned-cluster
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    lb_subset_config:
+      fallback_policy: NO_FALLBACK
+      subset_selectors:
+        - keys:
+            - default
+        - keys:
+            - version
+    load_assignment:
+      cluster_name: versioned-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 19090
+          metadata:
+            filter_metadata:
+              envoy.lb:
+                default: "true"
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 19091
+          metadata:
+            filter_metadata:
+              envoy.lb:
+                version: "1.0"

@@ -68,6 +68,15 @@ absence of a version payload could be:
     :linenos:
     :caption: :download:`payload-to-metadata-filter.yaml <_include/payload-to-metadata-filter.yaml>`
 
+A corresponding upstream cluster configuration could be:
+
+.. literalinclude:: _include/header-to-metadata-filter.yaml
+    :language: yaml
+    :lines: 39-49
+    :lineno-start: 37
+    :linenos:
+    :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
+
 The request thrift structure could be:
 
 .. literalinclude:: _include/request.proto
