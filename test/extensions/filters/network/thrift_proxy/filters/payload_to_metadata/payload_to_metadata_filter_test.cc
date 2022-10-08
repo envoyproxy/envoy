@@ -70,7 +70,8 @@ public:
   //     f10: set
   //   }
   // }
-  void writeMessage(MessageMetadata& metadata, Buffer::Instance& buffer, std::string string_value = "two") {
+  void writeMessage(MessageMetadata& metadata, Buffer::Instance& buffer,
+                    std::string string_value = "two") {
     Buffer::OwnedImpl msg;
     ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
     metadata.setProtocol(protocol_);
@@ -146,8 +147,7 @@ public:
     proto->writeStructEnd(msg);
     proto->writeMessageEnd(msg);
 
-    TransportPtr transport =
-        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
   }
 
@@ -648,7 +648,7 @@ request_rules:
 
 // Test the invalid value won't get written as a number.
 TEST_F(PayloadToMetadataTest, BadNumberTypeTest) {
-    const std::string request_config_yaml = R"EOF(
+  const std::string request_config_yaml = R"EOF(
 request_rules:
   - method_name: foo
     field_selector:
@@ -1011,7 +1011,7 @@ request_rules:
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
 
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
-  writeMessage(*metadata, data,  std::string(length, 'x'));
+  writeMessage(*metadata, data, std::string(length, 'x'));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
   filter_->onDestroy();
@@ -1056,7 +1056,8 @@ request_rules:
       key: seven
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", "two"}, {"six", "6"}, {"seven", "seven"}};
+  std::map<std::string, std::string> expected = {
+      {"present", "two"}, {"six", "6"}, {"seven", "seven"}};
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));

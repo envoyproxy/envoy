@@ -170,14 +170,15 @@ void testForbiddenConfig(const std::string& yaml, const std::string& message) {
 // does not allow rule without either on_present or on_missing
 TEST(PayloadToMetadataFilterConfigTest, EmptyOnPresentOnMissing) {
   std::string yaml =
-R"EOF(
+      R"EOF(
 request_rules:
   - method_name: foo
     field_selector:
       name: info
       id: 2
   )EOF";
-  std::string error_message = "payload to metadata filter: neither `on_present` nor `on_missing` set";
+  std::string error_message =
+      "payload to metadata filter: neither `on_present` nor `on_missing` set";
 
   testForbiddenConfig(yaml, error_message);
 }
@@ -185,7 +186,7 @@ request_rules:
 // does not allow on_missing without value
 TEST(PayloadToMetadataFilterConfigTest, NoValueInOnMissing) {
   std::string yaml =
-R"EOF(
+      R"EOF(
 request_rules:
   - method_name: foo
     field_selector:
@@ -196,7 +197,8 @@ request_rules:
       key: foo
       type: STRING
   )EOF";
-  std::string error_message = "payload to metadata filter: cannot specify on_missing rule without non-empty value";
+  std::string error_message =
+      "payload to metadata filter: cannot specify on_missing rule without non-empty value";
 
   testForbiddenConfig(yaml, error_message);
 }
@@ -204,7 +206,7 @@ request_rules:
 // does not allow on_missing without value
 TEST(PayloadToMetadataFilterConfigTest, MultipleRulesWithSameFieldSelector) {
   std::string yaml =
-R"EOF(
+      R"EOF(
 request_rules:
   - method_name: foo
     field_selector:
