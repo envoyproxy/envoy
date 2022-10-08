@@ -240,7 +240,7 @@ request_rules:
   std::map<std::string, std::string> expected = {{"present", "1"}};
 
   initializeFilter(request_config_yaml);
-  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapNumEq(expected)));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   Buffer::OwnedImpl data;
@@ -251,7 +251,7 @@ request_rules:
   filter_->onDestroy();
 }
 
-TEST_F(PayloadToMetadataTest, MatchSecondLayerNumber) {
+TEST_F(PayloadToMetadataTest, MatchSecondLayerBool) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - method_name: foo
@@ -270,10 +270,10 @@ request_rules:
       value: unknown
 )EOF";
 
-  std::map<std::string, std::string> expected = {{"present", 1}};
+  std::map<std::string, std::string> expected = {{"present", "1"}};
 
   initializeFilter(request_config_yaml);
-  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapNumEq(expected)));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   Buffer::OwnedImpl data;
@@ -284,14 +284,170 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(PayloadToMetadataTest, MatchSecondLayerByte) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f2
+        id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
 
-// TODO
-// multiple rule tests
-// num -> string
-// num -> regex -> string
-// list < protobuf
-// list > protobuf
-// list is sibling of protobuf
+  std::map<std::string, std::string> expected = {{"present", "2"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MatchSecondLayerDouble) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f3
+        id: 3
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "3.000000"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MatchSecondLayerInt16) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f4
+        id: 4
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "4"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MatchSecondLayerInt32) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f5
+        id: 5
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "5"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MatchSecondLayerInt64) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: payload
+      id: 3
+      child:
+        name: f6
+        id: 6
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "6"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
 
 TEST_F(PayloadToMetadataTest, DefaultNamespaceTest) {
   const std::string request_config_yaml = R"EOF(
@@ -519,14 +675,240 @@ request_rules:
   filter_->onDestroy();
 }
 
+// Number to number test
+TEST_F(PayloadToMetadataTest, NumberToNumberType) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: first_field
+      id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: number
+      type: NUMBER
+)EOF";
+
+  std::map<std::string, int> expected = {{"number", 1}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data, "1");
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Number to number with regex test
+TEST_F(PayloadToMetadataTest, NumberToNumberTypeWithRegex) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: first_field
+      id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: number
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^(\\w+)$"
+        substitution: "91\\1 "
+      type: NUMBER
+)EOF";
+
+  std::map<std::string, int> expected = {{"number", 911}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data, "1");
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
 // Set configured value when payload is missing.
-TEST_F(PayloadToMetadataTest, SetMissingValueTest) {
+TEST_F(PayloadToMetadataTest, MissingValueInFirstLayer) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - method_name: foo
     field_selector:
       name: too_big
       id: 100
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Set configured value when payload is missing in the second layer.
+TEST_F(PayloadToMetadataTest, MissingValueInSecondLayer) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: too_big
+        id: 100
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Set configured value when payload is missing in the third layer.
+TEST_F(PayloadToMetadataTest, MissingValueInThirdLayer) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: f1
+        id: 1
+        child:
+          name: unknown
+          id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Perform on_missing while field selector points to a struct.
+TEST_F(PayloadToMetadataTest, FieldSelectorPointsToStruct) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Perform on_missing while field selector points to a map.
+TEST_F(PayloadToMetadataTest, FieldSelectorPointsToMap) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: f8
+        id: 8
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+  std::map<std::string, std::string> expected = {{"missing", "unknown"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// Set configured value when payload is missing in the second layer.
+TEST_F(PayloadToMetadataTest, Point) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: too_big
+        id: 100
     on_present:
       metadata_namespace: envoy.lb
       key: present
@@ -630,6 +1012,59 @@ request_rules:
 
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
   writeMessage(*metadata, data,  std::string(length, 'x'));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+TEST_F(PayloadToMetadataTest, MultipleRulesTest) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+  - method_name: bar
+    field_selector:
+      name: first_field
+      id: 1
+    on_present:
+      metadata_namespace: envoy.lb
+      key: method_not_match
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: f6
+        id: 6
+    on_present:
+      metadata_namespace: envoy.lb
+      key: six
+  - method_name: foo
+    field_selector:
+      name: third_field
+      id: 3
+      child:
+        name: f7
+        id: 7
+    on_present:
+      metadata_namespace: envoy.lb
+      key: seven
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "two"}, {"six", "6"}, {"seven", "seven"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
   filter_->onDestroy();

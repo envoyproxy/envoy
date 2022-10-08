@@ -39,7 +39,7 @@ request_rules:
     on_missing:
       metadata_namespace: envoy.lb
       key: default
-      value: 'unknown'
+      value: unknown
   )EOF";
 
   PayloadToMetadataProtoConfig proto_config;
@@ -71,7 +71,7 @@ request_rules:
     on_missing:
       metadata_namespace: envoy.lb
       key: default
-      value: 'unknown'
+      value: unknown
   )EOF";
 
   PayloadToMetadataProtoConfig proto_config;
@@ -97,7 +97,7 @@ request_rules:
     on_missing:
       metadata_namespace: envoy.lb
       key: default
-      value: 'unknown'
+      value: unknown
   )EOF";
 
   PayloadToMetadataProtoConfig proto_config;
@@ -149,7 +149,7 @@ request_rules:
     on_missing:
       metadata_namespace: envoy.lb
       key: default
-      value: 'unknown'
+      value: unknown
   )EOF";
 
   PayloadToMetadataProtoConfig proto_config;
@@ -193,10 +193,37 @@ request_rules:
       id: 2
     on_missing:
       metadata_namespace: envoy.lb
-      key: "foo"
+      key: foo
       type: STRING
   )EOF";
   std::string error_message = "payload to metadata filter: cannot specify on_missing rule without non-empty value";
+
+  testForbiddenConfig(yaml, error_message);
+}
+
+// does not allow on_missing without value
+TEST(PayloadToMetadataFilterConfigTest, MultipleRulesWithSameFieldSelector) {
+  std::string yaml =
+R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: info
+      id: 2
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: foo
+      value: unknown
+  - method_name: foo
+    field_selector:
+      name: info
+      id: 2
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: bar
+      value: unknown
+  )EOF";
+  std::string error_message = "payload to metadata filter: multiple rules with same field selector";
 
   testForbiddenConfig(yaml, error_message);
 }

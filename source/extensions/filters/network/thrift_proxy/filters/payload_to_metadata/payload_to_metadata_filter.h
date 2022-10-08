@@ -96,12 +96,21 @@ public:
   FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
                           int16_t& field_id) override;
   FilterStatus fieldEnd() override;
+  FilterStatus boolValue(bool& value) override { return numberValue(value); }
   FilterStatus byteValue(uint8_t& value) override { return numberValue(value); }
   FilterStatus int16Value(int16_t& value) override { return numberValue(value); }
   FilterStatus int32Value(int32_t& value) override { return numberValue(value); }
   FilterStatus int64Value(int64_t& value) override { return numberValue(value); }
   FilterStatus doubleValue(double& value) override { return numberValue(value); }
   FilterStatus stringValue(absl::string_view value) override;
+  FilterStatus mapBegin(FieldType&, FieldType&, uint32_t&) override {
+    return handleContainerBegin();
+  }
+  FilterStatus mapEnd() override { return handleContainerEnd(); }
+  FilterStatus listBegin(FieldType&, uint32_t&) override { return handleContainerBegin(); }
+  FilterStatus listEnd() override { return handleContainerEnd(); }
+  FilterStatus setBegin(FieldType&, uint32_t&) override { return handleContainerBegin(); }
+  FilterStatus setEnd() override { return handleContainerEnd(); }
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
@@ -114,6 +123,16 @@ public:
 private:
   template <typename NumberType> FilterStatus numberValue(NumberType value);
   FilterStatus handleString(std::string value);
+
+  FilterStatus handleContainerBegin() {
+    steps_++;
+    return FilterStatus::Continue;
+  }
+
+  FilterStatus handleContainerEnd() {
+    steps_--;
+    return FilterStatus::Continue;
+  }
 
   MetadataHandler& parent_;
   TrieSharedPtr node_;
@@ -151,16 +170,17 @@ private:
 
   // TODO(kuochunghsu): extract the metadata handling logic form header/payload to metadata filters.
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
-  bool addMetadata(StructMap&, const std::string&, const std::string&, std::string,
-                   ValueType) const;
-  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&) const;
+  bool addMetadata(const std::string&, const std::string&, std::string, ValueType);
+  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&);
   const std::string& decideNamespace(const std::string& nspace) const;
+  void setDynamicMetadata();
   const ConfigSharedPtr config_;
   absl::flat_hash_set<uint16_t> matched_rule_ids_;
   TrieMatchHandlerPtr handler_;
   TransportPtr transport_;
   ProtocolPtr protocol_;
   DecoderPtr decoder_;
+  StructMap structs_by_namespace_;
 };
 
 } // namespace PayloadToMetadataFilter

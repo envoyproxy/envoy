@@ -17,6 +17,8 @@ namespace ThriftFilters {
 namespace PayloadToMetadataFilter {
 
 using namespace Envoy::Extensions::NetworkFilters;
+using FieldSelector = envoy::extensions::filters::network::thrift_proxy::filters::
+    payload_to_metadata::v3::PayloadToMetadata::FieldSelector;
 
 Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters::
                    payload_to_metadata::v3::PayloadToMetadata& config) {
@@ -28,39 +30,39 @@ Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters:
 
 Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
     : rule_(rule), rule_id_(rule_id) {
-  if (!rule.has_on_present() && !rule.has_on_missing()) {
+  if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("payload to metadata filter: neither `on_present` nor `on_missing` set");
   }
 
-  if (rule.has_on_missing() && rule.on_missing().value().empty()) {
+  if (rule_.has_on_missing() && rule_.on_missing().value().empty()) {
     throw EnvoyException(
         "payload to metadata filter: cannot specify on_missing rule without non-empty value");
   }
 
-  if (rule.has_on_present() && rule.on_present().has_regex_value_rewrite()) {
-    const auto& rewrite_spec = rule.on_present().regex_value_rewrite();
+  if (rule_.has_on_present() && rule_.on_present().has_regex_value_rewrite()) {
+    const auto& rewrite_spec = rule_.on_present().regex_value_rewrite();
     regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
-  switch (rule.match_specifier_case()) {
+  switch (rule_.match_specifier_case()) {
   case ProtoRule::MatchSpecifierCase::kMethodName:
     match_type_ = MatchType::METHOD_NAME;
-    method_or_service_name_ = rule.method_name();
+    method_or_service_name_ = rule_.method_name();
     break;
   case ProtoRule::MatchSpecifierCase::kServiceName:
     match_type_ = MatchType::SERVICE_NAME;
-    if (!rule.service_name().empty() && !absl::EndsWith(rule.service_name(), ":")) {
-      method_or_service_name_ = rule.service_name() + ":";
+    if (!rule_.service_name().empty() && !absl::EndsWith(rule_.service_name(), ":")) {
+      method_or_service_name_ = rule_.service_name() + ":";
     } else {
-      method_or_service_name_ = rule.service_name();
+      method_or_service_name_ = rule_.service_name();
     }
     break;
   case ProtoRule::MatchSpecifierCase::MATCH_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  auto field_selector = rule.field_selector();
+  FieldSelector field_selector = rule_.field_selector();
   TrieSharedPtr node = root;
   while (true) {
     int16_t id = static_cast<int16_t>(field_selector.id().value());
@@ -75,10 +77,14 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
     // operation= hits protobuf compile-error on merging operand to the object,
     // so use Swap to prevent the merge.
-    auto child = field_selector.child();
+    FieldSelector child;
+    child.CopyFrom(field_selector.child());
     field_selector.Swap(&child);
   }
   ASSERT(node != root);
+  if (node->rule_.has_value()) {
+    throw EnvoyException("payload to metadata filter: multiple rules with same field selector");
+  }
   node->rule_ = *this;
 }
 
@@ -107,6 +113,7 @@ FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
   if (last_field_id_.has_value()) {
     if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end()) {
       node_ = node_->children_[last_field_id_.value()];
+      ENVOY_LOG(trace, "name: {}", node_->name_);
     } else {
       steps_++;
     }
@@ -155,8 +162,9 @@ FilterStatus TrieMatchHandler::handleString(std::string value) {
   ASSERT(last_field_id_.has_value());
   if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end() &&
       node_->children_[last_field_id_.value()]->rule_.has_value()) {
-    parent_.handleOnPresent(std::move(value),
-                            node_->children_[last_field_id_.value()]->rule_.value());
+    auto on_present_node = node_->children_[last_field_id_.value()];
+    ENVOY_LOG(trace, "name: {}", on_present_node->name_);
+    parent_.handleOnPresent(std::move(value), on_present_node->rule_.value());
   }
   return FilterStatus::Continue;
 }
@@ -194,9 +202,8 @@ const std::string& PayloadToMetadataFilter::decideNamespace(const std::string& n
   return nspace.empty() ? payloadToMetadata : nspace;
 }
 
-bool PayloadToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
-                                          const std::string& key, std::string value,
-                                          ValueType type) const {
+bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, const std::string& key,
+                                          std::string value, ValueType type) {
   ProtobufWkt::Value val;
   ASSERT(!value.empty());
 
@@ -229,10 +236,10 @@ bool PayloadToMetadataFilter::addMetadata(StructMap& map, const std::string& met
   }
 
   // Have we seen this namespace before?
-  auto namespace_iter = map.find(meta_namespace);
-  if (namespace_iter == map.end()) {
-    map[meta_namespace] = ProtobufWkt::Struct();
-    namespace_iter = map.find(meta_namespace);
+  auto namespace_iter = structs_by_namespace_.find(meta_namespace);
+  if (namespace_iter == structs_by_namespace_.end()) {
+    structs_by_namespace_[meta_namespace] = ProtobufWkt::Struct();
+    namespace_iter = structs_by_namespace_.find(meta_namespace);
   }
 
   auto& keyval = namespace_iter->second;
@@ -243,9 +250,7 @@ bool PayloadToMetadataFilter::addMetadata(StructMap& map, const std::string& met
 
 // add metadata['key']= value depending on payload present or missing case
 void PayloadToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
-                                            const KeyValuePair& keyval) const {
-  StructMap structs_by_namespace;
-
+                                            const KeyValuePair& keyval) {
   if (keyval.has_regex_value_rewrite()) {
     const auto& matcher = rule.regexRewrite();
     value = matcher->replaceAll(value, rule.regexSubstitution());
@@ -255,13 +260,15 @@ void PayloadToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rul
 
   if (!value.empty()) {
     const auto& nspace = decideNamespace(keyval.metadata_namespace());
-    addMetadata(structs_by_namespace, nspace, keyval.key(), std::move(value), keyval.type());
+    addMetadata(nspace, keyval.key(), std::move(value), keyval.type());
   } else {
     ENVOY_LOG(debug, "value is empty, not adding metadata");
   }
+}
 
-  if (!structs_by_namespace.empty()) {
-    for (auto const& entry : structs_by_namespace) {
+void PayloadToMetadataFilter::setDynamicMetadata() {
+  if (!structs_by_namespace_.empty()) {
+    for (auto const& entry : structs_by_namespace_) {
       decoder_callbacks_->streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }
@@ -289,6 +296,8 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
     bool underflow = false;
     decoder_->onData(data, underflow);
     ASSERT(handler_->isComplete() || underflow);
+
+    setDynamicMetadata();
   }
 
   return FilterStatus::Continue;
