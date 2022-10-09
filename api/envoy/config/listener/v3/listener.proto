@@ -39,16 +39,13 @@ message AdditionalAddress {
 
   // [#not-implemented-hide:]
   // Additional socket options that may not be present in Envoy source code or
-  // precompiled binaries. If not specified, the listener's
+  // precompiled binaries. If specified, this will override the
   // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
-  // will apply to this address.
-  repeated core.v3.SocketOption socket_options = 2;
-
-  // [#not-implemented-hide:]
-  // Indicate no any socket options apply to this address even the listener's
-  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
-  // has specified.
-  bool no_socket_options = 3;
+  // in the listener. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  core.v3.SocketOptionsOverride socket_options = 2;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
