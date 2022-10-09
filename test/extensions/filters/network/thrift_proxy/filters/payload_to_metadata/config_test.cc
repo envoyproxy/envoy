@@ -203,6 +203,7 @@ request_rules:
   testForbiddenConfig(yaml, error_message);
 }
 
+// TODO: allow this in a later commit.
 // does not allow on_missing without value
 TEST(PayloadToMetadataFilterConfigTest, MultipleRulesWithSameFieldSelector) {
   std::string yaml =

@@ -60,6 +60,7 @@ struct Trie {
   std::weak_ptr<Trie> parent_;
   // Field ID to payload node
   absl::node_hash_map<int16_t, TrieSharedPtr> children_;
+  // TODO in a later commit: std::vector<uint16_t> rule_ids_ to allow multiple rules in the same payload node.
   OptRef<Rule> rule_;
 };
 
