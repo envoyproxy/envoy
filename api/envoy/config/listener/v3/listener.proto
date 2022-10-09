@@ -42,7 +42,13 @@ message AdditionalAddress {
   // precompiled binaries. If not specified, the listener's
   // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
   // will apply to this address.
-  repeated core.SocketOption socket_options = 2;
+  repeated core.v3.SocketOption socket_options = 2;
+
+  // [#not-implemented-hide:]
+  // Indicate no any socket options apply to this address even the listener's
+  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  // has specified.
+  bool no_socket_options = 3;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
