@@ -47,11 +47,11 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
   switch (rule_.match_specifier_case()) {
   case ProtoRule::MatchSpecifierCase::kMethodName:
-    match_type_ = MatchType::METHOD_NAME;
+    match_type_ = MatchType::MethodName;
     method_or_service_name_ = rule_.method_name();
     break;
   case ProtoRule::MatchSpecifierCase::kServiceName:
-    match_type_ = MatchType::SERVICE_NAME;
+    match_type_ = MatchType::ServiceName;
     if (!rule_.service_name().empty() && !absl::EndsWith(rule_.service_name(), ":")) {
       method_or_service_name_ = rule_.service_name() + ":";
     } else {
@@ -89,11 +89,11 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 }
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
-  if (match_type_ == MatchType::METHOD_NAME) {
+  if (match_type_ == MatchType::MethodName) {
     return method_or_service_name_.empty() ||
            (metadata.hasMethodName() && metadata.methodName() == method_or_service_name_);
   }
-  ASSERT(match_type_ == MatchType::SERVICE_NAME);
+  ASSERT(match_type_ == MatchType::ServiceName);
   return method_or_service_name_.empty() ||
          (metadata.hasMethodName() &&
           absl::StartsWith(metadata.methodName(), method_or_service_name_));
@@ -172,11 +172,11 @@ FilterStatus TrieMatchHandler::handleString(std::string value) {
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
 void PayloadToMetadataFilter::handleOnPresent(std::string&& value, const Rule& rule) {
-  if (matched_rule_ids_.find(rule.rule_id()) == matched_rule_ids_.end()) {
+  if (matched_rule_ids_.find(rule.ruleId()) == matched_rule_ids_.end()) {
     return;
   }
-  ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule.rule_id());
-  matched_rule_ids_.erase(rule.rule_id());
+  ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule.ruleId());
+  matched_rule_ids_.erase(rule.ruleId());
 
   if (!value.empty() && rule.rule().has_on_present()) {
     applyKeyValue(std::move(value), rule, rule.rule().on_present());
@@ -277,7 +277,7 @@ void PayloadToMetadataFilter::setDynamicMetadata() {
 FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr metadata) {
   for (const auto& rule : config_->requestRules()) {
     if (rule.matches(*metadata)) {
-      matched_rule_ids_.insert(rule.rule_id());
+      matched_rule_ids_.insert(rule.ruleId());
     }
   }
 

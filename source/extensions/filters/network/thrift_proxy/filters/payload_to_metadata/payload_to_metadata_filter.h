@@ -36,13 +36,13 @@ public:
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
-  uint16_t rule_id() const { return rule_id_; }
+  uint16_t ruleId() const { return rule_id_; }
   bool matches(const ThriftProxy::MessageMetadata& metadata) const;
 
 private:
   enum class MatchType {
-    METHOD_NAME = 1,
-    SERVICE_NAME = 2,
+    MethodName = 1,
+    ServiceName = 2,
   };
   const ProtoRule rule_;
   Regex::CompiledMatcherPtr regex_rewrite_{};

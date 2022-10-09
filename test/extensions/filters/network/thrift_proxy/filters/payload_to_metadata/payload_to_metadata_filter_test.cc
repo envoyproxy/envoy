@@ -449,6 +449,36 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(PayloadToMetadataTest, DoNotMatchServiceName) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - service_name: unknown
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).Times(0);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
 TEST_F(PayloadToMetadataTest, DefaultNamespaceTest) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
@@ -899,7 +929,7 @@ request_rules:
 }
 
 // Set configured value when payload is missing in the second layer.
-TEST_F(PayloadToMetadataTest, Point) {
+TEST_F(PayloadToMetadataTest, PointToNonExistSecondLayer) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - method_name: foo
@@ -931,8 +961,8 @@ request_rules:
   filter_->onDestroy();
 }
 
-// Missing case is not executed when payload is present.
-TEST_F(PayloadToMetadataTest, NoMissingWhenPayloadIsPresent) {
+// on_missing is not executed when payload is present.
+TEST_F(PayloadToMetadataTest, NoApplyOnMissingWhenPayloadIsPresent) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - method_name: foo
@@ -944,6 +974,31 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
+// on_present is not executed when payload is missing.
+TEST_F(PayloadToMetadataTest, NoApplyOnPresentWhenPayloadIsPresent) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: too_big
+      id: 100
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+)EOF";
+
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -1056,12 +1111,11 @@ request_rules:
       key: seven
 )EOF";
 
-  // TODO in next diff: support multiple rules
-  // std::map<std::string, std::string> expected = {
-  //     {"present", "two"}, {"six", "6"}, {"seven", "seven"}};
+  std::map<std::string, std::string> expected = {
+      {"present", "two"}, {"six", "6"}, {"seven", "seven"}};
 
   initializeFilter(request_config_yaml);
-  // EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
   Buffer::OwnedImpl data;
