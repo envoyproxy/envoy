@@ -58,7 +58,8 @@ struct Trie {
   Trie(TrieSharedPtr parent = nullptr) : parent_(parent) {}
   absl::string_view name_;
   std::weak_ptr<Trie> parent_;
-  absl::node_hash_map<uint32_t, TrieSharedPtr> children_;
+  // Field ID to payload node
+  absl::node_hash_map<int16_t, TrieSharedPtr> children_;
   OptRef<Rule> rule_;
 };
 

@@ -25,7 +25,7 @@ Config::Config(const envoy::extensions::filters::network::thrift_proxy::filters:
   trie_root_ = std::make_shared<Trie>();
   request_rules_.reserve(config.request_rules().size());
   for (const auto& entry : config.request_rules()) {
-    request_rules_.emplace_back(entry, request_rules_.size(), trie_root_);
+    request_rules_.emplace_back(entry, static_cast<uint16_t>(request_rules_.size()), trie_root_);
   }
 }
 
