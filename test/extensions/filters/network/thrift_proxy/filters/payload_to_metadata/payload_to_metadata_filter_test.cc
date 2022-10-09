@@ -44,15 +44,20 @@ using namespace Envoy::Extensions::NetworkFilters;
 
 class PayloadToMetadataTest : public testing::Test {
 public:
-  void initializeFilter(const std::string& yaml) {
+  void initializeFilter(const std::string& yaml, bool expect_type_inquiry = true) {
     envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
         PayloadToMetadata proto_config;
     TestUtility::loadFromYaml(yaml, proto_config);
     const auto& filter_config = std::make_shared<Config>(proto_config);
     filter_ = std::make_shared<PayloadToMetadataFilter>(filter_config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).WillOnce(Return(transport_));
-    EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).WillOnce(Return(protocol_));
+    if (expect_type_inquiry) {
+      EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).WillOnce(Return(transport_));
+      EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).WillOnce(Return(protocol_));
+    } else {
+      EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).Times(0);
+      EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).Times(0);
+    }
   }
 
   // Request payload
@@ -465,9 +470,7 @@ request_rules:
       value: unknown
 )EOF";
 
-  initializeFilter(request_config_yaml);
-  EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).Times(0);
+  initializeFilter(request_config_yaml, false);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
