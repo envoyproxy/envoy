@@ -1298,7 +1298,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
   thread_local_wasm->start(plugin);
 }
 
-class WasmCommonContextTest : public Common::Wasm::WasmTestBase<
+class WasmCommonContextTest : public Common::Wasm::WasmHttpFilterTestBase<
                                   testing::TestWithParam<std::tuple<std::string, std::string>>> {
 public:
   WasmCommonContextTest() = default;
@@ -1312,16 +1312,10 @@ public:
               });
   }
 
-  void setupContext() {
-    context_ =
-        std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_handle_);
-    context_->onCreate();
-  }
+  void setupContext() { setupFilterBase<TestContext>(); }
 
   TestContext& rootContext() { return *static_cast<TestContext*>(root_context_); }
-  TestContext& context() { return *context_; }
-
-  std::unique_ptr<TestContext> context_;
+  TestContext& context() { return *static_cast<TestContext*>(context_.get()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
@@ -1399,43 +1393,8 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   root_context_->validateConfiguration("", plugin_);
 }
 
-class TestFilter : public Envoy::Extensions::Common::Wasm::Context {
-public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-      : Envoy::Extensions::Common::Wasm::Context(wasm, root_context_id, plugin_handle) {}
-  using ::Envoy::Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t, std::string_view message) override {
-    std::cerr << message << "\n";
-    return proxy_wasm::WasmResult::Ok;
-  }
-};
-
-class WasmCommonHttpContextTest
-    : public Common::Wasm::WasmHttpFilterTestBase<
-          testing::TestWithParam<std::tuple<std::string, std::string>>> {
-public:
-  WasmCommonHttpContextTest() = default;
-
-  void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
-    setRootId(root_id);
-    setVmConfiguration(vm_configuration);
-    setupBase(std::get<0>(GetParam()), code,
-              [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
-                return new NiceMock<TestContext>(wasm, plugin);
-              });
-  }
-  void setupFilter() { setupFilterBase<TestFilter>(); }
-
-  TestContext& rootContext() { return *static_cast<TestContext*>(root_context_); }
-
-  TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
-};
-
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonHttpContextTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
-
 // test that we don't send the local reply twice, even though it's specified in the wasm code
-TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
+TEST_P(WasmCommonContextTest, DuplicateLocalReply) {
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
@@ -1446,20 +1405,20 @@ TEST_P(WasmCommonHttpContextTest, DuplicateLocalReply) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "", "send local reply twice");
-  setupFilter();
+  setup(code, "context", "send local reply twice");
+  setupContext();
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce([this](Http::ResponseHeaderMap&, bool) { filter().onResponseHeaders(0, false); });
+      .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
   EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, _, testing::Eq("ok")));
 
   // Create in-VM context.
-  filter().onCreate();
-  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onRequestBody(0, false));
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
 }
 
 // test that we don't send the local reply twice when the wasm code panics
-TEST_P(WasmCommonHttpContextTest, LocalReplyWhenPanic) {
+TEST_P(WasmCommonContextTest, LocalReplyWhenPanic) {
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
@@ -1470,8 +1429,8 @@ TEST_P(WasmCommonHttpContextTest, LocalReplyWhenPanic) {
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "", "panic after sending local reply");
-  setupFilter();
+  setup(code, "context", "panic after sending local reply");
+  setupContext();
   // In the case of VM failure, failStream is called, so we need to make sure that we don't send the
   // local reply twice.
   EXPECT_CALL(decoder_callbacks_,
@@ -1480,8 +1439,8 @@ TEST_P(WasmCommonHttpContextTest, LocalReplyWhenPanic) {
                              testing::Eq("wasm_fail_stream")));
 
   // Create in-VM context.
-  filter().onCreate();
-  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onRequestBody(0, false));
+  context().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
 }
 
 } // namespace Wasm
