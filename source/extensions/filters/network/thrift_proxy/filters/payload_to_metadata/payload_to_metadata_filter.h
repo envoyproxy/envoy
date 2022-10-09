@@ -32,7 +32,7 @@ using TrieSharedPtr = std::shared_ptr<Trie>;
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, uint16_t id, TrieSharedPtr root);
+  Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
@@ -56,11 +56,12 @@ using PayloadToMetadataRules = std::vector<Rule>;
 
 struct Trie {
   Trie(TrieSharedPtr parent = nullptr) : parent_(parent) {}
-  absl::string_view name_;
+  std::string name_;
   std::weak_ptr<Trie> parent_;
   // Field ID to payload node
   absl::node_hash_map<int16_t, TrieSharedPtr> children_;
-  // TODO in a later commit: std::vector<uint16_t> rule_ids_ to allow multiple rules in the same payload node.
+  // TODO in a later commit: std::vector<uint16_t> rule_ids_ to allow multiple rules in the same
+  // payload node.
   OptRef<Rule> rule_;
 };
 

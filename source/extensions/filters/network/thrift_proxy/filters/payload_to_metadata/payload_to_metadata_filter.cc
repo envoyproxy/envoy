@@ -78,8 +78,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
     // operation= hits protobuf compile-error on merging operand to the object,
     // so use Swap to prevent the merge.
-    FieldSelector child;
-    child.CopyFrom(field_selector.child());
+    FieldSelector child = field_selector.child();
     field_selector.Swap(&child);
   }
   ASSERT(node != root);
@@ -109,7 +108,8 @@ FilterStatus TrieMatchHandler::messageEnd() {
 
 FilterStatus TrieMatchHandler::structBegin(absl::string_view) {
   ENVOY_LOG(trace, "TrieMatchHandler structBegin id:{}",
-            last_field_id_.has_value() ? std::to_string(last_field_id_.value()) : "no_id");
+            last_field_id_.has_value() ? std::to_string(last_field_id_.value())
+                                       : "top_level_struct");
   ASSERT(node_);
   if (last_field_id_.has_value()) {
     if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end()) {
