@@ -119,6 +119,16 @@ message TcpKeepalive {
 message ExtraSourceAddress {
   // The additional address to bind.
   SocketAddress address = 1 [(validate.rules).message = {required: true}];
+
+  // [#not-implemented-hide:]
+  oneof socket_options_specifier {
+    // [#not-implemented-hide:]
+    // Additional socket options that may not be present in Envoy source code or
+    // precompiled binaries. If no socket options specified, the BindConfig's
+    // :ref:`socket_options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
+    // will apply to this address.
+    repeated core.SocketOption socket_options = 2;
+  }
 }
 
 // [#next-free-field: 6]
