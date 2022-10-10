@@ -1638,6 +1638,9 @@ void Context::failStream(WasmStreamType stream_type) {
 WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                       Pairs additional_headers, uint32_t grpc_status,
                                       std::string_view details) {
+  // This flag is used to avoid calling sendLocalReply() twice, even if wasm code has this
+  // logic. We can't reuse "local_reply_sent_" here because it can't avoid calling nested
+  // sendLocalReply() during encodeHeaders().
   if (local_reply_hold_) {
     return WasmResult::BadArgument;
   }
@@ -1665,6 +1668,8 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
                                   modify_headers = std::move(modify_headers), grpc_status,
                                   details = StringUtil::replaceAllEmptySpace(
                                       absl::string_view(details.data(), details.size()))] {
+      // When the wasm vm fails, failStream() is called if the plugin is fail-closed, we need
+      // this flag to avoid calling sendLocalReply() twice.
       if (local_reply_sent_) {
         return;
       }
