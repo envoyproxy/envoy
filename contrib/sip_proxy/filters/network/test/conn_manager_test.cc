@@ -90,9 +90,17 @@ public:
 
     EXPECT_CALL(factory_context_, localInfo()).WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));
+
+    downstream_connection_infos_ = std::make_shared<DownstreamConnectionInfos>(thread_local_);
+    downstream_connection_infos_->init();
+
+    upstream_transaction_infos_ = std::make_shared<UpstreamTransactionInfos>(
+        thread_local_, static_cast<std::chrono::seconds>(2));
+    upstream_transaction_infos_->init();
+
     filter_ = std::make_unique<ConnectionManager>(
         *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
-        transaction_infos_, nullptr, nullptr);
+        transaction_infos_, downstream_connection_infos_, upstream_transaction_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -476,11 +484,14 @@ settings:
   NiceMock<Random::MockRandomGenerator> random_;
   std::unique_ptr<ConnectionManager> filter_;
   std::shared_ptr<Router::TransactionInfos> transaction_infos_;
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos_;
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
   MessageMetadataSharedPtr metadata_;
 
   NiceMock<Api::MockApi> api_;
   Thread::ThreadFactory& thread_factory_;
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 /*TEST_F(SipConnectionManagerTest, OnDataHandlesSipCall) {

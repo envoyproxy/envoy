@@ -152,8 +152,6 @@ route_config:
     route:
       cluster: "test"
 settings:
-  upstream_transactions:
-    enabled: true
   transaction_timeout: 32s
   local_services:
   - domain: pcsf-cfed.cncs.svc.cluster.local
@@ -291,8 +289,8 @@ TEST_F(SipDecoderTest, DecodeOK200) {
   buffer_.add(SIP_OK200_REGISTER);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -315,8 +313,8 @@ TEST_F(SipDecoderTest, DecodeOK200EmptyHeader) {
   buffer_.add(SIP_OK200_EMPTY_HEADER);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -339,8 +337,8 @@ TEST_F(SipDecoderTest, DecodeOK200DifferentHeaderFormats) {
   buffer_.add(SIP_OK200_DIFF_HEADER_FORMATS);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 
@@ -456,8 +454,8 @@ TEST_F(SipDecoderTest, DecodeFAILURE4XX) {
   buffer_.add(SIP_FAILURE4XX_FULL);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 

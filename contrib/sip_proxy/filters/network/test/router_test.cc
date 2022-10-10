@@ -64,8 +64,6 @@ public:
                route:
                 cluster: fake_cluster2
            settings:
-             upstream_transactions:
-               enabled: true
              transaction_timeout: 32s
              local_services:
              - domain: "pcsf-cfed.cncs.svc.cluster.local"
@@ -379,7 +377,14 @@ public:
 };
 
 // fixme - need to update once the feature is configurable
-TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
+/*TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
+  const std::string sip_protocol_options_yaml = R"EOF(
+        session_affinity: true
+        registration_affinity: true
+        upstream_transactions:
+          enabled: true
+)EOF";
+  initializeTrans(sip_protocol_options_yaml);
   initializeTrans();
   initializeRouter();
   initializeTransaction();
@@ -398,7 +403,7 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeader) {
 
   completeRequest();
   destroyRouter();
-}
+}*/
 
 TEST_F(SipRouterTest, CustomizedAffinity) {
   initializeTrans();

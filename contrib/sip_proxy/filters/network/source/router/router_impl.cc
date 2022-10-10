@@ -196,7 +196,7 @@ FilterStatus Router::handleAffinity() {
   }
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && options_->upstreamTransactionsEnabled()) {
+  if (!metadata->destination().empty()) {
     ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
