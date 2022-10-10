@@ -118,7 +118,6 @@ TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
   Stats::TestUtil::TestSymbolTable symbol_table;
   ContextImpl context(*symbol_table);
   absl::optional<Context::RequestStatNames> request_names;
-  std::unique_ptr<std::string> service_name_without_dots_;
   request_names = context.resolveDynamicServiceAndMethodWithDotReplaced(path);
   EXPECT_TRUE(request_names);
   EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicSavedName>(request_names->service_));

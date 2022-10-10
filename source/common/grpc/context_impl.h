@@ -58,7 +58,7 @@ public:
    * service name if there are any.
    * @param path supplies the :path header.
    * @return if both gRPC serve and method have been resolved successfully returns
-   *   a populated RequestStatNames and an unique_ptr, otherwise returns an empty optional.
+   *   a populated RequestStatNames, otherwise returns an empty optional.
    */
   absl::optional<RequestStatNames>
   resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) override;
