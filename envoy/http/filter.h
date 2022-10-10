@@ -519,7 +519,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -949,7 +949,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
