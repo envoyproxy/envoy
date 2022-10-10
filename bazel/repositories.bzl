@@ -1240,7 +1240,7 @@ filegroup(
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during interation tests.
+    # during integration tests.
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,

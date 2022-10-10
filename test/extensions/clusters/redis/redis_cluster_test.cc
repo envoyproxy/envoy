@@ -21,7 +21,6 @@
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
@@ -77,7 +76,7 @@ public:
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string&, const std::string&) override {
+         Stats::Scope&, const std::string&, const std::string&, bool) override {
     EXPECT_EQ(22120, host->address()->ip()->port());
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
         create_(host->address()->asString())};
@@ -99,14 +98,13 @@ protected:
 
   void setupFromV3Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
-    NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
+        stats_store_, validation_visitor_);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
@@ -116,8 +114,8 @@ protected:
         server_context_, cluster_config,
         TestUtility::downcastAndValidate<
             const envoy::extensions::clusters::redis::v3::RedisClusterConfig&>(config),
-        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false,
-        cluster_callback_);
+        *this, server_context_.cluster_manager_, runtime_, *api_, dns_resolver_, factory_context,
+        std::move(scope), false, cluster_callback_);
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
@@ -128,14 +126,13 @@ protected:
   }
 
   void setupFactoryFromV3Yaml(const std::string& yaml) {
-    NiceMock<Upstream::MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
+        stats_store_, validation_visitor_);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
@@ -145,8 +142,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, cm, stats_store_, std::move(dns_resolver_), ssl_context_manager_,
-        std::move(outlier_event_logger), false, validation_visitor_);
+        server_context_, server_context_.cluster_manager_, stats_store_, std::move(dns_resolver_),
+        ssl_context_manager_, std::move(outlier_event_logger), false, validation_visitor_);
 
     RedisClusterFactory factory = RedisClusterFactory();
     factory.createClusterWithConfig(server_context_, cluster_config, config,
@@ -168,7 +165,7 @@ protected:
   }
 
   void expectRedisSessionCreated() {
-    resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     EXPECT_CALL(*resolve_timer_, disableTimer());
     ON_CALL(random_, random()).WillByDefault(Return(0));
   }
@@ -632,7 +629,7 @@ protected:
   }
 
   void exerciseStubs() {
-    EXPECT_CALL(dispatcher_, createTimer_(_));
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_));
     RedisCluster::RedisDiscoverySession discovery_session(*cluster_, *this);
     EXPECT_FALSE(discovery_session.enableHashtagging());
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
@@ -667,18 +664,12 @@ protected:
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
-  Server::MockOptions options_;
   std::shared_ptr<Upstream::MockClusterMockPrioritySet> hosts_;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* interval_timer_{};
@@ -938,7 +929,7 @@ TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaFailure) {
 }
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
-  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&server_context_.dispatcher_);
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));
@@ -962,7 +953,7 @@ TEST_F(RedisClusterTest, EmptyDnsResponse) {
 }
 
 TEST_F(RedisClusterTest, FailedDnsResponse) {
-  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  Event::MockTimer* dns_timer = new NiceMock<Event::MockTimer>(&server_context_.dispatcher_);
   setupFromV3Yaml(BasicConfig);
   const std::list<std::string> resolved_addresses{};
   EXPECT_CALL(*dns_timer, enableTimer(_, _));

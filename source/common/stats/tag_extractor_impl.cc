@@ -90,7 +90,7 @@ TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl:
     : TagExtractorImplBase(name, regex, substr),
       regex_(Regex::Utility::parseStdRegex(std::string(regex))) {}
 
-std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
+std::string& TagExtractorImplBase::addTagReturningValueRef(std::vector<Tag>& tags) const {
   tags.emplace_back();
   Tag& tag = tags.back();
   tag.name_ = name_;
@@ -121,7 +121,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
     // from the string but also not necessary in the tag value ("." for example). If there is no
     // second submatch, then the value_subexpr is the same as the remove_subexpr.
     const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
-    addTag(tags) = value_subexpr.str();
+    addTagReturningValueRef(tags) = value_subexpr.str();
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
@@ -169,7 +169,7 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
     }
 
     if (negative_match_.empty() || negative_match_ != value_subexpr) {
-      addTag(tags) = std::string(value_subexpr);
+      addTagReturningValueRef(tags) = std::string(value_subexpr);
 
       // Determines which characters to remove from stat_name to elide remove_subexpr.
       std::string::size_type start = remove_subexpr.data() - stat_name.data();
@@ -242,7 +242,7 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTag(tags) = std::string(tag_value);
+  addTagReturningValueRef(tags) = std::string(tag_value);
   remove_characters.insert(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);
@@ -292,6 +292,15 @@ bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& in
     }
   }
   return pattern_index == tokens_.size() && input_index == input_tokens.size();
+}
+
+TagExtractorFixedImpl::TagExtractorFixedImpl(absl::string_view name, absl::string_view value)
+    : TagExtractorImplBase(name, value), value_(std::string(value)) {}
+
+bool TagExtractorFixedImpl::extractTag(TagExtractionContext&, std::vector<Tag>& tags,
+                                       IntervalSet<size_t>&) const {
+  addTagReturningValueRef(tags) = value_;
+  return true;
 }
 
 } // namespace Stats

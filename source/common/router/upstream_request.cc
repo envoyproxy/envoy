@@ -142,7 +142,7 @@ void UpstreamRequest::cleanUp() {
 
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
-                                                     Tracing::EgressConfig::get());
+                                                     parent_.callbacks()->tracingConfig());
   }
 
   if (per_try_timeout_ != nullptr) {

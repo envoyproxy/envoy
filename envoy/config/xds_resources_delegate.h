@@ -1,12 +1,15 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -67,6 +70,18 @@ public:
    */
   virtual void onConfigUpdated(const XdsSourceId& source_id,
                                const std::vector<DecodedResourceRef>& resources) PURE;
+
+  /**
+   * Invoked when loading a resource obtained from the getResources() call resulted in a failure.
+   * This would typically happen when there is a parsing or validation error on the xDS resource
+   * protocol buffer.
+   *
+   * @param source_id The xDS source for the requested resource.
+   * @param resource_name The name of the resource.
+   * @param exception The exception that occurred, if any.
+   */
+  virtual void onResourceLoadFailed(const XdsSourceId& source_id, const std::string& resource_name,
+                                    const absl::optional<EnvoyException>& exception) PURE;
 };
 
 using XdsResourcesDelegatePtr = std::unique_ptr<XdsResourcesDelegate>;
@@ -84,14 +99,15 @@ public:
    * @param config Configuration of the XdsResourcesDelegate to create.
    * @param validation_visitor Validates the configuration.
    * @param api The APIs that can be used by the delegate.
+   * @param dispatcher The dispatcher for the thread.
    * @return The created XdsResourcesDelegate instance
    */
   virtual XdsResourcesDelegatePtr
   createXdsResourcesDelegate(const ProtobufWkt::Any& config,
-                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                             Api::Api& api) PURE;
+                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                             Event::Dispatcher& dispatcher) PURE;
 
-  std::string category() const override { return "envoy.config.xds"; }
+  std::string category() const override { return "envoy.xds_delegates"; }
 };
 
 } // namespace Config
