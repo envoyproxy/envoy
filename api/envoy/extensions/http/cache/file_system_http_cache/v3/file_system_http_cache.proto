@@ -25,8 +25,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Configuration for a cache implementation that caches in the local filesystem.
 //
 // By default this cache uses a least-recently-used eviction strategy.
-//
-// Used in the ``typed_config`` field of ``envoy.extensions.filters.http.cache.v3.CacheConfig``.
 // [#next-free-field: 7]
 message FileSystemHttpCacheConfig {
   // Configuration of a manager for how the file system is used asynchronously.
