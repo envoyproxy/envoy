@@ -8,12 +8,11 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/factory_context.h"
-#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/http/matching/inputs.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/http/custom_response/response.h"
+#include "source/extensions/filters/http/custom_response/policy.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -22,20 +21,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
-
-/**
- * All stats for the custom response filter. @see stats_macros.h
- */
-#define ALL_CUSTOM_RESPONSE_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)        \
-  COUNTER(custom_response_redirect_no_route)                                                       \
-  COUNTER(custom_response_redirect_invalid_uri)
-
-/**
- * Wrapper struct for stats. @see stats_macros.h
- */
-MAKE_STAT_NAMES_STRUCT(CustomResponseFilterStatNames, ALL_CUSTOM_RESPONSE_FILTER_STATS);
-MAKE_STATS_STRUCT(CustomResponseFilterStats, CustomResponseFilterStatNames,
-                  ALL_CUSTOM_RESPONSE_FILTER_STATS);
 
 /**
  * Container class to store filter configuration, which includes custom
@@ -48,13 +33,12 @@ public:
       const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
       Server::Configuration::ServerFactoryContext& context);
 
-  ResponseSharedPtr getResponse(Http::ResponseHeaderMap& headers,
-                                const StreamInfo::StreamInfo& stream_info) const;
+  PolicySharedPtr getPolicy(Http::ResponseHeaderMap& headers,
+                            const StreamInfo::StreamInfo& stream_info) const;
 
   virtual ~FilterConfigBase() = default;
 
 protected:
-  absl::flat_hash_map<absl::string_view, ResponseSharedPtr> responses_;
   Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
 };
 
@@ -63,13 +47,10 @@ public:
   FilterConfig(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
                Stats::StatName prefix, Server::Configuration::FactoryContext& context);
 
-  CustomResponseFilterStats& stats() { return stats_; }
-
   ~FilterConfig() override = default;
 
 private:
-  CustomResponseFilterStatNames stat_names_;
-  CustomResponseFilterStats stats_;
+  Stats::StatName stats_prefix_;
 };
 
 class FilterConfigPerRoute : public FilterConfigBase, public Router::RouteSpecificFilterConfig {

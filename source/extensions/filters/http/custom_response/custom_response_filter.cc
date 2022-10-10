@@ -13,22 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-namespace {
-bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
-                  OptRef<const Network::Connection> connection) {
-  if (downstream_headers.getSchemeValue() == Http::Headers::get().SchemeValues.Http) {
-    return true;
-  }
-  if (connection.has_value() && !connection->ssl()) {
-    return true;
-  }
-  return false;
-}
-} // namespace
-
 Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeaderMap& header_map,
                                                               bool) {
-  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
+  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");
   if (!filter_state) {
     downstream_headers_ = &header_map;
@@ -41,127 +28,24 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
 }
 
 Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
-                                                              bool) {
+                                                              bool end_stream) {
   // If filter state for custom response exists, it means this response is a
   // custom response. Apply the custom response mutations to the response from
   // the remote source and return.
-  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Response>(
+  auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");
   if (filter_state) {
-    // Apply mutations if this is a non-error response. Else leave be.
-    auto const cr_code = Http::Utility::getResponseStatusOrNullopt(headers);
-    if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
-      return Http::FilterHeadersStatus::Continue;
-    }
-    filter_state->mutateHeaders(headers, encoder_callbacks_->streamInfo());
-    if (filter_state->statusCode().has_value()) {
-      auto const code = *filter_state->statusCode();
-      headers.setStatus(std::to_string(enumToInt(code)));
-      encoder_callbacks_->streamInfo().setResponseCode(static_cast<uint32_t>(code));
-    }
-    return Http::FilterHeadersStatus::Continue;
+    return filter_state->encodeHeaders(headers, end_stream, *this);
   }
 
-  auto custom_response = base_config_->getResponse(headers, encoder_callbacks_->streamInfo());
+  auto policy = base_config_->getPolicy(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
-  if (!custom_response) {
+  if (!policy) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Handle remote body
-  if (custom_response->isRemote()) {
-    // Modify the request headers & recreate stream.
-
-    // downstream_headers_ can be null if sendLocalReply was called during
-    // decodeHeaders of a previous filter. In that case just continue, as Custom
-    // Response is not compatible with sendLocalReply.
-    if (downstream_headers_ == nullptr) {
-      return Http::FilterHeadersStatus::Continue;
-    }
-
-    auto& remote_data_source = custom_response->remoteDataSource();
-    if (!remote_data_source.has_value()) {
-      ENVOY_LOG(trace, "RemoteDataSource is empty");
-      config_->stats().custom_response_redirect_invalid_uri_.inc();
-      return Http::FilterHeadersStatus::Continue;
-    }
-    Http::Utility::Url absolute_url;
-    if (!absolute_url.initialize(remote_data_source->uri(), false)) {
-      ENVOY_LOG(trace, "Redirect for custom response failed: invalid location {}",
-                remote_data_source->uri());
-      config_->stats().custom_response_redirect_invalid_uri_.inc();
-      return Http::FilterHeadersStatus::Continue;
-    }
-    // Don't change the scheme from the original request
-    const bool scheme_is_http =
-        schemeIsHttp(*downstream_headers_, decoder_callbacks_->connection());
-
-    // Cache original host and path
-    const std::string original_host(downstream_headers_->getHostValue());
-    const std::string original_path(downstream_headers_->getPathValue());
-    const bool scheme_is_set = (downstream_headers_->Scheme() != nullptr);
-    Cleanup restore_original_headers([this, original_host, original_path, scheme_is_set,
-                                      scheme_is_http]() {
-      downstream_headers_->setHost(original_host);
-      downstream_headers_->setPath(original_path);
-      if (scheme_is_set) {
-        downstream_headers_->setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                                      : Http::Headers::get().SchemeValues.Https);
-      }
-    });
-
-    // Replace the original host, scheme and path.
-    downstream_headers_->setScheme(absolute_url.scheme());
-    downstream_headers_->setHost(absolute_url.hostAndPort());
-
-    auto path_and_query = absolute_url.pathAndQueryParams();
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_reject_path_with_fragment")) {
-      // Envoy treats internal redirect as a new request and will reject it if URI path
-      // contains #fragment. However the Location header is allowed to have #fragment in URI path.
-      // To prevent Envoy from rejecting internal redirect, strip the #fragment from Location URI if
-      // it is present.
-      auto fragment_pos = path_and_query.find('#');
-      path_and_query = path_and_query.substr(0, fragment_pos);
-    }
-    downstream_headers_->setPath(path_and_query);
-
-    if (decoder_callbacks_->downstreamCallbacks()) {
-      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
-    }
-    const auto route = decoder_callbacks_->route();
-    // Don't allow a redirect to a non existing route.
-    if (!route) {
-      config_->stats().custom_response_redirect_no_route_.inc();
-      ENVOY_LOG(trace, "Redirect for custom response failed: no route found");
-      return Http::FilterHeadersStatus::Continue;
-    }
-    downstream_headers_->setMethod(Http::Headers::get().MethodValues.Get);
-    downstream_headers_->remove(Http::Headers::get().ContentLength);
-    encoder_callbacks_->streamInfo().filterState()->setData(
-        "envoy.filters.http.custom_response", custom_response,
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
-    restore_original_headers.cancel();
-    decoder_callbacks_->recreateStream(nullptr);
-
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
-  // Handle local body
-  std::string body;
-  Http::Code code = custom_response->getStatusCodeForLocalReply(headers);
-  if (encoder_callbacks_->streamInfo().getRequestHeaders() != nullptr) {
-    custom_response->formatBody(*encoder_callbacks_->streamInfo().getRequestHeaders(), headers,
-                                encoder_callbacks_->streamInfo(), body);
-  }
-
-  const auto mutate_headers = [custom_response = custom_response,
-                               this](Http::ResponseHeaderMap& headers) {
-    custom_response->mutateHeaders(headers, encoder_callbacks_->streamInfo());
-  };
-  encoder_callbacks_->sendLocalReply(code, body, mutate_headers, absl::nullopt, "");
-  return Http::FilterHeadersStatus::StopIteration;
+  return policy->encodeHeaders(headers, end_stream, *this);
 }
 
 } // namespace CustomResponse

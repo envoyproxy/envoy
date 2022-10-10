@@ -30,13 +30,14 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
+  Http::RequestHeaderMap* downstreamHeaders() { return downstream_headers_; }
+  Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
+  Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
+
   ~CustomResponseFilter() override = default;
 
   CustomResponseFilter(std::shared_ptr<FilterConfig> config)
       : config_{std::move(config)}, base_config_{config_.get()} {}
-
-  void onRemoteResponse(Http::ResponseHeaderMap& headers, const ResponseSharedPtr& custom_response,
-                        const Http::ResponseMessage* response);
 
 private:
   std::shared_ptr<FilterConfig> config_;
