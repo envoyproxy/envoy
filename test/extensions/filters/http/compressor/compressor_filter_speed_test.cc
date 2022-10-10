@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
@@ -155,35 +153,11 @@ CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats
   return config;
 }
 
-static uint64_t TestDataSize = 122880;
+static constexpr uint64_t TestDataSize = 122880;
 
 Buffer::OwnedImpl generateTestData() {
   Buffer::OwnedImpl data;
-  std::string filename = std::to_string(TestDataSize) + ".data";
-  std::ifstream input_file(filename, std::ios::in | std::ios::binary);
-  if (!input_file) {
-    printf("Failed to find data file: %s\n", filename.c_str());
-    TestUtility::feedBufferWithRandomCharacters(data, TestDataSize);
-
-    std::ofstream output_file(filename, std::ios::trunc);
-    if (!output_file.is_open()) {
-      printf("Error create file: %s\n", filename.c_str());
-    }
-    output_file << data.toString();
-    output_file.close();
-  } else {
-    std::stringstream buf;
-    buf << input_file.rdbuf();
-    input_file.close();
-    data.add(absl::string_view(buf.str()));
-
-    TestDataSize = data.length();
-#ifdef WIN32
-    printf("TestDataSize: %lld\n", TestDataSize);
-#else
-    printf("TestDataSize: %ld\n", TestDataSize);
-#endif
-  }
+  TestUtility::feedBufferWithRandomCharacters(data, TestDataSize);
   return data;
 }
 
