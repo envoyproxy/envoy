@@ -173,13 +173,13 @@ ConnectionManager::~ConnectionManager() { ENVOY_LOG(debug, "Destroying connectio
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
   if (settings()->upstreamTransactionsEnabled()) {
-    createNewDownstreamConnection();
+    storeDownstreamConnectionInCache();
   }
   ENVOY_LOG(debug, "Creating connection manager");
   return Network::FilterStatus::Continue;
 }
 
-void ConnectionManager::createNewDownstreamConnection() {
+void ConnectionManager::storeDownstreamConnectionInCache() {
   std::string thread_id = Utility::threadId(context_);
   std::string downstream_conn_id =
       read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
@@ -187,9 +187,9 @@ void ConnectionManager::createNewDownstreamConnection() {
   local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
   downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
 
-  ENVOY_LOG(info, "Created downstream connection with thread_id={}, downstream_connection_id={}",
+  ENVOY_LOG(info, "Cached downstream connection with thread_id={}, downstream_connection_id={}",
             thread_id, downstream_conn_id);
-  ENVOY_LOG(debug, "Number of downstream connections={}", downstream_connection_infos_->size());
+  ENVOY_LOG(trace, "Number of downstream connections={}", downstream_connection_infos_->size());
 }
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
@@ -378,7 +378,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  if (!metadata->validate(settings()->traServiceConfig().has_grpc_service())) {
+  if (!metadata->isValid(settings()->traServiceConfig().has_grpc_service())) {
     ENVOY_LOG(error, "Invalid message received. Dropping message.");
     return nullptr;
   }
@@ -709,10 +709,6 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
   }
 
   try {
-    if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
-      throw EnvoyException("Downstream connection is closed");
-    }
-
     Buffer::OwnedImpl buffer;
     std::unique_ptr<Encoder> encoder = std::make_unique<EncoderImpl>();
     encoder->encode(metadata, buffer);
@@ -723,12 +719,7 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     parent_.read_callbacks_->connection().write(buffer, false);
 
     return SipFilters::ResponseStatus::Complete;
-  } catch (const AppException& ex) {
-    ENVOY_LOG(error, "SIP response application error: {}", ex.what());
-    // Until deciding what local replies to send, none will be sent
-    // sendLocalReply(ex, false);
-    return SipFilters::ResponseStatus::Reset;
-  } catch (const EnvoyException& ex) {
+   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "SIP response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
     onError(ex.what());
@@ -784,7 +775,7 @@ void DownstreamConnectionInfos::init() {
   std::weak_ptr<DownstreamConnectionInfos> this_weak_ptr = this->shared_from_this();
   tls_->set(
       [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        UNREFERENCED_PARAMETER(dispatcher); // todo
+        UNREFERENCED_PARAMETER(dispatcher);
         if (auto this_shared_ptr = this_weak_ptr.lock()) {
           return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
         }
@@ -798,7 +789,7 @@ void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
     return;
   }
 
-  ENVOY_LOG(debug, "Insert into Downstream connection map {}", conn_id);
+  ENVOY_LOG(trace, "Insert into Downstream connection map {}", conn_id);
 
   tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
       std::make_pair(conn_id, std::make_shared<ConnectionManager::DownstreamConnection>(
@@ -811,7 +802,7 @@ size_t DownstreamConnectionInfos::size() {
 }
 
 void DownstreamConnectionInfos::deleteDownstreamConnection(std::string&& conn_id) {
-  ENVOY_LOG(debug, "Deleted from Downstream connection map {}", conn_id);
+  ENVOY_LOG(trace, "Deleted from Downstream connection map {}", conn_id);
   if (hasDownstreamConnection(conn_id)) {
     tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.erase(
         conn_id);
@@ -894,12 +885,10 @@ void SipProxy::UpstreamTransactionInfos::resetDownstreamConnRelatedTransactions(
   for (auto it = upstream_transaction_infos_map.cbegin();
        it != upstream_transaction_infos_map.cend();) {
     auto trans_to_end = it->second;
-    if (trans_to_end->downstream_conn_id_ == downstream_conn_id) {
-      it++;
-      trans_to_end->onReset();
-      continue;
-    }
     it++;
+    if (trans_to_end->downstream_conn_id_ == downstream_conn_id) {
+      trans_to_end->onReset();
+    }
   }
 }
 

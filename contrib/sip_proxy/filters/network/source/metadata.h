@@ -223,7 +223,7 @@ public:
     return tra_context_map_;
   }
 
-  bool validate(bool check_tra_context);
+  bool isValid(bool check_tra_context);
 
 private:
   MsgType msg_type_;

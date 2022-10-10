@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstddef>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -50,7 +49,7 @@ public:
 
 class ConnectionManager;
 
-// Thread local wrapper aorund our map conn-id -> DownstreamConnection
+// Thread local wrapper around our map conn-id -> DownstreamConnection
 struct ThreadLocalDownstreamConnectionInfo : public ThreadLocal::ThreadLocalObject,
                                              public Logger::Loggable<Logger::Id::filter> {
   ThreadLocalDownstreamConnectionInfo(std::shared_ptr<DownstreamConnectionInfos> parent)
@@ -121,7 +120,7 @@ public:
       Server::Configuration::FactoryContext& context,
       std::shared_ptr<Router::TransactionInfos> transaction_infos,
       std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connections_info,
-      std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_info);
+      std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -170,7 +169,7 @@ private:
   friend struct ThreadLocalUpstreamTransactionInfo; // Needs to access UpstreamActiveTrans private
                                                     // inner class
 
-  void createNewDownstreamConnection();
+  void storeDownstreamConnectionInCache();
 
   struct ActiveTrans;
 
@@ -493,7 +492,7 @@ private:
     std::string transactionId() const override { return ""; }
     absl::optional<OriginIngress> originIngress() override { return parent_.originIngress(); }
 
-    Router::RouteConstSharedPtr route() override { return nullptr; }
+    Router::RouteConstSharedPtr route() override { ASSERT(false, "route() not implemented"); }
 
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
       UNREFERENCED_PARAMETER(response);
@@ -510,9 +509,9 @@ private:
 
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
-    std::shared_ptr<Router::TransactionInfos> transactionInfos() override { return nullptr; }
+    std::shared_ptr<Router::TransactionInfos> transactionInfos() override { ASSERT(false, "transactionInfos() not implemented"); }
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
-      return nullptr;
+      ASSERT(false, "downstreamConnectionInfos() not implemented");
     }
     std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() override {
       return parent_.upstream_transaction_infos_;
@@ -520,14 +519,14 @@ private:
 
     void onReset() override{};
 
-    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override { return nullptr; }
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override { ASSERT(false, "traHandler() not implemented"); }
 
     void continueHandling(const std::string& key, bool try_next_affinity) override {
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(try_next_affinity);
     }
 
-    MessageMetadataSharedPtr metadata() override { return nullptr; };
+    MessageMetadataSharedPtr metadata() override { ASSERT(false, "metadata() not implemented"); };
 
     // SipFilters::PendingListHandler
     void pushIntoPendingList(const std::string& type, const std::string& key,
@@ -612,8 +611,6 @@ public:
 private:
   ThreadLocal::SlotPtr tls_;
 };
-
-// TODO Idea for getting upstream transactions cache in TLS as common to all, review it
 
 struct ThreadLocalUpstreamTransactionInfo : public ThreadLocal::ThreadLocalObject,
                                             public Logger::Loggable<Logger::Id::filter> {

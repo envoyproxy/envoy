@@ -250,7 +250,7 @@ absl::string_view MessageMetadata::getDomainFromHeaderParameter(HeaderType type,
   return "";
 }
 
-bool MessageMetadata::validate(bool check_tra_context) {
+bool MessageMetadata::isValid(bool check_tra_context) {
   // Check message type has been identified as request or response
   if ((msgType() != MsgType::Request) && (msgType() != MsgType::Response)) {
     error_message_ = "Message not identified as request or response";
