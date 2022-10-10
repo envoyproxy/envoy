@@ -93,6 +93,9 @@ minor_behavior_changes:
       envoy_listener_downstream_cx_total{} 2.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
+- area: dynamic_forward_proxy
+  change: |
+    No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -117,6 +120,9 @@ bug_fixes:
 - area: upstream
   change: |
     fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
+- area: tls
+  change: |
+    fixed a bug where, when runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` is set to false, the wrong TLS alerts would sometimes be sent in response to certificate validation failures.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -196,16 +202,22 @@ new_features:
     added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
 - area: upstream
   change: |
-    added a new field :ref:`additional_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.additional_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
+    added a new field :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>` to the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target host's address' version.
 - area: admin
   change: |
     added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
 - area: health check
   change: |
     added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
+- area: health check
+  change: |
+    added :ref:`thrift health check <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>` as a :ref:`custom health check <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`.
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: redis
+  change: |
+    added support for redis transactions.
 - area: listener
   change: |
     expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.

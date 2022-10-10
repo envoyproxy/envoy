@@ -135,6 +135,7 @@ public:
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(bool, isShadow, (), (const, override));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
