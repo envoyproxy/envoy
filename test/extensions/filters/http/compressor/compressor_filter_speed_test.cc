@@ -178,7 +178,11 @@ Buffer::OwnedImpl generateTestData() {
     data.add(absl::string_view(buf.str()));
 
     TestDataSize = data.length();
+#ifdef WIN32
+    printf("TestDataSize: %lld\n", TestDataSize);
+#else
     printf("TestDataSize: %ld\n", TestDataSize);
+#endif
   }
   return data;
 }
