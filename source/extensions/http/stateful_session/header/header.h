@@ -54,7 +54,7 @@ private:
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
-  Envoy::Http::LowerCaseString getHeaderName() const { return name_; }
+  const Envoy::Http::LowerCaseString& getHeaderName() const { return name_; }
 
   const Envoy::Http::LowerCaseString name_;
 };
