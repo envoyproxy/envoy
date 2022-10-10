@@ -30,12 +30,14 @@ public:
   bool registrationAffinity() const override;
   const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
   customizedAffinity() const override;
+  bool upstreamTransactionsEnabled() const override;
 
 private:
   bool session_affinity_;
   bool registration_affinity_;
   const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity
       customized_affinity_;
+  bool upstream_transactions_enable_;
 };
 
 /**

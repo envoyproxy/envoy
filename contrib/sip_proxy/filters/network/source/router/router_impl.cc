@@ -195,28 +195,24 @@ FilterStatus Router::handleAffinity() {
     callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
   }
 
-  const std::shared_ptr<const ProtocolOptionsConfig> options =
-      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
-          SipFilters::SipFilterNames::get().SipProxy);
-
   // ONLY used in case of responses to upstream initiated transactions
-  if (!metadata->destination().empty() && settings_->upstreamTransactionsEnabled()) {
+  if (!metadata->destination().empty() && options_->upstreamTransactionsEnabled()) {
     ENVOY_LOG(info, "Got message with pre-set destination: {}", metadata->destination());
     return FilterStatus::Continue;
   }
 
-  if (options == nullptr || metadata->msgType() == MsgType::Response) {
+  if (options_ == nullptr || metadata->msgType() == MsgType::Response) {
     return FilterStatus::Continue;
   }
 
   // Do subscribe
-  callbacks_->traHandler()->doSubscribe(options->customizedAffinity());
+  callbacks_->traHandler()->doSubscribe(options_->customizedAffinity());
 
   if (metadata->affinity().empty()) {
-    metadata->setStopLoadBalance(options->customizedAffinity().stop_load_balance());
+    metadata->setStopLoadBalance(options_->customizedAffinity().stop_load_balance());
 
-    if (!options->customizedAffinity().entries().empty()) {
-      for (const auto& aff : options->customizedAffinity().entries()) {
+    if (!options_->customizedAffinity().entries().empty()) {
+      for (const auto& aff : options_->customizedAffinity().entries()) {
         // default header is Route, TOP-URI also used as Route
         HeaderType header = HeaderType::Route;
         if (!aff.header().empty()) {
@@ -251,7 +247,7 @@ FilterStatus Router::handleAffinity() {
                                             aff.subscribe());
         }
       }
-    } else if (metadata->methodType() != MethodType::Register && options->sessionAffinity()) {
+    } else if (metadata->methodType() != MethodType::Register && options_->sessionAffinity()) {
       metadata->setStopLoadBalance(false);
 
       if (metadata->header(HeaderType::Route).empty()) {
@@ -267,7 +263,7 @@ FilterStatus Router::handleAffinity() {
           metadata->affinity().emplace_back("Route", "ep", "ep", false, false);
         }
       }
-    } else if (metadata->methodType() == MethodType::Register && options->registrationAffinity()) {
+    } else if (metadata->methodType() == MethodType::Register && options_->registrationAffinity()) {
       metadata->setStopLoadBalance(false);
 
       // For REGISTER, opaque is set when parse Authorization, opaque works as same as ep
@@ -301,26 +297,6 @@ void Router::reuseUpstreamConnection(const std::string& host, std::shared_ptr<Tr
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
 
-  if (settings_->upstreamTransactionsEnabled()) {
-    if (callbacks_->originIngress().has_value()) {
-      if (metadata->hasXEnvoyOriginIngressHeader()) {
-        ENVOY_STREAM_LOG(
-            info,
-            "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
-            "being replaced ...",
-            *callbacks_);
-        metadata->removeXEnvoyOriginIngressHeader();
-      }
-      ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
-      metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
-    } else {
-      ENVOY_STREAM_LOG(error,
-                       "No Ingress ID defined for current transaction. Discarding the message",
-                       *callbacks_);
-      return FilterStatus::StopIteration;
-    }
-  }
-
   if (upstream_connection_ != nullptr) {
     return FilterStatus::Continue;
   }
@@ -348,10 +324,32 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   cluster_ = cluster->info();
   ENVOY_STREAM_LOG(debug, "cluster '{}' matched", *callbacks_, cluster_name);
 
+  options_ =  cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(SipFilters::SipFilterNames::get().SipProxy);
+
   if (cluster_->maintenanceMode()) {
     stats_.upstream_rq_maintenance_mode_.inc();
     throw AppException(AppExceptionType::InternalError,
                        fmt::format("maintenance mode for cluster '{}'", cluster_name));
+  }
+
+  if (options_->upstreamTransactionsEnabled()) {
+    if (callbacks_->originIngress().has_value()) {
+      if (metadata->hasXEnvoyOriginIngressHeader()) {
+        ENVOY_STREAM_LOG(
+            info,
+            "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
+            "being replaced ...",
+            *callbacks_);
+        metadata->removeXEnvoyOriginIngressHeader();
+      }
+      ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
+      metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
+    } else {
+      ENVOY_STREAM_LOG(error,
+                       "No Ingress ID defined for current transaction. Discarding the message",
+                       *callbacks_);
+      return FilterStatus::StopIteration;
+    }
   }
 
   handleAffinity();
@@ -393,7 +391,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
   if (reuseUpstreamConnection(host->address()->ip()->addressAsString(), transaction_info, metadata);
       upstream_connection_ == nullptr) {
     upstream_connection_ = std::make_shared<UpstreamConnection>(
-        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info, context_);
+        std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info, context_,
+        options_->upstreamTransactionsEnabled());
     upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
     upstream_connection_->setMetadata(metadata);
     transaction_info->insertUpstreamConnection(host->address()->ip()->addressAsString(),
@@ -423,7 +422,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   auto& transaction_info = (*transaction_infos_)[cluster_->name()];
 
   // ONLY used in case of responses to upstream initiated transactions
-  if (settings_->upstreamTransactionsEnabled() && !metadata->destination().empty() && 
+  if (options_->upstreamTransactionsEnabled() && !metadata->destination().empty() && 
       metadata->msgType() == MsgType::Response) {
     std::string host = metadata->destination();
 
@@ -563,8 +562,9 @@ void Router::cleanup() { upstream_connection_.reset(); }
 
 UpstreamConnection::UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool,
                                        std::shared_ptr<TransactionInfo> transaction_info,
-                                       Server::Configuration::FactoryContext& context)
-    : conn_pool_(pool), transaction_info_(transaction_info), context_(context) {}
+                                       Server::Configuration::FactoryContext& context,
+                                       bool upstream_transactions_enabled)
+    : conn_pool_(pool), transaction_info_(transaction_info), context_(context), upstream_transactions_enabled_(upstream_transactions_enabled) {}
 
 UpstreamConnection::~UpstreamConnection() {
   if (conn_pool_handle_) {
@@ -804,7 +804,7 @@ bool UpstreamMessageDecoder::onData(Buffer::Instance& data) {
 }
 
 FilterStatus UpstreamMessageDecoder::checkUpstreamRequestValidity(MessageMetadataSharedPtr metadata) {
-  if (!settings()->upstreamTransactionsEnabled()) {
+  if (!parent_.upstreamTransactionsEnabled()) {
     ENVOY_LOG(error,
               "Upstream transaction support disabled. Dropping the received upstream request.");
     return FilterStatus::StopIteration;

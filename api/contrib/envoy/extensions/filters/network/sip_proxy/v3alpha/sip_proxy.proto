@@ -70,9 +70,6 @@ message SipProxy {
     // False: sip service proxy
     // True:  sip load balancer
     bool operate_via = 4;
-
-    // Upstream transactions support configuration
-    UpstreamTransactions upstream_transactions = 5;
   }
 
   // The human readable prefix to use when emitting statistics.
@@ -117,6 +114,9 @@ message SipProtocolOptions {
 
   // Customized affinity
   CustomizedAffinity customized_affinity = 3;
+
+  // Upstream transactions support configuration
+  UpstreamTransactions upstream_transactions = 4;
 }
 
 // For affinity

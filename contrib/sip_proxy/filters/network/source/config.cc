@@ -35,7 +35,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions& config)
     : session_affinity_(config.session_affinity()),
       registration_affinity_(config.registration_affinity()),
-      customized_affinity_(config.customized_affinity()) {}
+      customized_affinity_(config.customized_affinity()),
+      upstream_transactions_enable_(config.upstream_transactions().enabled()) {}
 
 bool ProtocolOptionsConfigImpl::sessionAffinity() const { return session_affinity_; }
 bool ProtocolOptionsConfigImpl::registrationAffinity() const { return registration_affinity_; }
@@ -43,6 +44,7 @@ const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinit
 ProtocolOptionsConfigImpl::customizedAffinity() const {
   return customized_affinity_;
 }
+bool ProtocolOptionsConfigImpl::upstreamTransactionsEnabled() const { return upstream_transactions_enable_; }
 
 Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& proto_config,
@@ -73,18 +75,16 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = nullptr;
   std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos = nullptr;
 
-  if (proto_config.settings().upstream_transactions().enabled()) {
-    // Map of upstream transactions per worker thread
-    upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
-        context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
-                                   proto_config.settings(), transaction_timeout, 32000)));
-    upstream_transaction_infos->init();
+  // Map of upstream transactions per worker thread
+  upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
+      context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
+                                  proto_config.settings(), transaction_timeout, 32000)));
+  upstream_transaction_infos->init();
 
-    // Map of downstream connections per worker thread
-    downstream_connection_infos =
-        std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
-    downstream_connection_infos->init();
-  }
+  // Map of downstream connections per worker thread
+  downstream_connection_infos =
+      std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
+  downstream_connection_infos->init();
 
   return [filter_config, &context, transaction_infos, downstream_connection_infos,
           upstream_transaction_infos](Network::FilterManager& filter_manager) -> void {
@@ -111,7 +111,7 @@ ConfigImpl::ConfigImpl(
           static_cast<std::chrono::milliseconds>(
               PROTOBUF_GET_MS_OR_DEFAULT(config.settings(), transaction_timeout, 32000)),
           config.settings().local_services(), config.settings().tra_service_config(),
-          config.settings().operate_via(), config.settings().upstream_transactions())) {
+          config.settings().operate_via())) {
 
   if (config.sip_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");

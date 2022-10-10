@@ -71,6 +71,7 @@ public:
   virtual bool registrationAffinity() const PURE;
   virtual const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity&
   customizedAffinity() const PURE;
+  virtual bool upstreamTransactionsEnabled() const PURE;
 };
 
 class TrafficRoutingAssistantHandler : public TrafficRoutingAssistant::RequestCallbacks,

@@ -172,9 +172,7 @@ ConnectionManager::ConnectionManager(
 ConnectionManager::~ConnectionManager() { ENVOY_LOG(debug, "Destroying connection manager"); }
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
-  if (settings()->upstreamTransactionsEnabled()) {
-    storeDownstreamConnectionInCache();
-  }
+  storeDownstreamConnectionInCache();
   ENVOY_LOG(debug, "Creating connection manager");
   return Network::FilterStatus::Continue;
 }
@@ -368,9 +366,8 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   ENVOY_CONN_LOG(info, "received event {}", read_callbacks_->connection(), static_cast<int>(event));
   resetAllDownstreamTrans(event == Network::ConnectionEvent::LocalClose);
 
-  if (settings()->upstreamTransactionsEnabled() && local_origin_ingress_.has_value() &&
-      ((event == Network::ConnectionEvent::RemoteClose) ||
-       (event == Network::ConnectionEvent::LocalClose))) {
+  if ((event == Network::ConnectionEvent::RemoteClose) ||
+       (event == Network::ConnectionEvent::LocalClose)) {
     resetAllUpstreamTrans();
     downstream_connection_infos_->deleteDownstreamConnection(
         local_origin_ingress_->getDownstreamConnectionID());
@@ -383,16 +380,7 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSh
     return nullptr;
   }
   std::string&& k = std::string(metadata->transactionId().value());
-  if ((!settings()->upstreamTransactionsEnabled()) && (metadata->msgType() == MsgType::Response)) {
-    ENVOY_LOG(error, "Upstream transactions support disabled. Dropping response received from "
-                     "upstream transaction.");
-    return nullptr;
-  } else if ((settings()->upstreamTransactionsEnabled()) &&
-             (metadata->msgType() == MsgType::Response) &&
-             (upstream_transaction_infos_->hasTransaction(k))) {
-    ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
-    return upstream_transaction_infos_->getTransaction(k).get();
-  } else {
+  if (metadata->msgType() == MsgType::Request) {
     stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
     // if (metadata->methodType() == MethodType::Ack) {
     if (transactions_.find(k) != transactions_.end()) {
@@ -406,7 +394,15 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSh
     transactions_.emplace(k, std::move(new_trans));
 
     return transactions_.at(k).get();
-  }
+  } else {
+    if (upstream_transaction_infos_->hasTransaction(k)) {
+      ENVOY_LOG(debug, "Response from upstream transaction ID {} received.", k);
+      return upstream_transaction_infos_->getTransaction(k).get();
+    } else {
+      ENVOY_LOG(error, "No upstream transaction active with ID {}.", k);
+      return nullptr;
+    }
+  } 
 }
 
 bool ConnectionManager::ResponseDecoder::onData(MessageMetadataSharedPtr metadata) {

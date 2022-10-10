@@ -29,6 +29,7 @@
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
+#include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -321,6 +322,7 @@ private:
   std::shared_ptr<TransactionInfos> transaction_infos_{};
   std::shared_ptr<SipSettings> settings_;
   Server::Configuration::FactoryContext& context_;
+  std::shared_ptr<const SipProxy::ProtocolOptionsConfig> options_;
 };
 
 class UpstreamMessageDecoder : public DecoderCallbacks,
@@ -362,7 +364,8 @@ class UpstreamConnection : public Tcp::ConnectionPool::Callbacks,
 public:
   UpstreamConnection(std::shared_ptr<Upstream::TcpPoolData> pool_data,
                      std::shared_ptr<TransactionInfo> transaction_info,
-                     Server::Configuration::FactoryContext& context);
+                     Server::Configuration::FactoryContext& context,
+                     bool upstream_transactions_enabled);
   ~UpstreamConnection() override;
   FilterStatus start();
   void resetStream();
@@ -416,6 +419,8 @@ public:
 
   std::string threadId() { return thread_id_; }
 
+  bool upstreamTransactionsEnabled() { return upstream_transactions_enabled_; }
+
 private:
   std::shared_ptr<Upstream::TcpPoolData> conn_pool_;
 
@@ -434,6 +439,7 @@ private:
   Buffer::OwnedImpl upstream_buffer_;
   Server::Configuration::FactoryContext& context_;
   std::string thread_id_;
+  bool upstream_transactions_enabled_;
 };
 
 } // namespace Router
