@@ -54,9 +54,9 @@ private:
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
-  std::string getHeaderName() const { return name_; }
+  Envoy::Http::LowerCaseString getHeaderName() const { return name_; }
 
-  const std::string name_;
+  const Envoy::Http::LowerCaseString name_;
 };
 
 } // namespace Header

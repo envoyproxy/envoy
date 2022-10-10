@@ -12,7 +12,7 @@ void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     const std::string encoded_address =
         Envoy::Base64::encode(host_address.data(), host_address.length());
-    headers.setCopy(Envoy::Http::LowerCaseString(factory_.getHeaderName()), encoded_address);
+    headers.setCopy(factory_.getHeaderName(), encoded_address);
   }
 }
 
