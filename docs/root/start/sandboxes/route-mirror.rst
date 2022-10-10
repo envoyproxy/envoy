@@ -11,13 +11,14 @@ This simple example demonstrates Envoy's request mirroring capability using
 `request mirror policies <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy>`__.
 
 Incoming requests are received by ``envoy-front-proxy`` service. The envoy instance running
-in this container is configured with two routes:
+in this container is configured with two routes (:download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`):
 
 .. literalinclude:: _include/route-mirror/front-envoy.yaml
    :language: yaml
-   :lines: 7-37
+   :lines: 16-34
    :linenos:
-   :emphasize-lines: 14-26
+   :emphasize-lines: 5-17
+   :caption: Envoy configuration with route mirror policy
 
 A request for the path ``/service/1`` is forwarded to the ``service1`` cluster.
 In addition, the request is also forwarded to the ``service1-mirror`` cluster.
@@ -40,68 +41,62 @@ Change to the ``examples/route-mirror`` directory.
     $ docker-compose build
     $ docker-compose up -d
 
-
 .. code-block:: console
-
 
     $ pwd
     envoy/examples/route-mirror
     $ docker-compose ps
+    NAME                               COMMAND                  SERVICE             STATUS              PORTS
+    route-mirror-envoy-front-proxy-1   "/docker-entrypoint.…"   envoy-front-proxy   running             0.0.0.0:10000->10000/tcp, :::10000->10000/tcp
+    route-mirror-service1-1            "python3 /code/servi…"   service1            running (healthy)
+    route-mirror-service1-mirror-1     "python3 /code/servi…"   service1-mirror     running (healthy)
+    route-mirror-service2-1            "python3 /code/servi…"   service2            running (healthy)
+    route-mirror-service2-mirror-1     "python3 /code/servi…"   service2-mirror     running (healthy)
 
-    NAME                                COMMAND                  SERVICE             STATUS              PORTS
-    ---------------------------------------------------------------------------------------------------------------------------
+Step 2: Make a request to the statically mirrored route
+*******************************************************
 
-    route-mirror-front-envoy-1       "/docker-entrypoint.…"   front-envoy         running             0.0.0.0:8001->8001/tcp,
-                                                                                                         :::8001->8001/tcp,
-                                                                                                         0.0.0.0:8080->8080/tcp,
-                                                                                                         :::8080->8080/tcp,
-                                                                                                         0.0.0.0:8443->8443/tcp,
-                                                                                                         :::8443->8443/tcp,
-                                                                                                         10000/tcp
-    route-mirror-service1-1          "/usr/local/bin/star…"   service1            running (healthy)
-    route-mirror-service1-mirror-1   "/usr/local/bin/star…"   service1-mirror     running (healthy)
-    route-mirror-service2-1          "/usr/local/bin/star…"   service2            running (healthy)
-    route-mirror-service2-mirror-1   "/usr/local/bin/star…"   service2-mirror     running (healthy)
-
-Step 2: Demonstrate static mirror cluster name
-**********************************************
+Send a request to ``service1``:
 
 .. code-block:: console
 
   $ pwd
   envoy/examples/route-mirror
-  $ curl localhost:8080/service/1
+  $ curl localhost:10000/service/1
   Hello from behind Envoy (service 1)!
 
 The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
 ``service1`` and also sends the request to the service 1 mirror, ``service1-mirror``.
 
-Step 3: See Logs
-****************
+Step 3: View logs for the statically mirrored request
+*****************************************************
+
+View the logs for the ``service1`` and ``service1-mirror`` services:
 
 .. code-block:: console
 
    $ docker-compose logs service1
 
    ...
-   Host: localhost:8080
+   Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
    $ docker-compose logs service1-mirror
 
    ...
-   Host: localhost-shadow:8080
+   Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
 The above logs from the ``service1`` and ``service1-mirror`` services show that
-both the ``service1`` and ``service1-mirror`` services got the request.
+both the ``service1`` and ``service1-mirror`` services got the request made
+in Step 1.
 
 You can also see that for the request to the ``service1-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
 hostname.
 
-Step 4: Demonstrate mirror cluster via header
-*********************************************
+Step 4: Make a request to the route mirrored by request header
+**************************************************************
 
 In this step, we will see a demonstration where the request specifies via a header, ``x-mirror-cluster``,
 the cluster that envoy will mirror the request to.
@@ -110,28 +105,28 @@ the cluster that envoy will mirror the request to.
 
   $ pwd
   envoy/examples/route-mirror
-  $ curl --header "x-mirror-cluster: service2-mirror" localhost:8080/service/2
+  $ curl --header "x-mirror-cluster: service2-mirror" localhost:10000/service/2
   Hello from behind Envoy (service 2)!
 
 The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
 ``service2`` and also mirrors the request to the cluster named, ``service2-mirror``.
 
 
-Step 4: See Logs
-****************
+Step 5: View logs for the request mirrored by request header
+************************************************************
+
+View the logs for the ``service2`` and ``service2-mirror`` services:
 
 .. code-block:: console
 
    $ docker-compose logs service2
-
    ...
-   Host: localhost:8080
+   Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
    $ docker-compose logs service2-mirror
-
    ...
-   Host: localhost-shadow:8080
+   Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
 
 The above logs show that both the ``service2`` and ``service2-mirror`` services
@@ -143,4 +138,9 @@ hostname.
 
 If you do not specify the ``x-mirror-cluster`` in the request to ``service2``,
 ``service2-mirror`` will not receive the request.
+
+.. seealso::
+
+   :ref:`Envoy request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
+    Learn more Envoy's request mirroring policy.
 

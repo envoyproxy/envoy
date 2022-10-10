@@ -69,8 +69,8 @@ The following sandboxes are available:
     postgres
     rbac
     redis
-    skywalking
     route-mirror
+    skywalking
     tls-inspector
     tls-sni
     tls
