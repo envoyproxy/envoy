@@ -1504,7 +1504,7 @@ TEST_F(HostImplTest, HealthStatus) {
 
   // If the degraded flag is the only thing set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->health());
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
 }
 
 // Test that it's not possible to do a HostDescriptionImpl with a unix
