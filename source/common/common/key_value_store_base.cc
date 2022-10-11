@@ -1,4 +1,4 @@
-#include "key_value_store_base.h"
+#include "source/common/common/key_value_store_base.h"
 #include "source/common/common/key_value_store_base.h"
 
 #include <algorithm>
@@ -33,8 +33,8 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 }
 
 bool checkForTtl(absl::string_view& contents) {
-  if (contents.size() > TTL_KEY.length() && contents.substr(0, TTL_KEY.length()) == TTL_KEY) {
-    contents.remove_prefix(TTL_KEY.length());
+  if (contents.size() > KV_STORE_TTL_KEY.length() && contents.substr(0, KV_STORE_TTL_KEY.length()) == KV_STORE_TTL_KEY) {
+    contents.remove_prefix(KV_STORE_TTL_KEY.length());
     return true;
   }
   return false;
@@ -84,7 +84,7 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
         }
       }
     }
-    if (!(ttl.has_value() && ttl <= std::chrono::seconds(0))) {
+    if (!ttl.has_value() || ttl > std::chrono::seconds(0)) {
       addOrUpdate(key.value(), value.value(), ttl);
     }
   }

@@ -38,7 +38,7 @@ void FileBasedKeyValueStore::flush() {
     file->write(it.second.first);
     if (it.second.second.has_value()) {
       std::string ttl = std::to_string(it.second.second.value().count());
-      file->write(TTL_KEY);
+      file->write(KV_STORE_TTL_KEY);
       file->write(absl::StrCat(ttl.length(), "\n"));
       file->write(ttl);
     }

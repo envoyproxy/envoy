@@ -12,6 +12,7 @@
 #include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
+inline constexpr absl::string_view KV_STORE_TTL_KEY = "TTL";
 
 // This is the base implementation of the KeyValueStore. It handles the various
 // functions other than flush(), which will be implemented by subclasses.
@@ -50,5 +51,4 @@ protected:
   TimeSource& time_source_;
 };
 
-inline constexpr absl::string_view TTL_KEY = "TTL";
 } // namespace Envoy
