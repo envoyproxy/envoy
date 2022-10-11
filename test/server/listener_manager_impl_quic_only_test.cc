@@ -288,7 +288,7 @@ filter_chains:
 udp_listener_config:
   quic_options:
     connection_id_generator_config:
-      name: envoy.quic.deterministric_connection_id_generator
+      name: envoy.quic.deterministic_connection_id_generator
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig
   )EOF",

@@ -279,7 +279,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   // Initialize connection ID generator factory.
   envoy::config::core::v3::TypedExtensionConfig cid_generator_config;
   if (!config.has_connection_id_generator_config()) {
-    cid_generator_config.set_name("envoy.quic.deterministric_connection_id_generator");
+    cid_generator_config.set_name("envoy.quic.deterministic_connection_id_generator");
     envoy::extensions::quic::connection_id_generator::v3::DeterministicConnectionIdGeneratorConfig
         empty_connection_id_generator_config;
     cid_generator_config.mutable_typed_config()->PackFrom(empty_connection_id_generator_config);
