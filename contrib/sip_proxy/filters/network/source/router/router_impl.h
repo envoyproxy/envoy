@@ -22,6 +22,7 @@
 #include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
+#include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 #include "contrib/sip_proxy/filters/network/source/conn_state.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 #include "contrib/sip_proxy/filters/network/source/decoder_events.h"
@@ -29,7 +30,6 @@
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
 #include "contrib/sip_proxy/filters/network/source/router/router.h"
 #include "contrib/sip_proxy/filters/network/source/utility.h"
-#include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -306,7 +306,9 @@ private:
   QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
                                        const std::string& key, MessageMetadataSharedPtr metadata);
 
-  std::shared_ptr<UpstreamConnection> getUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info, MessageMetadataSharedPtr metadata);
+  std::shared_ptr<UpstreamConnection>
+  getUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info,
+                        MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;

@@ -367,7 +367,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   resetAllDownstreamTrans(event == Network::ConnectionEvent::LocalClose);
 
   if ((event == Network::ConnectionEvent::RemoteClose) ||
-       (event == Network::ConnectionEvent::LocalClose)) {
+      (event == Network::ConnectionEvent::LocalClose)) {
     resetAllUpstreamTrans();
     downstream_connection_infos_->deleteDownstreamConnection(
         local_origin_ingress_->getDownstreamConnectionID());
@@ -402,7 +402,7 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler(MessageMetadataSh
       ENVOY_LOG(error, "No upstream transaction active with ID {}.", k);
       return nullptr;
     }
-  } 
+  }
 }
 
 bool ConnectionManager::ResponseDecoder::onData(MessageMetadataSharedPtr metadata) {
@@ -715,7 +715,7 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
     parent_.read_callbacks_->connection().write(buffer, false);
 
     return SipFilters::ResponseStatus::Complete;
-   } catch (const EnvoyException& ex) {
+  } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "SIP response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
     onError(ex.what());

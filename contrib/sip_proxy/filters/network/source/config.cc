@@ -44,7 +44,9 @@ const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinit
 ProtocolOptionsConfigImpl::customizedAffinity() const {
   return customized_affinity_;
 }
-bool ProtocolOptionsConfigImpl::upstreamTransactionsEnabled() const { return upstream_transactions_enable_; }
+bool ProtocolOptionsConfigImpl::upstreamTransactionsEnabled() const {
+  return upstream_transactions_enable_;
+}
 
 Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& proto_config,
@@ -78,7 +80,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   // Map of upstream transactions per worker thread
   upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
       context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
-                                  proto_config.settings(), transaction_timeout, 32000)));
+                                 proto_config.settings(), transaction_timeout, 32000)));
   upstream_transaction_infos->init();
 
   // Map of downstream connections per worker thread

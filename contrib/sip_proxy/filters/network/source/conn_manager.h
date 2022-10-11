@@ -510,7 +510,9 @@ private:
 
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
-    std::shared_ptr<Router::TransactionInfos> transactionInfos() override { ASSERT(false, "transactionInfos() not implemented"); }
+    std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
+      ASSERT(false, "transactionInfos() not implemented");
+    }
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       ASSERT(false, "downstreamConnectionInfos() not implemented");
     }
@@ -520,7 +522,9 @@ private:
 
     void onReset() override{};
 
-    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override { ASSERT(false, "traHandler() not implemented"); }
+    std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
+      ASSERT(false, "traHandler() not implemented");
+    }
 
     void continueHandling(const std::string& key, bool try_next_affinity) override {
       UNREFERENCED_PARAMETER(key);

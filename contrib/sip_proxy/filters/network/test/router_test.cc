@@ -26,7 +26,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
