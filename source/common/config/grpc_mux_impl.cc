@@ -201,11 +201,12 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
       ApiState& api_state = apiStateFor(type_url);
-      ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
-                api_state.pauses_);
+      ENVOY_LOG(debug, "Decreasing pause count on discovery requests for {} (previous count {})",
+                type_url, api_state.pauses_);
       ASSERT(api_state.paused());
 
       if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
+        ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
         queueDiscoveryRequest(type_url);
         api_state.pending_ = false;
       }
@@ -394,9 +395,9 @@ void GrpcMuxImpl::onEstablishmentFailure() {
           /*type_url=*/api_state.first,
           std::vector<std::string>{api_state.second->request_.resource_names().begin(),
                                    api_state.second->request_.resource_names().end()});
+      previously_fetched_data_ = true;
     }
   }
-  previously_fetched_data_ = true;
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
