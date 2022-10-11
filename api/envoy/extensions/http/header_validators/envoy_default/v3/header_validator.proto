@@ -36,13 +36,15 @@ message HeaderValidatorConfig {
     ALLOW = 0;
 
     // Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
-    // end with the stream reset. The "httpN.requests_rejected_with_underscores_in_headers" counter
+    // end with the stream reset. The
+    // :ref:`httpN.requests_rejected_with_underscores_in_headers <config_http_conn_man_stats_per_codec>` counter
     // is incremented for each rejected request.
     REJECT_REQUEST = 1;
 
     // Drop the client header with name containing underscores. The header is dropped before the filter chain is
     // invoked and as such filters will not see dropped headers. The
-    // "httpN.dropped_headers_with_underscores" is incremented for each dropped header.
+    // :ref:`httpN.dropped_headers_with_underscores <config_http_conn_man_stats_per_codec>` is incremented for
+    // each dropped header.
     DROP_HEADER = 2;
   }
 
