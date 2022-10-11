@@ -76,7 +76,8 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: String = "[test]"
+    virtualClusters: String = "[test]",
+    enableSkipDNSLookupForProxiedRequests: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -113,7 +114,8 @@ class EnvoyConfigurationTest {
       emptyList(),
       emptyMap(),
       emptyMap(),
-      emptyList()
+      emptyList(),
+      enableSkipDNSLookupForProxiedRequests
     )
   }
 
@@ -184,6 +186,9 @@ class EnvoyConfigurationTest {
     // Filters
     assertThat(resolvedTemplate).contains("filter_name")
     assertThat(resolvedTemplate).contains("test_config")
+
+    // Proxying
+    assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests false")
   }
 
   @Test
@@ -198,7 +203,8 @@ class EnvoyConfigurationTest {
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
-      h2ExtendKeepaliveTimeout = true
+      h2ExtendKeepaliveTimeout = true,
+      enableSkipDNSLookupForProxiedRequests = true
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
@@ -225,6 +231,9 @@ class EnvoyConfigurationTest {
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
+
+    // Proxying
+    assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests true")
   }
 
   @Test

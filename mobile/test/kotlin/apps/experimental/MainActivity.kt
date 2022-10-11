@@ -60,6 +60,8 @@ class MainActivity : Activity() {
       .enableInterfaceBinding(true)
       .enableDNSUseSystemResolver(false)
       .enableSocketTagging(true)
+      .enableProxying(true)
+      .enableSkipDNSLookupForProxiedRequests(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
       .addKeyValueStore("demo-kv-store", SharedPreferencesStore(preferences))
