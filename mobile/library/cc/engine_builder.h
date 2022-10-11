@@ -38,6 +38,7 @@ public:
   EngineBuilder& setAppId(const std::string& app_id);
   EngineBuilder& setDeviceOs(const std::string& app_id);
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
+  EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
   EngineBuilder& enableGzip(bool gzip_on);
   EngineBuilder& enableBrotli(bool brotli_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);

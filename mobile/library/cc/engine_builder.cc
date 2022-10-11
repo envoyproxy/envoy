@@ -109,6 +109,11 @@ EngineBuilder& EngineBuilder::setStreamIdleTimeoutSeconds(int stream_idle_timeou
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds) {
+  this->per_try_idle_timeout_seconds_ = per_try_idle_timeout_seconds;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableGzip(bool gzip_on) {
   this->gzip_filter_ = gzip_on;
   return *this;

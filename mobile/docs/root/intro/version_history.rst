@@ -15,6 +15,7 @@ Bugfixes:
 
 Features:
 
+- api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
 
 

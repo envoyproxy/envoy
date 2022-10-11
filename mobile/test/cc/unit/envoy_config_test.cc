@@ -24,7 +24,7 @@ namespace {
 using namespace Platform;
 
 TEST(TestConfig, ConfigIsApplied) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
   engine_builder.addGrpcStatsDomain("asdf.fake.website")
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
@@ -38,7 +38,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
       .setDeviceOs("probably-ubuntu-on-CI");
-  auto config_str = engine_builder.generateConfigStr();
+  std::string config_str = engine_builder.generateConfigStr();
 
   std::vector<std::string> must_contain = {
       "- &stats_domain asdf.fake.website",
@@ -61,8 +61,8 @@ TEST(TestConfig, ConfigIsApplied) {
 }
 
 TEST(TestConfig, ConfigIsValid) {
-  auto engine_builder = EngineBuilder();
-  auto config_str = engine_builder.generateConfigStr();
+  EngineBuilder engine_builder;
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
@@ -78,9 +78,9 @@ TEST(TestConfig, ConfigIsValid) {
 
 #if !defined(__APPLE__)
 TEST(TestConfig, SetUseDnsCAresResolver) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
   engine_builder.useDnsSystemResolver(false);
-  auto config_str = engine_builder.generateConfigStr();
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
@@ -90,10 +90,10 @@ TEST(TestConfig, SetUseDnsCAresResolver) {
 #endif
 
 TEST(TestConfig, SetGzip) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
 
   engine_builder.enableGzip(false);
-  auto config_str = engine_builder.generateConfigStr();
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
@@ -105,10 +105,10 @@ TEST(TestConfig, SetGzip) {
 }
 
 TEST(TestConfig, SetBrotli) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
 
   engine_builder.enableBrotli(false);
-  auto config_str = engine_builder.generateConfigStr();
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
@@ -120,10 +120,10 @@ TEST(TestConfig, SetBrotli) {
 }
 
 TEST(TestConfig, SetSocketTag) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
 
   engine_builder.enableSocketTagging(false);
-  auto config_str = engine_builder.generateConfigStr();
+  std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("http.socket_tag.SocketTag")));
@@ -135,7 +135,7 @@ TEST(TestConfig, SetSocketTag) {
 }
 
 TEST(TestConfig, SetAltSvcCache) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
 
   std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
 
@@ -143,6 +143,34 @@ TEST(TestConfig, SetAltSvcCache) {
                       &config_str);
 
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config_str, bootstrap);
+}
+
+TEST(TestConfig, StreamIdleTimeout) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 15s"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config_str, bootstrap);
+
+  engine_builder.setStreamIdleTimeoutSeconds(42);
+  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 42s"));
+  TestUtility::loadFromYaml(config_str, bootstrap);
+}
+
+TEST(TestConfig, PerTryIdleTimeout) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 15s"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(config_str, bootstrap);
+
+  engine_builder.setPerTryIdleTimeoutSeconds(42);
+  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 42s"));
   TestUtility::loadFromYaml(config_str, bootstrap);
 }
 
