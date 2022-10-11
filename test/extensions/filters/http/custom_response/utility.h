@@ -11,18 +11,18 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
   custom_response_matcher:
     matcher_list:
       matchers:
-        # Apply the 400_response policy to any 4xx response
+        # Apply a locally stored custom response to any 4xx response.
       - predicate:
           single_predicate:
             input:
-              name: status_code
+              name: 4xx_response
               typed_config:
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeClassMatchInput
             value_match:
               exact: "4xx"
         on_match:
           action:
-            name: custom_response1
+            name: action
             typed_config:
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
               name: local_response
@@ -32,48 +32,50 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 body:
                   inline_string: "not allowed"
                 body_format:
-                  text_format: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
-                headers_to_add:
+                  json_format:
+                    status: "%RESPONSE_CODE%"
+                    message: "%LOCAL_REPLY_BODY%"
+                response_headers_to_add:
                 - header:
                     key: "foo"
                     value: "x-bar"
                   append: false
-        # Apply the gateway_error_response policy to status codes 502, 503 and 504.
+        # Redirect to different upstream if the status code is one of 502, 503 or 504.
       - predicate:
           or_matcher:
             predicate:
             - single_predicate:
                 input:
-                  name: status_code
+                  name: "502_response"
                   typed_config:
                     "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
                 value_match:
                   exact: "502"
             - single_predicate:
                 input:
-                  name: status_code
+                  name: "503_response"
                   typed_config:
                     "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
                 value_match:
                   exact: "503"
             - single_predicate:
                 input:
-                  name: status_code
+                  name: "504_response"
                   typed_config:
                     "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
                 value_match:
                   exact: "504"
         on_match:
           action:
-            name: custom_response2
+            name: action
             typed_config:
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_policy
+              name: redirect_response
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
                 status_code: 299
                 uri: "https://foo.example/gateway_error"
-                headers_to_add:
+                response_headers_to_add:
                 - header:
                     key: "foo2"
                     value: "x-bar2"
@@ -81,22 +83,22 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
       - predicate:
           single_predicate:
             input:
-              name: status_code
+              name: "500_response"
               typed_config:
                 "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
             value_match:
               exact: "500"
         on_match:
           action:
-            name: custom_response3
+            name: action
             typed_config:
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_policy
+              name: redirect_response
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
                 status_code: 292
                 uri: "https://foo.example/internal_server_error"
-                headers_to_add:
+                response_headers_to_add:
                 - header:
                     key: "foo3"
                     value: "x-bar3"

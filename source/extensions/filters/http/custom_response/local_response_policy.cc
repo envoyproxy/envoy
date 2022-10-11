@@ -31,7 +31,7 @@ LocalResponsePolicy::LocalResponsePolicy(const envoy::extensions::filters::http:
   if (config.has_status_code()) {
     status_code_ = static_cast<Http::Code>(config.status_code().value());
   }
-  header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
+  header_parser_ = Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
 }
 
 void LocalResponsePolicy::formatBody(const Http::RequestHeaderMap& request_headers,

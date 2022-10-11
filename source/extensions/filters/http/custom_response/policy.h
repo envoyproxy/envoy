@@ -18,7 +18,7 @@ class CustomResponseFilter;
 class Policy : public std::enable_shared_from_this<Policy>, public StreamInfo::FilterState::Object {
 
 public:
-  virtual ~Policy() = default;
+  ~Policy() override = default;
 
   virtual Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                                   CustomResponseFilter&) const PURE;

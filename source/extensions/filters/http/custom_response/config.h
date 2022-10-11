@@ -36,7 +36,7 @@ public:
   PolicySharedPtr getPolicy(Http::ResponseHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info) const;
 
-  ~FilterConfig() = default;
+  ~FilterConfig() override = default;
 
 private:
   Stats::StatName stats_prefix_;
