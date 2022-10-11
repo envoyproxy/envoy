@@ -57,6 +57,7 @@ public:
    * @param resource_names The names of the requested resources.
    * @return A set of xDS resources for the given source.
    */
+  // TODO(abeyad): change resource_names to a set.
   virtual std::vector<envoy::service::discovery::v3::Resource>
   getResources(const XdsSourceId& source_id,
                const std::vector<std::string>& resource_names) const PURE;
