@@ -92,8 +92,8 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
   }
 
   // Attempt to load the proxy's hostname from the DNS cache.
-  auto result = connectivity_manager_->dnsCache()->loadDnsCacheEntry(proxy_settings->hostname(),
-                                                                     proxy_settings->port(), *this);
+  auto result = connectivity_manager_->dnsCache()->loadDnsCacheEntry(
+      proxy_settings->hostname(), proxy_settings->port(), false, *this);
 
   // If the hostname is not in the cache, pause filter iteration. The DNS cache will call
   // onLoadDnsCacheComplete when DNS resolution succeeds, fails, or times out and processing
