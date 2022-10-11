@@ -1058,7 +1058,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8-edge/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-07-11",
+        release_date = "2022-10-09",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
@@ -1073,7 +1073,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8-edge/chromium-base_trace_event_common-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-19",
+        release_date = "2022-10-09",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
@@ -1302,7 +1302,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-08-05",
+        release_date = "2022-10-09",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/{version}/LICENSE",
