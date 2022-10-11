@@ -2,8 +2,8 @@ load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load(
-    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:xcodeproj.bzl",
-    "top_level_target",
+    "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
+    "top_level_targets",
     "xcode_schemes",
     "xcodeproj",
 )
@@ -151,36 +151,14 @@ xcodeproj(
     tags = ["manual"],
     top_level_targets = [
         # Apps
-        top_level_target(
-            "//examples/objective-c/hello_world:app",
-            target_environments = [
-                "device",
-                "simulator",
+        top_level_targets(
+            labels = [
+                "//examples/objective-c/hello_world:app",
+                "//examples/swift/async_await:app",
+                "//examples/swift/hello_world:app",
+                "//test/swift/apps/baseline:app",
+                "//test/swift/apps/experimental:app",
             ],
-        ),
-        top_level_target(
-            "//examples/swift/async_await:app",
-            target_environments = [
-                "device",
-                "simulator",
-            ],
-        ),
-        top_level_target(
-            "//examples/swift/hello_world:app",
-            target_environments = [
-                "device",
-                "simulator",
-            ],
-        ),
-        top_level_target(
-            "//test/swift/apps/baseline:app",
-            target_environments = [
-                "device",
-                "simulator",
-            ],
-        ),
-        top_level_target(
-            "//test/swift/apps/experimental:app",
             target_environments = [
                 "device",
                 "simulator",
