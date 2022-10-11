@@ -281,7 +281,6 @@ new_features:
     Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
     :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via Request Header.
 
-
 deprecated:
 - area: http
   change: |
