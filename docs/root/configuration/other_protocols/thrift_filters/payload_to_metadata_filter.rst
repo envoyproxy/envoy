@@ -40,9 +40,9 @@ nor :ref:`on_missing
 is triggered. i.e., no metadata is added for this :ref:`rule
 <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.Rule>`.
 
-Currently payload to metadata filter doesn't support container type payload, i.e., list, set, map.
+Currently payload to metadata filter doesn't support container type payload, i.e., list, set and map.
 
-This filter is designed to support payload passthrough. By performing payload to metadata filter
+This filter is designed to support payload passthrough. Performing payload to metadata filter
 can do deserialization once, and pass the metadata to other filters. This means that load balancing
 decisions, consumed from log and routing could all use payload information with a single parse.
 Also notably performing the parsing in payload passthrough buffer will mean deserialization once

@@ -454,6 +454,36 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(PayloadToMetadataTest, EmptyMethodName) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - method_name: ""
+    field_selector:
+      name: second_field
+      id: 2
+    on_present:
+      metadata_namespace: envoy.lb
+      key: present
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: missing
+      value: unknown
+)EOF";
+
+  std::map<std::string, std::string> expected = {{"present", "two"}};
+
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+
+  Buffer::OwnedImpl data;
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  writeMessage(*metadata, data);
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  filter_->onDestroy();
+}
+
 TEST_F(PayloadToMetadataTest, DoNotMatchServiceName) {
   const std::string request_config_yaml = R"EOF(
 request_rules:

@@ -86,13 +86,14 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
   if (match_type_ == MatchType::MethodName) {
-    return method_or_service_name_.empty() ||
-           (metadata.hasMethodName() && metadata.methodName() == method_or_service_name_);
+    const std::string& method_name{method_or_service_name_};
+    return method_name.empty() ||
+           (metadata.hasMethodName() && metadata.methodName() == method_name);
   }
   ASSERT(match_type_ == MatchType::ServiceName);
-  return method_or_service_name_.empty() ||
-         (metadata.hasMethodName() &&
-          absl::StartsWith(metadata.methodName(), method_or_service_name_));
+  const std::string& service_name{method_or_service_name_};
+  return service_name.empty() ||
+         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name));
 }
 
 FilterStatus TrieMatchHandler::messageEnd() {
@@ -263,6 +264,8 @@ void PayloadToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
   } else if (!keyval.value().empty()) {
     value = keyval.value();
   }
+  // We do *not* modify value is not present in `on_present` or `on_missing`.
+  // That is, we apply the original field value to the metadata.
 
   if (!value.empty()) {
     const auto& nspace = decideNamespace(keyval.metadata_namespace());
@@ -272,7 +275,7 @@ void PayloadToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
   }
 }
 
-void PayloadToMetadataFilter::setDynamicMetadata() {
+void PayloadToMetadataFilter::finalizeDynamicMetadata() {
   if (!structs_by_namespace_.empty()) {
     for (auto const& entry : structs_by_namespace_) {
       decoder_callbacks_->streamInfo().setDynamicMetadata(entry.first, entry.second);
@@ -303,7 +306,7 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
     decoder_->onData(data, underflow);
     ASSERT(handler_->isComplete() || underflow);
 
-    setDynamicMetadata();
+    finalizeDynamicMetadata();
   }
 
   return FilterStatus::Continue;

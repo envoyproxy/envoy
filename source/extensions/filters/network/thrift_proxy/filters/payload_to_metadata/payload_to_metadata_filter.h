@@ -174,7 +174,8 @@ private:
   bool addMetadata(const std::string&, const std::string&, std::string, ValueType);
   void applyKeyValue(std::string, const Rule&, const KeyValuePair&);
   const std::string& decideNamespace(const std::string& nspace) const;
-  void setDynamicMetadata();
+  void finalizeDynamicMetadata();
+
   const ConfigSharedPtr config_;
   absl::flat_hash_set<uint16_t> matched_rule_ids_;
   TrieMatchHandlerPtr handler_;
