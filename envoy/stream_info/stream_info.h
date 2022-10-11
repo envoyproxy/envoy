@@ -741,6 +741,8 @@ public:
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
+  virtual bool isShadow() const PURE;
+
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());

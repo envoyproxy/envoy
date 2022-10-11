@@ -898,7 +898,8 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled());
+                       .setSampled(shadow_policy.traceSampled())
+                       .setIsShadow(true);
     config_.shadowWriter().shadow(std::string(cluster_name.value()), std::move(request), options);
   }
 }

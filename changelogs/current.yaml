@@ -93,6 +93,9 @@ minor_behavior_changes:
       envoy_listener_downstream_cx_total{} 2.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
+- area: dynamic_forward_proxy
+  change: |
+    No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -273,6 +276,10 @@ new_features:
 - area: grpc_json_transcoder
   change: |
     added support for newline-delimited streams in :ref:`stream_newline_delimited <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
+- area: http
+  change: |
+    Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
+    :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via request/response header.
 
 deprecated:
 - area: http

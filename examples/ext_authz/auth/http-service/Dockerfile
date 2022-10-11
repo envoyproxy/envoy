@@ -1,4 +1,4 @@
-FROM node:alpine@sha256:7e68e0ab5f106662b4f3a812ebc96548e2fd7880cb8e7d9600de2361ea1eab9a
+FROM node:alpine@sha256:d4935e4a77d3a9aca897dc3610f7a9abc83732ba4075439fbdb46a517c07d81e
 
 COPY . /app
 CMD ["node", "/app/http-service/server"]

@@ -5358,8 +5358,8 @@ envoy_cc_test(
 
 envoy_cc_library(
     name = "quic_load_balancer_server_id_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_server_id.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_server_id.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_server_id.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_server_id.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -5373,8 +5373,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_load_balancer_config_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_config.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_config.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_config.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_config.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -5389,8 +5389,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_load_balancer_encoder_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_encoder.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_encoder.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_encoder.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_encoder.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
