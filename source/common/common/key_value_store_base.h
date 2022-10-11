@@ -41,6 +41,7 @@ protected:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
   Config::TtlManager ttl_manager_;
+  // Pair.first is the value and pair.second is an optional TTL
   quiche::QuicheLinkedHashMap<std::string,
                               std::pair<std::string, absl::optional<std::chrono::seconds>>>
       store_;
@@ -49,4 +50,5 @@ protected:
   TimeSource& time_source_;
 };
 
+inline constexpr absl::string_view TTL_KEY = "TTL";
 } // namespace Envoy

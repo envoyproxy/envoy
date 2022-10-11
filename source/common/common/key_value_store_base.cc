@@ -1,3 +1,4 @@
+#include "key_value_store_base.h"
 #include "source/common/common/key_value_store_base.h"
 
 #include <algorithm>
@@ -32,10 +33,8 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 }
 
 bool checkForTtl(absl::string_view& contents) {
-  constexpr absl::string_view ttl_string = "TTL";
-  if (contents.size() > ttl_string.length() &&
-      contents.substr(0, ttl_string.length()) == ttl_string) {
-    contents.remove_prefix(3);
+  if (contents.size() > TTL_KEY.length() && contents.substr(0, TTL_KEY.length()) == TTL_KEY) {
+    contents.remove_prefix(TTL_KEY.length());
     return true;
   }
   return false;
@@ -71,22 +70,23 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       return false;
     }
     if (checkForTtl(contents)) {
-      uint64_t ttlInt;
+      uint64_t ttl_int;
       auto token = getToken(contents, error);
-      if (token.has_value() && absl::SimpleAtoi(token.value(), &ttlInt)) {
+      if (token.has_value() && absl::SimpleAtoi(token.value(), &ttl_int)) {
         ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttlInt)) -
+            std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttl_int)) -
             time_source_.monotonicTime()));
       } else {
         if (!token.has_value()) {
           ENVOY_LOG(warn, error);
         } else {
-          ENVOY_LOG(warn, "TTL was read from disk, but aoti() failed");
+          ENVOY_LOG(warn, "TTL was read from disk but failed to convert to integer");
         }
       }
     }
-
-    addOrUpdate(key.value(), value.value(), ttl);
+    if (!(ttl.has_value() && ttl <= std::chrono::seconds(0))) {
+      addOrUpdate(key.value(), value.value(), ttl);
+    }
   }
   return true;
 }
@@ -98,6 +98,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   std::string value(value_view);
   // Do not add if ttl is <= 0
   if (ttl && ttl <= std::chrono::seconds(0)) {
+    ASSERT(false);
     return;
   }
   absl::optional<std::chrono::seconds> absolute_ttl = absl::nullopt;
