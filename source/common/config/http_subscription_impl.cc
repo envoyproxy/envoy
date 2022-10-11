@@ -41,6 +41,13 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
   ASSERT(http_rule.body() == "*");
 }
 
+HttpSubscriptionImpl::~HttpSubscriptionImpl() {
+  if (periodic_stats_timer_) {
+    periodic_stats_timer_->disableTimer();
+    periodic_stats_timer_.reset();
+  }
+}
+
 // Config::Subscription
 void HttpSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
@@ -49,6 +56,15 @@ void HttpSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
+
+  // We may never succeed, so handle the initial case.
+  last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+  periodic_stats_timer_ = dispatcher_.createTimer([this]() -> void {
+    stats_.time_since_last_update_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()) -
+                                       last_update_time_);
+    periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
+  });
+  periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
 
   Protobuf::RepeatedPtrField<std::string> resources_vector(resource_names.begin(),
                                                            resource_names.end());
@@ -94,7 +110,9 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
         DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
     callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
     request_.set_version_info(message.version_info());
-    stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
+    last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+    stats_.update_time_.set(last_update_time_);
+    stats_.time_since_last_update_.set(0);
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
     stats_.update_success_.inc();

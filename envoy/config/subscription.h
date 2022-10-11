@@ -239,6 +239,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
   COUNTER(update_success)                                                                          \
   GAUGE(update_time, NeverImport)                                                                  \
   GAUGE(version, NeverImport)                                                                      \
+  GAUGE(time_since_last_update, NeverImport)                                                       \
   HISTOGRAM(update_duration, Milliseconds)                                                         \
   TEXT_READOUT(version_text)
 
@@ -249,6 +250,8 @@ struct SubscriptionStats {
   ALL_SUBSCRIPTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
                          GENERATE_TEXT_READOUT_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
+
+constexpr uint32_t PERIODIC_STATS_TIMER_REFRESH_MS = 10 * 1000;
 
 } // namespace Config
 } // namespace Envoy

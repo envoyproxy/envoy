@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <queue>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -215,6 +216,21 @@ public:
 
   void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
+  void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    periodic_stats_timer_ = new Event::MockTimer(&dispatcher_);
+    expectEnablePeriodicStatsTimer(period);
+  }
+
+  void expectEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    EXPECT_CALL(*periodic_stats_timer_, enableTimer(period, _));
+  }
+
+  void expectDisablePeriodicStatsTimer() override {
+    EXPECT_CALL(*periodic_stats_timer_, disableTimer());
+  }
+
+  void callPeriodicStatsTimerCb() override { periodic_stats_timer_->invokeCallback(); }
+
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockDispatcher dispatcher_;
@@ -234,6 +250,7 @@ public:
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};
   bool should_use_unified_;
+  Event::MockTimer* periodic_stats_timer_;
 };
 
 } // namespace

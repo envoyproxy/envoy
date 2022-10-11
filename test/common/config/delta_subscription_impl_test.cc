@@ -26,6 +26,7 @@ INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionImplTest, DeltaSubscriptionImplTest,
                          testing::ValuesIn({LegacyOrUnified::Legacy, LegacyOrUnified::Unified}));
 
 TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"name1", "name2", "name3"});
   expectSendMessage({"name4"}, {"name1", "name2"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name3", "name4"});
@@ -37,6 +38,7 @@ TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   expectSendMessage({}, {"name1", "name2", "name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
   subscription_->updateResourceInterest({"name4"});
+  expectDisablePeriodicStatsTimer();
 }
 
 // Checks that after a pause(), no requests are sent until resume().
@@ -44,6 +46,7 @@ TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
 // request. (This collapsing happens any time multiple updates arrive before a request
 // can be sent, not just with pausing: rate limiting or a down gRPC stream would also do it).
 TEST_P(DeltaSubscriptionImplTest, PauseHoldsRequest) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
   // If nested pause wasn't handled correctly, the single expectedSendMessage below would be
@@ -58,16 +61,20 @@ TEST_P(DeltaSubscriptionImplTest, PauseHoldsRequest) {
   subscription_->updateResourceInterest({"name3", "name4"});
   subscription_->updateResourceInterest({"name1", "name2", "name3", "name4"});
   subscription_->updateResourceInterest({"name3", "name4"});
+  expectDisablePeriodicStatsTimer();
 }
 
 TEST_P(DeltaSubscriptionImplTest, ResponseCausesAck) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"name1"});
   deliverConfigUpdate({"name1"}, "someversion", true);
+  expectDisablePeriodicStatsTimer();
 }
 
 // Checks that after a pause(), no ACK requests are sent until resume(), but that after the
 // resume, *all* ACKs that arrived during the pause are sent (in order).
 TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"name1", "name2", "name3"});
   auto resume_sub = subscription_->pause();
   // The server gives us our first version of resource name1.
@@ -121,6 +128,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
       }));
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
+  expectDisablePeriodicStatsTimer();
 }
 
 class DeltaSubscriptionNoGrpcStreamTest : public testing::TestWithParam<LegacyOrUnified> {};

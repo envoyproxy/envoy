@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include "source/common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -61,7 +63,8 @@ public:
   virtual testing::AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected,
                                             uint32_t failure, uint32_t init_fetch_timeout,
                                             uint64_t update_time, uint64_t version,
-                                            absl::string_view version_text) {
+                                            absl::string_view version_text,
+                                            uint64_t time_since_last_update) {
     // TODO(fredlas) rework update_success_ to make sense across all xDS carriers. Its value in
     // statsAre() calls in many tests will probably have to be changed.
     UNREFERENCED_PARAMETER(attempt);
@@ -93,6 +96,11 @@ public:
       return testing::AssertionFailure()
              << "version_text: expected " << version << ", got " << stats_.version_text_.value();
     }
+    if (time_since_last_update != stats_.time_since_last_update_.value()) {
+      return testing::AssertionFailure()
+             << "time_since_last_update: expected " << time_since_last_update << ", got "
+             << stats_.time_since_last_update_.value();
+    }
     return testing::AssertionSuccess();
   }
 
@@ -109,6 +117,14 @@ public:
   virtual void callInitFetchTimeoutCb() PURE;
 
   virtual void doSubscriptionTearDown() {}
+
+  virtual void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds period) PURE;
+
+  virtual void expectEnablePeriodicStatsTimer(std::chrono::milliseconds period) PURE;
+
+  virtual void expectDisablePeriodicStatsTimer() PURE;
+
+  virtual void callPeriodicStatsTimerCb() PURE;
 
   // Helper util to convert to absl::flat_hash_set when calling Subscription interface methods.
   absl::flat_hash_set<std::string> flattenResources(const std::set<std::string>& resources) {

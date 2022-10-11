@@ -219,6 +219,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   std::string test_path = TestEnvironment::temporaryDirectory();
   config.set_path(test_path);
   auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(test_path, _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
@@ -236,6 +237,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   std::string test_path = TestEnvironment::temporaryDirectory();
   auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(test_path, _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
@@ -262,7 +264,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   cm_.initializeThreadLocalClusters({"static_cluster"});
   EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
@@ -282,7 +284,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   cm_.initializeThreadLocalClusters({"static_cluster"});
   EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
@@ -335,7 +337,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcSubscription) {
         return async_client_factory;
       }));
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(4);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   subscriptionFromConfigSource(config)->start({"static_cluster"});
@@ -393,7 +395,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
   EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
-  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
@@ -411,7 +413,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscriptio
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(4);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
   collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",

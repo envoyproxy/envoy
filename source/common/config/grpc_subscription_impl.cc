@@ -28,6 +28,13 @@ GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
       stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
       init_fetch_timeout_(init_fetch_timeout), is_aggregated_(is_aggregated), options_(options) {}
 
+GrpcSubscriptionImpl::~GrpcSubscriptionImpl() {
+  if (periodic_stats_timer_) {
+    periodic_stats_timer_->disableTimer();
+    periodic_stats_timer_.reset();
+  }
+}
+
 // Config::Subscription
 void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
@@ -36,6 +43,15 @@ void GrpcSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resourc
     });
     init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
   }
+  // We may never succeed, so handle the initial case.
+  last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+  periodic_stats_timer_ = dispatcher_.createTimer([this]() -> void {
+    // only emit this if there was ever an update.
+    stats_.time_since_last_update_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()) -
+                                       last_update_time_);
+    periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
+  });
+  periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
 
   watch_ = grpc_mux_->addWatch(type_url_, resources, *this, resource_decoder_, options_);
 
@@ -77,7 +93,9 @@ void GrpcSubscriptionImpl::onConfigUpdate(const std::vector<Config::DecodedResou
       dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
   stats_.update_attempt_.inc();
-  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
+  last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+  stats_.update_time_.set(last_update_time_);
+  stats_.time_since_last_update_.set(0);
   stats_.version_.set(HashUtil::xxHash64(version_info));
   stats_.version_text_.set(version_info);
   stats_.update_duration_.recordValue(update_duration.count());
@@ -101,7 +119,9 @@ void GrpcSubscriptionImpl::onConfigUpdate(
   std::chrono::milliseconds update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher_.timeSource().monotonicTime() - start);
   stats_.update_success_.inc();
-  stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));
+  last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+  stats_.update_time_.set(last_update_time_);
+  stats_.time_since_last_update_.set(0);
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
   stats_.version_text_.set(system_version_info);
   stats_.update_duration_.recordValue(update_duration.count());

@@ -54,7 +54,6 @@ public:
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
-
     if (should_use_unified_) {
       mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
@@ -215,6 +214,21 @@ public:
 
   void callInitFetchTimeoutCb() override { init_timeout_timer_->invokeCallback(); }
 
+  void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    periodic_stats_timer_ = new Event::MockTimer(&dispatcher_);
+    expectEnablePeriodicStatsTimer(period);
+  }
+
+  void expectEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    EXPECT_CALL(*periodic_stats_timer_, enableTimer(period, _));
+  }
+
+  void expectDisablePeriodicStatsTimer() override {
+    EXPECT_CALL(*periodic_stats_timer_, disableTimer());
+  }
+
+  void callPeriodicStatsTimerCb() override { periodic_stats_timer_->invokeCallback(); }
+
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
@@ -236,6 +250,7 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   bool should_use_unified_;
+  Event::MockTimer* periodic_stats_timer_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

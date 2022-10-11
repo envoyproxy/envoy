@@ -31,6 +31,7 @@ public:
                        OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
+  ~HttpSubscriptionImpl() override;
 
   // Config::Subscription
   void start(const absl::flat_hash_set<std::string>& resource_names) override;
@@ -60,6 +61,8 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Event::TimerPtr periodic_stats_timer_;
+  uint64_t last_update_time_;
 };
 
 } // namespace Config

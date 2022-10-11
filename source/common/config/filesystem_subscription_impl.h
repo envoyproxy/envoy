@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -29,6 +31,7 @@ public:
                              OpaqueResourceDecoderSharedPtr resource_decoder,
                              SubscriptionStats stats,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  ~FilesystemSubscriptionImpl() override;
 
   // Config::Subscription
   // We report all discovered resources in the watched file, so the resource names arguments are
@@ -53,6 +56,9 @@ protected:
   SubscriptionStats stats_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Event::Dispatcher& dispatcher_;
+  Event::TimerPtr periodic_stats_timer_;
+  uint64_t last_update_time_;
 };
 
 // Currently a FilesystemSubscriptionImpl subclass, but this will need to change when we support

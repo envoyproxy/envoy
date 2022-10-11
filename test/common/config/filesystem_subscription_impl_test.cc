@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -23,21 +25,25 @@ class FilesystemSubscriptionImplTest : public testing::Test,
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, "", 0));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(";!@#badjso n");
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, "", 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, TEST_TIME_MILLIS, 7148434200721666028, "0", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate that a file that is initially available results in a successful update.
 TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
   updateFile("{\"versionInfo\": \"0\", \"resources\": []}", false);
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(1, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  EXPECT_TRUE(statsAre(1, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate that if we fail to set a watch, we get a sensible warning.
@@ -62,25 +68,29 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
 // Validate that the update_time statistic isn't changed when the configuration update gets
 // rejected.
 TEST_F(FilesystemSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, "", 0));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(";!@#badjso n");
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0, 0, "", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate that the update_time statistic is changed after a trivial configuration update
 // (update that resulted in no change).
 TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   startSubscription({"cluster0", "cluster1"});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, "", 0));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0"));
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 0, TEST_TIME_MILLIS, 7148434200721666028, "0", 0));
   // Advance the simulated time.
   simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
-  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
+  EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // TODO(htuch): Add generic test harness support for collection subscriptions so that we can test
@@ -122,7 +132,8 @@ public:
   }
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
-                           uint64_t version, absl::string_view version_text) {
+                           uint64_t version, absl::string_view version_text,
+                           uint64_t time_since_last_update) {
     if (attempt != stats_.update_attempt_.value()) {
       return testing::AssertionFailure() << "update_attempt: expected " << attempt << ", got "
                                          << stats_.update_attempt_.value();
@@ -148,8 +159,23 @@ public:
       return testing::AssertionFailure()
              << "version_text: expected " << version << ", got " << stats_.version_text_.value();
     }
+    if (time_since_last_update != stats_.time_since_last_update_.value()) {
+      return testing::AssertionFailure()
+             << "time_since_last_update: expected " << time_since_last_update << ", got "
+             << stats_.time_since_last_update_.value();
+    }
     return testing::AssertionSuccess();
   }
+
+  void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds timeout) {
+    periodic_stats_timer_ =
+        new Event::MockTimer(reinterpret_cast<Event::MockDispatcher*>(dispatcher_.get()));
+    EXPECT_CALL(*periodic_stats_timer_, enableTimer(timeout, _));
+  }
+
+  void expectDisablePeriodicStatsTimer() { EXPECT_CALL(*periodic_stats_timer_, disableTimer()); }
+
+  void callPeriodicStatsTimerCb() { periodic_stats_timer_->invokeCallback(); }
 
   const envoy::config::core::v3::PathConfigSource path_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -160,6 +186,7 @@ public:
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   FilesystemCollectionSubscriptionImpl subscription_;
+  Event::MockTimer* periodic_stats_timer_;
 };
 
 // Validate that an initial collection load succeeds, followed by a successful update, for inline
@@ -167,8 +194,9 @@ public:
 TEST_F(FilesystemCollectionSubscriptionImplTest, InlineEntrySuccess) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::listener::v3::Listener>
       resource_decoder("name");
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   subscription_.start({});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, "", 0));
   // Initial config load.
   const auto inline_entry =
       TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
@@ -197,7 +225,7 @@ resource:
   EXPECT_CALL(callbacks_,
               onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), "system.1"));
   updateFile(resource);
-  EXPECT_TRUE(statsAre(2, 1, 0, 0, 1471442407191366964, "system.1"));
+  EXPECT_TRUE(statsAre(2, 1, 0, 0, 1471442407191366964, "system.1", 0));
   // Update.
   const auto inline_entry_2 =
       TestUtility::parseYaml<xds::core::v3::CollectionEntry::InlineEntry>(R"EOF(
@@ -229,17 +257,19 @@ resource:
                 onConfigUpdate(DecodedResourcesEq(decoded_resources_2.refvec_), "system.2"));
     updateFile(resource_2);
   }
-  EXPECT_TRUE(statsAre(3, 2, 0, 0, 17889017004055064037ULL, "system.2"));
+  EXPECT_TRUE(statsAre(3, 2, 0, 0, 17889017004055064037ULL, "system.2", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate handling of invalid resource wrappers
 TEST_F(FilesystemCollectionSubscriptionImplTest, BadEnvelope) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   subscription_.start({});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, "", 0));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, _));
   // Unknown collection type.
   updateFile("{}");
-  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, "", 0));
   const std::string resource = R"EOF(
 version: system.1
 resource:
@@ -248,13 +278,15 @@ resource:
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, _));
   // Invalid collection type structure.
   updateFile(resource);
-  EXPECT_TRUE(statsAre(3, 0, 0, 2, 0, ""));
+  EXPECT_TRUE(statsAre(3, 0, 0, 2, 0, "", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate handling of unknown fields.
 TEST_F(FilesystemCollectionSubscriptionImplTest, UnknownFields) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   subscription_.start({});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, "", 0));
   const std::string resource = R"EOF(
 version: system.1
 resource:
@@ -275,13 +307,15 @@ resource:
   )EOF";
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(resource);
-  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, "", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 // Validate handling of rejected config.
 TEST_F(FilesystemCollectionSubscriptionImplTest, ConfigRejection) {
+  expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
   subscription_.start({});
-  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, ""));
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, "", 0));
   const std::string resource = R"EOF(
 version: system.1
 resource:
@@ -302,7 +336,8 @@ resource:
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _)).WillOnce(Throw(EnvoyException("blah")));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, _));
   updateFile(resource);
-  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, ""));
+  EXPECT_TRUE(statsAre(2, 0, 1, 0, 0, "", 0));
+  expectDisablePeriodicStatsTimer();
 }
 
 } // namespace

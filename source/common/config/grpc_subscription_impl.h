@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 
 #include "envoy/config/grpc_mux.h"
@@ -44,6 +45,8 @@ public:
 
   ScopedResume pause();
 
+  ~GrpcSubscriptionImpl() override;
+
 private:
   void disableInitFetchTimeoutTimer();
 
@@ -60,6 +63,8 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
   const bool is_aggregated_;
   const SubscriptionOptions options_;
+  Event::TimerPtr periodic_stats_timer_;
+  uint64_t last_update_time_;
 
   struct ResourceNameFormatter {
     void operator()(std::string* out, const Config::DecodedResourceRef& resource) {

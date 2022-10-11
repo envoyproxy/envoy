@@ -106,11 +106,12 @@ public:
 
   AssertionResult statsAre(uint32_t attempt, uint32_t success, uint32_t rejected, uint32_t failure,
                            uint32_t init_fetch_timeout, uint64_t update_time, uint64_t version,
-                           absl::string_view version_text) override {
+                           absl::string_view version_text,
+                           uint64_t time_since_last_update) override {
     // The first attempt always fail unless there was a file there to begin with.
-    return SubscriptionTestHarness::statsAre(attempt, success, rejected,
-                                             failure + (file_at_start_ ? 0 : 1), init_fetch_timeout,
-                                             update_time, version, version_text);
+    return SubscriptionTestHarness::statsAre(
+        attempt, success, rejected, failure + (file_at_start_ ? 0 : 1), init_fetch_timeout,
+        update_time, version, version_text, time_since_last_update);
   }
 
   void expectConfigUpdateFailed() override { stats_.update_failure_.inc(); }
@@ -127,6 +128,22 @@ public:
     // initial_fetch_timeout not implemented
   }
 
+  void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    periodic_stats_timer_ =
+        new Event::MockTimer(dynamic_cast<Event::MockDispatcher*>(dispatcher_.get()));
+    expectEnablePeriodicStatsTimer(period);
+  }
+
+  void expectEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    EXPECT_CALL(*periodic_stats_timer_, enableTimer(period, _));
+  }
+
+  void expectDisablePeriodicStatsTimer() override {
+    EXPECT_CALL(*periodic_stats_timer_, disableTimer());
+  }
+
+  void callPeriodicStatsTimerCb() override { periodic_stats_timer_->invokeCallback(); }
+
   const envoy::config::core::v3::PathConfigSource path_;
   std::string version_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -138,6 +155,7 @@ public:
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
+  Event::MockTimer* periodic_stats_timer_;
 };
 
 } // namespace Config

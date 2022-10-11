@@ -189,6 +189,20 @@ public:
     timer_cb_();
   }
 
+  void expectCreateEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    periodic_stats_timer_ = new Event::MockTimer(&dispatcher_);
+    expectEnablePeriodicStatsTimer(period);
+  }
+
+  void expectEnablePeriodicStatsTimer(std::chrono::milliseconds period) override {
+    EXPECT_CALL(*periodic_stats_timer_, enableTimer(period, _));
+  }
+  void expectDisablePeriodicStatsTimer() override {
+    EXPECT_CALL(*periodic_stats_timer_, disableTimer());
+  }
+
+  void callPeriodicStatsTimerCb() override { periodic_stats_timer_->invokeCallback(); }
+
   bool request_in_progress_{};
   std::string version_;
   std::set<std::string> cluster_names_;
@@ -207,6 +221,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Event::MockTimer* periodic_stats_timer_;
 };
 
 } // namespace Config

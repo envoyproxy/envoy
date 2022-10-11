@@ -24,9 +24,9 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
-      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+      stats_(stats), api_(api), validation_visitor_(validation_visitor), dispatcher_(dispatcher) {
   if (!path_config_source.has_watched_directory()) {
-    file_watcher_ = dispatcher.createFilesystemWatcher();
+    file_watcher_ = dispatcher_.createFilesystemWatcher();
     file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
       if (started_) {
         refresh();
@@ -34,7 +34,7 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
     });
   } else {
     directory_watcher_ =
-        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher_);
     directory_watcher_->setCallback([this]() {
       if (started_) {
         refresh();
@@ -43,9 +43,25 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
   }
 }
 
+FilesystemSubscriptionImpl::~FilesystemSubscriptionImpl() {
+  if (periodic_stats_timer_) {
+    periodic_stats_timer_->disableTimer();
+    periodic_stats_timer_.reset();
+  }
+}
+
 // Config::Subscription
 void FilesystemSubscriptionImpl::start(const absl::flat_hash_set<std::string>&) {
   started_ = true;
+  // We may never succeed, so handle the initial case.
+  last_update_time_ = DateUtil::nowToMilliseconds(dispatcher_.timeSource());
+  periodic_stats_timer_ = dispatcher_.createTimer([this]() -> void {
+    stats_.time_since_last_update_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()) -
+                                       last_update_time_);
+    periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
+  });
+  periodic_stats_timer_->enableTimer(std::chrono::milliseconds(PERIODIC_STATS_TIMER_REFRESH_MS));
+
   // Attempt to read in case there is a file there already.
   refresh();
 }
@@ -80,7 +96,9 @@ void FilesystemSubscriptionImpl::refresh() {
   ProtobufTypes::MessagePtr config_update;
   TRY_ASSERT_MAIN_THREAD {
     const std::string version = refreshInternal(&config_update);
-    stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
+    last_update_time_ = DateUtil::nowToMilliseconds(api_.timeSource());
+    stats_.update_time_.set(last_update_time_);
+    stats_.time_since_last_update_.set(0);
     stats_.version_.set(HashUtil::xxHash64(version));
     stats_.version_text_.set(version);
     stats_.update_success_.inc();
