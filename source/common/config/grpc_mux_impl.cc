@@ -395,9 +395,9 @@ void GrpcMuxImpl::onEstablishmentFailure() {
           /*type_url=*/api_state.first,
           std::vector<std::string>{api_state.second->request_.resource_names().begin(),
                                    api_state.second->request_.resource_names().end()});
+      previously_fetched_data_ = true;
     }
   }
-  previously_fetched_data_ = true;
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {

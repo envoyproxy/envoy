@@ -114,6 +114,9 @@ bug_fixes:
 - area: logger
   change: |
     added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
+- area: thrift
+  change: |
+    fixed the routing decision when thrift filters change the value of the cluster header.
 - area: router
   change: |
     fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
