@@ -1068,9 +1068,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # NOTE: Update together with v8.
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
         version = "521ac34ebd795939c7e16b37d9d3ddb40e8ed556",
-        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8-edge/wee8-fetch-deps.sh.
+        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
         sha256 = "53ed4c8ddc1cd578e7886f6ec21e3cfc904a0ca094380a6938011b3e686e9983",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8-edge/chromium-base_trace_event_common-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
         release_date = "2022-01-19",
