@@ -151,6 +151,10 @@ new_features:
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span
     by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return multiple header values for same header name by setting
     ``{["return_duplicate_headers"] = true}`` as the ``options``.
+- area: http
+  change: |
+    Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
+    :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via Request Header.
 
 deprecated:
 - area: http
