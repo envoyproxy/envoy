@@ -107,6 +107,8 @@ private:
   };
 
   void addReadRequest();
+  void addWriteRequest();
+  void continueWriting(Request& req, uint32_t offset);
   // Checks if the io handle is the one that registered eventfd with `io_uring`.
   // An io handle can be a leader in two cases:
   //   1. it's a server socket accepting new connections;
@@ -126,6 +128,9 @@ private:
   int32_t bytes_to_read_{0};
   bool is_read_added_{false};
   bool is_read_enabled_{true};
+  std::list<Buffer::SliceDataPtr> write_buf_{};
+  uint32_t vecs_to_write_{0};
+  bool is_write_added_{false};
   std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
 };
 
