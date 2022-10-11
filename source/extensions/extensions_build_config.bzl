@@ -56,6 +56,7 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+    "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
 
     #
     # Input Matchers
@@ -356,6 +357,11 @@ EXTENSIONS = {
 
     "envoy.http.header_validators.envoy_default":        "//source/extensions/http/header_validators/envoy_default:config",
 
+    #
+    # Path Pattern Match and Path Pattern Rewrite
+    #
+    "envoy.path.match.uri_template.uri_template_matcher": "//source/extensions/path/match/uri_template:config",
+    "envoy.path.rewrite.uri_template.uri_template_rewriter": "//source/extensions/path/rewrite/uri_template:config",
     #
     # Early Data option
     #

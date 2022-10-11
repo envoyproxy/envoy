@@ -231,8 +231,7 @@ public:
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, time_source),
-        used_(true) {
+                            priority, time_source) {
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -286,8 +285,10 @@ public:
 
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
-  bool used() const override { return used_; }
-  void used(bool new_used) override { used_ = new_used; }
+  bool used() const override { return handle_count_ > 0; }
+  HostHandlePtr acquireHandle() const override {
+    return std::make_unique<HostHandleImpl>(shared_from_this());
+  }
 
 protected:
   static CreateConnectionData
@@ -304,7 +305,20 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
-  std::atomic<bool> used_;
+
+  struct HostHandleImpl : HostHandle {
+    HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
+      parent->handle_count_++;
+    }
+    ~HostHandleImpl() override {
+      if (const auto host = parent_.lock()) {
+        ASSERT(host->handle_count_ > 0);
+        host->handle_count_--;
+      }
+    }
+    const std::weak_ptr<const HostImpl> parent_;
+  };
+  mutable std::atomic<uint32_t> handle_count_{};
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -1111,6 +1125,13 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
 Network::ConnectionSocket::OptionsSharedPtr
 combineConnectionSocketOptions(const ClusterInfo& cluster,
                                const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+/**
+ * Utility function to resolve health check address.
+ */
+Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    Network::Address::InstanceConstSharedPtr host_address);
 
 } // namespace Upstream
 } // namespace Envoy

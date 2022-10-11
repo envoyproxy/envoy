@@ -260,12 +260,19 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
+# path match by pattern
+/*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
+# path rewrite by pattern
+/*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
+# Dubbo codec
+/*/extensions/common/dubbo @wbpcode @lizan
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -294,3 +301,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
+/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch

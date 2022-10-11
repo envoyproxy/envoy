@@ -43,7 +43,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
   uint32_t default_port = config_->port();
 
-  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
+  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, false, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {

@@ -40,9 +40,8 @@ public:
   void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
                        const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
-    const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
-    auto health_check_address =
-        port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+    const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
+    auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
 
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);

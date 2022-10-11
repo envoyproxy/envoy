@@ -21,7 +21,7 @@ class RepickClusterFilter : public Http::PassThroughFilter {
 public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_header, bool) override {
     request_header.addCopy(Envoy::Http::LowerCaseString(ClusterHeaderName), ClusterName);
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     return Http::FilterHeadersStatus::Continue;
   }
 };

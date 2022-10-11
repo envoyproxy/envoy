@@ -54,12 +54,9 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    // Ensure that decodeData is only called for HTTP/3 (where protocol is set at the
-    // connection level). In HTTP/3 the FIN arrives separately so we will get
-    // decodeData() with an empty body.
+    // decodeData is called for HTTP/3 where the FIN arrives separately from headers.
     if (config_->where_to_add_body_ == test::integration::filters::AddBodyFilterConfig::DEFAULT) {
-      if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
-          data.length() == 0u) {
+      if (end_stream && data.length() == 0u) {
         data.add("body");
       }
     } else if (config_->where_to_add_body_ ==
@@ -83,12 +80,9 @@ public:
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    // Ensure that encodeData is only called for HTTP/3 (where protocol is set at the
-    // connection level). In HTTP/3 the FIN arrives separately so we will get
-    // encodeData() with an empty body.
+    // encodeData is called for HTTP/3 where the FIN arrives separately from headers.
     if (config_->where_to_add_body_ == test::integration::filters::AddBodyFilterConfig::DEFAULT) {
-      if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
-          data.length() == 0) {
+      if (end_stream && data.length() == 0) {
         data.add("body");
       }
     } else if (config_->where_to_add_body_ ==

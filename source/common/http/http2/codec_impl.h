@@ -266,8 +266,8 @@ protected:
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
     uint32_t bufferLimit() const override { return pending_recv_data_->highWatermark(); }
-    const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.connection_.connectionInfoProvider().localAddress();
+    const Network::ConnectionInfoProvider& connectionInfoProvider() override {
+      return parent_.connection_.connectionInfoProvider();
     }
     absl::string_view responseDetails() override { return details_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;

@@ -342,6 +342,11 @@ def normalize_field_type_name(type_context, field_fqn):
         Normalized type name as a string.
     """
     if field_fqn.startswith('.'):
+        # If there's a [#allow-fully-qualified-name] annotation, return the FQN
+        # field type without attempting to normalize.
+        if annotations.ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION in type_context.leading_comment.annotations:
+            return field_fqn
+
         # Let's say we have type context namespace a.b.c.d.e and the type we're
         # trying to normalize is a.b.d.e. We take (from the end) on package fragment
         # at a time, and apply the inner-most evaluation that protoc performs to see

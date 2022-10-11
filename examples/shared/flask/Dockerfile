@@ -1,4 +1,4 @@
-FROM python:3.10.6-slim-bullseye@sha256:dff7fd9200421a8c65e020af221a21c8aab784c5c8a8d55c64a095b645209d77
+FROM python:3.10.7-slim-bullseye@sha256:04a4e3f8fae018a92e082d7f18285d2e5058cee77a7fa5374c832f328a1b5c20
 
 ENV DEBIAN_FRONTEND=noninteractive
 

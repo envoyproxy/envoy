@@ -85,13 +85,10 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
+  Router::RouteConstSharedPtr route() override;
   void resetStream(Http::StreamResetReason reset_reason,
                    absl::string_view transport_failure_reason) override;
-  Router::RouteConstSharedPtr route() override;
-  Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
-  void setRoute(Router::RouteConstSharedPtr route) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-  void clearRouteCache() override;
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
@@ -103,6 +100,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   void traversePerFilterConfig(
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
 
   // Functions to set or get iteration state.
@@ -127,6 +125,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     }
     return saved_response_metadata_.get();
   }
+
+  Router::RouteConstSharedPtr getRoute() const;
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -249,9 +249,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestDataTooLarge();
   void requestDataDrained();
-
-  void requestRouteConfigUpdate(
-      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
@@ -472,27 +469,6 @@ public:
   virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
 
   /**
-   * Returns the current route.
-   */
-  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
-
-  /**
-   * Sets the current route.
-   */
-  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
-
-  /**
-   * Clears the cached route.
-   */
-  virtual void clearRouteCache() PURE;
-
-  /**
-   * Update the current route configuration.
-   */
-  virtual void
-  requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
-
-  /**
    * Returns the current active span.
    */
   virtual Tracing::Span& activeSpan() PURE;
@@ -534,6 +510,11 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Returns a handle to the downstream callbacks, if available.
+   */
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
 };
 
 /**

@@ -61,7 +61,7 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 } // namespace
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) ABSL_FLAG(bool, flag, maybeOverride(#flag, value), "");
+#define QUIC_FLAG(flag, value) ABSL_FLAG(bool, envoy_##flag, maybeOverride(#flag, value), "");
 #include "quiche/quic/core/quic_flags_list.h"
 QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)  // NOLINT
 QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)    // NOLINT
@@ -74,7 +74,7 @@ QUIC_FLAG(quic_restart_flag_http2_testonly_default_true, true)      // NOLINT
 #undef QUIC_FLAG
 
 #define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \
-  ABSL_FLAG(type, flag, maybeOverride(#flag, value), help);
+  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), help);
 
 #define DEFINE_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                                  \
   DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
@@ -108,8 +108,8 @@ namespace {
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
-  ASSERT(absl::GetFlag(FLAGS_quic_restart_flag_quic_testonly_default_true) == true);
-#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_" #flag, &FLAGS_##flag);
+  ASSERT(absl::GetFlag(FLAGS_envoy_quic_restart_flag_quic_testonly_default_true) == true);
+#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
 #include "quiche/quic/core/quic_flags_list.h"
   QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_false, false)
   QUIC_FLAG(quic_reloadable_flag_spdy_testonly_default_true, true)

@@ -137,9 +137,9 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
 
   // Verify that route cache is cleared when modifying HTTP request headers.
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter().setDecoderFilterCallbacks(decoder_callbacks);
-  EXPECT_CALL(decoder_callbacks, clearRouteCache()).Times(2);
+  EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(2);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
@@ -158,6 +158,7 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
 TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   setupTest("", "headers");
   setupFilter();
+
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
   EXPECT_CALL(filter(),
               log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
@@ -165,9 +166,9 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
 
   // Verify that route cache is cleared when modifying HTTP request headers.
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter().setDecoderFilterCallbacks(decoder_callbacks);
-  EXPECT_CALL(decoder_callbacks, clearRouteCache()).Times(2);
+  EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(2);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
@@ -179,7 +180,7 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter().decodeMetadata(request_metadata));
 
   // Verify that route cache is NOT cleared when modifying HTTP response headers.
-  EXPECT_CALL(decoder_callbacks, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(0);
 
   Http::TestResponseHeaderMapImpl response_headers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, false));
