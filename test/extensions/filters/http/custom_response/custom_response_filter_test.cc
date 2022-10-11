@@ -24,24 +24,10 @@ namespace {
 
 class CustomResponseFilterTest : public testing::Test {
 public:
-  void setupMockObjects() {
-    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_))
-        .WillRepeatedly(Return(&thread_local_cluster_));
-    EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillRepeatedly(Invoke([&](Envoy::Http::RequestMessagePtr& message,
-                                   Envoy::Http::AsyncClient::Callbacks& callback,
-                                   const Envoy::Http::AsyncClient::RequestOptions& options)
-                                   -> Http::AsyncClient::Request* {
-          message_.swap(message);
-          client_callback_ = &callback;
-          options_ = options;
-          return &client_request_;
-        }));
-  }
-
   void setupFilterAndCallback() {
     filter_ = std::make_unique<CustomResponseFilter>(config_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
   void createConfig(const absl::string_view config_str = kDefaultConfig) {
@@ -57,17 +43,9 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
-  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
+  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Envoy::Http::MockAsyncClientRequest> client_request_{
-      &thread_local_cluster_.async_client_};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
-
-  // Mocks for http request.
-  Envoy::Http::AsyncClient::Callbacks* client_callback_;
-  Envoy::Http::RequestMessagePtr message_;
-  Envoy::Http::AsyncClient::RequestOptions options_;
 
   std::unique_ptr<CustomResponseFilter> filter_;
   std::shared_ptr<FilterConfig> config_;
@@ -76,24 +54,29 @@ public:
 };
 
 TEST_F(CustomResponseFilterTest, LocalData) {
-  setupMockObjects();
   createConfig();
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl headers{{":status", "499"}};
+  Http::TestRequestHeaderMapImpl request_headers{};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "499"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _));
-  EXPECT_EQ(filter_->encodeHeaders(headers, true), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            Http::FilterHeadersStatus::StopIteration);
 }
 
-TEST_F(CustomResponseFilterTest, DISABLED_RemoteData) {
-  setupMockObjects();
+TEST_F(CustomResponseFilterTest, RemoteData) {
   createConfig();
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl headers{{":status", "503"}};
-  EXPECT_EQ(filter_->encodeHeaders(headers, true), Http::FilterHeadersStatus::StopIteration);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_));
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            Http::FilterHeadersStatus::StopIteration);
 }
 
 } // namespace

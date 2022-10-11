@@ -30,6 +30,21 @@ TEST(CustomResponseFilterConfigTest, CustomResponseFilter) {
   cb(filter_callback);
 }
 
+TEST(CustomResponseFilterConfigTest, InvalidURI) {
+  envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
+  std::string config(kDefaultConfig);
+  config.replace(config.find("https"), 4, "%#?*");
+
+  TestUtility::loadFromYaml(config, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  CustomResponseFilterFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(filter_config, "stats", context),
+                            EnvoyException,
+                            "Invalid uri specified for redirection for custom response: "
+                            "%#?*s://foo.example/gateway_error");
+}
+
 } // namespace
 } // namespace CustomResponse
 } // namespace HttpFilters

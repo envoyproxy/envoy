@@ -53,8 +53,9 @@ Http::FilterHeadersStatus
 LocalResponsePolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
                                    CustomResponseFilter& custom_response_filter) const {
   auto encoder_callbacks = custom_response_filter.encoderCallbacks();
-  // ENVOY_BUG(encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
-  //"envoy.filters.http.custom_response") == nullptr);
+  ENVOY_BUG(encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
+                "envoy.filters.http.custom_response") == nullptr,
+            "Filter State should not be set when using the LocalResponse policy.");
   // Handle local body
   std::string body;
   Http::Code code = getStatusCodeForLocalReply(headers);

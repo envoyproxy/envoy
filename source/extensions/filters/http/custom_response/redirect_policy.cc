@@ -56,7 +56,7 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   auto filter_state = encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");
   if (filter_state) {
-    // ENVOY_BUG(filter_state == this);
+    ENVOY_BUG(filter_state == this, "Policy filter state should be this policy.");
     //  Apply mutations if this is a non-error response. Else leave be.
     auto const cr_code = Http::Utility::getResponseStatusOrNullopt(headers);
     if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
@@ -85,7 +85,7 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
 
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(http_uri_, false)) {
-    ENVOY_LOG(trace, "Redirect for custom response failed: invalid location {}", http_uri_);
+    ENVOY_LOG(error, "Redirect for custom response failed: invalid location {}", http_uri_);
     stats_.custom_response_redirect_invalid_uri_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -134,6 +134,8 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   downstream_headers->setMethod(Http::Headers::get().MethodValues.Get);
   downstream_headers->remove(Http::Headers::get().ContentLength);
   encoder_callbacks->streamInfo().filterState()->setData(
+      // TODO(pradeepcrao): Currently we don't have a mechanism to add readonly
+      // objects to FilterState, even if they're immutable.
       "envoy.filters.http.custom_response", const_cast<RedirectPolicy*>(this)->shared_from_this(),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   restore_original_headers.cancel();
