@@ -277,6 +277,10 @@ message JwtProvider {
   // Enables JWT cache, its size is specified by ``jwt_cache_size``.
   // Only valid JWT tokens are cached.
   JwtCacheConfig jwt_cache_config = 12;
+
+  // Add JWT Claim to HTTP Header
+
+  repeated JwtClaimToHeader claim_to_header = 15;
 }
 
 // This message specifies JWT Cache configuration.
@@ -716,4 +720,15 @@ message PerRouteConfig {
     // in ``JwtAuthentication``. If no, the requests using this route will be rejected with 403.
     string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
   }
+}
+
+// This message specifies a combination of header name and claim name.
+message JwtClaimToHeader {
+  
+  // The HTTP header name.
+  string name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // JWT Claim
+  string claim = 2 [(validate.rules).string = {min_len: 1}];;
 }

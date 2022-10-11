@@ -122,6 +122,7 @@ public:
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
+    extractor_->sanitizeClaimHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
@@ -171,6 +172,7 @@ public:
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true, true);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
+    extractor_->sanitizeClaimHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {
@@ -203,6 +205,7 @@ public:
     auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */,
                                      true /* allow missing */);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
+    extractor_->sanitizeClaimHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
         [&ctximpl](const std::string& name, const ProtobufWkt::Struct& extracted_data) {

@@ -286,6 +286,14 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     }
   }
 
+  if (provider.claim_to_header_size() != 0) {
+    for (const auto& header : provider.claim_to_header()) {
+      if (!header.claim().empty()) {
+        // TODO: Add a logic to fetch custom claim from jwt payload
+      }
+    }
+  }
+
   if (!provider.forward()) {
     // TODO(potatop) remove JWT from queries.
     // Remove JWT from headers.
