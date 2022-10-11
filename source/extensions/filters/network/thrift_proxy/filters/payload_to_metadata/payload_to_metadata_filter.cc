@@ -183,8 +183,12 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
     if (!value.empty() && rule.rule().has_on_present()) {
       // We can *not* always std::move(value) here since we need `value` if multiple rules are
       // matched. Optimize the most common usage, which is one rule per payload field.
-      applyKeyValue(rule_ids.size() == 1 ? std::move(value) : value, rule,
-                    rule.rule().on_present());
+      if (rule_ids.size() == 1) {
+        applyKeyValue(std::move(value), rule, rule.rule().on_present());
+        break;
+      } else {
+        applyKeyValue(value, rule, rule.rule().on_present());
+      }
     }
   }
 }
