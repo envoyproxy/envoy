@@ -119,12 +119,11 @@ protected:
     listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
     EXPECT_CALL(listener_config_, filterChainManager())
         .WillRepeatedly(ReturnRef(filter_chain_manager_));
-    quic_listener_ = staticUniquePointerCast<ActiveQuicListener>(
-        listener_factory_->createActiveUdpListener(
+    quic_listener_ =
+        staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             scoped_runtime_.loader(), 0, connection_handler_,
             listener_config_.socket_factories_[0]->getListenSocket(0), *dispatcher_,
-            listener_config_),
-        validation_visitor_);
+            listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
         ActiveQuicListenerPeer::cryptoConfig(*quic_listener_);
@@ -146,8 +145,8 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
-                                                       quic_stat_names_);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
+                                                       validation_visitor_);
   }
 
   void maybeConfigureMocks(int connection_count) {

@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Extensions of QUIC crypto stream.
+# Extensions of QUIC connection ID generator.
 
 envoy_extension_package()
 
