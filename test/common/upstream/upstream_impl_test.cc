@@ -1483,6 +1483,30 @@ TEST_F(HostImplTest, HealthFlags) {
   EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
+TEST_F(HostImplTest, HealthStatus) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1, 0,
+                                    Host::HealthStatus::DRAINING);
+
+  // To begin with, no flags are set so EDS status is used.
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->healthStatus());
+
+  // Setting an active unhealthy flag make the host unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // Setting a degraded flag on an unhealthy host has no effect.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // If the degraded flag is the only thing set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->health());
+}
+
 // Test that it's not possible to do a HostDescriptionImpl with a unix
 // domain socket host and a health check config with non-zero port.
 // This is a regression test for oss-fuzz issue
