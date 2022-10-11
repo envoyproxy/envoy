@@ -10,13 +10,6 @@ def envoy_mobile_repositories():
         urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
     )
 
-    http_archive(
-        name = "swift_flatbuffers",
-        sha256 = "f97965a727d26386afaefff950badef2db3ab6af9afe23ed6d94bfb65f95f37e",
-        strip_prefix = "flatbuffers-2.0.8",
-        urls = ["https://github.com/google/flatbuffers/archive/refs/tags/v2.0.8.tar.gz"],
-    )
-
     upstream_envoy_overrides()
     swift_repos()
     kotlin_repos()
