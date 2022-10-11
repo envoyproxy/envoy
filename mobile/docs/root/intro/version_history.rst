@@ -7,6 +7,7 @@ Pending Release
 Breaking changes:
 
 - ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
+- build: building on macOS now requires Xcode 14.0. (:issue:`#2544 <2544>`)
 
 Bugfixes:
 
