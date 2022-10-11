@@ -1163,8 +1163,9 @@ namespace fmt {
 template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
   template <typename FormatContext>
   auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
-    absl::string_view out =
-        host.hostname().empty() ? host.hostname() : host.address()->asStringView();
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
     return formatter<absl::string_view>().format(out, ctx);
   }
 };

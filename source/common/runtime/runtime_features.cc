@@ -42,6 +42,7 @@ RUNTIME_GUARD(envoy_reloadable_features_combine_sds_requests);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_remote_address);
+RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
 RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
@@ -66,6 +67,7 @@ RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_time
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
+RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
 RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -156,7 +158,7 @@ bool hasRuntimePrefix(absl::string_view feature) {
   // Track Envoy reloadable and restart features, excluding synthetic QUIC flags
   // which are not tracked in the list below.
   return (absl::StartsWith(feature, "envoy.reloadable_features.") &&
-          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_quic")) ||
+          !absl::StartsWith(feature, "envoy.reloadable_features.FLAGS_envoy_quic")) ||
          absl::StartsWith(feature, "envoy.restart_features.");
 }
 
