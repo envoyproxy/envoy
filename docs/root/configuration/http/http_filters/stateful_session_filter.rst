@@ -57,9 +57,10 @@ session state implementation.
 One example
 ___________
 
-Currently, only :ref:`cookie-based session state
-<envoy_v3_api_msg_extensions.http.stateful_session.cookie.v3.CookieBasedSessionState>` is supported.
-So let's take this as an example.
+Currently, :ref:`cookie-based session state
+<envoy_v3_api_msg_extensions.http.stateful_session.cookie.v3.CookieBasedSessionState>` and :ref:`header-based session state
+<envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` are supported.
+So let's take this as an example for cookie based implementation.
 
 .. literalinclude:: _include/stateful-cookie-session.yaml
     :language: yaml
@@ -75,3 +76,21 @@ request will be routed to that host.
 
 If there is no valid cookie, the load balancer will choose a new upstream host. When responding, the address
 of the selected upstream host will be stored in the cookie named ``global-session-cookie``.
+
+Similar example for header based configuration would be:
+
+.. literalinclude:: _include/stateful-header-session.yaml
+    :language: yaml
+    :lines: 28-41
+    :emphasize-lines: 4-11
+    :linenos:
+    :lineno-start: 28
+    :caption: :download:`stateful-header-session.yaml <_include/stateful-header-session.yaml>`
+
+Note
+___________
+
+* The header based implementation assumes that a client will use the last supplied value for the session
+  header and will pass it with every subsequent request.
+* StatefulSessionPerRoute should be used if path match is required.
+
