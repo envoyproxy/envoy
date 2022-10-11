@@ -32,7 +32,8 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 }
 
 bool checkForTtl(absl::string_view& contents) {
-  if (contents.size() > KV_STORE_TTL_KEY.length() && contents.substr(0, KV_STORE_TTL_KEY.length()) == KV_STORE_TTL_KEY) {
+  if (contents.size() > KV_STORE_TTL_KEY.length() &&
+      contents.substr(0, KV_STORE_TTL_KEY.length()) == KV_STORE_TTL_KEY) {
     contents.remove_prefix(KV_STORE_TTL_KEY.length());
     return true;
   }
