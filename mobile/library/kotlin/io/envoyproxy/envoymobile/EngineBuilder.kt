@@ -37,6 +37,7 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   protected var eventTracker: ((Map<String, String>) -> Unit)? = null
   protected var enableProxying = false
+  private var enableSkipDNSLookupForProxiedRequests = false
   private var engineType: () -> EnvoyEngine = {
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
@@ -345,6 +346,22 @@ open class EngineBuilder(
   }
 
   /**
+   * Allows Envoy to avoid having to wait on DNS response in the dynamic forward proxy filter
+   * for requests that are proxied i.e., a proxied request that goes to example.com will
+   * not have to wait for the DNS resolution for example.com domain if skipping of the DNS lookup
+   * is enabled. Defaults to false.
+   *
+   * @param enableSkipDNSLookup whether to ship waiting for DNS responses in the
+   *                            dynamic forward proxy filter for proxied requests.
+   *
+   * @return This builder.
+   */
+  fun enableSkipDNSLookupForProxiedRequests(enableSkipDNSLookup: Boolean): EngineBuilder {
+    this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookup
+    return this
+  }
+
+  /**
    * Add a rate at which to ping h2 connections on new stream creation if the connection has
    * sat idle. Defaults to 1 millisecond which effectively enables h2 ping functionality
    * and results in a connection ping on every new stream creation. Set it to
@@ -635,7 +652,8 @@ open class EngineBuilder(
       platformFilterChain,
       stringAccessors,
       keyValueStores,
-      statsSinks
+      statsSinks,
+      enableSkipDNSLookupForProxiedRequests
     )
 
     return when (configuration) {

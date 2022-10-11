@@ -118,6 +118,7 @@ R"(- &enable_drain_post_dns_refresh false
 - &per_try_idle_timeout 15s
 - &trust_chain_verification VERIFY_TRUST_CHAIN
 - &virtual_clusters []
+- &skip_dns_lookup_for_proxied_requests false
 
 !ignore stats_defs:
   base_metrics_service: &base_metrics_service
@@ -505,6 +506,7 @@ layered_runtime:
             allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
             http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
+            skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in
 // https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
