@@ -276,6 +276,10 @@ new_features:
 - area: grpc_json_transcoder
   change: |
     added support for newline-delimited streams in :ref:`stream_newline_delimited <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
+- area: http
+  change: |
+    Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
+    :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via request/response header.
 
 deprecated:
 - area: http

@@ -1143,6 +1143,13 @@ envoy.http.stateful_session.cookie:
   status: alpha
   type_urls:
   - envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
+envoy.http.stateful_session.header:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
 envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input

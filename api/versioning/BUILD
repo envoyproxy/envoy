@@ -171,6 +171,7 @@ proto_library(
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/xff/v3:pkg",
         "//envoy/extensions/http/stateful_session/cookie/v3:pkg",
+        "//envoy/extensions/http/stateful_session/header/v3:pkg",
         "//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
