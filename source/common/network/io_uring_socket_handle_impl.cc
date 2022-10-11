@@ -45,7 +45,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     ::close(fd_);
   }
   if (isLeader()) {
-    io_uring_factory_.get().ref().unregisterEventfd();
+    if (io_uring_factory_.get().ref().isEventfdRegistered()) {
+      io_uring_factory_.get().ref().unregisterEventfd();
+    }
     file_event_adapter_.reset();
   }
   SET_SOCKET_INVALID(fd_);
@@ -237,7 +239,10 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileTriggerType trigger, uint32_t events) {
   // Check if this is a server socket accepting new connections.
   if (isLeader()) {
-    file_event_adapter_->initialize(dispatcher, cb, trigger, events);
+    // Multiple listeners in single thread, there can be registered by other listener.
+    if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
+      file_event_adapter_->initialize(dispatcher, cb, trigger, events);
+    }
     file_event_adapter_->addAcceptRequest();
     io_uring_factory_.get().ref().submit();
     return;
