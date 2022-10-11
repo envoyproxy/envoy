@@ -609,7 +609,8 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
                            "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
+        validation_visitor_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
