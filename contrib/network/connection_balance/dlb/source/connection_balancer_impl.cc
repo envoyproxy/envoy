@@ -24,7 +24,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
       dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(config);
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
   auto status = Envoy::MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb_config);
-  if (absl::IsInternal(status)) {
+  if (!status.ok()) {
     ExceptionUtil::throwEnvoyException(
         fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
   }
