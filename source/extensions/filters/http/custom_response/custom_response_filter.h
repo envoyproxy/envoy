@@ -37,11 +37,11 @@ public:
   ~CustomResponseFilter() override = default;
 
   CustomResponseFilter(std::shared_ptr<FilterConfig> config)
-      : config_{std::move(config)}, base_config_{config_.get()} {}
+      : config_{std::move(config)}, config_to_use_{config_.get()} {}
 
 private:
   std::shared_ptr<FilterConfig> config_;
-  const FilterConfigBase* base_config_ = nullptr;
+  const FilterConfig* config_to_use_ = nullptr;
   Http::RequestHeaderMap* downstream_headers_ = nullptr;
 };
 

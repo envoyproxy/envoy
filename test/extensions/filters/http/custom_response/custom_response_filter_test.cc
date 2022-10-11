@@ -48,7 +48,7 @@ public:
     envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
     TestUtility::loadFromYaml(std::string(config_str), filter_config);
     Stats::StatNameManagedStorage prefix("stats", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(filter_config, prefix.statName(), context_);
+    config_ = std::make_shared<FilterConfig>(filter_config, context_, prefix.statName());
   }
 
   void setServerName(const std::string& server_name) {
@@ -56,7 +56,7 @@ public:
         server_name);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

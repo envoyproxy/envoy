@@ -20,9 +20,9 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
   if (!filter_state) {
     downstream_headers_ = &header_map;
     const auto* per_route_settings =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
-    base_config_ = per_route_settings ? static_cast<const FilterConfigBase*>(per_route_settings)
-                                      : static_cast<const FilterConfigBase*>(config_.get());
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
+    config_to_use_ = per_route_settings ? static_cast<const FilterConfig*>(per_route_settings)
+                                        : static_cast<const FilterConfig*>(config_.get());
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return filter_state->encodeHeaders(headers, end_stream, *this);
   }
 
-  auto policy = base_config_->getPolicy(headers, encoder_callbacks_->streamInfo());
+  auto policy = config_to_use_->getPolicy(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
   if (!policy) {

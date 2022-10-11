@@ -69,25 +69,21 @@ public:
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    Stats::StatName stats_prefix, Server::Configuration::FactoryContext& context)
-    : FilterConfigBase(config, context.getServerFactoryContext()), stats_prefix_(stats_prefix) {}
-
-FilterConfigBase::FilterConfigBase(
-    const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, Stats::StatName stats_prefix)
+    : stats_prefix_(stats_prefix) {
   // Allow matcher to not be set, to allow for cases where we only have route or
   // virtual host specific configurations.
   if (config.has_custom_response_matcher()) {
     CustomResponseMatchActionValidationVisitor validation_visitor;
-    CustomResponseActionFactoryContext action_factory_context{context, context.scope().prefix()};
+    CustomResponseActionFactoryContext action_factory_context{context, stats_prefix_};
     Matcher::MatchTreeFactory<Http::HttpMatchingData, CustomResponseActionFactoryContext> factory(
         action_factory_context, context, validation_visitor);
     matcher_ = factory.create(config.custom_response_matcher())();
   }
 }
 
-PolicySharedPtr FilterConfigBase::getPolicy(Http::ResponseHeaderMap& headers,
-                                            const StreamInfo::StreamInfo& stream_info) const {
+PolicySharedPtr FilterConfig::getPolicy(Http::ResponseHeaderMap& headers,
+                                        const StreamInfo::StreamInfo& stream_info) const {
   if (!matcher_) {
     return PolicySharedPtr{};
   }

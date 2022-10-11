@@ -156,12 +156,14 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response = sendRequestAndWaitForResponse(
-      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(20));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
-  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
-  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_invalid_uri")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
+  EXPECT_EQ(
+      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   EXPECT_EQ("x-bar2",
             response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }
@@ -181,7 +183,8 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   EXPECT_EQ("502", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
-  EXPECT_EQ(1, test_server_->counter("custom_response_redirect_no_route")->value());
+  EXPECT_EQ(1,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
 }
 
 // Verify that the route specific filter is picked if specified.
@@ -217,8 +220,10 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
-  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
-  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_invalid_uri")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
+  EXPECT_EQ(
+      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   EXPECT_EQ("x-bar2",
             response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }

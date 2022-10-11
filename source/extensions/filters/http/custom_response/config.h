@@ -27,36 +27,20 @@ namespace CustomResponse {
  * responses, and matching tree/list to get custom response for a particular
  * upstream response for both hcm and route specific configs.
  */
-class FilterConfigBase {
+class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigBase(
-      const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-      Server::Configuration::ServerFactoryContext& context);
+  FilterConfig(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+               Envoy::Server::Configuration::ServerFactoryContext& context,
+               Stats::StatName stats_prefix);
 
   PolicySharedPtr getPolicy(Http::ResponseHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info) const;
 
-  virtual ~FilterConfigBase() = default;
-
-protected:
-  Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
-};
-
-class FilterConfig : public FilterConfigBase {
-public:
-  FilterConfig(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
-               Stats::StatName prefix, Server::Configuration::FactoryContext& context);
-
-  ~FilterConfig() override = default;
+  ~FilterConfig() = default;
 
 private:
   Stats::StatName stats_prefix_;
-};
-
-class FilterConfigPerRoute : public FilterConfigBase, public Router::RouteSpecificFilterConfig {
-public:
-  using FilterConfigBase::FilterConfigBase;
-  ~FilterConfigPerRoute() override = default;
+  Matcher::MatchTreePtr<Http::HttpMatchingData> matcher_;
 };
 
 } // namespace CustomResponse
