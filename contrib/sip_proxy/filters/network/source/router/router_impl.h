@@ -306,7 +306,7 @@ private:
   QueryStatus handleCustomizedAffinity(const std::string& header, const std::string& type,
                                        const std::string& key, MessageMetadataSharedPtr metadata);
 
-  void reuseUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info, MessageMetadataSharedPtr metadata);
+  std::shared_ptr<UpstreamConnection> getUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info, MessageMetadataSharedPtr metadata);
 
   Upstream::ClusterManager& cluster_manager_;
   RouterStats stats_;
@@ -349,7 +349,7 @@ public:
 
 private:
   FilterStatus checkUpstreamRequestValidity(MessageMetadataSharedPtr metadata);
-  SipFilters::DecoderFilterCallbacks* searchDownstreamConnection(MessageMetadataSharedPtr metadata);
+  SipFilters::DecoderFilterCallbacks* getDownstreamConnection(MessageMetadataSharedPtr metadata);
 
   UpstreamConnection& parent_;
   DecoderPtr decoder_;

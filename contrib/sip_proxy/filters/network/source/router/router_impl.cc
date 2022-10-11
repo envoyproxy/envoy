@@ -281,17 +281,15 @@ FilterStatus Router::handleAffinity() {
   return FilterStatus::Continue;
 }
 
-void Router::reuseUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info, MessageMetadataSharedPtr metadata) {
+std::shared_ptr<UpstreamConnection> Router::getUpstreamConnection(const std::string& host, std::shared_ptr<TransactionInfo> transaction_info, MessageMetadataSharedPtr metadata) {
   auto upstream_connection = transaction_info->getUpstreamConnection(host);
   if (upstream_connection != nullptr) {
     // There is upstream request for the host, reuse it.
     ENVOY_STREAM_LOG(trace, "reuse upstream request from {}", *callbacks_, host);
-    upstream_connection_ = upstream_connection;
-    upstream_connection_->setMetadata(metadata);
-    upstream_connection_->setDecoderFilterCallbacks(*callbacks_);
-  } else {
-    upstream_connection_ = nullptr;
-  }
+    upstream_connection->setMetadata(metadata);
+    upstream_connection->setDecoderFilterCallbacks(*callbacks_);
+  } 
+  return upstream_connection;
 }
 
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
@@ -335,6 +333,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   if (options_->upstreamTransactionsEnabled()) {
     if (callbacks_->originIngress().has_value()) {
       if (metadata->hasXEnvoyOriginIngressHeader()) {
+        // This header removal will be made configurable in the future for supporting meshed topologies
         ENVOY_STREAM_LOG(
             info,
             "X-Envoy-Origin-Ingress header existing in incoming message, removing it for "
@@ -344,12 +343,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
       }
       ENVOY_STREAM_LOG(debug, "Adding X-Envoy-Origin-Ingress header ...", *callbacks_);
       metadata->addXEnvoyOriginIngressHeader(callbacks_->originIngress().value());
-    } else {
-      ENVOY_STREAM_LOG(error,
-                       "No Ingress ID defined for current transaction. Discarding the message",
-                       *callbacks_);
-      return FilterStatus::StopIteration;
-    }
+    } 
   }
 
   handleAffinity();
@@ -388,8 +382,8 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     return FilterStatus::StopIteration;
   }
 
-  if (reuseUpstreamConnection(host->address()->ip()->addressAsString(), transaction_info, metadata);
-      upstream_connection_ == nullptr) {
+  upstream_connection_ = getUpstreamConnection(host->address()->ip()->addressAsString(), transaction_info, metadata);
+  if (upstream_connection_ == nullptr) {
     upstream_connection_ = std::make_shared<UpstreamConnection>(
         std::make_shared<Upstream::TcpPoolData>(*conn_pool), transaction_info, context_,
         options_->upstreamTransactionsEnabled());
@@ -428,8 +422,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
     ENVOY_LOG(debug, "Using preset destination {} for responses coming from downstream", host);
 
-    if (reuseUpstreamConnection(host, transaction_info, metadata);
-        upstream_connection_ != nullptr) {
+    upstream_connection_ = getUpstreamConnection(host, transaction_info, metadata);
+    if (upstream_connection_ != nullptr) {
       // There is upstream request for the host, reuse it.
       ENVOY_STREAM_LOG(trace, "call upstream_connection_->start()", *callbacks_);
       // Continue: continue to messageEnd, StopIteration: continue to next affinity
@@ -487,8 +481,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       return FilterStatus::Continue;
     }
 
-    if (reuseUpstreamConnection(host, transaction_info, metadata);
-        upstream_connection_ != nullptr) {
+    upstream_connection_ = getUpstreamConnection(host, transaction_info, metadata);
+    if (upstream_connection_ != nullptr) {
       transaction_info->insertTransaction(std::string(metadata->transactionId().value()),
                                           callbacks_, upstream_connection_);
       ENVOY_STREAM_LOG(trace, "call upstream_connection_->start()", *callbacks_);
@@ -840,7 +834,7 @@ FilterStatus UpstreamMessageDecoder::checkUpstreamRequestValidity(MessageMetadat
   return FilterStatus::Continue;
 }
 
-SipFilters::DecoderFilterCallbacks* UpstreamMessageDecoder::searchDownstreamConnection(MessageMetadataSharedPtr metadata) {
+SipFilters::DecoderFilterCallbacks* UpstreamMessageDecoder::getDownstreamConnection(MessageMetadataSharedPtr metadata) {
   auto origin_ingress = metadata->originIngress();
 
   auto message_thread_id = origin_ingress->getThreadID();
@@ -880,7 +874,7 @@ FilterStatus UpstreamMessageDecoder::transportBegin(MessageMetadataSharedPtr met
       return FilterStatus::StopIteration;
     }
 
-    auto downstream_conn = searchDownstreamConnection(metadata); 
+    auto downstream_conn = getDownstreamConnection(metadata); 
     if (downstream_conn == nullptr) {
       return FilterStatus::StopIteration;
     }

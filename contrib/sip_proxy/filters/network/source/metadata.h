@@ -92,8 +92,6 @@ private:
   bool subscribe_;
 };
 
-// rename to OriginIngress for consistency
-// think about using string-view here if possible, and adding a move ctr
 class OriginIngress {
 public:
   OriginIngress(const std::string& thread_id, const std::string& connection_id)
