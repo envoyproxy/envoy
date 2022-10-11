@@ -84,7 +84,7 @@ public:
     // Make sure the requested memory allocation is below uint32_t::max
     const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
     validateCapacity(new_capacity);
-    ASSERT(validInput(absl::string_view(data, data_size)));
+    ASSERT(valid(absl::string_view(data, data_size)));
 
     switch (type()) {
     case Type::Reference: {
@@ -257,7 +257,7 @@ protected:
 
   bool valid() const { return Validator()(getStringView()); }
 
-  bool validInput(absl::string_view data) const { return Validator()(data); }
+  bool valid(absl::string_view data) const { return Validator()(data); }
 
   /**
    * @return the type of backing storage for the string.
