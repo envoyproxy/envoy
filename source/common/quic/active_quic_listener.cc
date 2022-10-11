@@ -291,8 +291,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           cid_generator_config);
   quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
-                                                 cid_generator_config_factory),
-      concurrency_);
+                                                 cid_generator_config_factory));
 
   uint8_t cid_length = quic_cid_generator_factory_->getConnectionIdLengthWithoutRouteConfig();
   if (cid_length == 0 || cid_length > quic::kQuicMaxConnectionIdWithLengthPrefixLength) {

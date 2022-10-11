@@ -28,6 +28,8 @@ envoy_cc_library(
 
 envoy_cc_extension(
     name = "envoy_deterministic_connection_id_generator_config",
+    srcs = ["envoy_deterministic_connection_id_generator_config.cc"],
+    hdrs = ["envoy_deterministic_connection_id_generator_config.h"],
     extra_visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
@@ -37,5 +39,6 @@ envoy_cc_extension(
         ":envoy_deterministic_connection_id_generator_lib",
         "//envoy/registry",
         "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+        "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
     ],
 )

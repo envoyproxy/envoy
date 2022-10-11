@@ -2,7 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/common/quic/envoy_quic_connection_id_generator_factory.h";
+#include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -15,7 +15,7 @@ public:
   EnvoyQuicConnectionIdGeneratorFactoryPtr
   createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config) override;
   std::string name() const override { return "envoy.quic.deterministric_connection_id_generator"; }
-}
+};
 
 DECLARE_FACTORY(EnvoyDeterministicConnectionIdGeneratorConfigFactory);
 

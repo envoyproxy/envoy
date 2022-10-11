@@ -53,8 +53,7 @@ public:
    * Returns a connection ID factory based on the given config.
    */
   virtual EnvoyQuicConnectionIdGeneratorFactoryPtr
-  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
-                                         uint32_t concurrency) PURE;
+  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config) PURE;
 };
 
 } // namespace Quic

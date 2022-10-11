@@ -8,7 +8,10 @@ namespace Envoy {
 namespace Quic {
 
 ProtobufTypes::MessagePtr
-EnvoyDeterministicConnectionIdGeneratorConfigFactory::createEmptyConfigProto() {}
+EnvoyDeterministicConnectionIdGeneratorConfigFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::quic::connection_id_generator::v3::
+                              DeterministicConnectionIdGeneratorConfig>();
+}
 
 EnvoyQuicConnectionIdGeneratorFactoryPtr
 EnvoyDeterministicConnectionIdGeneratorConfigFactory::createQuicConnectionIdGeneratorFactory(
