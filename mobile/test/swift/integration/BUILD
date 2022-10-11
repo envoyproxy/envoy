@@ -42,19 +42,6 @@ envoy_mobile_swift_test(
     ],
 )
 
-envoy_mobile_swift_test(
-    name = "flatbuffer_test",
-    srcs = [
-        "FlatBufferTest.swift",
-    ] + [
-        "//test/fbs:test_fb_swift_srcs",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@swift_flatbuffers//swift",
-    ],
-)
-
 envoy_cc_library(
     name = "test_extensions_cc",
     srcs = [

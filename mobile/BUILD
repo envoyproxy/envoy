@@ -136,7 +136,6 @@ xcodeproj(
             test_action = xcode_schemes.test_action([
                 "//experimental/swift:quic_stream_test",
                 "//test/objective-c:envoy_bridge_utility_test",
-                "//test/swift/integration:flatbuffer_test",
                 "//test/swift/integration:test",
                 "//test/swift/stats:test",
                 "//test/swift:test",
@@ -167,7 +166,6 @@ xcodeproj(
         # Tests
         "//experimental/swift:quic_stream_test",
         "//test/objective-c:envoy_bridge_utility_test",
-        "//test/swift/integration:flatbuffer_test",
         "//test/swift/integration:test",
         "//test/swift/stats:test",
         "//test/swift:test",

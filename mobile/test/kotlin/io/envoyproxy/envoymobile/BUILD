@@ -17,16 +17,6 @@ envoy_mobile_kt_test(
 )
 
 envoy_mobile_kt_test(
-    name = "flatbuffers_test",
-    srcs = [
-        "FlatBuffersTest.kt",
-    ],
-    deps = [
-        "//test/fbs:test_fb_kt_lib",
-    ],
-)
-
-envoy_mobile_kt_test(
     name = "grpc_request_headers_builder_test",
     srcs = [
         "GRPCRequestHeadersBuilderTest.kt",
