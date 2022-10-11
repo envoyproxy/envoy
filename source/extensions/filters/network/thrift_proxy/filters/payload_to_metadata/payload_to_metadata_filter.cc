@@ -1,6 +1,5 @@
 #include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_to_metadata_filter.h"
 
-#include "source/common/common/base64.h"
 #include "source/common/common/regex.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
@@ -81,11 +80,8 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
     FieldSelector child = field_selector.child();
     field_selector.Swap(&child);
   }
-  ASSERT(node != root);
-  if (node->rule_.has_value()) {
-    throw EnvoyException("payload to metadata filter: multiple rules with same field selector");
-  }
-  node->rule_ = *this;
+
+  node->rule_ids_.push_back(rule_id_);
 }
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
@@ -162,25 +158,33 @@ FilterStatus TrieMatchHandler::handleString(std::string value) {
   ASSERT(node_);
   ASSERT(last_field_id_.has_value());
   if (steps_ == 0 && node_->children_.find(last_field_id_.value()) != node_->children_.end() &&
-      node_->children_[last_field_id_.value()]->rule_.has_value()) {
+      !node_->children_[last_field_id_.value()]->rule_ids_.empty()) {
     auto on_present_node = node_->children_[last_field_id_.value()];
     ENVOY_LOG(trace, "name: {}", on_present_node->name_);
-    parent_.handleOnPresent(std::move(value), on_present_node->rule_.value());
+    parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_);
   }
   return FilterStatus::Continue;
 }
 
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
-void PayloadToMetadataFilter::handleOnPresent(std::string&& value, const Rule& rule) {
-  if (matched_rule_ids_.find(rule.ruleId()) == matched_rule_ids_.end()) {
-    return;
-  }
-  ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule.ruleId());
-  matched_rule_ids_.erase(rule.ruleId());
+void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
+                                              const std::vector<uint16_t>& rule_ids) {
+  for (uint16_t rule_id : rule_ids) {
+    if (matched_rule_ids_.find(rule_id) == matched_rule_ids_.end()) {
+      return;
+    }
+    ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
 
-  if (!value.empty() && rule.rule().has_on_present()) {
-    applyKeyValue(std::move(value), rule, rule.rule().on_present());
+    matched_rule_ids_.erase(rule_id);
+    ASSERT(rule_id < config_->requestRules().size());
+    const Rule& rule = config_->requestRules()[rule_id];
+    if (!value.empty() && rule.rule().has_on_present()) {
+      // We can *not* always std::move(value) here since we need `value` if multiple rules are
+      // matched. Optimize the most common usage, which is one rule per payload field.
+      applyKeyValue(rule_ids.size() == 1 ? std::move(value) : value, rule,
+                    rule.rule().on_present());
+    }
   }
 }
 
@@ -189,6 +193,7 @@ void PayloadToMetadataFilter::handleOnMissing() {
 
   for (uint16_t rule_id : matched_rule_ids_) {
     ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
+
     ASSERT(rule_id < config_->requestRules().size());
     const Rule& rule = config_->requestRules()[rule_id];
     if (!rule.rule().has_on_missing()) {
@@ -250,7 +255,7 @@ bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, con
 }
 
 // add metadata['key']= value depending on payload present or missing case
-void PayloadToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule,
+void PayloadToMetadataFilter::applyKeyValue(std::string value, const Rule& rule,
                                             const KeyValuePair& keyval) {
   if (keyval.has_regex_value_rewrite()) {
     const auto& matcher = rule.regexRewrite();

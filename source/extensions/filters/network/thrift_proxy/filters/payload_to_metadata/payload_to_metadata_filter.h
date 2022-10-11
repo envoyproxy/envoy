@@ -60,9 +60,7 @@ struct Trie {
   std::weak_ptr<Trie> parent_;
   // Field ID to payload node
   absl::node_hash_map<int16_t, TrieSharedPtr> children_;
-  // TODO in a later commit: std::vector<uint16_t> rule_ids_ to allow multiple rules in the same
-  // payload node.
-  OptRef<Rule> rule_;
+  std::vector<uint16_t> rule_ids_;
 };
 
 class Config {
@@ -82,7 +80,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class MetadataHandler {
 public:
   virtual ~MetadataHandler() = default;
-  virtual void handleOnPresent(std::string&& value, const Rule& rule) PURE;
+  virtual void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) PURE;
   virtual void handleOnMissing() PURE;
 };
 
@@ -159,7 +157,7 @@ public:
   FilterStatus passthroughData(Buffer::Instance& data) override;
 
   // MetadataHandler
-  void handleOnPresent(std::string&& value, const Rule& rule) override;
+  void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) override;
   void handleOnMissing() override;
 
 private:
@@ -174,7 +172,7 @@ private:
   // TODO(kuochunghsu): extract the metadata handling logic form header/payload to metadata filters.
   using StructMap = std::map<std::string, ProtobufWkt::Struct>;
   bool addMetadata(const std::string&, const std::string&, std::string, ValueType);
-  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&);
+  void applyKeyValue(std::string, const Rule&, const KeyValuePair&);
   const std::string& decideNamespace(const std::string& nspace) const;
   void setDynamicMetadata();
   const ConfigSharedPtr config_;

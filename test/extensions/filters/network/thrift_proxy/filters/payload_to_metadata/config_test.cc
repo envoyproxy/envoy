@@ -22,6 +22,17 @@ namespace PayloadToMetadataFilter {
 using PayloadToMetadataProtoConfig = envoy::extensions::filters::network::thrift_proxy::filters::
     payload_to_metadata::v3::PayloadToMetadata;
 
+void testValidConfig(const std::string& yaml) {
+  PayloadToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  PayloadToMetadataFilterConfig factory;
+  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
 // Tests that a valid config with payload is properly consumed.
 TEST(PayloadToMetadataFilterConfigTest, SimpleConfig) {
   const std::string yaml = R"EOF(
@@ -42,14 +53,7 @@ request_rules:
       value: unknown
   )EOF";
 
-  PayloadToMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  PayloadToMetadataFilterConfig factory;
-  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addDecoderFilter(_));
-  cb(filter_callbacks);
+  testValidConfig(yaml);
 }
 
 TEST(PayloadToMetadataFilterConfigTest, SimpleConfigWithServiceName) {
@@ -74,14 +78,7 @@ request_rules:
       value: unknown
   )EOF";
 
-  PayloadToMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  PayloadToMetadataFilterConfig factory;
-  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addDecoderFilter(_));
-  cb(filter_callbacks);
+  testValidConfig(yaml);
 }
 
 TEST(PayloadToMetadataFilterConfigTest, SimpleConfigWithServiceNameEndInColon) {
@@ -100,14 +97,33 @@ request_rules:
       value: unknown
   )EOF";
 
-  PayloadToMetadataProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-  PayloadToMetadataFilterConfig factory;
-  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  NetworkFilters::ThriftProxy::ThriftFilters::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addDecoderFilter(_));
-  cb(filter_callbacks);
+  testValidConfig(yaml);
+}
+
+// does not allow on_missing without value
+TEST(PayloadToMetadataFilterConfigTest, MultipleRulesWithSameFieldSelector) {
+  std::string yaml =
+      R"EOF(
+request_rules:
+  - method_name: foo
+    field_selector:
+      name: info
+      id: 2
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: foo
+      value: unknown
+  - method_name: foo
+    field_selector:
+      name: info
+      id: 2
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: bar
+      value: unknown
+  )EOF";
+
+  testValidConfig(yaml);
 }
 
 // Tests that configuration does not allow value and regex_value_rewrite in the same rule.
@@ -199,34 +215,6 @@ request_rules:
   )EOF";
   std::string error_message =
       "payload to metadata filter: cannot specify on_missing rule without non-empty value";
-
-  testForbiddenConfig(yaml, error_message);
-}
-
-// TODO: allow this in a later commit.
-// does not allow on_missing without value
-TEST(PayloadToMetadataFilterConfigTest, MultipleRulesWithSameFieldSelector) {
-  std::string yaml =
-      R"EOF(
-request_rules:
-  - method_name: foo
-    field_selector:
-      name: info
-      id: 2
-    on_missing:
-      metadata_namespace: envoy.lb
-      key: foo
-      value: unknown
-  - method_name: foo
-    field_selector:
-      name: info
-      id: 2
-    on_missing:
-      metadata_namespace: envoy.lb
-      key: bar
-      value: unknown
-  )EOF";
-  std::string error_message = "payload to metadata filter: multiple rules with same field selector";
 
   testForbiddenConfig(yaml, error_message);
 }
