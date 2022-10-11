@@ -1218,6 +1218,7 @@ struct
 structs
 subclassed
 subclasses
+subcomponent
 subdirectories
 subdirectory
 subdirs
