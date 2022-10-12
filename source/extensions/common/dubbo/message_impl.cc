@@ -1,7 +1,5 @@
 #include "source/extensions/common/dubbo/message_impl.h"
 
-#include "source/common/http/header_map_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -9,48 +7,36 @@ namespace Dubbo {
 
 RpcRequestImpl::Attachment::Attachment(MapPtr&& value, size_t offset)
     : attachment_(std::move(value)), attachment_offset_(offset) {
-  headers_ = Http::RequestHeaderMapImpl::create();
-
   ASSERT(attachment_ != nullptr);
   ASSERT(attachment_->toMutableUntypedMap().has_value());
-
-  for (const auto& pair : *attachment_) {
-    const auto key = pair.first->toString();
-    const auto value = pair.second->toString();
-    if (!key.has_value() || !value.has_value()) {
-      continue;
-    }
-    headers_->addCopy(Http::LowerCaseString(key.value().get()), value.value().get());
-  }
 }
 
-void RpcRequestImpl::Attachment::insert(const std::string& key, const std::string& value) {
+void RpcRequestImpl::Attachment::insert(absl::string_view key, absl::string_view value) {
+  ASSERT(attachment_->toMutableUntypedMap().has_value());
+
   attachment_updated_ = true;
 
-  attachment_->emplace(std::make_unique<String>(key), std::make_unique<String>(value));
-
-  auto lowcase_key = Http::LowerCaseString(key);
-  headers_->remove(lowcase_key);
-  headers_->addCopy(lowcase_key, value);
+  attachment_->toMutableUntypedMap().value().get()[std::make_unique<String>(key)] =
+      std::make_unique<String>(value);
 }
 
-void RpcRequestImpl::Attachment::remove(const std::string& key) {
+void RpcRequestImpl::Attachment::remove(absl::string_view key) {
   ASSERT(attachment_->toMutableUntypedMap().has_value());
 
   attachment_updated_ = true;
   attachment_->toMutableUntypedMap().value().get().erase(key);
-  headers_->remove(Http::LowerCaseString(key));
 }
 
-const std::string* RpcRequestImpl::Attachment::lookup(const std::string& key) const {
+absl::optional<absl::string_view> RpcRequestImpl::Attachment::lookup(absl::string_view key) const {
   ASSERT(attachment_->toMutableUntypedMap().has_value());
 
   auto& map = attachment_->toMutableUntypedMap().value().get();
   auto result = map.find(key);
-  if (result != map.end() && result->second->toString().has_value()) {
-    return &(result->second->toString().value().get());
+  if (result != map.end() && result->second->type() == Hessian2::Object::Type::String) {
+    ASSERT(result->second->toString().has_value());
+    return absl::make_optional<absl::string_view>(result->second->toString().value().get());
   }
-  return nullptr;
+  return absl::nullopt;
 }
 
 void RpcRequestImpl::assignParametersIfNeed() const {
@@ -69,8 +55,8 @@ void RpcRequestImpl::assignAttachmentIfNeed() const {
   assignParametersIfNeed();
   attachment_ = attachment_lazy_callback_();
 
-  if (auto g = attachment_->lookup("group"); g != nullptr) {
-    const_cast<RpcRequestImpl*>(this)->group_ = *g;
+  if (auto g = attachment_->lookup("group"); g.has_value()) {
+    const_cast<RpcRequestImpl*>(this)->group_ = std::string(g.value());
   }
 }
 
