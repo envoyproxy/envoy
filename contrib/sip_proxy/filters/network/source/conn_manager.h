@@ -493,7 +493,7 @@ private:
     std::string transactionId() const override { return ""; }
     absl::optional<OriginIngress> originIngress() override { return parent_.originIngress(); }
 
-    Router::RouteConstSharedPtr route() override { 
+    Router::RouteConstSharedPtr route() override {
       ASSERT(false, "route() not implemented");
       return nullptr;
     }
@@ -537,7 +537,7 @@ private:
       UNREFERENCED_PARAMETER(try_next_affinity);
     }
 
-    MessageMetadataSharedPtr metadata() override { 
+    MessageMetadataSharedPtr metadata() override {
       ASSERT(false, "metadata() not implemented");
       return nullptr;
     };
