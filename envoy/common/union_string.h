@@ -84,6 +84,8 @@ public:
     // Make sure the requested memory allocation is below uint32_t::max
     const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
     validateCapacity(new_capacity);
+    ASSERT(valid(absl::string_view(data, data_size)));
+
     switch (type()) {
     case Type::Reference: {
       // Rather than be too clever and optimize this uncommon case, we switch to
@@ -101,7 +103,6 @@ public:
     }
     }
     getInVec(buffer_).insert(getInVec(buffer_).end(), data, data + data_size);
-    ASSERT(valid());
   }
 
   /**
@@ -255,6 +256,8 @@ protected:
   enum class Type { Reference, Inline };
 
   bool valid() const { return Validator()(getStringView()); }
+
+  bool valid(absl::string_view data) const { return Validator()(data); }
 
   /**
    * @return the type of backing storage for the string.
