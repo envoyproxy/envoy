@@ -51,6 +51,8 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
+  // TODO(#23286) - Add support for validating the :protocol pseudo header for extended CONNECT
+  // requests.
 
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
@@ -137,17 +139,17 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
   bool path_is_asterisk = path == "*";
-  bool path_is_empty = path.empty();
+  bool path_is_absolute = !path.empty() && path.at(0) == '/';
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
+  if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme", and
     // ":path" pseudo-header fields, unless they are CONNECT requests (Section 8.5). An HTTP
     // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
-    auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
-                                 : UhvResponseCodeDetail::get().InvalidScheme;
+    auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
+                                : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
   } else if (is_connect_method) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
@@ -159,10 +161,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //  * The ":authority" pseudo-header field contains the host and port to connect to (equivalent
     //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
     //    [HTTP/1.1]).
-    //
-    // TODO - Add support for extended CONNECT requests: envoy.reloadable_features.use_rfc_connect
     absl::string_view details;
-    if (!path_is_empty) {
+    if (!path.empty()) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
@@ -176,10 +176,9 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   // Step 2: Validate and normalize the :path pseudo header
-  if ((path_is_empty && !is_connect_method) || (path_is_asterisk && !is_options_method)) {
-    // The :path must not be empty for non-CONNECT requests and only OPTIONS requests accept a
-    // :path of "*". This is based on RFC 9113,
-    // https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
+  if (!path_is_absolute && !is_connect_method && (!is_options_method || !path_is_asterisk)) {
+    // The :path must be in absolute-form or, for an OPTIONS request, in asterisk-form. This is
+    // based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // This pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or "https"
     // URIs that do not contain a path component MUST include a value of '/'. The exceptions to
@@ -213,6 +212,9 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
 
+  // TODO(#23290) - Add support for detecting and validating duplicate headers. This would most
+  // likely need to occur within the H2 codec because, at this point, duplicate headers have been
+  // concatenated into a list.
   header_map.iterate(
       [this, &reject_details, &allowed_headers, &drop_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
@@ -362,8 +364,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores =
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
+  const auto& underscore_action = config_.headers_with_underscores_action();
 
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
@@ -379,6 +380,7 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   bool is_valid = true;
   char c = '\0';
+  bool has_underscore = false;
 
   // Verify that the header name is all lowercase. From RFC 9113,
   // https://www.rfc-editor.org/rfc/rfc9113#section-8.2.1:
@@ -388,18 +390,26 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   // (0x20), and uppercase characters ('A' to 'Z', ASCII 0x41 to 0x5a).
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
-    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores) &&
-                (c < 'A' || c > 'Z');
+    if (c != '_') {
+      is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z');
+    } else {
+      has_underscore = true;
+    }
   }
 
-  if (!is_valid && c == '_' &&
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
-    return {HeaderEntryValidationResult::Action::DropHeader,
-            UhvResponseCodeDetail::get().InvalidUnderscore};
-  } else if (!is_valid) {
-    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
-                            : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {HeaderEntryValidationResult::Action::Reject, details};
+  if (!is_valid) {
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidNameCharacters};
+  }
+
+  if (has_underscore) {
+    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      return {HeaderEntryValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      return {HeaderEntryValidationResult::Action::DropHeader,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    }
   }
 
   return HeaderEntryValidationResult::success();

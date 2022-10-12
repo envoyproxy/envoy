@@ -50,6 +50,7 @@ public:
             {"getNumValues", static_luaGetNumValues},
             {"remove", static_luaRemove},
             {"replace", static_luaReplace},
+            {"setHttp1ReasonPhrase", static_luaSetHttp1ReasonPhrase},
             {"__pairs", static_luaPairs}};
   }
 
@@ -104,6 +105,13 @@ private:
    * @return nothing.
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaReplace);
+
+  /**
+   * Set a HTTP1 reason phrase
+   * @param 1 (string): reason phrase
+   * @return nothing.
+   */
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaSetHttp1ReasonPhrase);
 
   void checkModifiable(lua_State* state);
 

@@ -1,5 +1,8 @@
 #include "source/common/common/key_value_store_base.h"
 
+#include <algorithm>
+#include <chrono>
+
 #include "absl/cleanup/cleanup.h"
 
 namespace Envoy {
@@ -8,7 +11,7 @@ namespace {
 // Removes a length prefixed token from |contents| and returns the token,
 // or returns absl::nullopt on failure.
 absl::optional<absl::string_view> getToken(absl::string_view& contents, std::string& error) {
-  const auto it = contents.find("\n");
+  const auto it = contents.find('\n');
   if (it == contents.npos) {
     error = "Bad file: no newline";
     return {};
@@ -35,7 +38,9 @@ KeyValueStoreBase::KeyValueStoreBase(Event::Dispatcher& dispatcher,
     : max_entries_(max_entries), flush_timer_(dispatcher.createTimer([this, flush_interval]() {
         flush();
         flush_timer_->enableTimer(flush_interval);
-      })) {
+      })),
+      ttl_manager_([this](const std::vector<std::string>& expired) { onExpiredKeys(expired); },
+                   dispatcher, dispatcher.timeSource()) {
   if (flush_interval.count() > 0) {
     flush_timer_->enableTimer(flush_interval);
   }
@@ -53,24 +58,45 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       ENVOY_LOG(warn, error);
       return false;
     }
-    addOrUpdate(key.value(), value.value());
+    addOrUpdate(key.value(), value.value(), absl::nullopt);
   }
   return true;
 }
 
-void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view) {
+void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_view value_view,
+                                    absl::optional<std::chrono::seconds> ttl) {
   ENVOY_BUG(!under_iterate_, "addOrUpdate under the stack of iterate");
   std::string key(key_view);
   std::string value(value_view);
+  // Do not add if ttl is <= 0
+  if (ttl && ttl <= std::chrono::seconds(0)) {
+    ASSERT(false);
+    return;
+  }
+
   // Attempt to insert the entry into the store. If it already exists, remove
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
   if (!store_.emplace(key, value).second) {
     store_.erase(key);
     store_.emplace(key, value);
+    ttl_manager_.clear(key);
   }
   if (max_entries_ && store_.size() > max_entries_) {
     store_.pop_front();
+  }
+  if (ttl) {
+    ttl_manager_.add(std::chrono::milliseconds(ttl.value()), key);
+  }
+  if (!flush_timer_->enabled()) {
+    flush();
+  }
+}
+
+void KeyValueStoreBase::onExpiredKeys(const std::vector<std::string>& keys) {
+  ENVOY_BUG(!under_iterate_, "onExpiredKeys under the stack of iterate");
+  for (const auto& key : keys) {
+    store_.erase(std::string(key));
   }
   if (!flush_timer_->enabled()) {
     flush();
@@ -79,6 +105,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
 
 void KeyValueStoreBase::remove(absl::string_view key) {
   ENVOY_BUG(!under_iterate_, "remove under the stack of iterate");
+  ttl_manager_.clear(std::string(key));
   store_.erase(std::string(key));
   if (!flush_timer_->enabled()) {
     flush();

@@ -219,6 +219,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setIsShadow(bool s) {
+      is_shadow = s;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -247,6 +252,8 @@ public:
     envoy::config::core::v3::Metadata metadata;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
+
+    bool is_shadow{false};
   };
 
   /**
@@ -284,6 +291,10 @@ public:
     }
     RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       StreamOptions::setRetryPolicy(p);
+      return *this;
+    }
+    RequestOptions& setIsShadow(bool s) {
+      StreamOptions::setIsShadow(s);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

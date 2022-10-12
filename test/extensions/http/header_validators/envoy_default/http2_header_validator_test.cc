@@ -320,7 +320,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
@@ -359,9 +359,9 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
                              UhvResponseCodeDetail::get().EmptyHeaderName);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name_uppercase, valid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderName) {
@@ -377,18 +377,12 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderName) {
     auto result = uhv->validateGenericHeaderName(header_string);
     if (testChar(kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
+    } else if (c != '_') {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
     } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidUnderscore);
     }
   }
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
-  HeaderString invalid_underscore{"x_foo"};
-  auto uhv = createH2(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrictInvalidEmpty) {

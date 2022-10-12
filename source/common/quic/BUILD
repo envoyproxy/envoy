@@ -58,7 +58,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_clock_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
-        "@com_github_google_quiche//:quic_core_crypto_random_lib",
+        "@com_github_google_quiche//:quiche_common_random_lib",
     ],
 )
 
@@ -182,6 +182,17 @@ envoy_cc_library(
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_deterministic_connection_id_generator_lib",
+    srcs = ["envoy_deterministic_connection_id_generator.cc"],
+    hdrs = ["envoy_deterministic_connection_id_generator.h"],
+    tags = ["nofips"],
+    deps = [
+        ":envoy_quic_utils_lib",
+        "@com_github_google_quiche//:quic_core_deterministic_connection_id_generator_lib",
     ],
 )
 
@@ -370,6 +381,7 @@ envoy_cc_library(
     hdrs = ["active_quic_listener.h"],
     tags = ["nofips"],
     deps = [
+        ":envoy_deterministic_connection_id_generator_lib",
         ":envoy_quic_alarm_factory_lib",
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_dispatcher_lib",

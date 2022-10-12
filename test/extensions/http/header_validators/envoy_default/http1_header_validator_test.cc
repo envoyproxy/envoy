@@ -118,9 +118,9 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryGeneric) {
 
   EXPECT_ACCEPT(uhv->validateRequestHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidNameCharacters);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryEmpty) {
@@ -153,9 +153,9 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderEntryGeneric) {
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderEntry(valid_name, valid_value));
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidNameCharacters);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidValueCharacters);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapAllowed) {
@@ -398,7 +398,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapInvalidGeneric) {
   auto uhv = createH1(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaderMap(headers),
-                             UhvResponseCodeDetail::get().InvalidCharacters);
+                             UhvResponseCodeDetail::get().InvalidNameCharacters);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) {

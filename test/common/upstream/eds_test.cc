@@ -36,7 +36,7 @@ namespace {
 
 class EdsTest : public testing::Test {
 public:
-  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
+  EdsTest() { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -123,22 +123,22 @@ public:
   }
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
-    local_info_.node_.mutable_locality()->set_zone("us-east-1a");
+    server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ = cm_.subscription_factory_.callbacks_;
+    eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+    EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
@@ -154,20 +154,11 @@ public:
   Stats::TestUtil::TestStore stats_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
-  NiceMock<MockClusterManager> cm_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   NiceMock<Random::MockRandomGenerator> random_;
   TestScopedRuntime runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-  Server::MockOptions options_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -670,6 +661,42 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
+}
+
+TEST_F(EdsTest, UseAddressForHealthChecks) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  auto* health_check_config_address =
+      endpoint->mutable_health_check_config()->mutable_address()->mutable_socket_address();
+  health_check_config_address->set_address("4.3.2.1");
+  health_check_config_address->set_port_value(4321);
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(hosts.size(), 1);
+  EXPECT_EQ(hosts[0]->healthCheckAddress()->asString(), "4.3.2.1:4321");
+}
+
+TEST_F(EdsTest, MalformedIPForHealthChecks) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  auto* endpoint = cluster_load_assignment.add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+  auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(1234);
+  auto* health_check_config_address =
+      endpoint->mutable_health_check_config()->mutable_address()->mutable_socket_address();
+  health_check_config_address->set_address("foo.bar.com");
+  health_check_config_address->set_port_value(4321);
+  cluster_load_assignment.set_cluster_name("fare");
+  initialize();
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException, "malformed IP address: foo.bar.com");
 }
 
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
@@ -1998,7 +2025,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
-  cm_.local_cluster_name_ = "name";
+  server_context_.cluster_manager_.local_cluster_name_ = "name";
   resetCluster();
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -2324,7 +2351,7 @@ TEST_F(EdsTest, MalformedIP) {
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
   EdsAssignmentTimeoutTest() {
-    EXPECT_CALL(dispatcher_, createTimer_(_))
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
           EXPECT_EQ(nullptr, interval_timer_);

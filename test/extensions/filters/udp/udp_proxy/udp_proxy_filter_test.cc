@@ -75,30 +75,45 @@ public:
     }
 
     void expectWriteToUpstream(const std::string& data, int sys_errno = 0,
-                               const Network::Address::Ip* local_ip = nullptr) {
+                               const Network::Address::Ip* local_ip = nullptr,
+                               bool expect_connect = false, int connect_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
-      EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
-          .WillOnce(Invoke(
-              [this, data, local_ip, sys_errno](
-                  const Buffer::RawSlice* slices, uint64_t, int,
-                  const Network::Address::Ip* self_ip,
-                  const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
-                EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
-                                                  slices[0].len_));
-                EXPECT_EQ(peer_address, *upstream_address_);
-                if (local_ip == nullptr) {
-                  EXPECT_EQ(nullptr, self_ip);
-                } else {
-                  EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
-                }
-                // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
-                // operator.
-                if (sys_errno == 0) {
-                  return makeNoError(data.size());
-                } else {
-                  return makeError(sys_errno);
-                }
-              }));
+      if (expect_connect) {
+        EXPECT_CALL(*socket_->io_handle_, connect(_))
+            .WillOnce(Invoke([connect_sys_errno]() -> Api::SysCallIntResult {
+              if (!connect_sys_errno) {
+                return Api::SysCallIntResult{0, 0};
+              } else {
+                return Api::SysCallIntResult{-1, connect_sys_errno};
+              }
+            }));
+      } else {
+        EXPECT_CALL(*socket_->io_handle_, connect(_)).Times(0);
+      }
+      if (!connect_sys_errno) {
+        EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
+            .WillOnce(Invoke(
+                [this, data, local_ip, sys_errno](
+                    const Buffer::RawSlice* slices, uint64_t, int,
+                    const Network::Address::Ip* self_ip,
+                    const Network::Address::Instance& peer_address) -> Api::IoCallUint64Result {
+                  EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
+                                                    slices[0].len_));
+                  EXPECT_EQ(peer_address, *upstream_address_);
+                  if (local_ip == nullptr) {
+                    EXPECT_EQ(nullptr, self_ip);
+                  } else {
+                    EXPECT_EQ(self_ip->addressAsString(), local_ip->addressAsString());
+                  }
+                  // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
+                  // operator.
+                  if (sys_errno == 0) {
+                    return makeNoError(data.size());
+                  } else {
+                    return makeError(sys_errno);
+                  }
+                }));
+      }
     }
 
     void recvDataFromUpstream(const std::string& data, int recv_sys_errno = 0,
@@ -349,7 +364,7 @@ public:
 
   void ensureNoIpTransparentSocketOptions() {
     expectSessionCreate(upstream_address_v6_);
-    test_sessions_[0].expectWriteToUpstream("hello");
+    test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
     recvDataFromDownstream("[2001:db8:85a3::9a2e:370:7334]:1000",
                            "[2001:db8:85a3::9a2e:370:7335]:80", "hello");
 
@@ -389,7 +404,7 @@ upstream_socket_config:
         true, false);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -436,7 +451,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -446,7 +461,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -472,7 +487,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -482,7 +497,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -516,7 +531,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
   EXPECT_EQ(5, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -551,6 +566,45 @@ matcher:
 
   filter_.reset();
   EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 10 1 1 0 2");
+}
+
+// Verify upstream connect error handling.
+TEST_F(UdpProxyFilterTest, ConnectErrorHandling) {
+  InSequence s;
+
+  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:cluster_name)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
+                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        access_log_format));
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true, 1);
+  EXPECT_LOG_CONTAINS("debug", "cannot connect",
+                      recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello"));
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  EXPECT_EQ(
+      1, TestUtility::findCounter(
+             factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
+             "udp.sess_tx_errors")
+             ->value());
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 5 0 0 0 1");
 }
 
 // No upstream host handling.
@@ -629,7 +683,7 @@ matcher:
   cluster_update_callbacks_->onClusterAddOrUpdate(
       factory_context_.cluster_manager_.thread_local_cluster_);
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -663,7 +717,7 @@ matcher:
       1, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -680,7 +734,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -702,7 +756,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -713,7 +767,7 @@ matcher:
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -736,7 +790,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -764,7 +818,7 @@ matcher:
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -776,7 +830,7 @@ matcher:
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello");
+  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -816,7 +870,7 @@ use_per_packet_load_balancing: true
       2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -829,7 +883,7 @@ use_per_packet_load_balancing: true
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
@@ -887,7 +941,7 @@ use_per_packet_load_balancing: true
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -920,7 +974,7 @@ use_per_packet_load_balancing: true
   )EOF"));
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -931,7 +985,7 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -958,7 +1012,7 @@ use_per_packet_load_balancing: true
       2, 0, 0, 0, 0);
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -968,7 +1022,7 @@ use_per_packet_load_balancing: true
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
       .WillOnce(Return(new_host));
   expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello2");
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
@@ -1178,7 +1232,7 @@ hash_policies:
         return host;
       }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
@@ -1207,7 +1261,7 @@ matcher:
             return host;
           }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }
@@ -1280,7 +1334,7 @@ hash_policies:
         return host;
       }));
   expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   test_sessions_[0].recvDataFromUpstream("world");
 }

@@ -149,6 +149,7 @@ envoy.filters.http.adaptive_concurrency:
 envoy.filters.http.admission_control:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: stable
   type_urls:
@@ -233,6 +234,7 @@ envoy.filters.http.cors:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.cors.v3.Cors
+  - envoy.extensions.filters.http.cors.v3.CorsPolicy
 envoy.filters.http.csrf:
   categories:
   - envoy.filters.http
@@ -678,6 +680,13 @@ envoy.health_checkers.redis:
   status: stable
   type_urls:
   - envoy.extensions.health_checkers.redis.v3.Redis
+envoy.health_checkers.thrift:
+  categories:
+  - envoy.health_checkers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.thrift.v3.Thrift
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection
@@ -754,6 +763,22 @@ envoy.matching.matchers.ip:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
+envoy.path.match.uri_template.uri_template_matcher:
+    categories:
+    - envoy.path.match
+    security_posture: robust_to_untrusted_downstream_and_upstream
+    status: stable
+    undocumented: true
+    type_urls:
+    - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+envoy.path.rewrite.uri_template.uri_template_rewriter:
+      categories:
+      - envoy.path.rewrite
+      security_posture: robust_to_untrusted_downstream_and_upstream
+      status: stable
+      undocumented: true
+      type_urls:
+      - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
@@ -1118,6 +1143,13 @@ envoy.http.stateful_session.cookie:
   status: alpha
   type_urls:
   - envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
+envoy.http.stateful_session.header:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
 envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input

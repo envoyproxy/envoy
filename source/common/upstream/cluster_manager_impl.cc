@@ -325,9 +325,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (bootstrap.has_xds_delegate_extension()) {
     auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
         bootstrap.xds_delegate_extension());
-    xds_resources_delegate_ =
-        factory.createXdsResourcesDelegate(bootstrap.xds_delegate_extension().typed_config(),
-                                           validation_context.dynamicValidationVisitor(), api);
+    xds_resources_delegate_ = factory.createXdsResourcesDelegate(
+        bootstrap.xds_delegate_extension().typed_config(),
+        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
@@ -403,6 +403,10 @@ ClusterManagerImpl::ClusterManagerImpl(
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      const std::string target_xds_authority =
+          Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or("");
+      auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
+
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -415,7 +419,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
@@ -428,8 +432,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), makeOptRefFromPtr(xds_resources_delegate_.get()),
-            Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or(""));
+            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
       }
     }
   } else {
@@ -855,7 +858,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
       if (host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         ENVOY_LOG_EVENT(debug, "outlier_detection_ejection",
                         "host {} in cluster {} was ejected by the outlier detector",
-                        host->address(), host->cluster().name());
+                        host->address()->asStringView(), host->cluster().name());
         postThreadLocalHealthFailure(host);
       }
     });
@@ -1027,7 +1030,8 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster,
   tls_.runOnAllThreads([cluster, predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     auto cluster_entry = cluster_manager->thread_local_clusters_.find(cluster);
     if (cluster_entry != cluster_manager->thread_local_clusters_.end()) {
-      cluster_entry->second->drainAllConnPools(predicate);
+      cluster_entry->second->drainConnPools(
+          predicate, ConnectionPool::DrainBehavior::DrainExistingConnections);
     }
   });
 }
@@ -1038,7 +1042,8 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
 
   tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainAllConnPools(predicate);
+      cluster_entry.second->drainConnPools(predicate,
+                                           ConnectionPool::DrainBehavior::DrainExistingConnections);
     }
   });
 }
@@ -1132,10 +1137,17 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     if ((cluster_info_->features() &
          ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
         conn_info.connection_ != nullptr) {
-      auto& conn_map = parent_.host_tcp_conn_map_[logical_host];
-      conn_map.emplace(conn_info.connection_.get(),
-                       std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
-                           parent_, logical_host, *conn_info.connection_));
+      auto conn_map_iter = parent_.host_tcp_conn_map_.find(logical_host);
+      if (conn_map_iter == parent_.host_tcp_conn_map_.end()) {
+        conn_map_iter =
+            parent_.host_tcp_conn_map_.try_emplace(logical_host, logical_host->acquireHandle())
+                .first;
+      }
+      auto& conn_map = conn_map_iter->second;
+      conn_map.connections_.emplace(
+          conn_info.connection_.get(),
+          std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
+              parent_, logical_host, *conn_info.connection_));
     }
     return conn_info;
   } else {
@@ -1177,7 +1189,28 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools(
     const HostVector& hosts_removed) {
-  parent_.drainConnPools(hosts_removed);
+  for (const auto& host : hosts_removed) {
+    parent_.drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainAndDelete);
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    drainConnPools(host_set->hosts());
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools(
+    DrainConnectionsHostPredicate predicate, ConnectionPool::DrainBehavior behavior) {
+  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const auto& host : host_set->hosts()) {
+      if (predicate != nullptr && !predicate(*host)) {
+        continue;
+      }
+
+      parent_.drainOrCloseConnPools(host, behavior);
+    }
+  }
 }
 
 ClusterUpdateCallbacksHandlePtr
@@ -1381,64 +1414,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   thread_local_dispatcher_.clearDeferredDeleteList();
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) {
-  for (const HostSharedPtr& host : hosts) {
-    {
-      auto container = getHttpConnPoolsContainer(host);
-      if (container != nullptr) {
-        drainConnPools(host, *container);
-      }
-    }
-    {
-      auto container = host_tcp_conn_pool_map_.find(host);
-      if (container != host_tcp_conn_pool_map_.end()) {
-        drainTcpConnPools(container->second);
-      }
-    }
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
-    HostSharedPtr old_host, ConnPoolsContainer& container) {
-  // Make a copy to protect against erasure in the callback.
-  std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
-  container.draining_ = true;
-
-  // We need to hold off on actually emptying out the container until we have finished processing
-  // `addIdleCallback`. If we do not, then it's possible that the container could be erased in
-  // the middle of its iteration, which leads to undefined behaviour. We handle that case by
-  // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
-  // afterwards whether it is empty and deleting it if necessary.
-  container.do_not_delete_ = true;
-  pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
-  container.do_not_delete_ = false;
-
-  if (container.pools_->empty()) {
-    host_http_conn_pool_map_.erase(old_host);
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
-    TcpConnPoolsContainer& container) {
-
-  // Copy the pools so that it is safe for the completion callback to mutate `container.pools_`.
-  // `container` may be invalid after all calls to `startDrain()`.
-  std::vector<Tcp::ConnectionPool::Instance*> pools;
-  for (const auto& pair : container.pools_) {
-    pools.push_back(pair.second.get());
-  }
-
-  container.draining_ = true;
-  for (auto pool : pools) {
-    pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
-  }
-}
-
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
     const HostConstSharedPtr& host, Network::ClientConnection& connection) {
   auto host_tcp_conn_map_it = host_tcp_conn_map_.find(host);
   ASSERT(host_tcp_conn_map_it != host_tcp_conn_map_.end());
-  TcpConnectionsMap& connections_map = host_tcp_conn_map_it->second;
+  auto& connections_map = host_tcp_conn_map_it->second.connections_;
   auto it = connections_map.find(&connection);
   ASSERT(it != connections_map.end());
   connection.dispatcher().deferredDelete(std::move(it->second));
@@ -1474,17 +1454,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     const HostSharedPtr& host) {
-
-  // Drain all HTTP and TCP connection pool connections in the case of a host health failure. If
-  // outlier/ health is due to `ECMP` flow hashing issues for example, a new set of connections
-  // might do better.
-  // TODO(mattklein123): This function is currently very specific, but in the future when we do
-  // more granular host set changes, we should be able to capture single host changes and make them
-  // more targeted.
-  drainAllConnPoolsWorker(host);
-
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
+    drainOrCloseConnPools(host, absl::nullopt);
+
     // Close non connection pool TCP connections obtained from tcpConn()
     //
     // TODO(jono): The only remaining user of the non-pooled connections seems to be the statsd
@@ -1504,8 +1477,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
+  } else {
+    drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
   }
 }
 
@@ -1517,8 +1492,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_, host};
-    container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
+    container_iter =
+        host_http_conn_pool_map_.try_emplace(host, thread_local_dispatcher_, host).first;
   }
 
   return &container_iter->second;
@@ -1583,36 +1558,22 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainConnPools() {
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    parent_.drainConnPools(host_set->hosts());
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::drainAllConnPools(
-    DrainConnectionsHostPredicate predicate) {
-  for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-    for (const HostSharedPtr& host : host_set->hosts()) {
-      if (predicate != nullptr && !predicate(*host)) {
-        continue;
-      }
-
-      parent_.drainAllConnPoolsWorker(host);
-    }
-  }
-}
-
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
-    const HostSharedPtr& host) {
-  // Drain or close any HTTP connection pool for the host. Draining an HTTP pool only leads to
-  // idle connections being closed. Non-idle connections are marked as draining and prevents new
-  // streams to go through them, causing new connections to be opened.
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
+    const HostSharedPtr& host, absl::optional<ConnectionPool::DrainBehavior> drain_behavior) {
+  // Drain or close any HTTP connection pool for the host.
   {
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
       container->do_not_delete_ = true;
-      container->pools_->drainConnections(
-          Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+      if (drain_behavior.has_value()) {
+        container->pools_->drainConnections(drain_behavior.value());
+      } else {
+        // TODO(wbpcode): 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' and 'closeConnections'
+        // is only supported for TCP connection pools for now. Use 'DrainExistingConnections'
+        // drain here as alternative.
+        container->pools_->drainConnections(
+            ConnectionPool::DrainBehavior::DrainExistingConnections);
+      }
       container->do_not_delete_ = false;
 
       if (container->pools_->empty()) {
@@ -1620,12 +1581,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
       }
     }
   }
+  // Drain or close any TCP connection pool for the host.
   {
-    // Drain or close any TCP connection pool for the host. Draining a TCP pool doesn't lead to
-    // connections being closed, it only prevents new connections through the pool. The
-    // CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE can be used to make the pool close any
-    // active connections.
-    const auto& container = host_tcp_conn_pool_map_.find(host);
+    const auto container = host_tcp_conn_pool_map_.find(host);
     if (container != host_tcp_conn_pool_map_.end()) {
       // Draining pools or closing connections can cause pool deletion if it becomes
       // idle. Copy `pools_` so that we aren't iterating through a container that
@@ -1636,11 +1594,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
       }
 
       for (auto* pool : pools) {
-        if (host->cluster().features() &
-            ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
-          pool->closeConnections();
+        if (drain_behavior.has_value()) {
+          pool->drainConnections(drain_behavior.value());
         } else {
-          pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+          pool->closeConnections();
         }
       }
     }
@@ -1752,14 +1709,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     return;
   }
 
-  ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+  ENVOY_LOG(trace, "Erasing idle pool for host {}", *host);
   container->pools_->erasePool(priority, hash_key);
 
   // Guard deletion of the container with `do_not_delete_` to avoid deletion while
   // iterating through the container in `container->pools_->startDrain()`. See
   // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
   if (!container->do_not_delete_ && container->pools_->empty()) {
-    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+    ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", *host);
     host_http_conn_pool_map_.erase(
         host); // NOTE: `container` is erased after this point in the lambda.
   }
@@ -1801,7 +1758,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
     host->transportSocketFactory().hashKey(hash_key, context->upstreamTransportSocketOptions());
   }
 
-  TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
+  auto container_iter = parent_.host_tcp_conn_pool_map_.find(host);
+  if (container_iter == parent_.host_tcp_conn_pool_map_.end()) {
+    container_iter = parent_.host_tcp_conn_pool_map_.try_emplace(host, host->acquireHandle()).first;
+  }
+  TcpConnPoolsContainer& container = container_iter->second;
   auto pool_iter = container.pools_.find(hash_key);
   if (pool_iter == container.pools_.end()) {
     bool inserted;
@@ -1833,7 +1794,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
-      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+      ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
       thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
       container.pools_.erase(erase_iter);
     }
@@ -1960,13 +1921,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(
-      server_context_, cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-      context_.runtime(), context_.mainThreadDispatcher(), log_manager_, context_.localInfo(),
-      admin_, singleton_manager_, outlier_event_logger, added_via_api,
-      added_via_api ? validation_context_.dynamicValidationVisitor()
-                    : validation_context_.staticValidationVisitor(),
-      context_.api(), context_.options());
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+                                        ssl_context_manager_, outlier_event_logger, added_via_api,
+                                        added_via_api
+                                            ? validation_context_.dynamicValidationVisitor()
+                                            : validation_context_.staticValidationVisitor());
 }
 
 CdsApiPtr

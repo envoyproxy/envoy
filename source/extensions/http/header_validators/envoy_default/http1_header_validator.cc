@@ -45,6 +45,8 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
+  // Pseudo headers in HTTP/1.1 are synthesized by the codec from the request line prior to
+  // submitting the header map for validation in UHV.
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
       {":method", &Http1HeaderValidator::validateMethodHeader},
       {":authority", &Http1HeaderValidator::validateHostHeader},
@@ -124,8 +126,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   absl::string_view path = header_map.getPathValue();
   absl::string_view host = header_map.getHostValue();
-  // Step 1: verify that required pseudo headers are present. Pseudo headers in HTTP/1.1 are
-  // synthesized by the codec from the request line and HTTP/1.1 requests requires the
+  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
   // :method header based on RFC 9112
   // https://www.rfc-editor.org/rfc/rfc9112.html#section-3:
   //
@@ -153,6 +154,22 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
             UhvResponseCodeDetail::get().InvalidHost};
   }
 
+  // Verify that the path and Host/:authority header matches based on the method.
+  // From RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.2:
+  //
+  // When a proxy receives a request with an absolute-form of request-target, the
+  // proxy MUST ignore the received Host header field (if any) and instead replace
+  // it with the host information of the request-target. A proxy that forwards
+  // such a request MUST generate a new Host field-value based on the received
+  // request-target rather than forward the received Host field-value.
+  // ...
+  // If the target URI includes an authority component, then a client MUST send a
+  // field-value for Host that is identical to that authority component,
+  // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
+  //
+  // TODO(#6589) - This needs to be implemented after we have path normalization so that we can
+  // parse the :path form and compare the authority component of the path against the :authority
+  // header.
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
 
@@ -163,6 +180,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   auto path_is_asterisk = path == "*";
+  auto path_is_absolute = path.empty() ? false : path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
@@ -312,6 +330,9 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       }
     }
   }
+
+  // If path normalization is disabled or the path isn't absolute then the path will be validated
+  // against the RFC character set in validateRequestHeaderEntry.
 
   // Step 4: Verify each request header
   std::string reject_details;

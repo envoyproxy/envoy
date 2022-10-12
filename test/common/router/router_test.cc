@@ -17,6 +17,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
@@ -86,7 +87,7 @@ public:
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
-  void testRequestResponseSize(bool with_trailers) {
+  void testRequestResponse(bool with_trailers, bool can_use_http3 = true) {
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
@@ -96,7 +97,7 @@ public:
                        const Http::ConnectionPool::Instance::StreamOptions& options)
                        -> Http::ConnectionPool::Cancellable* {
               EXPECT_FALSE(options.can_send_early_data_);
-              EXPECT_TRUE(options.can_use_http3_);
+              EXPECT_EQ(options.can_use_http3_, can_use_http3);
               response_decoder = &decoder;
               callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                                     upstream_stream_info_, Http::Protocol::Http10);
@@ -4209,7 +4210,7 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_.decodeData(*body_data, true));
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4253,7 +4254,7 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 
   auto mock_predicate = std::make_shared<NiceMock<MockInternalRedirectPredicate>>();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, predicates())
       .WillOnce(Return(std::vector<InternalRedirectPredicateSharedPtr>({mock_predicate})));
   EXPECT_CALL(*mock_predicate, acceptTargetRoute(_, _, _, _)).WillOnce(Return(false));
@@ -4278,7 +4279,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   setNumPreviousRedirect(2);
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4300,11 +4301,13 @@ TEST_F(RouterTest, HttpInternalRedirectMatchedToDirectResponseSucceeded) {
 
   enableRedirects();
   sendRequest();
-  EXPECT_CALL(callbacks_, clearRouteCache()).WillOnce(InvokeWithoutArgs([&]() -> void {
-    // Direct message route should be matched after internal redirect
-    EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
-    EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
-  }));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache())
+      .WillOnce(InvokeWithoutArgs([&]() -> void {
+        // Direct message route should be matched after internal redirect
+        EXPECT_CALL(*callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+        EXPECT_CALL(*callbacks_.route_, directResponseEntry())
+            .WillRepeatedly(Return(&direct_response));
+      }));
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -4325,7 +4328,7 @@ TEST_F(RouterTest, InternalRedirectStripsFragment) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
@@ -4347,7 +4350,7 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   Http::ResponseHeaderMapPtr redirect_headers{new Http::TestResponseHeaderMapImpl{
       {":status", "302"}, {"location", "http://www.foo.com/#fragment"}}};
@@ -4371,7 +4374,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 
   redirect_headers_->setLocation("https://www.foo.com");
   EXPECT_CALL(connection_, ssl()).WillOnce(Return(ssl_connection));
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -4394,7 +4397,7 @@ TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_,
               isCrossSchemeRedirectAllowed())
       .WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, clearRouteCache());
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -6040,11 +6043,21 @@ TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
 }
 
 // Test that request/response header/body sizes are properly recorded.
-TEST_F(RouterTest, RequestResponseSize) { testRequestResponseSize(false); }
+TEST_F(RouterTest, RequestResponseSize) { testRequestResponse(false); }
 
 // Test that request/response header/body sizes are properly recorded
 // when there are trailers in both the request/response.
-TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponseSize(true); }
+TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponse(true); }
+
+TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
+  auto address = Network::Utility::parseInternetAddressAndPort("127.0.0.1:20");
+  std::string hostname = "www.lyft.com";
+  callbacks_.stream_info_.filterState()->setData(
+      Network::Http11ProxyInfoFilterState::key(),
+      std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+  testRequestResponse(true, false);
+}
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();

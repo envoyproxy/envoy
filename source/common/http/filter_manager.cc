@@ -261,18 +261,13 @@ Upstream::ClusterInfoConstSharedPtr ActiveStreamFilterBase::clusterInfo() {
   return parent_.filter_manager_callbacks_.clusterInfo();
 }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return route(nullptr); }
+Router::RouteConstSharedPtr ActiveStreamFilterBase::route() { return getRoute(); }
 
-Router::RouteConstSharedPtr ActiveStreamFilterBase::route(const Router::RouteCallback& cb) {
-  return parent_.filter_manager_callbacks_.route(cb);
-}
-
-void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
-  parent_.filter_manager_callbacks_.setRoute(std::move(route));
-}
-
-void ActiveStreamFilterBase::clearRouteCache() {
-  parent_.filter_manager_callbacks_.clearRouteCache();
+Router::RouteConstSharedPtr ActiveStreamFilterBase::getRoute() const {
+  if (parent_.filter_manager_callbacks_.downstreamCallbacks()) {
+    return parent_.filter_manager_callbacks_.downstreamCallbacks()->route(nullptr);
+  }
+  return parent_.streamInfo().route();
 }
 
 void ActiveStreamFilterBase::resetIdleTimer() {
@@ -281,45 +276,50 @@ void ActiveStreamFilterBase::resetIdleTimer() {
 
 const Router::RouteSpecificFilterConfig*
 ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
-  auto route = parent_.filter_manager_callbacks_.route(nullptr);
-  if (route == nullptr) {
+  auto current_route = getRoute();
+  if (current_route == nullptr) {
     return nullptr;
   }
 
-  auto* result = route->mostSpecificPerFilterConfig(filter_context_.config_name);
+  auto* result = current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 
   if (result == nullptr && filter_context_.filter_name != filter_context_.config_name) {
     // Fallback to use filter name.
-    result = route->mostSpecificPerFilterConfig(filter_context_.filter_name);
+    result = current_route->mostSpecificPerFilterConfig(filter_context_.filter_name);
   }
   return result;
 }
 
 void ActiveStreamFilterBase::traversePerFilterConfig(
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  auto route = parent_.filter_manager_callbacks_.route(nullptr);
-  if (route == nullptr) {
+  Router::RouteConstSharedPtr current_route = getRoute();
+  if (current_route == nullptr) {
     return;
   }
 
   bool handled = false;
-  route->traversePerFilterConfig(filter_context_.config_name,
-                                 [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
-                                   handled = true;
-                                   cb(config);
-                                 });
+  current_route->traversePerFilterConfig(
+      filter_context_.config_name,
+      [&handled, &cb](const Router::RouteSpecificFilterConfig& config) {
+        handled = true;
+        cb(config);
+      });
 
   if (handled || filter_context_.filter_name == filter_context_.config_name) {
     return;
   }
 
-  route->traversePerFilterConfig(filter_context_.filter_name, cb);
+  current_route->traversePerFilterConfig(filter_context_.filter_name, cb);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {
   // TODO(mattklein123): At some point we might want to actually wrap this interface but for now
   // we give the filter direct access to the encoder options.
   return parent_.filter_manager_callbacks_.http1StreamEncoderOptions();
+}
+
+OptRef<DownstreamStreamFilterCallbacks> ActiveStreamFilterBase::downstreamCallbacks() {
+  return parent_.filter_manager_callbacks_.downstreamCallbacks();
 }
 
 OptRef<UpstreamStreamFilterCallbacks> ActiveStreamFilterBase::upstreamCallbacks() {
@@ -1452,11 +1452,6 @@ void ActiveStreamDecoderFilter::addUpstreamSocketOptions(
 
 Network::Socket::OptionsSharedPtr ActiveStreamDecoderFilter::getUpstreamSocketOptions() const {
   return parent_.upstream_options_;
-}
-
-void ActiveStreamDecoderFilter::requestRouteConfigUpdate(
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.filter_manager_callbacks_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {

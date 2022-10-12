@@ -160,7 +160,8 @@ private:
                               public RequestDecoder,
                               public Tracing::Config,
                               public ScopeTrackedObject,
-                              public FilterManagerCallbacks {
+                              public FilterManagerCallbacks,
+                              public DownstreamStreamFilterCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
@@ -277,9 +278,6 @@ private:
                      absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
-    void setRoute(Router::RouteConstSharedPtr route) override;
-    void clearRouteCache() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -287,6 +285,14 @@ private:
     void onLocalReply(Code code) override;
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
+    OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
+
+    // DownstreamStreamFilterCallbacks
+    void setRoute(Router::RouteConstSharedPtr route) override;
+    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void clearRouteCache() override;
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     absl::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
@@ -297,8 +303,6 @@ private:
 
     void refreshCachedRoute();
     void refreshCachedRoute(const Router::RouteCallback& cb);
-    void requestRouteConfigUpdate(
-        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
@@ -419,8 +423,10 @@ private:
 
   /**
    * Process a stream that is ending due to upstream response or reset.
+   * If check_for_deferred_close is true, the ConnectionManager will check to
+   * see if the connection was drained and should be closed if no streams remain.
    */
-  void doEndStream(ActiveStream& stream);
+  void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
   void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag,
                        absl::string_view details);

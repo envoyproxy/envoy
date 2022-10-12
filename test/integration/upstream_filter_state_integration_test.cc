@@ -145,7 +145,7 @@ TEST_P(UpstreamAccessLogTest, UpstreamFilterState) {
         envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-            "%UPSTREAM_FILTER_STATE(test_key)%");
+            "%UPSTREAM_FILTER_STATE(test_key)%\n");
         upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
         typed_config->PackFrom(router_config);
       });

@@ -251,7 +251,7 @@ typed_config:
   std::string response;
 
 #ifndef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 #endif
@@ -1237,6 +1237,27 @@ typed_config:
 )EOF";
 
   testRewriteResponse(FILTER_AND_CODE);
+}
+
+// Test whether setting the HTTP1 reason phrase
+TEST_P(LuaIntegrationTest, Http1ReasonPhrase) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        response_handle:headers():setHttp1ReasonPhrase("Slow Down")
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 400 Slow Down\r\n") == 0);
 }
 
 } // namespace

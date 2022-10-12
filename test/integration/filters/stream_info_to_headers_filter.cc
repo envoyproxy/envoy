@@ -50,6 +50,11 @@ public:
             Http::LowerCaseString("alpn"),
             decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
       }
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+        headers.addCopy(
+            Http::LowerCaseString("remote_address"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString());
+      }
 
       headers.addCopy(Http::LowerCaseString("num_streams"),
                       decoder_callbacks_->streamInfo().upstreamInfo()->upstreamNumStreams());

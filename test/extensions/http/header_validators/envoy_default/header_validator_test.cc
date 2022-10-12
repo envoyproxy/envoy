@@ -77,19 +77,30 @@ TEST_F(BaseHeaderValidatorTest, ValidateMethodRestricted) {
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateSchemeValid) {
-  HeaderString valid{"https"};
-  HeaderString valid_mixed_case{"hTtPs"};
+  HeaderString valid_https{"https"};
+  HeaderString valid_http{"http"};
   auto uhv = createBase(empty_config);
 
-  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid));
-  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_mixed_case));
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_https));
+  EXPECT_ACCEPT(uhv->validateSchemeHeader(valid_http));
+}
+
+TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidMixedCase) {
+  HeaderString invalid_https{"HtTps"};
+  HeaderString invalid_http{"hTtp"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_https),
+                             UhvResponseCodeDetail::get().InvalidScheme);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_http),
+                             UhvResponseCodeDetail::get().InvalidScheme);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateSchemeInvalidChar) {
-  HeaderString invalid{"http_ssh"};
+  HeaderString invalid_char{"http_ssh"};
   auto uhv = createBase(empty_config);
 
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid),
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateSchemeHeader(invalid_char),
                              UhvResponseCodeDetail::get().InvalidScheme);
 }
 
@@ -130,18 +141,12 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderName) {
     auto result = uhv->validateGenericHeaderName(header_string);
     if (testChar(kGenericHeaderNameCharTable, c)) {
       EXPECT_ACCEPT(result);
+    } else if (c != '_') {
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
     } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidUnderscore);
     }
   }
-}
-
-TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
-  HeaderString invalid_underscore{"x_foo"};
-  auto uhv = createBase(reject_headers_with_underscores_config);
-
-  EXPECT_REJECT_WITH_DETAILS(uhv->validateGenericHeaderName(invalid_underscore),
-                             UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyInvalidEmpty) {
@@ -161,6 +166,14 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
+TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
+  HeaderString invalid_with_underscore{"x_fo<o"};
+  auto uhv = createBase(drop_headers_with_underscores_config);
+
+  auto result = uhv->validateGenericHeaderName(invalid_with_underscore);
+  EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
+}
+
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
   auto uhv = createBase(empty_config);
   std::string name{"aaaaa"};
@@ -175,7 +188,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderValue) {
     if (testChar(kGenericHeaderValueCharTable, c)) {
       EXPECT_ACCEPT(result);
     } else {
-      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidCharacters);
+      EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidValueCharacters);
     }
   }
 }

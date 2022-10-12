@@ -35,6 +35,11 @@ public:
 
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  // Save HTTP response headers to the downstream filter state.
+  virtual void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 };
 
 using TunnelingConfigHelperOptConstRef = OptRef<const TunnelingConfigHelper>;
@@ -67,14 +72,14 @@ public:
    * @param info supplies the stream info object associated with the upstream connection.
    * @param upstream supplies the generic upstream for the stream.
    * @param host supplies the description of the host that will carry the request.
-   * @param upstream_local_address supplies the local address of the upstream connection.
+   * @param address_provider supplies the address provider of the upstream connection.
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
-  virtual void
-  onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
-                     Upstream::HostDescriptionConstSharedPtr& host,
-                     const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                     Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
+  virtual void onGenericPoolReady(StreamInfo::StreamInfo* info,
+                                  std::unique_ptr<GenericUpstream>&& upstream,
+                                  Upstream::HostDescriptionConstSharedPtr& host,
+                                  const Network::ConnectionInfoProvider& address_provider,
+                                  Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
   /**
    * Called to indicate a failure for GenericConnPool::newStream to establish a stream.
@@ -142,13 +147,15 @@ public:
    * @param config the tunneling config, if doing connect tunneling.
    * @param context the load balancing context for this connection.
    * @param upstream_callbacks the callbacks to provide to the connection if successfully created.
+   * @param downstream_info is the downstream connection stream info.
    * @return may be null if there is no cluster with the given name.
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         TunnelingConfigHelperOptConstRef config,
                         Upstream::LoadBalancerContext* context,
-                        Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
+                        Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+                        StreamInfo::StreamInfo& downstream_info) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

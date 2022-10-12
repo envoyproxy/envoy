@@ -109,7 +109,8 @@ HeaderValidator::validateSchemeHeader(const HeaderString& value) {
   // The validation mode controls whether uppercase letters are permitted.
   absl::string_view scheme = value.getStringView();
 
-  if (!absl::EqualsIgnoreCase(scheme, "http") && !absl::EqualsIgnoreCase(scheme, "https")) {
+  if (scheme != "http" && scheme != "https") {
+    // TODO(#23313) - Honor config setting for mixed case.
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidScheme};
   }
@@ -165,8 +166,6 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   const auto& key_string_view = name.getStringView();
-  bool allow_underscores =
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::ALLOW;
   // This header name is initially invalid if the name is empty.
   if (key_string_view.empty()) {
     return {HeaderEntryValidationResult::Action::Reject,
@@ -174,21 +173,32 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   }
 
   bool is_valid = true;
+  bool has_underscore = false;
   char c = '\0';
+  const auto& underscore_action = config_.headers_with_underscores_action();
 
   for (auto iter = key_string_view.begin(); iter != key_string_view.end() && is_valid; ++iter) {
     c = *iter;
-    is_valid &= testChar(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
+    if (c != '_') {
+      is_valid &= testChar(kGenericHeaderNameCharTable, c);
+    } else {
+      has_underscore = true;
+    }
   }
 
-  if (!is_valid && c == '_' &&
-      config_.headers_with_underscores_action() == HeaderValidatorConfig::DROP_HEADER) {
-    return {HeaderEntryValidationResult::Action::DropHeader,
-            UhvResponseCodeDetail::get().InvalidUnderscore};
-  } else if (!is_valid) {
-    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
-                            : UhvResponseCodeDetail::get().InvalidCharacters;
-    return {HeaderEntryValidationResult::Action::Reject, details};
+  if (!is_valid) {
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidNameCharacters};
+  }
+
+  if (has_underscore) {
+    if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      return {HeaderEntryValidationResult::Action::Reject,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      return {HeaderEntryValidationResult::Action::DropHeader,
+              UhvResponseCodeDetail::get().InvalidUnderscore};
+    }
   }
 
   return HeaderEntryValidationResult::success();
@@ -218,7 +228,7 @@ HeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
 
   if (!is_valid) {
     return {HeaderValueValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidCharacters};
+            UhvResponseCodeDetail::get().InvalidValueCharacters};
   }
 
   return HeaderValueValidationResult::success();
@@ -229,6 +239,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6:
   //
   // Content-Length = 1*DIGIT
+  // TODO(#23315) - Validate multiple Content-Length values
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
@@ -253,6 +264,8 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   //
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
+  //
+  // TODO(#22859, #23314) - Fully implement IPv6 address validation
   const auto host = value.getStringView();
   if (host.empty()) {
     return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
@@ -277,7 +290,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     return {HeaderValueValidationResult::Action::Reject, result.details()};
   }
 
-  const auto port_string = result.port();
+  const auto port_string = result.portAndDelimiter();
   if (!port_string.empty()) {
     // Validate the port, which will be in the form of ":<uint16_t>"
     bool is_valid = true;

@@ -32,7 +32,6 @@ public:
 
   /*
    * Validate the :status response pseudo header based on the range of valid response statuses.
-   * TODO: add RFC reference
    */
   virtual HeaderValueValidationResult
   validateStatusHeader(const ::Envoy::Http::HeaderString& value);
@@ -114,7 +113,7 @@ protected:
     absl::string_view address() const { return std::get<2>(result_); }
 
     // The port component of the URI path, including the leading ":" delimiter.
-    absl::string_view port() const { return std::get<3>(result_); }
+    absl::string_view portAndDelimiter() const { return std::get<3>(result_); }
 
   private:
     std::tuple<RejectAction, std::string, absl::string_view, absl::string_view> result_;
@@ -141,7 +140,8 @@ protected:
 };
 
 struct UhvResponseCodeDetailValues {
-  const std::string InvalidCharacters = "uhv.invalid_characters";
+  const std::string InvalidNameCharacters = "uhv.invalid_name_characters";
+  const std::string InvalidValueCharacters = "uhv.invalid_value_characters";
   const std::string InvalidUrl = "uhv.invalid_url";
   const std::string InvalidHost = "uhv.invalid_host";
   const std::string InvalidScheme = "uhv.invalid_scheme";

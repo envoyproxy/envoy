@@ -9,6 +9,7 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/escaping.h"
 #include "fmt/format.h"
+#include "fmt/ostream.h"
 
 namespace Envoy {
 namespace Http {
@@ -81,5 +82,7 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
     return fmt::formatter<std::string>().format(str, ctx);
   }
 };
+
+template <> struct formatter<::Envoy::Http::MetadataMapVector> : fmt::ostream_formatter {};
 
 } // namespace fmt

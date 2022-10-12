@@ -337,6 +337,7 @@ message RateLimitConfig {
 }
 
 message RateLimitPerRoute {
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.
     OVERRIDE = 0;
@@ -365,6 +366,7 @@ message RateLimitPerRoute {
   }
 
   // Specifies if the rate limit filter should include the virtual host rate limits.
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits override options.

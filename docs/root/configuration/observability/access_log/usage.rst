@@ -437,7 +437,7 @@ The following command operators are supported:
     * **RLSE**: The request was rejected because there was an error in rate limit service.
     * **IH**: The request was rejected because it set an invalid value for a
       :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
-    * **SI**: Stream idle timeout in addition to 408 response code.
+    * **SI**: Stream idle timeout in addition to 408 or 504 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached max stream duration.

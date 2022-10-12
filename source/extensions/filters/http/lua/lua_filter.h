@@ -537,7 +537,7 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
-    void onHeadersModified() override { callbacks_->clearRouteCache(); }
+    void onHeadersModified() override { callbacks_->downstreamCallbacks()->clearRouteCache(); }
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 

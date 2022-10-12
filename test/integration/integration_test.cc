@@ -831,7 +831,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 
 TEST_P(IntegrationTest, TestSmuggling) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - uniform handling of Transfer-Encoding validation between codec and UHV
+  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
   return;
 #endif
 
@@ -963,7 +963,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - uniform handling of Transfer-Encoding validation between codec and UHV
+  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
   return;
 #endif
 
@@ -1078,7 +1078,7 @@ TEST_P(IntegrationTest, BadHeader) {
 
 TEST_P(IntegrationTest, Http10Disabled) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 
@@ -1090,7 +1090,7 @@ TEST_P(IntegrationTest, Http10Disabled) {
 
 TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 
@@ -1104,7 +1104,7 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 // Turn HTTP/1.0 support on and verify 09 style requests work.
 TEST_P(IntegrationTest, Http09Enabled) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 
@@ -1128,7 +1128,7 @@ TEST_P(IntegrationTest, Http09Enabled) {
 
 TEST_P(IntegrationTest, Http09WithKeepalive) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 
@@ -1149,7 +1149,7 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 
@@ -1355,7 +1355,7 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
 #ifdef ENVOY_ENABLE_UHV
-  // TODO - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
 #endif
 

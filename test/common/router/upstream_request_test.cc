@@ -1,5 +1,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
@@ -144,13 +145,6 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_EQ(filter->callbacks_->clusterInfo(), router_filter_interface_.callbacks_.clusterInfo());
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());
-
-  EXPECT_ENVOY_BUG(filter->callbacks_->requestRouteConfigUpdate(nullptr),
-                   "requestRouteConfigUpdate called from upstream filter");
-  EXPECT_ENVOY_BUG(filter->callbacks_->setRoute(nullptr),
-                   "set route cache called from upstream filter");
-  EXPECT_ENVOY_BUG(filter->callbacks_->clearRouteCache(),
-                   "clear route cache called from upstream filter");
 
   EXPECT_CALL(*conn_pool_, newStream(_))
       .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
