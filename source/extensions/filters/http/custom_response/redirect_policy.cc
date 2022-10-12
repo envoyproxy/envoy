@@ -85,8 +85,8 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
 
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(http_uri_, false)) {
-    ENVOY_LOG(error, "Redirect for custom response failed: invalid location {}", http_uri_);
-    stats_.custom_response_redirect_invalid_uri_.inc();
+    ENVOY_BUG(true,
+              absl::StrCat("Redirect for custom response failed: invalid location {}", http_uri_));
     return Http::FilterHeadersStatus::Continue;
   }
   // Don't change the scheme from the original request

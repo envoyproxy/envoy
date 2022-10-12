@@ -117,7 +117,6 @@ message CustomResponse {
   //               - header:
   //                   key: "foo"
   //                   value: "x-bar"
-  //                 append: false
   //       # Redirect to different upstream if the status code is one of 502, 503 or 504.
   //     - predicate:
   //         or_matcher:
@@ -157,7 +156,6 @@ message CustomResponse {
   //               - header:
   //                   key: "foo2"
   //                   value: "x-bar2"
-  //                 append: false
   //
   // -- attention::
   //  The first matched policy wins. Once the response is matched, matcher

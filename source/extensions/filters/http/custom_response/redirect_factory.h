@@ -9,7 +9,7 @@ namespace CustomResponse {
 
 class RedirectFactory : public PolicyFactory {
 public:
-  ~RedirectFactory() override = default;
+  ~RedirectFactory() override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

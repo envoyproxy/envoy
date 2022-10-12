@@ -39,7 +39,6 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "foo"
                     value: "x-bar"
-                  append: false
         # Redirect to different upstream if the status code is one of 502, 503 or 504.
       - predicate:
           or_matcher:
@@ -79,7 +78,6 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "foo2"
                     value: "x-bar2"
-                  append: false
       - predicate:
           single_predicate:
             input:
@@ -102,7 +100,6 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "foo3"
                     value: "x-bar3"
-                  append: false
   )EOF";
 
 }

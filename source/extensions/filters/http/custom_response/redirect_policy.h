@@ -21,8 +21,7 @@ class CustomResponseFilter;
  * All stats for the custom response filter. @see stats_macros.h
  */
 #define ALL_CUSTOM_RESPONSE_REDIRECT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)      \
-  COUNTER(custom_response_redirect_no_route)                                                       \
-  COUNTER(custom_response_redirect_invalid_uri)
+  COUNTER(custom_response_redirect_no_route)
 
 /**
  * Wrapper struct for stats. @see stats_macros.h

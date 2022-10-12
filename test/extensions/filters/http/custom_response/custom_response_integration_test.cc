@@ -162,8 +162,6 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
-  EXPECT_EQ(
-      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   EXPECT_EQ("x-bar2",
             response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }
@@ -213,7 +211,6 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
 
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
   EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
-  EXPECT_EQ(0, test_server_->counter("custom_response_redirect_invalid_uri")->value());
 
   // Send request to host without per route config
   default_request_headers_.setHost("some.route");
@@ -222,8 +219,6 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
-  EXPECT_EQ(
-      0, test_server_->counter("http.config_test.custom_response_redirect_invalid_uri")->value());
   EXPECT_EQ("x-bar2",
             response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }

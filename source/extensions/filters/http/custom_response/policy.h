@@ -31,8 +31,6 @@ using PolicySharedPtr = std::shared_ptr<Policy>;
 
 class PolicyFactory : public Config::TypedFactory {
 public:
-  ~PolicyFactory() override = default;
-
   virtual PolicySharedPtr createPolicy(const Protobuf::Message& config,
                                        Envoy::Server::Configuration::ServerFactoryContext& context,
                                        Stats::StatName stats_prefix) PURE;

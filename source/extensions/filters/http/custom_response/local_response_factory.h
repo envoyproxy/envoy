@@ -9,7 +9,7 @@ namespace CustomResponse {
 
 class LocalResponseFactory : public PolicyFactory {
 public:
-  ~LocalResponseFactory() override = default;
+  ~LocalResponseFactory() override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

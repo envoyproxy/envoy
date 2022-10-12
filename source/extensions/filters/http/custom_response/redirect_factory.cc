@@ -15,6 +15,8 @@ ProtobufTypes::MessagePtr RedirectFactory::createEmptyConfigProto() {
   return std::make_unique<RedirectPolicyProto>();
 }
 
+RedirectFactory::~RedirectFactory() = default;
+
 PolicySharedPtr
 RedirectFactory::createPolicy(const Protobuf::Message& config,
                               Envoy::Server::Configuration::ServerFactoryContext& context,

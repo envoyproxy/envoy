@@ -79,6 +79,53 @@ TEST_F(CustomResponseFilterTest, RemoteData) {
             Http::FilterHeadersStatus::StopIteration);
 }
 
+TEST_F(CustomResponseFilterTest, NoMatcherInConfig) {
+  createConfig("{}");
+  setupFilterAndCallback();
+
+  setServerName("server1.example.foo");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true), Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(CustomResponseFilterTest, MatchNotFound) {
+  createConfig("{}");
+  setupFilterAndCallback();
+
+  setServerName("server1.example.foo");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true), Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
+  createConfig(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+          name: local_response
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.LocalResponsePolicy
+            body:
+              inline_string: "not allowed"
+)EOF");
+  setupFilterAndCallback();
+
+  setServerName("server1.example.foo");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ("200", response_headers.getStatusValue());
+}
+
 } // namespace
 } // namespace CustomResponse
 } // namespace HttpFilters

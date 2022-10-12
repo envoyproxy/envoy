@@ -116,6 +116,12 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
   HttpMatchingDataImpl data(connection_info_provider);
 
   {
+    auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+  {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(200);
     data.onResponseHeaders(response_headers);
@@ -139,7 +145,12 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
   HttpMatchingDataImpl data(connection_info_provider);
-
+  {
+    auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
     response_headers.setStatus(100);

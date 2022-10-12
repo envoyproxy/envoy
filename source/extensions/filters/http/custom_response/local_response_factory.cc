@@ -14,6 +14,8 @@ ProtobufTypes::MessagePtr LocalResponseFactory::createEmptyConfigProto() {
   return std::make_unique<LocalResponsePolicyProto>();
 }
 
+LocalResponseFactory::~LocalResponseFactory() = default;
+
 PolicySharedPtr
 LocalResponseFactory::createPolicy(const Protobuf::Message& config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,
