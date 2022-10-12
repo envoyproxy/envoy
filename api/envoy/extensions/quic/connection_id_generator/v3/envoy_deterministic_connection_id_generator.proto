@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/qui
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC connection ID generator config]
-// [#extension: envoy.quic.connection_id_generator]
+// [#extension: envoy.quic.deterministic_connection_id_generator]
 
 // Configuration for a connection ID generator implementation which issues predictable CIDs with stable first 4 bytes.
 message DeterministicConnectionIdGeneratorConfig {
