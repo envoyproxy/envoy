@@ -493,7 +493,10 @@ private:
     std::string transactionId() const override { return ""; }
     absl::optional<OriginIngress> originIngress() override { return parent_.originIngress(); }
 
-    Router::RouteConstSharedPtr route() override { ASSERT(false, "route() not implemented"); }
+    Router::RouteConstSharedPtr route() override { 
+      ASSERT(false, "route() not implemented");
+      return nullptr;
+    }
 
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
       UNREFERENCED_PARAMETER(response);
@@ -512,9 +515,11 @@ private:
 
     std::shared_ptr<Router::TransactionInfos> transactionInfos() override {
       ASSERT(false, "transactionInfos() not implemented");
+      return nullptr;
     }
     std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstreamConnectionInfos() override {
       ASSERT(false, "downstreamConnectionInfos() not implemented");
+      return nullptr;
     }
     std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstreamTransactionInfos() override {
       return parent_.upstream_transaction_infos_;
@@ -524,6 +529,7 @@ private:
 
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       ASSERT(false, "traHandler() not implemented");
+      return nullptr;
     }
 
     void continueHandling(const std::string& key, bool try_next_affinity) override {
@@ -531,7 +537,10 @@ private:
       UNREFERENCED_PARAMETER(try_next_affinity);
     }
 
-    MessageMetadataSharedPtr metadata() override { ASSERT(false, "metadata() not implemented"); };
+    MessageMetadataSharedPtr metadata() override { 
+      ASSERT(false, "metadata() not implemented");
+      return nullptr;
+    };
 
     // SipFilters::PendingListHandler
     void pushIntoPendingList(const std::string& type, const std::string& key,
