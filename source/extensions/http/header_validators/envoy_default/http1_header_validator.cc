@@ -180,7 +180,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   auto path_is_asterisk = path == "*";
-  auto path_is_absolute = path.empty() ? false : path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
@@ -292,7 +291,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     // Validate and normalize the path, which must be a valid URI. This is only run if the config
     // is active.
     //
-    // If path normalization is disabled then the path will be validated against the RFC character 
+    // If path normalization is disabled then the path will be validated against the RFC character
     // set in validateRequestHeaderEntry.
     auto path_result = path_normalizer_.normalizePathUri(header_map);
     if (!path_result.ok()) {
@@ -330,9 +329,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       }
     }
   }
-
-  // If path normalization is disabled or the path isn't absolute then the path will be validated
-  // against the RFC character set in validateRequestHeaderEntry.
 
   // Step 4: Verify each request header
   std::string reject_details;

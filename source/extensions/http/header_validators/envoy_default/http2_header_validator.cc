@@ -138,18 +138,19 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
-  bool path_is_absolute = !path.empty() && path.at(0) == '/';
+  bool path_is_absolute = !path_is_empty && path.at(0) == '/';
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
+  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme", and
     // ":path" pseudo-header fields, unless they are CONNECT requests (Section 8.5). An HTTP
     // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
-    auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
-                                : UhvResponseCodeDetail::get().InvalidScheme;
+    auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
+                                 : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
   } else if (is_connect_method) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
@@ -162,7 +163,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
     //    [HTTP/1.1]).
     absl::string_view details;
-    if (!path.empty()) {
+    if (!path_is_empty) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
