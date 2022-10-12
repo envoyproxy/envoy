@@ -98,7 +98,15 @@ private:
   const bool disable_literal_context_modeling_{false};
 };
 
-using CompressionParams = std::tuple<int64_t, uint64_t, int64_t, uint64_t>;
+struct CompressionParams {
+  int64_t level;
+  uint64_t strategy;
+  int64_t window_bits;
+  uint64_t memory_level;
+
+  CompressionParams(int64_t l, uint64_t s, int64_t w, uint64_t m)
+      : level(l), strategy(s), window_bits(w), memory_level(m) {}
+};
 
 CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
@@ -108,12 +116,12 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
 
   const auto level =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel>(
-          std::get<0>(params));
+          params.level);
   const auto strategy =
       static_cast<Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy>(
-          std::get<1>(params));
-  const auto window_bits = std::get<2>(params);
-  const auto memory_level = std::get<3>(params);
+          params.strategy);
+  const auto window_bits = params.window_bits;
+  const auto memory_level = params.memory_level;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockGzipCompressorFactory>(level, strategy, window_bits, memory_level);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
@@ -128,8 +136,8 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
-  const auto level = std::get<0>(params);
-  const auto strategy = std::get<1>(params);
+  const auto level = params.level;
+  const auto strategy = params.strategy;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockZstdCompressorFactory>(level, strategy);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
@@ -144,7 +152,7 @@ CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
-  const auto quality = std::get<0>(params);
+  const auto quality = params.level;
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockBrotliCompressorFactory>(quality);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
@@ -312,9 +320,9 @@ compressChunks8192WithGzip/6/manual_time        16.9 ms         17.5 ms         
 */
 // SPELLCHECKER(on)
 
-static std::vector<CompressionParams> gzip_compression_params = {
+static const std::array<CompressionParams, 9> gzip_compression_params = {
     // Speed + Standard + Small Window + Low mem level
-    {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1},
+    CompressionParams(Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1),
 
     // Speed + Standard + Med window + Med mem level
     {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 12, 5},
@@ -420,9 +428,9 @@ BENCHMARK(compressChunks1024WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-static std::vector<CompressionParams> zstd_compression_params = {
+static const std::array<CompressionParams, 22> zstd_compression_params = {
     // level1 + default
-    {1, 0, 0, 0},
+    CompressionParams(1, 0, 0, 0),
 
     // level2 + default
     {2, 0, 0, 0},
@@ -567,9 +575,9 @@ BENCHMARK(compressChunks1024WithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-static std::vector<CompressionParams> brotli_compression_params = {
+static const std::array<CompressionParams, 11> brotli_compression_params = {
     // level1 + default
-    {1, 0, 0, 0},
+    CompressionParams(1, 0, 0, 0),
 
     // level2 + default
     {2, 0, 0, 0},
