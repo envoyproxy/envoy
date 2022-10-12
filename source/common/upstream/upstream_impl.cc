@@ -261,7 +261,7 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
   // Check if the health flag has changed.
   if (existing_host.healthFlagGet(flag) != updated_host.healthFlagGet(flag)) {
     // Keep track of the previous health value of the host.
-    const auto previous_health = existing_host.health();
+    const auto previous_health = existing_host.coarseHealth();
 
     if (updated_host.healthFlagGet(flag)) {
       existing_host.healthFlagSet(flag);
@@ -270,7 +270,7 @@ bool updateHealthFlag(const Host& updated_host, Host& existing_host, Host::Healt
     }
 
     // Rebuild if changing the flag affected the host health.
-    return previous_health != existing_host.health();
+    return previous_health != existing_host.coarseHealth();
   }
 
   return false;
@@ -1286,10 +1286,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
   auto excluded_list = std::make_shared<ExcludedHostVector>();
 
   for (const auto& host : hosts) {
-    if (host->health() == Host::Health::Healthy) {
+    if (host->coarseHealth() == Host::Health::Healthy) {
       healthy_list->get().emplace_back(host);
     }
-    if (host->health() == Host::Health::Degraded) {
+    if (host->coarseHealth() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
     if (excludeBasedOnHealthFlag(*host)) {
@@ -1304,8 +1304,8 @@ std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
            HostsPerLocalityConstSharedPtr>
 ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
   auto filtered_clones =
-      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
-                    [](const Host& host) { return host.health() == Host::Health::Degraded; },
+      hosts.filter({[](const Host& host) { return host.coarseHealth() == Host::Health::Healthy; },
+                    [](const Host& host) { return host.coarseHealth() == Host::Health::Degraded; },
                     [](const Host& host) { return excludeBasedOnHealthFlag(host); }});
 
   return std::make_tuple(std::move(filtered_clones[0]), std::move(filtered_clones[1]),
@@ -1914,7 +1914,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // - Active health checking is not enabled.
   // - The removed hosts are failing active health checking OR have been explicitly marked as
   //   unhealthy by a previous EDS update. We do not count outlier as a reason to remove a host
-  //   or any other future health condition that may be added so we do not use the health() API.
+  //   or any other future health condition that may be added so we do not use the coarseHealth()
+  //   API.
   // - We have explicitly configured the cluster to remove hosts regardless of active health status.
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();

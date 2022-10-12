@@ -233,8 +233,8 @@ public:
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
         health_status_(health_status) {
-    // This EDS flags setting is still necessary for stats, configuration dump, canonical health()
-    // etc.
+    // This EDS flags setting is still necessary for stats, configuration dump, canonical
+    // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -284,7 +284,7 @@ public:
     return health_status_;
   }
 
-  Host::Health health() const override {
+  Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||

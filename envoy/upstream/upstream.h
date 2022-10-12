@@ -164,9 +164,9 @@ public:
   };
 
   /**
-   * @return the health of the host.
+   * @return the coarse health status of the host.
    */
-  virtual Health health() const PURE;
+  virtual Health coarseHealth() const PURE;
 
   using HealthStatus = envoy::config::core::v3::HealthStatus;
 
