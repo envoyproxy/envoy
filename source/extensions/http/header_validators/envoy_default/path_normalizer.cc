@@ -333,7 +333,6 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
     header_map.setPath(absl::StrCat(prefix, normalized_path));
   }
 
-  // redirect |= normalized_path != original_path;
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
             PathNormalizerResponseCodeDetail::get().RedirectNormalized};
