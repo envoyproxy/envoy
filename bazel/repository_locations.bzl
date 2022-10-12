@@ -1054,11 +1054,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
         version = "10.7.193.13",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "be68ca9160ea0435b92595da54b35f07813f36837a4718d6920825bf5e9e05f1",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8-edge/v8-{version}.tar.gz"],
+        sha256 = "2170df76ce5d7ecd7fb8d131370d210152f200273cba126f06d8b88fb53c9fbc",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-10-09",
+        release_date = "2022-12-09",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
@@ -1069,11 +1069,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
         version = "521ac34ebd795939c7e16b37d9d3ddb40e8ed556",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "53ed4c8ddc1cd578e7886f6ec21e3cfc904a0ca094380a6938011b3e686e9983",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8-edge/chromium-base_trace_event_common-{version}.tar.gz"],
+        sha256 = "d99726bd452d1dd6cd50ab33060774e8437d9f0fc6079589f657fe369c66ec09",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-10-09",
+        release_date = "2022-12-09",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
