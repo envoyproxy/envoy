@@ -101,6 +101,14 @@ private:
       // or existing. Different clusters / listeners can share same secret so they have to be marked
       // warming correctly.
 
+      // Note that we are not using secret_provider_context's init manager because in some cases,
+      // for example oauth2 filter with sds config, it could be server's init manager. In oauth2
+      // filter example, if the filter config is dynamic, it could be received from xds server when
+      // the server's init manager is already in the initialized state. In that situation, adding
+      // init target to the initialized init manager will lead to assertion failure.
+      //
+      // It is expected that correct init manager will be passed to this method by the caller
+      // separately.
       init_manager.add(*secret_provider->initTarget());
       return secret_provider;
     }
