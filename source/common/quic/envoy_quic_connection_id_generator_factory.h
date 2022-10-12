@@ -17,7 +17,7 @@ using QuicConnectionIdGeneratorPtr = std::unique_ptr<quic::ConnectionIdGenerator
  */
 class EnvoyQuicConnectionIdGeneratorFactory {
 public:
-  virtual ~EnvoyQuicConnectionIdGeneratorFactory() {}
+  virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
 
   virtual QuicConnectionIdGeneratorPtr
   createQuicConnectionIdGenerator(quic::LoadBalancerEncoder& lb_encoder,
