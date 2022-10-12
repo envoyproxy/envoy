@@ -20,9 +20,23 @@ namespace Dlb {
 Envoy::Network::ConnectionBalancerSharedPtr
 DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
-  const auto dlb_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb&>(
-      config, context.messageValidationVisitor());
+  const auto& typed_config =
+      dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(config);
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb_config;
+  auto status = Envoy::MessageUtil::unpackToNoThrow(typed_config.typed_config(), dlb_config);
+  if (!status.ok()) {
+    ExceptionUtil::throwEnvoyException(
+        fmt::format("unexpected dlb config: {}", typed_config.DebugString()));
+  }
+
+  const int num = context.options().concurrency();
+
+  if (num > 32) {
+    ExceptionUtil::throwEnvoyException(
+        "Dlb connection balanncer only supports up to 32 worker threads, "
+        "please decrease the number of threads by `--concurrency`");
+  }
+
 #ifdef DLB_DISABLED
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
@@ -126,13 +140,6 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   tx_queue_id = createLdbQueue(domain);
   if (tx_queue_id == -1) {
     ExceptionUtil::throwEnvoyException(fmt::format("tx create_ldb_queue {}", errorDetails(errno)));
-  }
-
-  const int num = context.options().concurrency();
-  if (num > 32) {
-    ExceptionUtil::throwEnvoyException(
-        "Dlb connection balanncer only supports up to 32 worker threads, "
-        "please decrease the number of threads by `--concurrency`");
   }
 
   for (int i = 0; i < num; i++) {
