@@ -211,16 +211,10 @@ protected:
   void onConnectTimeout();
   void onUpstreamEvent(Network::ConnectionEvent event);
   void onUpstreamConnection();
-  void onIdleTimeout();
-  void resetIdleTimer();
-  void disableIdleTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-
-  Event::TimerPtr idle_timer_;
-  Event::TimerPtr connection_duration_timer_;
 
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.

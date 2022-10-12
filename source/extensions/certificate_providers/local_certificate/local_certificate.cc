@@ -23,6 +23,10 @@ Provider::Provider(const envoy::config::core::v3::TypedExtensionConfig& config,
   ca_key_ = Config::DataSource::read(message.rootca_key(), true, api);
   default_identity_cert_ = Config::DataSource::read(message.default_identity_cert(), true, api);
   default_identity_key_ = Config::DataSource::read(message.default_identity_key(), true, api);
+
+  auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(message.expiration_time());
+  expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
+
   // Generate TLSCertificate
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate = new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
   tls_certificate->mutable_certificate_chain()->set_inline_string(default_identity_cert_);
@@ -167,7 +171,20 @@ void Provider::signCertificate(const std::string sni,
 
   X509_set_issuer_name(crt, X509_get_subject_name(ca_cert.get()));
   X509_gmtime_adj(X509_get_notBefore(crt), 0);
-  X509_gmtime_adj(X509_get_notAfter(crt), 2 * 365 * 24 * 3600);
+
+
+  // Compare expiration_time config with upstream cert expiration. Use smaller
+  // value of those two dates as expiration time of mimic cert.
+  auto now = std::chrono::system_clock::now();
+  uint64_t valid_seconds = std::chrono::duration_cast<std::chrono::seconds>(expiration_config_ - now).count();
+  if (metadata->connectionInfo()->expirationPeerCertificate()) {
+    if (metadata->connectionInfo()->expirationPeerCertificate().value() <= expiration_config_) {
+        valid_seconds =
+          std::chrono::duration_cast<std::chrono::seconds>(metadata->connectionInfo()->expirationPeerCertificate().value() - now).count();
+    }
+  }
+
+  X509_gmtime_adj(X509_get_notAfter(crt), valid_seconds);
   X509_set_subject_name(crt, X509_REQ_get_subject_name(req));
   EVP_PKEY* req_pubkey = X509_REQ_get_pubkey(req);
   X509_set_pubkey(crt, req_pubkey);

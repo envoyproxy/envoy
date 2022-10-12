@@ -65,12 +65,7 @@ BumpingStats Config::generateStats(Stats::Scope& scope) {
 }
 
 RouteConstSharedPtr Config::getRoute() {
-  if (default_route_ != nullptr) {
-    return default_route_;
-  }
-
-  // no match, no more routes to try
-  return nullptr;
+  return default_route_;
 }
 
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
@@ -83,6 +78,9 @@ Filter::~Filter() {
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
+
+  ASSERT(generic_conn_pool_ == nullptr);
+  //ASSERT(upstream_ == nullptr);
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -94,6 +92,8 @@ void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbac
   // TODO, needs refactoring
   read_callbacks_->connection().readDisable(true);
   read_callbacks_->connection().write_disable = true;
+
+  getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 }
 
 StreamInfo::StreamInfo& Filter::getStreamInfo() {
@@ -218,14 +218,14 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
 }
 
 void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
-                                std::unique_ptr<TcpProxy::GenericUpstream>&& upstream,
+                                std::unique_ptr<TcpProxy::GenericUpstream>&&,
                                 Upstream::HostDescriptionConstSharedPtr&,
                                 const Network::ConnectionInfoProvider&,
                                 Ssl::ConnectionInfoConstSharedPtr info) {
 
   // Request mimick cert from local certificate provider.
   requestCertificate(info);
-  upstream_ = std::move(upstream);
+  //upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   onUpstreamConnection();
 }
@@ -253,7 +253,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  ASSERT(upstream_ == nullptr);
+  //ASSERT(upstream_ == nullptr);
   route_ = pickRoute();
   return establishUpstreamConnection();
 }
@@ -269,10 +269,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_.reset();
-    disableIdleTimer();
+    //upstream_.reset();
 
-    // happens in on onPoolFailure
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
@@ -288,20 +286,6 @@ void Filter::onUpstreamConnection() {
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
                  read_callbacks_->connection(),
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
-}
-
-void Filter::resetIdleTimer() {
-  if (idle_timer_ != nullptr) {
-    ASSERT(config_->idleTimeout());
-    idle_timer_->enableTimer(config_->idleTimeout().value());
-  }
-}
-
-void Filter::disableIdleTimer() {
-  if (idle_timer_ != nullptr) {
-    idle_timer_->disableTimer();
-    idle_timer_.reset();
-  }
 }
 
 void Filter::onCacheHit(const std::string) const {
