@@ -14,6 +14,9 @@ EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
   auto new_cid = DeterministicConnectionIdGenerator::GenerateNextConnectionId(original);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRoutine(new_cid.value(), original);
+    if (new_cid.value() == original) {
+      return absl::nullopt;
+    }
   }
   return new_cid;
 }
@@ -24,6 +27,9 @@ EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
   auto new_cid = DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(original, version);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRoutine(new_cid.value(), original);
+    if (new_cid.value() == original) {
+      return absl::nullopt;
+    }
   }
   return new_cid;
 }
