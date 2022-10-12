@@ -834,11 +834,10 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {
-    data.add(out, size);
-
     if (size == 0) {
       return true;
     }
+    data.add(out, size);
   }
   return false;
 }
