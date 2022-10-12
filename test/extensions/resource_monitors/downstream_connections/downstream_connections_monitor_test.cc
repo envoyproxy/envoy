@@ -55,6 +55,7 @@ TEST_F(ActiveDownstreamConnectionsMonitorTest, FailsToAllocateDeallocateWhenMinM
   EXPECT_FALSE(monitor_->tryAllocateResource(1));
   EXPECT_TRUE(monitor_->tryDeallocateResource(1));
   EXPECT_EQ(0, monitor_->currentResourceUsage());
+  EXPECT_FALSE(monitor_->tryDeallocateResource(1));
 }
 
 TEST_F(ActiveDownstreamConnectionsMonitorTest, AllocateCasMultithreaded) {

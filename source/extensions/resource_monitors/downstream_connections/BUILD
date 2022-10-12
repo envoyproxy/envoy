@@ -16,7 +16,6 @@ envoy_cc_library(
     deps = [
         "//envoy/server:proactive_resource_monitor_interface",
         "//envoy/server:resource_monitor_config_interface",
-        "//source/common/common:assert_lib",
         "//source/common/common:thread_synchronizer_lib",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],

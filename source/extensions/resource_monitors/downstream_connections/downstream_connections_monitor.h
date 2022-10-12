@@ -3,7 +3,6 @@
 #include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.h"
 #include "envoy/server/proactive_resource_monitor.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/common/thread_synchronizer.h"
 
 namespace Envoy {
@@ -25,7 +24,7 @@ public:
   int64_t maxResourceUsage() const override;
 
 protected:
-  int64_t max_;
+  const int64_t max_;
   std::atomic<int64_t> current_;
   // Used for testing only.
   mutable Thread::ThreadSynchronizer synchronizer_;

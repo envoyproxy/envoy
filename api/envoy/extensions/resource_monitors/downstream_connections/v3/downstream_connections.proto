@@ -20,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // The downstream connections resource monitor tracks the global number of open downstream connections.
 message DownstreamConnectionsConfig {
-  // Maximum threshold for global open active downstream connections, defaults to 0.
-  // If monitor is configured via Overload manager api and has no value set, Envoy will reject all incoming connections.
+  // Maximum threshold for global open downstream connections, defaults to 0.
+  // If monitor is enabled in Overload manager api, this field should be explicitly configured with value greater than 0.
   int64 max_active_downstream_connections = 1 [(validate.rules).int64 = {gt: 0}];
 }
