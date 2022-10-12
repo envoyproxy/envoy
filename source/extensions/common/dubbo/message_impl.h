@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/http/header_map.h"
-
 #include "source/extensions/common/dubbo/hessian2_utils.h"
 #include "source/extensions/common/dubbo/message.h"
 
