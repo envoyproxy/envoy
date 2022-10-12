@@ -84,11 +84,8 @@ public:
     if (!cap.combined_credits) {
       args.ldb_credit_pool_id = ldb_pool;
       args.dir_credit_pool_id = dir_pool;
-      args.num_ldb_credits = 32;
-      args.num_dir_credits = 32;
     } else {
       args.credit_pool_id = ldb_pool;
-      args.num_credits = 32;
     }
     args.cq_depth = cq_depth;
     args.num_ldb_event_state_entries = cq_depth * 2;
