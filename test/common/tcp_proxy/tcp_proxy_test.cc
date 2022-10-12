@@ -1330,7 +1330,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
 
 // Test that call to tcp_proxy filter's startUpstreamSecureTransport results
 // in upstream's startUpstreamSecureTransport call.
-TEST_F(TcpProxyTest, UpstreamStartSecuteTransport) {
+TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
   setup(1, config);
