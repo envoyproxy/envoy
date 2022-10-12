@@ -1,4 +1,5 @@
 #include "source/extensions/common/dubbo/message_impl.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -16,8 +17,10 @@ void RpcRequestImpl::Attachment::insert(absl::string_view key, absl::string_view
 
   attachment_updated_ = true;
 
-  attachment_->toMutableUntypedMap().value().get()[std::make_unique<String>(key)] =
-      std::make_unique<String>(value);
+  Hessian2::ObjectPtr key_o = std::make_unique<String>(key);
+  Hessian2::ObjectPtr val_o = std::make_unique<String>(value);
+  attachment_->toMutableUntypedMap().value().get().insert_or_assign(std::move(key_o),
+                                                                    std::move(val_o));
 }
 
 void RpcRequestImpl::Attachment::remove(absl::string_view key) {
