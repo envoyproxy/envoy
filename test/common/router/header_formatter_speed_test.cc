@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Router {
 
-static void BM_EvaluateHeaders(benchmark::State& state) {
+static void bmEvaluateHeaders(benchmark::State& state) {
   Http::TestRequestHeaderMapImpl request_header{
       {"bar", "a"}, {"foo", "1"}, {"test1", "to_overwrite"}};
 
@@ -43,7 +43,7 @@ static void BM_EvaluateHeaders(benchmark::State& state) {
   }
 }
 
-BENCHMARK(BM_EvaluateHeaders)->DenseRange(2, 20, 2);
+BENCHMARK(bmEvaluateHeaders)->DenseRange(2, 20, 2);
 
 } // namespace Router
 } // namespace Envoy
