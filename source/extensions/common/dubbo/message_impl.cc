@@ -1,4 +1,5 @@
 #include "source/extensions/common/dubbo/message_impl.h"
+
 #include <memory>
 
 namespace Envoy {
