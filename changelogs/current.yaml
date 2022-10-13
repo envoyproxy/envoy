@@ -75,6 +75,9 @@ minor_behavior_changes:
     support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 - area: http
   change: |
+     changed shadow requests to more closely behave like the requests they are shadowing. This includes matching the upstream logging for the original request, dynamic stats, suppressing Envoy headers, respecting expected request timeout, suppressing grpc request failure code stats and strict header checks. This behaviorial change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.closer_shadow_behavior`` to false.
+- area: http
+  change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
   change: |
     the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
