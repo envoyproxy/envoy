@@ -1,5 +1,13 @@
 #pragma once
 
+#include "envoy/http/filter.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/custom_response/policy.h"
+
+#include "test/integration/filters/common.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -102,7 +110,48 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                     value: "x-bar3"
   )EOF";
 
-}
+// Simulate filters that send local reply during either encode or decode based
+// on route specific config.
+class LocalReplyDuringDecodeIfNotCER : public Http::PassThroughFilter {
+public:
+  constexpr static char name[] = "local-reply-during-decode-if-not-cer";
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+
+    auto filter_state =
+        decoder_callbacks_->streamInfo()
+            .filterState()
+            ->getDataReadOnly<Envoy::Extensions::HttpFilters::CustomResponse::Policy>(
+                "envoy.filters.http.custom_response");
+    if (!filter_state) {
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
+                                         absl::nullopt, "");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+};
+
+class LocalReplyDuringEncodeIfNotCER : public Http::PassThroughFilter {
+public:
+  constexpr static char name[] = "local-reply-during-encode-if-not-cer";
+
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+
+    auto filter_state = encoder_callbacks_->streamInfo()
+                            .filterState()
+                            ->getDataReadOnly<Extensions::HttpFilters::CustomResponse::Policy>(
+                                "envoy.filters.http.custom_response");
+    if (!filter_state) {
+      encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
+                                         absl::nullopt, "");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+};
+
+} // namespace CustomResponse
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

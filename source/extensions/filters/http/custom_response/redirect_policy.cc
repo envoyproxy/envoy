@@ -74,14 +74,12 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   }
 
   // Modify the request headers & recreate stream.
-
-  // downstream_headers can be null if sendLocalReply was called during
-  // decodeHeaders of a previous filter. In that case just continue, as Custom
-  // Response is not compatible with sendLocalReply.
-  auto downstream_headers = custom_response_filter.downstreamHeaders();
-  if (downstream_headers == nullptr) {
+  // TODO(pradeepcrao): Currently Custom Response is not compatible with sendLocalReply.
+  if (custom_response_filter.onLocalRepplyCalled()) {
     return Http::FilterHeadersStatus::Continue;
   }
+  auto downstream_headers = custom_response_filter.downstreamHeaders();
+  RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(http_uri_, false)) {

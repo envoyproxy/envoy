@@ -3,7 +3,9 @@
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "utility.h"
@@ -334,6 +336,50 @@ name: local-reply-during-encode
   default_request_headers_.setHost("some.route");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
   // Verify we don't get the modified status value.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that we can't yet intercept local replies sent during decode if they don't
+// apply to the redirected route.
+// TODO(pradeepcrao): Make this work by modifying the interaction between
+// sendLocalReply and recreateStream
+TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyBeforeRedirectedCER) {
+
+  // Add filter that sends local reply after.
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode-if-not-cer
+)EOF");
+  SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
+  Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
+      factory);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  //     Verify we do not get a modified status value. (500 instead of 292)
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyAfterRedirectedCER) {
+
+  // Add filter that sends local reply after.
+  filters_after_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode-if-not-cer
+)EOF");
+  SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
+  Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
+      factory);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  //     Verify we do not get a modified status value. (500 instead of 292)
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 

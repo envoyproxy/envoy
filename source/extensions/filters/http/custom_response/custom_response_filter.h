@@ -30,9 +30,15 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
+  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData&) override {
+    on_local_reply_called_ = true;
+    return Http::LocalErrorStatus::Continue;
+  }
+
   Http::RequestHeaderMap* downstreamHeaders() { return downstream_headers_; }
   Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
   Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
+  bool onLocalRepplyCalled() const { return on_local_reply_called_; }
 
   ~CustomResponseFilter() override = default;
 
@@ -43,6 +49,7 @@ private:
   std::shared_ptr<FilterConfig> config_;
   const FilterConfig* config_to_use_ = nullptr;
   Http::RequestHeaderMap* downstream_headers_ = nullptr;
+  bool on_local_reply_called_ = false;
 };
 
 } // namespace CustomResponse

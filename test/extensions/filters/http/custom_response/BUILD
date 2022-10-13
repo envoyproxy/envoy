@@ -14,9 +14,15 @@ envoy_package()
 
 envoy_extension_cc_test_library(
     name = "utility_lib",
+    srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     extension_names = ["envoy.filters.http.custom_response"],
     deps = [
+        "//envoy/http:filter_interface",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/custom_response:policy_interface",
+        "//test/integration/filters:common_lib",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -79,10 +85,12 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/custom_response:factory",
         "//source/extensions/filters/http/custom_response:local_response_policy_lib",
         "//source/extensions/filters/http/custom_response:redirect_policy_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/integration/filters:local_reply_during_decoding_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
