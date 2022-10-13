@@ -5,6 +5,20 @@ Envoy Payload-To-Metadata Filter
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata>`
 
+A typical use case for this filter is to dynamically match a specified payload field of requests
+with load balancer subsets. For this, a given payload field's value would be extracted and attached
+to the request as dynamic metadata which would then be used to match a subset of endpoints.
+
+We already have :ref:`header-To-metadata filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`
+to achieve the similar goal. However, we have two reasons for introducing new :ref:`payload-To-metadata filter
+<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata>`:
+
+1. Transports like framed transport don't support THeaders, which is unable to use :ref:`Header-To-Metadata filter
+<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`.
+
+2. Directly referring to payload field stops envoy relying on that the downstream service always copies the field
+to the THeader correctly and guarantees single truth of source.
+
 This filter is configured with :ref:`request_rules
 <envoy_v3_api_field_extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3.PayloadToMetadata.request_rules>`
 that will be matched against requests. A
@@ -50,10 +64,6 @@ and not re-serializing, which is the most performant outcome.
 
 If any of the filter chain doesn't support payload passthrough, a customized non-passthrough
 filter to setup metadata is encouraged from point of performance view.
-
-A typical use case for this filter is to dynamically match requests with load balancer
-subsets. For this, a given payload field's value would be extracted and attached to the request
-as dynamic metadata which would then be used to match a subset of endpoints.
 
 Example
 -------
