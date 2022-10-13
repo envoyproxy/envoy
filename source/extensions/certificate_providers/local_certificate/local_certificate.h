@@ -58,13 +58,13 @@ private:
   void signCertificate(const std::string sni,
                        Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
                        Event::Dispatcher& thread_local_dispatcher);
-  void setSubject(const std::string& subject, X509_NAME* x509_name);
+  void setSubject(absl::string_view subject, X509_NAME* x509_name);
   Event::Dispatcher& main_thread_dispatcher_;
   std::string ca_cert_;
   std::string ca_key_;
   std::string default_identity_cert_;
   std::string default_identity_key_;
-  SystemTime expiration_config_;
+  absl::optional<SystemTime> expiration_config_;
 
   Common::CallbackManager<> update_callback_manager_;
   absl::flat_hash_map<std::string, std::list<OnDemandUpdateHandleImpl*>>

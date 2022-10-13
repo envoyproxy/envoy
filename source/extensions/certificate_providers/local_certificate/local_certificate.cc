@@ -24,8 +24,10 @@ Provider::Provider(const envoy::config::core::v3::TypedExtensionConfig& config,
   default_identity_cert_ = Config::DataSource::read(message.default_identity_cert(), true, api);
   default_identity_key_ = Config::DataSource::read(message.default_identity_key(), true, api);
 
-  auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(message.expiration_time());
-  expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
+  if (message.has_expiration_time()) {
+    auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(message.expiration_time());
+    expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
+  }
 
   // Generate TLSCertificate
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate = new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
@@ -176,11 +178,15 @@ void Provider::signCertificate(const std::string sni,
   // Compare expiration_time config with upstream cert expiration. Use smaller
   // value of those two dates as expiration time of mimic cert.
   auto now = std::chrono::system_clock::now();
-  uint64_t valid_seconds = std::chrono::duration_cast<std::chrono::seconds>(expiration_config_ - now).count();
-  if (metadata->connectionInfo()->expirationPeerCertificate()) {
-    if (metadata->connectionInfo()->expirationPeerCertificate().value() <= expiration_config_) {
+  auto cert_expiration = metadata->connectionInfo()->expirationPeerCertificate();
+  uint64_t valid_seconds;
+  if (expiration_config_) {
+    valid_seconds = std::chrono::duration_cast<std::chrono::seconds>(expiration_config_.value() - now).count();
+  }
+  if (cert_expiration) {
+    if (!expiration_config_ || cert_expiration.value() <= expiration_config_.value()) {
         valid_seconds =
-          std::chrono::duration_cast<std::chrono::seconds>(metadata->connectionInfo()->expirationPeerCertificate().value() - now).count();
+          std::chrono::duration_cast<std::chrono::seconds>(cert_expiration.value() - now).count();
     }
   }
 
@@ -218,26 +224,24 @@ void Provider::signCertificate(const std::string sni,
   runOnDemandUpdateCallback(sni, thread_local_dispatcher, false);
 }
 
-void Provider::setSubject(const std::string& subject, X509_NAME* x509_name) {
-  const std::string delim = ", ";
+void Provider::setSubject(absl::string_view subject, X509_NAME* x509_name) {
+  // Parse the RFC 2253 format output of subjectPeerCertificate and set back to mimic cert.
+  const std::string delim = ",";
   std::string item;
-  size_t start = 0, end = subject.find(delim), pos = 0;
-  for ( ; end != std::string::npos; start = end + 2, end = subject.find(delim, start)) {
-    item = subject.substr(start, end - start);
-    if ((pos = item.find("=")) != std::string::npos) {
-      //X509_NAME_add_entry_by_txt(x509_name, "CN", MBSTRING_ASC,
-      //                           reinterpret_cast<const unsigned char*>(szCommon), -1, -1, 0);
-      // reference: https://github.com/openssl/openssl/blob/master/test/v3nametest.c
-      X509_NAME_add_entry_by_txt(x509_name, item.substr(0, pos).c_str(), MBSTRING_ASC,
-                                 reinterpret_cast<const unsigned char*>(item.substr(pos + 1).c_str()),
-                                 -1, -1, 0);
+  for (absl::string_view v: absl::StrSplit(subject, delim)) {
+    // This happens when peer subject from connectioninfo contains escaped comma,
+    // like O=Technology Co.\\, Ltd, have to remove the double backslash.
+    if (v.back() == '\\') {
+      absl::StrAppend(&item, v.substr(0, v.length() - 1), delim);
     }
-  }
-  item = subject.substr(start, subject.length() - start);
-  if ((pos = item.find("=")) != std::string::npos) {
-    X509_NAME_add_entry_by_txt(x509_name, item.substr(0, pos).c_str(), MBSTRING_ASC,
-                               reinterpret_cast<const unsigned char*>(item.substr(pos + 1).c_str()),
-                               -1, -1, 0);
+    else {
+      absl::StrAppend(&item, v.substr(0, v.length()));
+      std::vector<std::string> entries = absl::StrSplit(item, "=");
+      X509_NAME_add_entry_by_txt(x509_name, entries[0].c_str(), MBSTRING_ASC,
+                                 reinterpret_cast<const unsigned char*>(entries[1].c_str()),
+                                 -1, -1, 0);
+      item.clear();
+    }
   }
 }
 } // namespace LocalCertificate
