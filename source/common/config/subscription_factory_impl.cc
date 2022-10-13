@@ -24,10 +24,10 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
-    XdsResourcesDelegateOptRef xds_resources_delegate)
+    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTracerOptRef xds_config_tracer)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
-      xds_resources_delegate_(xds_resources_delegate) {}
+      xds_resources_delegate_(xds_resources_delegate), xds_config_tracer_(xds_config_tracer) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -98,7 +98,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_resources_delegate_, control_plane_id);
+            xds_config_tracer_, xds_resources_delegate_, control_plane_id);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -126,7 +126,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), xds_config_tracer_);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -192,7 +192,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
-                std::move(custom_config_validators)),
+                std::move(custom_config_validators), xds_config_tracer_),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }

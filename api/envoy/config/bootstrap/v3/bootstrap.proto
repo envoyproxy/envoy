@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -342,6 +342,10 @@ message Bootstrap {
   // TODO(abeyad): Add public-facing documentation.
   // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig xds_delegate_extension = 35;
+
+  // Optional XdsConfigTracer configuration, which allows tracking xDS resources and responses.
+  // If a value is not specified, no XdsConfigTracer will be used.
+  core.v3.TypedExtensionConfig xds_config_tracer_extension = 36;
 }
 
 // Administration interface :ref:`operations documentation

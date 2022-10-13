@@ -330,9 +330,18 @@ ClusterManagerImpl::ClusterManagerImpl(
         validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
+  if (bootstrap.has_xds_config_tracer_extension()) {
+    auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTracerFactory>(
+        bootstrap.xds_config_tracer_extension());
+    xds_config_tracer_ =
+        tracer_factory.createXdsConfigTracer(bootstrap.xds_config_tracer_extension().typed_config(),
+                                             validation_context.dynamicValidationVisitor());
+  }
+
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()));
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
+      makeOptRefFromPtr(xds_config_tracer_.get()));
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
@@ -399,7 +408,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracer_.get()));
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -432,7 +441,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracer_.get()),
+            xds_delegate_opt_ref, target_xds_authority);
       }
     }
   } else {

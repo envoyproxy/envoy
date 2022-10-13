@@ -59,6 +59,11 @@ public:
    * @return bool does the xDS discovery response have a set resource payload?
    */
   virtual bool hasResource() const PURE;
+
+  /**
+   * @return bool does the xDS discovery respon
+   */
+  virtual absl::optional<envoy::config::core::v3::Metadata> metadata() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;

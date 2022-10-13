@@ -774,6 +774,7 @@ private:
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
+  std::unique_ptr<Config::XdsConfigTracer> xds_config_tracer_;
 };
 
 } // namespace Upstream

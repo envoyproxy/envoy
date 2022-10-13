@@ -6,6 +6,7 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/logger.h"
@@ -34,7 +35,8 @@ public:
                  const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
                  Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
-                 CustomConfigValidatorsPtr&& config_validators);
+                 CustomConfigValidatorsPtr&& config_validators,
+                 XdsConfigTracerOptRef xds_config_tracer);
 
   ~NewGrpcMuxImpl() override;
 
@@ -178,6 +180,7 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   Event::Dispatcher& dispatcher_;
+  XdsConfigTracerOptRef xds_config_tracer_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

@@ -40,7 +40,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Random::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
-                               CustomConfigValidatorsPtr&& config_validators)
+                               CustomConfigValidatorsPtr&& config_validators,
+                               XdsConfigTracerOptRef xds_config_tracer)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), config_validators_(std::move(config_validators)),
@@ -48,7 +49,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      dispatcher_(dispatcher) {
+      dispatcher_(dispatcher), xds_config_tracer_(xds_config_tracer) {
   AllMuxes::get().insert(this);
 }
 
@@ -89,6 +90,11 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
+
+  if (xds_config_tracer_.has_value()) {
+    xds_config_tracer_->log(*message, TraceDetails(TraceState::RECEIVE));
+  }
+
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -108,7 +114,15 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     }
   }
 
-  kickOffAck(sub->second->sub_state_.handleResponse(*message));
+  auto ack = sub->second->sub_state_.handleResponse(*message);
+  if (xds_config_tracer_.has_value()) {
+    xds_config_tracer_->log(
+        *message, TraceDetails(ack.error_detail_.code() == Grpc::Status::WellKnownGrpcStatus::Ok
+                                   ? TraceState::INGESTED
+                                   : TraceState::FAILED,
+                               ack.error_detail_));
+  }
+  kickOffAck(ack);
   Memory::Utils::tryShrinkHeap();
 }
 

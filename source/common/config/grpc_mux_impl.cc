@@ -39,12 +39,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
+                         XdsConfigTracerOptRef xds_config_tracer,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)),
+      config_validators_(std::move(config_validators)), xds_config_tracer_(xds_config_tracer),
       xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
       first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -284,8 +285,16 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
+    if (xds_config_tracer_.has_value()) {
+      xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::RECEIVE));
+    }
+
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
+
+    if (xds_config_tracer_.has_value()) {
+      xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::INGESTED));
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -296,6 +305,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+    if (xds_config_tracer_.has_value()) {
+      xds_config_tracer_->log(*message, TraceDetails(TraceState::FAILED, *error_detail));
+    }
   }
   previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
