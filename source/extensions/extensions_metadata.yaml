@@ -1280,3 +1280,10 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.load_balancing_policies.least_request:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest

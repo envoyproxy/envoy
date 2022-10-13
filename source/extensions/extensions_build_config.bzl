@@ -367,6 +367,11 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # Load balancing policies for upstream
+    #
+    "envoy.load_balancing_policies.least_request":     "//source/extensions/load_balancing_policies/least_request:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
