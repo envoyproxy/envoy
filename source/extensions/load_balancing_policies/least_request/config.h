@@ -6,7 +6,7 @@
 
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
 
-#include "/source/common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +21,7 @@ struct LeastRequestCreator : public Logger::Loggable<Logger::Id::upstream> {
                                        TimeSource& time_source);
 };
 
-class Factory : Common::FactoryBase<
+class Factory : public Common::FactoryBase<
                     envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest,
                     LeastRequestCreator> {
 public:

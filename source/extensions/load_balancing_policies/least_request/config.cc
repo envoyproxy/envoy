@@ -32,6 +32,11 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(Upstream::LoadBalancer
       cluster_info.lbConfig(), old_type_config, time_source);
 }
 
+/**
+ * Static registration for the Factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(Factory, Upstream::TypedLoadBalancerFactory);
+
 } // namespace LeastRequest
 } // namespace LoadBalancingPolices
 } // namespace Extensions
