@@ -43,7 +43,6 @@ public:
     countState(trace_details.state_);
     if (trace_details.state_ == Config::TraceState::FAILED) {
       ErrorMessage = trace_details.error_detail_.message();
-      std::cout << "Boteng " << ErrorMessage << std::endl;
     }
   }
 
@@ -51,8 +50,6 @@ public:
            const Config::TraceDetails& trace_details) override {
     countState(trace_details.state_);
   }
-
-  // static std::string getFailedMessage() { return error_message_; };
 
   static std::atomic<int> ReceiveCount;
   static std::atomic<int> IngestedCount;
