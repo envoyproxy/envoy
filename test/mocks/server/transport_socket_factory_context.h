@@ -6,6 +6,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -22,7 +23,9 @@ public:
   MockTransportSocketFactoryContext();
   ~MockTransportSocketFactoryContext() override;
 
-  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+  Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  // Secret::MockSecretManager& secretManager() override { return secret_manager_; };
+  //  LocalInfo::MockLocalInfo& localInfo() override { return local_info_; };
 
   MOCK_METHOD(Server::Admin&, admin, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
@@ -42,13 +45,18 @@ public:
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockConfigTracker> config_tracker_;
   testing::NiceMock<Ssl::MockContextManager> context_manager_;
   testing::NiceMock<Stats::MockStore> store_;
   testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  Init::ManagerImpl init_manager_{"init_manager"};
+  // NiceMock<Secret::MockSecretManager> secret_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   Singleton::ManagerImpl singleton_manager_;
+  Stats::TestUtil::TestStore stats_;
 };
 } // namespace Configuration
 } // namespace Server

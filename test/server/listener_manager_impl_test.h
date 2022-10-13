@@ -35,6 +35,8 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
+using GenericSecretConfigProviderSharedPtr = std::shared_ptr<Secret::GenericSecretConfigProvider>;
+
 class ListenerHandle {
 public:
   ListenerHandle(bool need_local_drain_manager = true) {
@@ -338,10 +340,27 @@ protected:
     return manager_->addOrUpdateListener(listener, version_info, added_via_api);
   }
 
+  GenericSecretConfigProviderSharedPtr helperFindOrCreateGenericSecretProvider(
+      const envoy::config::core::v3::ConfigSource& sds_config_source,
+      const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Init::Manager& init_manager) {
+    std::function<void()> unregister_secret_provider = []() {};
+    GenericSecretConfigProviderSharedPtr secret_provider(sds_api_->create(
+        secret_provider_context, sds_config_source, config_name, unregister_secret_provider));
+    init_manager.add(*secret_provider->initTarget());
+    // secret_provider_context.initManager().add(*secret_provider->initTarget());
+    return secret_provider;
+  }
+
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
+  NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Stats::TestUtil::TestStore stats_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   class DumbInternalListenerRegistry : public Singleton::Instance,
                                        public Network::InternalListenerRegistry {
   public:
@@ -358,6 +377,7 @@ protected:
   NiceMock<MockGuardDog> guard_dog_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
+  std::unique_ptr<Secret::GenericSecretSdsApi> sds_api_;
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   Network::Address::InstanceConstSharedPtr direct_remote_address_;
