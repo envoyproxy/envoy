@@ -238,7 +238,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
 }
 
 TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirect) {
-  Http::TestResponseHeaderMapImpl redirect_response_{
+  const Http::TestResponseHeaderMapImpl redirect_response{
       {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
 
   auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
@@ -261,7 +261,7 @@ TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirect) {
     EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
   }
 
-  upstream_request_->encodeHeaders(redirect_response_, true);
+  upstream_request_->encodeHeaders(redirect_response, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -279,7 +279,7 @@ TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirect) {
 }
 
 TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirectWithRequestBody) {
-  Http::TestResponseHeaderMapImpl redirect_response_{
+  const Http::TestResponseHeaderMapImpl redirect_response{
       {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
 
   auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
@@ -293,14 +293,14 @@ TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirectWithRequestBody) {
   default_request_headers_.setHost("handle.internal.redirect");
   default_request_headers_.setMethod("POST");
 
-  const std::string& request_body = "foobarbizbaz";
+  const std::string request_body = "foobarbizbaz";
   buffer_factory_->setExpectedAccountBalance(request_body.size(), 1);
 
   IntegrationStreamDecoderPtr response =
       codec_client_->makeRequestWithBody(default_request_headers_, request_body);
 
   waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(redirect_response_, true);
+  upstream_request_->encodeHeaders(redirect_response, true);
 
   waitForNextUpstreamRequest();
 
