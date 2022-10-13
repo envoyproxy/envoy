@@ -35,10 +35,16 @@ envoy_cc_extension(
         "//test:__subpackages__",
     ],
     tags = ["nofips"],
-    deps = [
-        ":envoy_deterministic_connection_id_generator_lib",
-        "//envoy/registry",
-        "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
-        "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
-    ],
+    deps = select(
+        {
+            "//bazel:boringssl_fips": [],
+            "//bazel:boringssl_disabled": [],
+            "//conditions:default": [
+                ":envoy_deterministic_connection_id_generator_lib",
+                "//envoy/registry",
+                "//source/common/quic:envoy_quic_connection_id_generator_factory_interface",
+                "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
+            ],
+        },
+    ),
 )

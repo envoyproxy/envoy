@@ -14,11 +14,8 @@ EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
   auto new_cid = DeterministicConnectionIdGenerator::GenerateNextConnectionId(original);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRoutine(new_cid.value(), original);
-    if (new_cid.value() == original) {
-      return absl::nullopt;
-    }
   }
-  return new_cid;
+  return (new_cid.has_value() && new_cid.value() == original) ? absl::nullopt : new_cid;
 }
 
 absl::optional<quic::QuicConnectionId>
@@ -27,11 +24,8 @@ EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
   auto new_cid = DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(original, version);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRoutine(new_cid.value(), original);
-    if (new_cid.value() == original) {
-      return absl::nullopt;
-    }
   }
-  return new_cid;
+  return (new_cid.has_value() && new_cid.value() == original) ? absl::nullopt : new_cid;
 }
 
 QuicConnectionIdGeneratorPtr
@@ -92,6 +86,7 @@ EnvoyDeterministicConnectionIdGeneratorFactory::createCompatibleLinuxBpfSocketOp
       envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
       absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_)));
 #else
+  UNREFERENCED_PARAMETER(concurrency);
   PANIC("BPF filter is not supported in this platform.");
 #endif
 }
