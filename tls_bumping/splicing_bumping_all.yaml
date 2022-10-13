@@ -8,7 +8,7 @@ static_resources:
     address:
       socket_address:
         protocol: TCP
-        address: 127.0.0.1
+        address: 0.0.0.0
         port_value: 1234
     listener_filters:
     - name: envoy.filters.listener.tls_inspector
@@ -136,7 +136,7 @@ static_resources:
             cluster: dynamic_forward_proxy_cluster_splicing
     - filter_chain_match:
         transport_protocol: tls  # bumping by default
-      filters: # bumping by default
+      filters:
       - name: envoy.filters.network.sni_dynamic_forward_proxy
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
@@ -235,6 +235,15 @@ static_resources:
         dns_cache_config:
           name: http_dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options:
+          auto_sni: true
+          auto_san_validation: true
+        use_downstream_protocol_config:
+          http_protocol_options:
+          http2_protocol_options:
   - name: decap_cluster_tls
     load_assignment:
       cluster_name: decap_cluster_tls
@@ -254,6 +263,15 @@ static_resources:
         dns_cache_config:
           name: tls_dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options:
+          auto_sni: true
+          auto_san_validation: true
+        use_downstream_protocol_config:
+          http_protocol_options:
+          http2_protocol_options:
   - name: dynamic_forward_proxy_cluster_bumping
     connect_timeout: 1s
     lb_policy: CLUSTER_PROVIDED
@@ -264,6 +282,15 @@ static_resources:
         dns_cache_config:
           name: tls_dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options:
+          auto_sni: true
+          auto_san_validation: true
+        use_downstream_protocol_config:
+          http_protocol_options:
+          http2_protocol_options:
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
