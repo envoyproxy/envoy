@@ -77,39 +77,37 @@ void DubboRequest::forEach(IterateCallback callback) const {
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   ASSERT(typed_request != nullptr);
 
-  // TODO(wbpcode): better attachment structure is necessary to simplify these code the improve
-  // performance.
-  typed_request->attachment().headers().iterate(
-      [cb = std::move(callback)](const Http::HeaderEntry& header) {
-        if (cb(header.key().getStringView(), header.value().getStringView())) {
-          return Http::HeaderMap::Iterate::Continue;
-        } else {
-          return Http::HeaderMap::Iterate::Break;
-        }
-      });
+  for (const auto& pair : typed_request->attachment().attachment()) {
+    ASSERT(pair.first != nullptr && pair.second != nullptr);
+
+    if (pair.first->type() == Hessian2::Object::Type::String &&
+        pair.second->type() == Hessian2::Object::Type::String) {
+      ASSERT(pair.first->toString().has_value() && pair.second->toString().has_value());
+
+      if (!callback(pair.first->toString().value().get(), pair.second->toString().value().get())) {
+        break;
+      }
+    }
+  }
 }
 
 absl::optional<absl::string_view> DubboRequest::getByKey(absl::string_view key) const {
   if (key == VERSION_KEY) {
     return inner_metadata_->request().serviceVersion();
   }
-
   const auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   ASSERT(typed_request != nullptr);
 
-  const auto* result = typed_request->attachment().lookup(std::string(key));
-  if (result == nullptr) {
-    return absl::nullopt;
-  }
-  return absl::make_optional<absl::string_view>(*result);
+  return typed_request->attachment().lookup(key);
 }
+
 void DubboRequest::setByKey(absl::string_view key, absl::string_view val) {
   auto* typed_request =
       dynamic_cast<Common::Dubbo::RpcRequestImpl*>(&inner_metadata_->mutableRequest());
   ASSERT(typed_request != nullptr);
 
-  typed_request->mutableAttachment()->insert(std::string(key), std::string(val));
+  typed_request->mutableAttachment()->insert(key, val);
 }
 
 void DubboResponse::refreshGenericStatus() {
