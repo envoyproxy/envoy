@@ -38,6 +38,11 @@ behavior_changes:
     limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
     behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
+- area: config
+  change: |
+    Fixed resource tracking when using the Incremental (Delta-xDS) protocol. The protocol state will be updated after
+    the resources are successfully ingested and an ACK is sent. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -70,6 +75,9 @@ minor_behavior_changes:
     support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
 - area: http
   change: |
+     changed shadow requests to more closely behave like the requests they are shadowing. This includes matching the upstream logging for the original request, dynamic stats, suppressing Envoy headers, respecting expected request timeout, suppressing grpc request failure code stats and strict header checks. This behaviorial change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.closer_shadow_behavior`` to false.
+- area: http
+  change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
   change: |
     the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
@@ -88,6 +96,9 @@ minor_behavior_changes:
       envoy_listener_downstream_cx_total{} 2.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
       envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
+- area: dynamic_forward_proxy
+  change: |
+    No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -97,6 +108,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fixed a bug where a negative "exp", "iat", or "nbf" integer in JWT token readed as a large positive value.
+- area: grpc_transcoder
+  change: |
+    fixed a bug where a request with a wrong binding type is not rejected if the request body is empty.
 - area: listener
   change: |
     fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
@@ -106,6 +120,9 @@ bug_fixes:
 - area: logger
   change: |
     added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
+- area: thrift
+  change: |
+    fixed the routing decision when thrift filters change the value of the cluster header.
 - area: router
   change: |
     fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
@@ -207,6 +224,9 @@ new_features:
 - area: access_log
   change: |
     updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: redis
+  change: |
+    added support for redis transactions.
 - area: listener
   change: |
     expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
@@ -268,6 +288,10 @@ new_features:
 - area: grpc_stats
   change: |
     added support for replacing dots of gRPC service name with underscores in the gRPC stats by the config :ref:`replace_dots_in_grpc_service_name <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.replace_dots_in_grpc_service_name>`.
+- area: http
+  change: |
+    Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
+    :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via request/response header.
 
 deprecated:
 - area: http
