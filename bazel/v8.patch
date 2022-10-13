@@ -1,9 +1,10 @@
-# 1. Use already imported python dependencies and disable pointer compression (limits the maximum number of WasmVMs).
-# 2. Add support for --define=no_debug_info=1.
-# 3. Don't expose Wasm C API (only Wasm C++ API).
+# 1. Use already imported python dependencies
+# 2. Disable pointer compression (limits the maximum number of WasmVMs).
+# 3. Add support for --define=no_debug_info=1.
+# 4. Don't expose Wasm C API (only Wasm C++ API).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 13f2a5bebf..2197568c48 100644
+index 4e89f90e7e..ced403d5aa 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
@@ -15,6 +16,10 @@ index 13f2a5bebf..2197568c48 100644
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90e7e..3fcb38b3f3 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
 @@ -157,7 +157,7 @@ v8_int(
  # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
  v8_string(
