@@ -357,6 +357,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  bool startUpstreamSecureTransport() override;
 
   // GenericConnectionPoolCallbacks
   void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
