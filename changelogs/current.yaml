@@ -200,6 +200,9 @@ new_features:
 - area: thrift
   change: |
     added stats for downstream connection close to detect SR drop.
+- area: thrift
+  change: |
+    added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
 - area: compression
   change: |
     added support for :ref:`choose_first<envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`.
