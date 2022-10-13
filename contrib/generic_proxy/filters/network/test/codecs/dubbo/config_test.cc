@@ -1,6 +1,5 @@
 #include <memory>
 
-#include "envoy/config/core/v3/health_check.pb.h"
 #include "source/extensions/common/dubbo/message_impl.h"
 
 #include "test/extensions/common/dubbo/mocks.h"
@@ -45,7 +44,7 @@ MessageMetadataSharedPtr createDubboRequst(bool one_way_request) {
   request->setAttachmentLazyCallback([]() -> RpcRequestImpl::AttachmentPtr {
     auto map = std::make_unique<RpcRequestImpl::Attachment::Map>();
     Hessian2::ObjectPtr key_o = std::make_unique<Hessian2::StringObject>("group");
-    Hessian2::ObjectPtr val_o = std::make_unique<Hessian2::StringObject>("group");
+    Hessian2::ObjectPtr val_o = std::make_unique<Hessian2::StringObject>("fake_group");
 
     map->toMutableUntypedMap().value().get().emplace(std::move(key_o), std::move(val_o));
     return std::make_unique<RpcRequestImpl::Attachment>(std::move(map), 0);
