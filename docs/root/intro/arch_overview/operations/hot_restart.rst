@@ -37,6 +37,11 @@ independently.
 
 .. note::
 
+ The update of the listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` with a hot restart doesn't support well.
+ Suggest doing the update listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` separate with the hot restart.
+
+.. note::
+
  This feature is not supported on Windows.
 
 Socket handling
