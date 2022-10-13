@@ -1,9 +1,16 @@
+# This proxy listens on 2 ports:
+#
+#   10000 -> routes to `service-1`
+#   10001 -> routes to `envoy-2`
+
+# The `client_config` settings below are used by Skywalking to identify the proxy.
+
 static_resources:
   listeners:
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 8000
+        port_value: 10000
     traffic_direction: INBOUND
     filter_chains:
     - filters:
@@ -20,10 +27,15 @@ static_resources:
                     cluster_name: skywalking
                   timeout: 0.250s
                 client_config:
-                  service_name: service1-envoy
-                  instance_name: service1-envoy-1
+                  service_name: envoy-proxy-1
+                  instance_name: envoy-proxy-1-1
           codec_type: AUTO
           stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+              start_child_span: true
           route_config:
             name: service1_route
             virtual_hosts:
@@ -34,18 +46,13 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: local_service
+                  cluster: service_cluster1
                 decorator:
-                  operation: checkAvailability
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-              start_child_span: true
+                  operation: routeToService1
   - address:
       socket_address:
         address: 0.0.0.0
-        port_value: 9000
+        port_value: 10001
     traffic_direction: OUTBOUND
     filter_chains:
     - filters:
@@ -62,58 +69,54 @@ static_resources:
                     cluster_name: skywalking
                   timeout: 0.250s
                 client_config:
-                  service_name: service1-envoy
-                  instance_name: service1-envoy-1
+                  service_name: envoy-proxy-1
+                  instance_name: envoy-proxy-1-2
           codec_type: AUTO
           stat_prefix: egress_http
-          route_config:
-            name: service2_route
-            virtual_hosts:
-            - name: service2
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/trace/2"
-                route:
-                  cluster: service2
-                decorator:
-                  operation: checkStock
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
               start_child_span: true
+          route_config:
+            name: envoy2_route
+            virtual_hosts:
+            - name: envoy2
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: envoy_cluster2
+                decorator:
+                  operation: routeToEnvoy2
+
   clusters:
-  - name: local_service
+  - name: service_cluster1
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: local_service
+      cluster_name: service_cluster1
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
-                port_value: 8080
-  - name: service2
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    typed_extension_protocol_options:
-      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-        explicit_http_config:
-          http2_protocol_options: {}
-    load_assignment:
-      cluster_name: service2
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: service2
+                address: service-1
                 port_value: 8000
+  - name: envoy_cluster2
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: envoy_cluster2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: envoy-2
+                port_value: 10000
   - name: skywalking
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN

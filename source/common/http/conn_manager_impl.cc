@@ -890,9 +890,13 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
       }
 
       sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+      if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+        connection_manager_.handleCodecError(validation_result.details());
+      }
       return false;
     }
   }
+
   return true;
 }
 
@@ -933,8 +937,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   const Protocol protocol = connection_manager_.codec_->protocol();
   state_.saw_connection_close_ = HeaderUtility::shouldCloseConnection(protocol, *request_headers_);
 
+  // We end the decode here to mark that the downstream stream is complete.
+  maybeEndDecode(end_stream);
+
   if (!validateHeaders()) {
-    ENVOY_STREAM_LOG(debug, "request headers validation failed:\n{}", *this, *request_headers_);
+    ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
     return;
   }
 
@@ -950,9 +957,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   } else {
     snapped_route_config_ = connection_manager_.config_.routeConfigProvider()->configCast();
   }
-
-  // We end the decode here to mark that the downstream stream is complete.
-  maybeEndDecode(end_stream);
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
   if (connection_manager_.random_generator_.bernoulli(

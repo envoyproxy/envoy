@@ -3380,14 +3380,14 @@ envoy_cc_library(
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
             "quiche/quic/core/io/event_loop_socket_factory.cc",
-            "quiche/quic/core/io/event_loop_tcp_client_socket.cc",
+            "quiche/quic/core/io/event_loop_connecting_client_socket.cc",
         ],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
             "quiche/quic/core/io/event_loop_socket_factory.h",
-            "quiche/quic/core/io/event_loop_tcp_client_socket.h",
+            "quiche/quic/core/io/event_loop_connecting_client_socket.h",
         ],
     }),
     copts = quiche_copts,
@@ -5353,6 +5353,57 @@ envoy_cc_test(
         ":quic_core_batch_writer_gso_batch_writer_lib",
         ":quic_core_batch_writer_sendmmsg_batch_writer_lib",
         ":quic_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_load_balancer_server_id_lib",
+    srcs = ["quiche/quic/load_balancer/load_balancer_server_id.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_server_id.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_load_balancer_config_lib",
+    srcs = ["quiche/quic/load_balancer/load_balancer_config.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_config.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_load_balancer_server_id_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_load_balancer_encoder_lib",
+    srcs = ["quiche/quic/load_balancer/load_balancer_encoder.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_encoder.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_connection_id_generator_interface_lib",
+        ":quic_core_crypto_random_lib",
+        ":quic_core_data_lib",
+        ":quic_core_types_lib",
+        ":quic_core_utils_lib",
+        ":quic_load_balancer_config_lib",
+        ":quic_load_balancer_server_id_lib",
+        ":quic_platform_bug_tracker",
+        ":quic_platform_export",
     ],
 )
 

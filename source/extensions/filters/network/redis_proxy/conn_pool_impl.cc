@@ -68,8 +68,10 @@ void InstanceImpl::init() {
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
 // failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
-InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks);
+InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
+                          Common::Redis::Client::Transaction& transaction) {
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks,
+                                                       transaction);
 }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
@@ -235,7 +237,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     client->host_ = host;
     client->redis_client_ =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_);
+                               auth_username_, auth_password_, false);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;
@@ -243,26 +245,47 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
 
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
-                                           PoolCallbacks& callbacks) {
+                                           PoolCallbacks& callbacks,
+                                           Common::Redis::Client::Transaction& transaction) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           config_->readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
+
+  // If there is an active transaction, establish a new connection if necessary.
+  if (transaction.active_ && !transaction.connection_established_) {
+    transaction.client_ =
+        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                               auth_username_, auth_password_, true);
+    if (transaction.connection_cb_) {
+      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+    }
+    transaction.connection_established_ = true;
+  }
+
   pending_requests_.emplace_back(*this, std::move(request), callbacks);
   PendingRequest& pending_request = pending_requests_.back();
-  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
-  pending_request.request_handler_ = client->redis_client_->makeRequest(
-      getRequest(pending_request.incoming_request_), pending_request);
+
+  if (!transaction.active_) {
+    pending_request.request_handler_ =
+        this->threadLocalActiveClient(host)->redis_client_->makeRequest(
+            getRequest(pending_request.incoming_request_), pending_request);
+  } else {
+    pending_request.request_handler_ = transaction.client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
+  }
+
   if (pending_request.request_handler_) {
     return &pending_request;
   } else {

@@ -389,7 +389,7 @@ public:
   virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
 
   /**
-   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * Find all the available per route filter configs, invoking the callback with each config (if
    * it is present). Iteration of the configs is in order of specificity. That means that the
    * callback will be called first for a config on a Virtual host, then a route, and finally a route
    * entry (weighted cluster). If a config is not present, the callback will not be invoked.
@@ -519,7 +519,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -949,7 +949,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.

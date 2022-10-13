@@ -1,25 +1,23 @@
 #!/bin/bash -e
 
 export NAME=skywalking
-export DELAY=10
-export PORT_PROXY="${SKYWALKING_PORT_PROXY:-11900}"
-export PORT_ADMIN="${SKYWALKING_PORT_ADMIN:-11901}"
-export PORT_UI="${SKYWALKING_PORT_UI:-11902}"
+export PORT_PROXY="${SKYWALKING_PORT_PROXY:-12600}"
+export PORT_UI="${SKYWALKING_PORT_UI:-12601}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-run_log "Test connection"
+run_log "Make a request to service-1"
 responds_with \
     "Hello from behind Envoy (service 1)!" \
     "http://localhost:${PORT_PROXY}/trace/1"
 
-run_log "Test stats"
+run_log "Make a request to service-2"
 responds_with \
-    "tracing.skywalking.segments_sent: 1" \
-    "http://localhost:${PORT_ADMIN}/stats"
+    "Hello from behind Envoy (service 2)!" \
+    "http://localhost:${PORT_PROXY}/trace/2"
 
-run_log "Test dashboard"
+run_log "View the traces in Skywalking UI"
 responds_with \
     "<!DOCTYPE html>" \
     "http://localhost:${PORT_UI}"

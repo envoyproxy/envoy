@@ -49,6 +49,13 @@ struct SupportedCommands {
   }
 
   /**
+   * @return commands which handle Redis transactions.
+   */
+  static const absl::flat_hash_set<std::string>& transactionCommands() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard");
+  }
+
+  /**
    * @return auth command
    */
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }

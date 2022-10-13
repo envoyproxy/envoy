@@ -69,7 +69,7 @@ The following sandboxes are available:
     postgres
     rbac
     redis
-    skywalking_tracing
+    skywalking
     tls-inspector
     tls-sni
     tls
