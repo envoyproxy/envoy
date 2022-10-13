@@ -1182,7 +1182,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    lb_ = lb_factory_->create();
+    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }
 
@@ -1550,7 +1550,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Maglev:
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create();
+      lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
       break;
     }
     }
