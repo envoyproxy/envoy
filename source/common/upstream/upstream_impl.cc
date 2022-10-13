@@ -62,9 +62,31 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
+  if (!address) {
+    return "";
+  }
+  return address->asString();
+}
+
 AddressSelectFn
 getSourceAddressFnFromBindConfig(const std::string& cluster_name,
                                  const envoy::config::core::v3::BindConfig& bind_config) {
+  if (bind_config.additional_source_addresses_size() > 0 &&
+      bind_config.extra_source_addresses_size() > 0) {
+    throw EnvoyException(
+        fmt::format("Can't specify both `extra_source_addresses` and `additional_source_addresses` "
+                    "in the {}'s upstream binding config",
+                    cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  }
+
+  if (bind_config.extra_source_addresses_size() > 1) {
+    throw EnvoyException(fmt::format(
+        "{}'s upstream binding config has more than one extra source addresses. Only one "
+        "extra source can be supported in BindConfig's extra_source_addresses field",
+        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+  }
+
   if (bind_config.additional_source_addresses_size() > 1) {
     throw EnvoyException(fmt::format(
         "{}'s upstream binding config has more than one additional source addresses. Only one "
@@ -75,6 +97,19 @@ getSourceAddressFnFromBindConfig(const std::string& cluster_name,
   std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
   source_address_list.emplace_back(
       Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
+
+  if (bind_config.extra_source_addresses_size() == 1) {
+    source_address_list.emplace_back(Network::Address::resolveProtoSocketAddress(
+        bind_config.extra_source_addresses(0).address()));
+    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
+      throw EnvoyException(fmt::format(
+          "{}'s upstream binding config has two same IP version source addresses. Only two "
+          "different IP version source addresses can be supported in BindConfig's source_address "
+          "and extra_source_addresses fields",
+          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
+    }
+  }
+
   if (bind_config.additional_source_addresses_size() == 1) {
     source_address_list.emplace_back(
         Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
@@ -722,11 +757,11 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 
   for (const auto& host : hosts_removed) {
-    mutable_cross_priority_host_map_->erase(host->address()->asString());
+    mutable_cross_priority_host_map_->erase(addressToString(host->address()));
   }
 
   for (const auto& host : hosts_added) {
-    mutable_cross_priority_host_map_->insert({host->address()->asString(), host});
+    mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
   }
 }
 
@@ -1746,7 +1781,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     // To match a new host with an existing host means comparing their addresses.
-    auto existing_host = all_hosts.find(host->address()->asString());
+    auto existing_host = all_hosts.find(addressToString(host->address()));
     const bool existing_host_found = existing_host != all_hosts.end();
 
     // Clear any pending deletion flag on an existing host in case it came back while it was
@@ -1830,7 +1865,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       final_hosts.push_back(existing_host->second);
     } else {
-      new_hosts_for_current_priority.emplace(host->address()->asString());
+      new_hosts_for_current_priority.emplace(addressToString(host->address()));
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }

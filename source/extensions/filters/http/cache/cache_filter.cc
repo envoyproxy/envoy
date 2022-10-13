@@ -102,6 +102,18 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (lookup_result_ == nullptr) {
+    // Filter chain iteration is paused while a lookup is outstanding, but the filter chain manager
+    // can still generate a local reply. One case where this can happen is when a downstream idle
+    // timeout fires, which may mean that the HttpCache isn't correctly setting deadlines on its
+    // asynchronous operations or is otherwise getting stuck.
+    ENVOY_BUG(Http::Utility::getResponseStatus(headers) !=
+                  Envoy::enumToInt(Http::Code::RequestTimeout),
+              "Request timed out while cache lookup was outstanding.");
+    filter_state_ = FilterState::NotServingFromCache;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
@@ -357,6 +369,11 @@ void CacheFilter::getTrailers() {
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
   if (filter_state_ == FilterState::Destroyed) {
     // The filter is being destroyed, any callbacks should be ignored.
+    return;
+  }
+  if (filter_state_ == FilterState::NotServingFromCache) {
+    // A response was injected into the filter chain before the cache lookup finished, e.g. because
+    // the request stream timed out.
     return;
   }
 

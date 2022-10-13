@@ -29,8 +29,13 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
   request->headers().setHost(parts.size() == 2
                                  ? absl::StrJoin(parts, "-shadow:")
                                  : absl::StrCat(request->headers().getHostValue(), "-shadow"));
+  const auto& shadow_options = options.is_shadow ? options : [options] {
+    Http::AsyncClient::RequestOptions actual_options(options);
+    actual_options.setIsShadow(true);
+    return actual_options;
+  }();
   // This is basically fire and forget. We don't handle cancelling.
-  thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
+  thread_local_cluster->httpAsyncClient().send(std::move(request), *this, shadow_options);
 }
 
 } // namespace Router

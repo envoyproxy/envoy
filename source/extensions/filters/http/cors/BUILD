@@ -16,6 +16,9 @@ envoy_cc_library(
     name = "cors_filter_lib",
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -34,8 +37,10 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/cors:cors_filter_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",
     ],
 )

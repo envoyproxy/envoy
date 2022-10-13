@@ -75,3 +75,8 @@ message SocketOption {
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
 }
+
+// [#not-implemented-hide:]
+message SocketOptionsOverride {
+  repeated SocketOption socket_options = 1;
+}

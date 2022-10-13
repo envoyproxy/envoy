@@ -176,11 +176,27 @@ protected:
     if (!expected_response_body.empty()) {
       const bool isJsonResponse = response->headers().getContentTypeValue() == "application/json";
       if (full_response && isJsonResponse) {
-        const bool isStreamingResponse = response->body()[0] == '[';
-        EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_response_body,
-                                                 isStreamingResponse))
-            << "Response mismatch. \nGot : " << response->body()
-            << "\nWant: " << expected_response_body;
+        const bool isArray = response->body()[0] == '[';
+
+        // test each line of the response for equality
+        std::stringstream response_body_stream(response->body());
+        std::stringstream expected_response_stream(expected_response_body);
+        std::string response_body_chunk;
+        std::string expected_response_chunk;
+        char delimiter = '\n';
+
+        while (std::getline(response_body_stream, response_body_chunk, delimiter)) {
+          std::getline(expected_response_stream, expected_response_chunk, delimiter);
+
+          EXPECT_TRUE(
+              TestUtility::jsonStringEqual(response_body_chunk, expected_response_chunk, isArray))
+              << "Response mismatch. \nGot : " << response_body_chunk
+              << "\nWant: " << expected_response_chunk;
+        }
+
+        // verify that both streams have been fully tested
+        EXPECT_EQ(response_body_stream.rdbuf()->in_avail(), 0);
+        EXPECT_EQ(expected_response_stream.rdbuf()->in_avail(), 0);
       } else if (full_response) {
         EXPECT_EQ(response->body(), expected_response_body);
       } else {
@@ -280,6 +296,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       },
       R"({"id":"20","theme":"Children"})");
 
+#ifndef ENVOY_ENABLE_UHV
+  // TODO(#23291) - UHV validate JSON-encoded gRPC query parameters
   // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -292,6 +310,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
           {"content-type", "application/json"},
       },
       R"({"id":"20","theme":"Children"})");
+#endif
 
   // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
   // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"
@@ -459,6 +478,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
 // After enable the "case_insensitive_enum_parsing" flag,
 // JSON enum value string can be in any case.
 TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
+
   // Enable case_insensitive_enum_parsing flag
   const std::string filter =
       R"EOF(
@@ -496,6 +516,38 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
                                       {"content-length", "31"},
                                       {"grpc-status", "0"}},
       R"({"id":"1234","gender":"FEMALE"})");
+}
+
+// Test newline-delimited stream translation.
+// By default, streams are aggregated into a JSON Array.
+// Newline-delimited streams return each message with a newline termination instead.
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingNewlineDelimitedGet) {
+  // Enable stream_newline_delimited flag
+  const std::string filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              print_options :
+                stream_newline_delimited : true
+            )EOF";
+  config_helper_.prependFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Reamde")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      R"({"id":"1","author":"Neal Stephenson","title":"Reamde"})"
+      "\n"
+      R"({"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"})");
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
