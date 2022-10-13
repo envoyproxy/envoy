@@ -11,6 +11,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -44,17 +45,18 @@ public:
 
   std::vector<envoy::service::discovery::v3::Resource>
   getResources(const Config::XdsSourceId& /*source_id*/,
-               const std::vector<std::string>& resource_names) const override {
+               const absl::flat_hash_set<std::string>& resource_names) const override {
     if (throws_ex_) {
       throw EnvoyException("intended exception thrown");
     }
 
     // If we get a wildcard request, generate CLA resources for the default {"name1", "name2",
     // "name3"}.
-    std::vector<std::string> resources_to_generate{resource_names.begin(), resource_names.end()};
+    absl::flat_hash_set<std::string> resources_to_generate{resource_names.begin(),
+                                                           resource_names.end()};
     if (resources_to_generate.empty() ||
         (resources_to_generate.size() == 1 &&
-         resources_to_generate[0] == std::string(Envoy::Config::Wildcard))) {
+         resources_to_generate.contains(Envoy::Config::Wildcard))) {
       resources_to_generate = {"name1", "name2", "name3"};
     }
 

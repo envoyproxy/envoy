@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/http/header_map.h"
-
 #include "source/extensions/common/dubbo/hessian2_utils.h"
 #include "source/extensions/common/dubbo/message.h"
 
@@ -51,12 +49,9 @@ public:
 
     const Map& attachment() const { return *attachment_; }
 
-    void insert(const std::string& key, const std::string& value);
-    void remove(const std::string& key);
-    const std::string* lookup(const std::string& key) const;
-
-    // Http::HeaderMap wrapper to attachment.
-    const Http::HeaderMap& headers() const { return *headers_; }
+    void insert(absl::string_view key, absl::string_view value);
+    void remove(absl::string_view key);
+    absl::optional<absl::string_view> lookup(absl::string_view key) const;
 
     // Whether the attachment should be re-serialized.
     bool attachmentUpdated() const { return attachment_updated_; }
@@ -71,11 +66,6 @@ public:
     // The binary offset of attachment in the original message. Retaining this value can help
     // subsequent re-serialization of the attachment without re-serializing the parameters.
     size_t attachment_offset_{};
-
-    // To reuse the HeaderMatcher API and related tools provided by Envoy, we store the key/value
-    // pair of the string type in the attachment in the Http::HeaderMap. This introduces additional
-    // overhead and ignores the case of the key in the attachment. But for now, it's acceptable.
-    Http::HeaderMapPtr headers_;
   };
   using AttachmentPtr = std::unique_ptr<Attachment>;
 
