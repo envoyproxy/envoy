@@ -2,9 +2,10 @@
 
 #include "source/common/protobuf/utility.h"
 
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/status_utility.h"
 
-#include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
+#include "contrib/network/connection_balance/dlb/source/connection_balancer_impl.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -51,6 +52,44 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(10, dlb.id());
 }
+
+TEST_F(DlbConnectionBalanceFactoryTest, EmptyProto) {
+  DlbConnectionBalanceFactory factory;
+  EXPECT_NE(nullptr,
+            dynamic_cast<envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb*>(
+                factory.createEmptyConfigProto().get()));
+}
+
+#ifndef DLB_DISABLED
+
+using testing::HasSubstr;
+
+TEST_F(DlbConnectionBalanceFactoryTest, MakeFromDefaultProto) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  DlbConnectionBalanceFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  makeDlbConnectionBalanceConfig(typed_config, dlb);
+
+  EXPECT_THAT_THROWS_MESSAGE(factory.createConnectionBalancerFromProto(typed_config, context),
+                             EnvoyException, HasSubstr("no available dlb hardware"));
+}
+
+TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  DlbConnectionBalanceFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  context.options_.concurrency_ = 33;
+
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  makeDlbConnectionBalanceConfig(typed_config, dlb);
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      factory.createConnectionBalancerFromProto(typed_config, context), EnvoyException,
+      HasSubstr("Dlb connection balanncer only supports up to 32 worker threads"));
+}
+#endif
 
 } // namespace Dlb
 } // namespace Extensions

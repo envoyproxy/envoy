@@ -127,7 +127,6 @@ public:
 #endif
 };
 
-REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
 using DlbConnectionBalanceFactorySingleton = InjectableSingleton<DlbConnectionBalanceFactory>;
 
 /**

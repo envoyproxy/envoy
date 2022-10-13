@@ -40,18 +40,12 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 #ifdef DLB_DISABLED
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
-  int device_id = 0;
+  int device_id = dlb_config.id();
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat buffer;
 
-  if (dlb_config.id()) {
-    device_id = dlb_config.id();
-    const std::string& device_name = fmt::format("/dev/dlb{}", device_id);
-    if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ != 0) {
-      ExceptionUtil::throwEnvoyException(fmt::format("dlb hardware {} not found", device_name));
-    }
-  } else {
-    std::string device_name;
+  std::string device_name = fmt::format("/dev/dlb{}", device_id);
+  if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ != 0) {
     int i = 0;
     // auto detect available dlb devices, now the max number of dlb device id is 63.
     const int max_id = 64;
@@ -59,6 +53,8 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
       device_name = fmt::format("/dev/dlb{}", i);
       if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ == 0) {
         device_id = i;
+        ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", dlb_config.id(),
+                  device_id);
         break;
       }
     }
@@ -238,6 +234,8 @@ DlbConnectionBalanceFactory::~DlbConnectionBalanceFactory() {
     }
   }
 }
+
+REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
 
 void DlbBalancedConnectionHandlerImpl::setDlbEvent() {
   auto listener = dynamic_cast<Envoy::Server::ActiveTcpListener*>(&handler_);
