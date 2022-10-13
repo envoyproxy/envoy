@@ -25,11 +25,11 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   const re2::RE2& re = getMetadataTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  std::string json_array, metadata_type;
+  re2::StringPiece json_array, metadata_type;
   while (re.PartialMatch(new_header_value, re, &metadata_type, &json_array)) {
     std::string new_format;
     TRY_ASSERT_MAIN_THREAD {
-      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(json_array);
+      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(json_array.as_string());
 
       // The given json string may be an invalid object or with an empty object array.
       if (parsed_params == nullptr || parsed_params->asObjectArray().empty()) {
@@ -41,12 +41,12 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
         new_format += ":" + parsed_params->asObjectArray()[i]->asString();
       }
 
-      new_format = "%" + metadata_type + "_METADATA(" + new_format + ")%";
+      new_format = "%" + metadata_type.as_string() + "_METADATA(" + new_format + ")%";
 
       ENVOY_LOG_MISC(
           warn,
           "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
-          metadata_type + "_METADATA", new_format.c_str());
+          metadata_type.as_string() + "_METADATA", new_format.c_str());
 
       re2::RE2::Replace(&new_header_value, re, new_format);
     }
@@ -73,9 +73,9 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
   const re2::RE2& re = getPerRequestTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  std::string required_state;
+  re2::StringPiece required_state;
   while (re.PartialMatch(new_header_value, re, &required_state)) {
-    std::string new_format = "%FILTER_STATE(" + required_state + ":PLAIN)%";
+    std::string new_format = "%FILTER_STATE(" + required_state.as_string() + ":PLAIN)%";
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
