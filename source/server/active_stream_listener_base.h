@@ -85,28 +85,28 @@ public:
   void onSocketAccepted(std::unique_ptr<ActiveTcpSocket> active_socket) {
     // Create and run the filters
     if (config_->filterChainFactory().createListenerFilterChain(*active_socket)) {
-      active_socket->startFilterChain();
+      active_socket->continueFilterChain(true);
     } else {
       // If create listener filter chain failed, it means the listener is missing
       // config due to the ECDS. Then close the connection directly.
-      active_socket->socket().close();
-      ASSERT(active_socket->isEndFilterIteration());
+      active_socket->socket_->close();
+      ASSERT(active_socket->iter_ == active_socket->accept_filters_.end());
     }
 
     // Move active_socket to the sockets_ list if filter iteration needs to continue later.
     // Otherwise we let active_socket be destructed when it goes out of scope.
-    if (!active_socket->isEndFilterIteration()) {
+    if (active_socket->iter_ != active_socket->accept_filters_.end()) {
       active_socket->startTimer();
       LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
     } else {
-      if (!active_socket->connected()) {
+      if (!active_socket->connected_) {
         // If active_socket is about to be destructed, emit logs if a connection is not created.
-        if (active_socket->streamInfo() != nullptr) {
-          emitLogs(*config_, *active_socket->streamInfo());
+        if (active_socket->stream_info_ != nullptr) {
+          emitLogs(*config_, *active_socket->stream_info_);
         } else {
           // If the active_socket is not connected, this socket is not promoted to active
           // connection. Thus the stream_info_ is owned by this active socket.
-          ENVOY_BUG(active_socket->streamInfo() != nullptr,
+          ENVOY_BUG(active_socket->stream_info_ != nullptr,
                     "the unconnected active socket must have stream info.");
         }
       }
