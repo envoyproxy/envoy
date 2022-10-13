@@ -112,6 +112,7 @@ private:
 
     // Upstream::LoadBalancerFactory
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
   private:
     Cluster& cluster_;
