@@ -285,6 +285,9 @@ new_features:
 - area: grpc_json_transcoder
   change: |
     added support for newline-delimited streams in :ref:`stream_newline_delimited <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
+- area: grpc_stats
+  change: |
+    added support for replacing dots of gRPC service name with underscores in the gRPC stats by the config :ref:`replace_dots_in_grpc_service_name <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.replace_dots_in_grpc_service_name>`.
 - area: http
   change: |
     Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
