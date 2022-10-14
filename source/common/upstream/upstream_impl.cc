@@ -166,6 +166,43 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
+const Network::ConnectionSocket::OptionsSharedPtr
+parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                          const envoy::config::core::v3::BindConfig bind_config) {
+  Network::ConnectionSocket::OptionsSharedPtr cluster_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
+  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+  }
+  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
+  if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
+      config.upstream_bind_config().freebind().value()) {
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildIpFreebindOptions());
+  }
+  if (config.upstream_connection_options().has_tcp_keepalive()) {
+    Network::Socket::appendOptions(
+        cluster_options,
+        Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
+  }
+  // Cluster socket_options trump cluster manager wide.
+  if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
+      0) {
+    auto socket_options = !config.upstream_bind_config().socket_options().empty()
+                              ? config.upstream_bind_config().socket_options()
+                              : bind_config.socket_options();
+    Network::Socket::appendOptions(
+        cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
+  }
+  if (cluster_options->empty()) {
+    return nullptr;
+  }
+  return cluster_options;
+}
+
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
