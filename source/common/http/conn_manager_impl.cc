@@ -305,12 +305,17 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
 
-  // Create account, wiring the stream to use it for tracking bytes.
-  // If tracking is disabled, the wiring becomes a NOP.
-  auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
   Buffer::BufferMemoryAccountSharedPtr downstream_stream_account =
-      buffer_factory.createAccount(response_encoder.getStream());
-  response_encoder.getStream().setAccount(downstream_stream_account);
+      response_encoder.getStream().account();
+
+  if (downstream_stream_account == nullptr) {
+    // Create account, wiring the stream to use it for tracking bytes.
+    // If tracking is disabled, the wiring becomes a NOP.
+    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
+    response_encoder.getStream().setAccount(downstream_stream_account);
+  }
+
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_stream_account)));
 
