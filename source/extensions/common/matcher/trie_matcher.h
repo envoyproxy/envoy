@@ -82,7 +82,7 @@ public:
     // sort them by the prefix length first (longest first), and the order of declaration second.
     std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
     bool first = true;
-    for (const auto node : values) {
+    for (const auto& node : values) {
       if (!first && node.exclusive_) {
         continue;
       }

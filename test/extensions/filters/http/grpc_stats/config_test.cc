@@ -116,6 +116,27 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }
 
+TEST_F(GrpcStatsFilterConfigTest, StatsReplaceDotsInGrpcServiceName) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_replace_dots_in_grpc_service_name(true);
+  initialize();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
+}
+
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2ContentTypeGrpcPlusProto) {
   config_.mutable_stats_for_all_methods()->set_value(true);
   initialize();
