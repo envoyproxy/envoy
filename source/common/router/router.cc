@@ -386,7 +386,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
-  config_.stats_.rq_total_.inc();
+  stats_.rq_total_.inc();
 
   // Initialize the `modify_headers` function as a no-op (so we don't have to remember to check it
   // against nullptr before calling it), and feed it behavior later if/when we have cluster info
@@ -396,7 +396,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
   if (!route_) {
-    config_.stats_.no_route_.inc();
+    stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no route match for URL '{}'", *callbacks_, headers.getPathValue());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
@@ -408,7 +408,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Determine if there is a direct response for the request.
   const auto* direct_response = route_->directResponseEntry();
   if (direct_response != nullptr) {
-    config_.stats_.rq_direct_response_.inc();
+    stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
     callbacks_->streamInfo().setRouteName(direct_response->routeName());
     callbacks_->sendLocalReply(
@@ -449,7 +449,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   Upstream::ThreadLocalCluster* cluster =
       config_.cm_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
-    config_.stats_.no_cluster_.inc();
+    stats_.no_cluster_.inc();
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoClusterFound);
@@ -898,7 +898,11 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled());
+                       .setSampled(shadow_policy.traceSampled())
+                       .setIsShadow(true);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
+      options.setFilterConfig(config_);
+    }
     config_.shadowWriter().shadow(std::string(cluster_name.value()), std::move(request), options);
   }
 }
@@ -1100,7 +1104,7 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
   if (downstream_response_started_) {
     if (upstream_request.grpcRqSuccessDeferred()) {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
-      config_.stats_.rq_reset_after_downstream_response_started_.inc();
+      stats_.rq_reset_after_downstream_response_started_.inc();
     }
   } else {
     Upstream::HostDescriptionConstSharedPtr upstream_host = upstream_request.upstreamHost();
@@ -1416,9 +1420,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(
-            cluster_->statsScope(), config_.stats_.stat_names_.retry_,
-            static_cast<Http::Code>(response_code), exclude_http_code_stats_);
+        code_stats.chargeBasicResponseStat(cluster_->statsScope(), stats_.stat_names_.retry_,
+                                           static_cast<Http::Code>(response_code),
+                                           exclude_http_code_stats_);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
@@ -1659,13 +1663,13 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   absl::string_view redirect_url = internal_redirect.value().getStringView();
   // Make sure the redirect response contains a URL to redirect to.
   if (redirect_url.empty()) {
-    config_.stats_.passthrough_internal_redirect_bad_location_.inc();
+    stats_.passthrough_internal_redirect_bad_location_.inc();
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: empty location", *callbacks_);
     return false;
   }
   Http::Utility::Url absolute_url;
   if (!absolute_url.initialize(redirect_url, false)) {
-    config_.stats_.passthrough_internal_redirect_bad_location_.inc();
+    stats_.passthrough_internal_redirect_bad_location_.inc();
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: invalid location {}", *callbacks_,
                      redirect_url);
     return false;
@@ -1678,7 +1682,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: incorrect scheme for {}", *callbacks_,
                      redirect_url);
-    config_.stats_.passthrough_internal_redirect_unsafe_scheme_.inc();
+    stats_.passthrough_internal_redirect_unsafe_scheme_.inc();
     return false;
   }
 
@@ -1700,7 +1704,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
 
   if (num_internal_redirect->value() >= policy.maxInternalRedirects()) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: redirect limits exceeded.", *callbacks_);
-    config_.stats_.passthrough_internal_redirect_too_many_redirects_.inc();
+    stats_.passthrough_internal_redirect_too_many_redirects_.inc();
     return false;
   }
   // Copy the old values, so they can be restored if the redirect fails.
@@ -1740,7 +1744,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   const auto route = callbacks_->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {
-    config_.stats_.passthrough_internal_redirect_no_route_.inc();
+    stats_.passthrough_internal_redirect_no_route_.inc();
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: no route found", *callbacks_);
     return false;
   }
@@ -1750,7 +1754,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   for (const auto& predicate : policy.predicates()) {
     if (!predicate->acceptTargetRoute(*filter_state, route_name, !scheme_is_http,
                                       !target_is_http)) {
-      config_.stats_.passthrough_internal_redirect_predicate_.inc();
+      stats_.passthrough_internal_redirect_predicate_.inc();
       ENVOY_STREAM_LOG(trace,
                        "Internal redirect failed: rejecting redirect targeting {}, by {} predicate",
                        *callbacks_, route_name, predicate->name());
