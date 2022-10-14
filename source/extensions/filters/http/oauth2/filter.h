@@ -230,10 +230,10 @@ public:
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
-  void finishFlow();
-
 private:
   friend class OAuth2Test;
+
+  void finishFlow();
 
   std::shared_ptr<CookieValidator> validator_;
 
@@ -242,7 +242,7 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
-  std::string new_expires_;
+  SystemTime new_expires_;
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};

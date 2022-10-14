@@ -762,6 +762,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  * Expected behavior: HTTP Utility should not strip the parameters of the original request.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000000000)));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
@@ -826,11 +827,15 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
        "OauthHMAC="
-       "NWUzNzE5MWQwYTg0ZjA2NjIyMjVjMzk3MzY3MzMyZmE0NjZmMWI2MjI1NWFhNDhkYjQ4NDFlZmRiMTVmMTk0MQ==;"
-       "version=1;path=/;Max-Age=;secure;HttpOnly"},
+       "OTE2ZmMxZDY5MzI3ODVlYmMwMGRjNWJlODM0ZDBiY2E5MWQ1NDYzNGQwYTVhZmZlYjllMjJiYTI2OGJiZTdhZg==;"
+       "version=1;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=;version=1;path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "BearerToken=;version=1;path=/;Max-Age=;secure"},
+       "OauthExpires=1000000010;version=1;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=access_code;version=1;path=/;Max-Age=10;secure"},
+      {Http::Headers::get().SetCookie.get(), "IdToken=id_token;version=1;path=/;Max-Age=10;secure"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refresh_token;version=1;path=/;Max-Age=10;secure"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
@@ -838,7 +843,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
-  filter_->finishFlow();
+  filter_->onGetAccessTokenSuccess("access_code", "id_token", "refresh_token",
+                                   /*expires_in=*/std::chrono::seconds(10));
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {

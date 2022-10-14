@@ -132,6 +132,9 @@ bug_fixes:
 - area: tls
   change: |
     fixed a bug where, when runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` is set to false, the wrong TLS alerts would sometimes be sent in response to certificate validation failures.
+- area: oauth
+  change: |
+    fixed the Max-Age of OAuth cookies.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

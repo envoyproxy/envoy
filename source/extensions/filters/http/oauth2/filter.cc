@@ -416,19 +416,19 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   id_token_ = id_token;
   refresh_token_ = refresh_token;
 
-  const auto new_epoch = time_source_.systemTime() + expires_in;
-  new_expires_ = std::to_string(
-      std::chrono::duration_cast<std::chrono::seconds>(new_epoch.time_since_epoch()).count());
+  new_expires_ = time_source_.systemTime() + expires_in;
 
   finishFlow();
 }
 
 void OAuth2Filter::finishFlow() {
   std::string token_payload;
+  std::string new_expires_str = std::to_string(
+      std::chrono::duration_cast<std::chrono::seconds>(new_expires_.time_since_epoch()).count());
   if (config_->forwardBearerToken()) {
-    token_payload = absl::StrCat(host_, new_expires_, access_token_, id_token_, refresh_token_);
+    token_payload = absl::StrCat(host_, new_expires_str, access_token_, id_token_, refresh_token_);
   } else {
-    token_payload = absl::StrCat(host_, new_expires_);
+    token_payload = absl::StrCat(host_, new_expires_str);
   }
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -441,9 +441,11 @@ void OAuth2Filter::finishFlow() {
   absl::Base64Escape(pre_encoded_token, &encoded_token);
 
   // We use HTTP Only cookies for the HMAC and Expiry.
-  const std::string cookie_tail = fmt::format(CookieTailFormatString, new_expires_);
-  const std::string cookie_tail_http_only =
-      fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
+  int64_t max_age =
+      std::chrono::duration_cast<std::chrono::seconds>(new_expires_ - time_source_.systemTime())
+          .count();
+  const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
+  const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
 
   // At this point we have all of the pieces needed to authorize a user.
   // Now, we construct a redirect request to return the user to their
@@ -459,7 +461,7 @@ void OAuth2Filter::finishFlow() {
       absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, cookie_tail_http_only));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
+      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_str, cookie_tail_http_only));
 
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
