@@ -45,7 +45,6 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
   std::unique_ptr<CustomResponseFilter> filter_;
   std::shared_ptr<FilterConfig> config_;
@@ -59,9 +58,12 @@ TEST_F(CustomResponseFilterTest, LocalData) {
 
   setServerName("server1.example.foo");
   Http::TestRequestHeaderMapImpl request_headers{};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "499"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _));
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(static_cast<Http::Code>(499), "not allowed", _, _, _));
+  ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
+      .WillByDefault(Return(&request_headers));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
             Http::FilterHeadersStatus::StopIteration);
 }
