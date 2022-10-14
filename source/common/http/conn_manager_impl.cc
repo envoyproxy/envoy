@@ -1631,6 +1631,9 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::OperationName::Egress;
+  }
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
@@ -1639,10 +1642,14 @@ const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() c
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig()->verbose_;
+  return connection_manager_.config_.tracingConfig() &&
+         connection_manager_.config_.tracingConfig()->verbose_;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::DefaultMaxPathTagLength;
+  }
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 

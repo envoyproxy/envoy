@@ -283,6 +283,7 @@ private:
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
+    // TODO(alyssawilk) this should be an optional reference.
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
