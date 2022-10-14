@@ -58,9 +58,9 @@ public:
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
-   * options.
+   * options. `absl::nullopt` returned when no any address.
    */
-  virtual UpstreamLocalAddress getUpstreamLocalAddress(
+  virtual absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr endpoint_address) const PURE;
 };
 

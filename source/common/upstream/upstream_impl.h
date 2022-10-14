@@ -74,7 +74,7 @@ public:
       const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
 
   // UpstreamLocalAddressSelector
-  UpstreamLocalAddress getUpstreamLocalAddress(
+  absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr endpoint_address) const override;
 
 private:

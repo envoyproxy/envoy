@@ -314,10 +314,10 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 }
 
-UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
+absl::optional<UpstreamLocalAddress> UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
     const Network::Address::InstanceConstSharedPtr endpoint_address) const {
   if (upstream_local_addresses_.empty()) {
-    return {nullptr, nullptr};
+    return absl::nullopt;
   }
 
   for (auto& local_address : upstream_local_addresses_) {
