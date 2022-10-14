@@ -314,6 +314,22 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 }
 
+UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
+    const Network::Address::InstanceConstSharedPtr endpoint_address) const {
+  if (upstream_local_addresses_.empty()) {
+    return {nullptr, nullptr};
+  }
+
+  for (auto& local_address : upstream_local_addresses_) {
+    ASSERT(local_address.address_->ip() != nullptr && endpoint_address->ip() != nullptr);
+    if (local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
+      return local_address;
+    }
+  }
+
+  return upstream_local_addresses_[0];
+}
+
 const Network::ConnectionSocket::OptionsSharedPtr
 UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
     const envoy::config::cluster::v3::Cluster& cluster_config,
