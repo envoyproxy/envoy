@@ -368,9 +368,10 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
     UpstreamLocalAddress extra_upstream_local_address;
     extra_upstream_local_address.address_ = Network::Address::resolveProtoSocketAddress(
         bind_config.extra_source_addresses(0).address());
-    ASSERT(extra_upstream_local_address.address_->ip() != nullptr);
+    ASSERT(extra_upstream_local_address.address_->ip() != nullptr &&
+           upstream_local_address.address_->ip() != nullptr);
     if (extra_upstream_local_address.address_->ip()->version() ==
-        extra_upstream_local_address.address_->ip()->version()) {
+        upstream_local_address.address_->ip()->version()) {
       throw EnvoyException(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "
           "different IP version source addresses can be supported in BindConfig's source_address "
@@ -383,11 +384,11 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
     Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                    base_socket_options);
 
-    if (bind_config.extra_source_addresses(0).has_override_socket_options()) {
+    if (bind_config.extra_source_addresses(0).has_socket_options()) {
       Network::Socket::appendOptions(
-          cluster_options,
+          extra_upstream_local_address.socket_options_,
           Network::SocketOptionFactory::buildLiteralOptions(
-              bind_config.extra_source_addresses(0).override_socket_options().socket_options()));
+              bind_config.extra_source_addresses(0).socket_options().socket_options()));
     } else {
       Network::Socket::appendOptions(extra_upstream_local_address.socket_options_,
                                      cluster_socket_options);
@@ -398,11 +399,12 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
 
   if (bind_config.additional_source_addresses_size() == 1) {
     UpstreamLocalAddress additional_upstream_local_address;
-    additional_upstream_local_address.address_ = Network::Address::resolveProtoSocketAddress(
-        bind_config.additional_source_addresses(0).address());
-    ASSERT(additional_upstream_local_address.address_->ip() != nullptr);
+    additional_upstream_local_address.address_ =
+        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0));
+    ASSERT(additional_upstream_local_address.address_->ip() != nullptr &&
+           upstream_local_address.address_->ip() != nullptr);
     if (additional_upstream_local_address.address_->ip()->version() ==
-        extra_upstream_local_address.address_->ip()->version()) {
+        upstream_local_address.address_->ip()->version()) {
       throw EnvoyException(fmt::format(
           "{}'s upstream binding config has two same IP version source addresses. Only two "
           "different IP version source addresses can be supported in BindConfig's source_address "
@@ -412,20 +414,11 @@ void UpstreamLocalAddressSelectorImpl::parseBindConfig(
 
     additional_upstream_local_address.socket_options_ =
         std::make_shared<Network::ConnectionSocket::Options>();
-    ;
+
     Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
                                    base_socket_options);
-
-    if (bind_config.additional_source_addresses(0).has_override_socket_options()) {
-      Network::Socket::appendOptions(cluster_options,
-                                     Network::SocketOptionFactory::buildLiteralOptions(
-                                         bind_config.additional_source_addresses(0)
-                                             .override_socket_options()
-                                             .socket_options()));
-    } else {
-      Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
-                                     cluster_socket_options);
-    }
+    Network::Socket::appendOptions(additional_upstream_local_address.socket_options_,
+                                   cluster_socket_options);
 
     upstream_local_addresses_.push_back(additional_upstream_local_address);
   }
