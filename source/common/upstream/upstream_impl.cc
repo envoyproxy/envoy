@@ -591,6 +591,26 @@ combineConnectionSocketOptions(const ClusterInfo& cluster,
   return connection_options;
 }
 
+Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
+    const absl::optional<UpstreamLocalAddress>& upstream_local_address,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  Network::ConnectionSocket::OptionsSharedPtr connection_options;
+  if (upstream_local_address.has_value()) {
+    if (options) {
+      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+      *connection_options = *options;
+      Network::Socket::appendOptions(connection_options,
+                                     upstream_local_address.value().socket_options_);
+    } else {
+      connection_options = options;
+    }
+  } else {
+    connection_options = options;
+  }
+
+  return connection_options;
+}
+
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
     const Network::Address::InstanceConstSharedPtr& address,
@@ -603,6 +623,7 @@ Host::CreateConnectionData HostImpl::createConnection(
       combineConnectionSocketOptions(cluster, options);
 
   auto source_address_fn = cluster.sourceAddressFn();
+  auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
   Network::ClientConnectionPtr connection;
   // If the transport socket options indicate the connection should be
@@ -610,9 +631,12 @@ Host::CreateConnectionData HostImpl::createConnection(
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address,
-        source_address_fn ? source_address_fn(address) : nullptr,
+        upstream_local_address.has_value() ? upstream_local_address.value().address_ : nullptr,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   } else if (address_list.size() > 1) {
@@ -620,8 +644,12 @@ Host::CreateConnectionData HostImpl::createConnection(
         dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
         connection_options);
   } else {
+    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
-        address, source_address_fn ? source_address_fn(address) : nullptr,
+        address,
+        upstream_local_address.has_value() ? upstream_local_address.value().address_ : nullptr,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   }
@@ -1105,6 +1133,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       resource_managers_(config, runtime, name_, *stats_scope_,
                          factory_context.clusterManager().clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
+      upstream_local_address_selector_(
+          std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
       source_address_fn_(getSourceAddressFn(config, bind_config)),
       lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),

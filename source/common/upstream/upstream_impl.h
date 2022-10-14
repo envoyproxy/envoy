@@ -784,6 +784,9 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
+  std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
+    return upstream_local_address_selector_;
+  }
   AddressSelectFn sourceAddressFn() const override { return source_address_fn_; };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
@@ -884,6 +887,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
+  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
   AddressSelectFn source_address_fn_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
@@ -1153,6 +1157,13 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
 Network::ConnectionSocket::OptionsSharedPtr
 combineConnectionSocketOptions(const ClusterInfo& cluster,
                                const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+/**
+ * Utility function to combine the given socket options with the socket options in cluster.
+ */
+Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
+    const absl::optional<UpstreamLocalAddress>& upstream_local_address,
+    const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 /**
  * Utility function to resolve health check address.

@@ -1010,6 +1010,12 @@ public:
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
+   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   */
+  virtual std::shared_ptr<UpstreamLocalAddressSelector>
+  getUpstreamLocalAddressSelector() const PURE;
+
+  /**
    * Returns an source address function which select source address for upstream connections to bind
    * to.
    *
