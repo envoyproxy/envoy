@@ -345,7 +345,7 @@ name: local-reply-during-encode
 // sendLocalReply and recreateStream
 TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyBeforeRedirectedCER) {
 
-  // Add filter that sends local reply after.
+  // Add filter that sends local reply before.
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode-if-not-cer
 )EOF");
