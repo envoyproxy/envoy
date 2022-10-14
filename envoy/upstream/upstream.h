@@ -39,6 +39,32 @@ class FilterChainManager;
 namespace Upstream {
 
 /**
+ * A bundle struct for address and socket options.
+ */
+struct UpstreamLocalAddress {
+public:
+  Network::Address::InstanceConstSharedPtr address_;
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+};
+
+/**
+ * A selector for select upstream local address based on the endpoint address.
+ */
+class UpstreamLocalAddressSelector {
+public:
+  virtual ~UpstreamLocalAddressSelector() = default;
+
+  /**
+   * Return UpstreamLocalAddress based on the endpoint address.
+   * @param endpoint_address is the address used to select upstream local address.
+   * @return UpstreamLocalAddress which includes the selected upstream local address and socket
+   * options.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr endpoint_address) const PURE;
+};
+
+/**
  * RAII handle for tracking the host usage by the connection pools.
  **/
 class HostHandle {

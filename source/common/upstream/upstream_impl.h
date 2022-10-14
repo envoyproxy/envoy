@@ -65,6 +65,34 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * An implementation of UpstreamLocalAddressSelector.
+ */
+class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
+public:
+  UpstreamLocalAddressSelectorImpl(
+      const envoy::config::cluster::v3::Cluster& config,
+      const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+
+  // UpstreamLocalAddressSelector
+  UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr endpoint_address) const override;
+
+private:
+  const Network::ConnectionSocket::OptionsSharedPtr
+  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+  const Network::ConnectionSocket::OptionsSharedPtr
+  parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                            const envoy::config::core::v3::BindConfig bind_config);
+  void parseBindConfig(const std::string cluster_name,
+                       const envoy::config::core::v3::BindConfig& bind_config,
+                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
+                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
+
+  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+};
+
+/**
  * Null implementation of HealthCheckHostMonitor.
  */
 class HealthCheckHostMonitorNullImpl : public HealthCheckHostMonitor {
