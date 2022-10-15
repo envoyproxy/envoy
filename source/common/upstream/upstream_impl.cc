@@ -596,12 +596,16 @@ Network::ConnectionSocket::OptionsSharedPtr
 combineConnectionSocketOptionsNew(const UpstreamLocalAddress& upstream_local_address,
                                   const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (options) {
-    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-    *connection_options = *options;
-    Network::Socket::appendOptions(connection_options, upstream_local_address.socket_options_);
+  if (!upstream_local_address.socket_options_->empty()) {
+    if (options) {
+      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+      *connection_options = *options;
+      Network::Socket::appendOptions(connection_options, upstream_local_address.socket_options_);
+    } else {
+      connection_options = upstream_local_address.socket_options_;
+    }
   } else {
-    connection_options = upstream_local_address.socket_options_;
+    connection_options = options;
   }
 
   return connection_options;
