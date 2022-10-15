@@ -37,8 +37,8 @@ independently.
 
 .. note::
 
- The update of the listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` with a hot restart doesn't support well.
- Suggest doing the update listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` separate with the hot restart.
+ Currently, updating a listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` during a hot restart isn't supported.
+ The old process socket options will be used. If it is required to update socket options either do a full restart or perform an LSD based listener updated.
 
 .. note::
 
