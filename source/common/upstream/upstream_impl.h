@@ -1163,9 +1163,9 @@ combineConnectionSocketOptions(const ClusterInfo& cluster,
 /**
  * Utility function to combine the given socket options with the socket options in cluster.
  */
-Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
-    const UpstreamLocalAddress& upstream_local_address,
-    const Network::ConnectionSocket::OptionsSharedPtr& options);
+Network::ConnectionSocket::OptionsSharedPtr
+combineConnectionSocketOptionsNew(const UpstreamLocalAddress& upstream_local_address,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 /**
  * Utility function to resolve health check address.

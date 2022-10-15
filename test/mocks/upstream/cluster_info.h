@@ -76,7 +76,8 @@ class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
 public:
   MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
 
-  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress, (const Network::Address::InstanceConstSharedPtr& address), (const));
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
+              (const Network::Address::InstanceConstSharedPtr& address), (const));
 
   Network::Address::InstanceConstSharedPtr& address_;
 };
@@ -154,7 +155,8 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (), (const));
+  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+              (const));
   MOCK_METHOD(AddressSelectFn, sourceAddressFn, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));

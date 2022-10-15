@@ -298,10 +298,8 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
-  base_socket_options_ =
-      buildBaseSocketOptions(cluster_config, bootstrap_bind_config);
-  cluster_socket_options_ =
-      parseClusterSocketOptions(cluster_config, bootstrap_bind_config);
+  base_socket_options_ = buildBaseSocketOptions(cluster_config, bootstrap_bind_config);
+  cluster_socket_options_ = parseClusterSocketOptions(cluster_config, bootstrap_bind_config);
 
   if (cluster_config.upstream_bind_config().has_source_address()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
@@ -309,8 +307,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 
   if (bootstrap_bind_config.has_source_address()) {
-    parseBindConfig("", bootstrap_bind_config, base_socket_options_,
-                    cluster_socket_options_);
+    parseBindConfig("", bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
   }
 }
 
@@ -322,10 +319,8 @@ UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
     UpstreamLocalAddress local_address;
     local_address.address_ = nullptr;
     local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
-    Network::Socket::appendOptions(local_address.socket_options_,
-                                   base_socket_options_);
-    Network::Socket::appendOptions(local_address.socket_options_,
-                                   cluster_socket_options_);
+    Network::Socket::appendOptions(local_address.socket_options_, base_socket_options_);
+    Network::Socket::appendOptions(local_address.socket_options_, cluster_socket_options_);
     return local_address;
   }
 
@@ -597,15 +592,14 @@ combineConnectionSocketOptions(const ClusterInfo& cluster,
   return connection_options;
 }
 
-Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
-    const UpstreamLocalAddress& upstream_local_address,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+Network::ConnectionSocket::OptionsSharedPtr
+combineConnectionSocketOptionsNew(const UpstreamLocalAddress& upstream_local_address,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (options) {
     connection_options = std::make_shared<Network::ConnectionSocket::Options>();
     *connection_options = *options;
-    Network::Socket::appendOptions(connection_options,
-                                    upstream_local_address.socket_options_);
+    Network::Socket::appendOptions(connection_options, upstream_local_address.socket_options_);
   } else {
     connection_options = upstream_local_address.socket_options_;
   }
@@ -637,8 +631,7 @@ Host::CreateConnectionData HostImpl::createConnection(
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
         combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
-        transport_socket_options->http11ProxyInfo()->proxy_address,
-        upstream_local_address.address_,
+        transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   } else if (address_list.size() > 1) {
@@ -650,8 +643,7 @@ Host::CreateConnectionData HostImpl::createConnection(
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
         combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
-        address,
-        upstream_local_address.address_,
+        address, upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   }
