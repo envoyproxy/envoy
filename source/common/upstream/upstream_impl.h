@@ -75,7 +75,7 @@ public:
 
   // UpstreamLocalAddressSelector
   absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr endpoint_address) const override;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const override;
 
 private:
   const Network::ConnectionSocket::OptionsSharedPtr
@@ -89,6 +89,8 @@ private:
                        const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
                        const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
 
+  Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
+  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   std::vector<UpstreamLocalAddress> upstream_local_addresses_;
 };
 

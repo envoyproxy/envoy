@@ -4790,7 +4790,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data = cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
@@ -5122,7 +5122,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data =

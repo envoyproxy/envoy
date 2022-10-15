@@ -298,26 +298,35 @@ HostVector filterHosts(const absl::node_hash_set<HostSharedPtr>& hosts,
 UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
-  Network::ConnectionSocket::OptionsSharedPtr base_socket_options =
+  base_socket_options_ =
       buildBaseSocketOptions(cluster_config, bootstrap_bind_config);
-  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options =
+  cluster_socket_options_ =
       parseClusterSocketOptions(cluster_config, bootstrap_bind_config);
 
   if (cluster_config.upstream_bind_config().has_source_address()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
-                    base_socket_options, cluster_socket_options);
+                    base_socket_options_, cluster_socket_options_);
   }
 
   if (bootstrap_bind_config.has_source_address()) {
-    parseBindConfig("bootstrap", bootstrap_bind_config, base_socket_options,
-                    cluster_socket_options);
+    parseBindConfig("", bootstrap_bind_config, base_socket_options_,
+                    cluster_socket_options_);
   }
 }
 
 absl::optional<UpstreamLocalAddress> UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
-    const Network::Address::InstanceConstSharedPtr endpoint_address) const {
+    const Network::Address::InstanceConstSharedPtr& endpoint_address) const {
+  // If there is no upstream local address specified, then return a nullptr for the address. And
+  // return the socket options.
   if (upstream_local_addresses_.empty()) {
-    return absl::nullopt;
+    UpstreamLocalAddress local_address;
+    local_address.address_ = nullptr;
+    local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+    Network::Socket::appendOptions(local_address.socket_options_,
+                                   base_socket_options_);
+    Network::Socket::appendOptions(local_address.socket_options_,
+                                   cluster_socket_options_);
+    return local_address;
   }
 
   for (auto& local_address : upstream_local_addresses_) {
@@ -374,9 +383,6 @@ UpstreamLocalAddressSelectorImpl::parseClusterSocketOptions(
                               : bind_config.socket_options();
     Network::Socket::appendOptions(
         cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
-  }
-  if (cluster_options->empty()) {
-    return nullptr;
   }
   return cluster_options;
 }
@@ -602,7 +608,7 @@ Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
       Network::Socket::appendOptions(connection_options,
                                      upstream_local_address.value().socket_options_);
     } else {
-      connection_options = options;
+      connection_options = upstream_local_address.value().socket_options_;
     }
   } else {
     connection_options = options;

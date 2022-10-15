@@ -72,6 +72,15 @@ public:
   }
 };
 
+class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+public:
+  MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
+
+  MOCK_METHOD(absl::optional<UpstreamLocalAddress>, getUpstreamLocalAddress, (const Network::Address::InstanceConstSharedPtr& address), (const));
+
+  Network::Address::InstanceConstSharedPtr& address_;
+};
+
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
@@ -204,6 +213,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};

@@ -36,6 +36,18 @@ MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
 
 MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
+MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address) : address_(address) {
+    ON_CALL(*this, getUpstreamLocalAddress(_)).WillByDefault(Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> absl::optional<UpstreamLocalAddress> {
+        if (address_ == nullptr) {
+            return absl::nullopt;
+        }
+        UpstreamLocalAddress ret;
+        ret.address_ = address_;
+        ret.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+        return ret; 
+    }));
+}
+
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
@@ -61,6 +73,7 @@ MockClusterInfo::MockClusterInfo()
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
           std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
           absl::nullopt)),
+      upstream_local_address_selector_(std::make_shared<NiceMock<MockUpstreamLocalAddressSelector>>(source_address_)),
       stats_scope_(stats_store_.createScope("test_scope")) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
@@ -93,6 +106,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, timeoutBudgetStats())
       .WillByDefault(
           Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
+  ON_CALL(*this, getUpstreamLocalAddressSelector()).WillByDefault(Return(upstream_local_address_selector_));
   ON_CALL(*this, sourceAddressFn())
       .WillByDefault(Return([addr = source_address_](
                                 const Network::Address::InstanceConstSharedPtr&) { return addr; }));

@@ -61,7 +61,7 @@ public:
    * options. `absl::nullopt` returned when no any address.
    */
   virtual absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr endpoint_address) const PURE;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
 };
 
 /**
