@@ -75,7 +75,8 @@ public:
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const override;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
 
 private:
   const Network::ConnectionSocket::OptionsSharedPtr
@@ -88,6 +89,9 @@ private:
                        const envoy::config::core::v3::BindConfig& bind_config,
                        const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
                        const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
+  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
+      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
 
   Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;

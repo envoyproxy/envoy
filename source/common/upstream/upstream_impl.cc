@@ -311,8 +311,29 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 }
 
+Network::ConnectionSocket::OptionsSharedPtr
+UpstreamLocalAddressSelectorImpl::combineConnectionSocketOptions(
+    const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  Network::ConnectionSocket::OptionsSharedPtr connection_options;
+  if (!local_address_options->empty()) {
+    if (options) {
+      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+      *connection_options = *options;
+      Network::Socket::appendOptions(connection_options, local_address_options);
+    } else {
+      connection_options = local_address_options;
+    }
+  } else {
+    connection_options = options;
+  }
+
+  return connection_options;
+}
+
 UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
-    const Network::Address::InstanceConstSharedPtr& endpoint_address) const {
+    const Network::Address::InstanceConstSharedPtr& endpoint_address,
+    const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
   // If there is no upstream local address specified, then return a nullptr for the address. And
   // return the socket options.
   if (upstream_local_addresses_.empty()) {
@@ -321,17 +342,22 @@ UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
     local_address.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
     Network::Socket::appendOptions(local_address.socket_options_, base_socket_options_);
     Network::Socket::appendOptions(local_address.socket_options_, cluster_socket_options_);
+    local_address.socket_options_ =
+        combineConnectionSocketOptions(local_address.socket_options_, socket_options);
     return local_address;
   }
 
   for (auto& local_address : upstream_local_addresses_) {
     ASSERT(local_address.address_->ip() != nullptr && endpoint_address->ip() != nullptr);
     if (local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
-      return local_address;
+      return {local_address.address_,
+              combineConnectionSocketOptions(local_address.socket_options_, socket_options)};
     }
   }
 
-  return upstream_local_addresses_[0];
+  return {
+      upstream_local_addresses_[0].address_,
+      combineConnectionSocketOptions(upstream_local_addresses_[0].socket_options_, socket_options)};
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr
@@ -627,25 +653,23 @@ Host::CreateConnectionData HostImpl::createConnection(
   // the host's address.
   if (transport_socket_options && transport_socket_options->http11ProxyInfo().has_value()) {
     ENVOY_LOG(debug, "Connecting to configured HTTP/1.1 proxy");
-    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(address);
-    Network::ConnectionSocket::OptionsSharedPtr connection_options =
-        combineConnectionSocketOptionsNew(upstream_local_address, options);
+    auto upstream_local_address =
+        source_address_selector->getUpstreamLocalAddress(address, options);
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address, upstream_local_address.address_,
-        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
-        transport_socket_options);
+        socket_factory.createTransportSocket(transport_socket_options, host),
+        upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list.size() > 1) {
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
         host, options);
   } else {
-    auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(address);
-    Network::ConnectionSocket::OptionsSharedPtr connection_options =
-        combineConnectionSocketOptionsNew(upstream_local_address, options);
+    auto upstream_local_address =
+        source_address_selector->getUpstreamLocalAddress(address, options);
     connection = dispatcher.createClientConnection(
         address, upstream_local_address.address_,
-        socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
-        transport_socket_options);
+        socket_factory.createTransportSocket(transport_socket_options, host),
+        upstream_local_address.socket_options_, transport_socket_options);
   }
 
   connection->connectionInfoSetter().enableSettingInterfaceName(

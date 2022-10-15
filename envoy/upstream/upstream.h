@@ -59,11 +59,13 @@ public:
   /**
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
+   * @param socket_options applied to the selected address.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
    * options.
    */
   virtual UpstreamLocalAddress getUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
 };
 
 /**

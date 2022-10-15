@@ -26,20 +26,13 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
                   address_list_[next_address_]->asStringView());
   auto& address = address_list_[next_address_++];
-  auto upstream_local_address = upstream_local_address_selector_->getUpstreamLocalAddress(address);
-  Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (options_) {
-    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-    *connection_options = *options_;
-    Network::Socket::appendOptions(connection_options, upstream_local_address.socket_options_);
-  } else {
-    connection_options = upstream_local_address.socket_options_;
-  }
+  auto upstream_local_address =
+      upstream_local_address_selector_->getUpstreamLocalAddress(address, options_);
 
   return dispatcher_.createClientConnection(
       address, upstream_local_address.address_,
-      socket_factory_.createTransportSocket(transport_socket_options_, host_), connection_options,
-      transport_socket_options_);
+      socket_factory_.createTransportSocket(transport_socket_options_, host_),
+      upstream_local_address.socket_options_, transport_socket_options_);
 }
 
 size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_; }
