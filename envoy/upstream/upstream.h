@@ -43,7 +43,9 @@ namespace Upstream {
  */
 struct UpstreamLocalAddress {
 public:
+  // When no upstream local address specified, the value is nullptr.
   Network::Address::InstanceConstSharedPtr address_;
+  // If there are socket options specified, then a empty list here.
   Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
@@ -58,9 +60,9 @@ public:
    * Return UpstreamLocalAddress based on the endpoint address.
    * @param endpoint_address is the address used to select upstream local address.
    * @return UpstreamLocalAddress which includes the selected upstream local address and socket
-   * options. `absl::nullopt` returned when no any address.
+   * options.
    */
-  virtual absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
+  virtual UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
 };
 

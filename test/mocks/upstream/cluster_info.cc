@@ -37,10 +37,7 @@ MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
 MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
 MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address) : address_(address) {
-    ON_CALL(*this, getUpstreamLocalAddress(_)).WillByDefault(Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> absl::optional<UpstreamLocalAddress> {
-        if (address_ == nullptr) {
-            return absl::nullopt;
-        }
+    ON_CALL(*this, getUpstreamLocalAddress(_)).WillByDefault(Invoke([&](const Network::Address::InstanceConstSharedPtr&) -> UpstreamLocalAddress {
         UpstreamLocalAddress ret;
         ret.address_ = address_;
         ret.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();

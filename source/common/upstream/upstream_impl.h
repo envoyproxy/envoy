@@ -74,7 +74,7 @@ public:
       const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
 
   // UpstreamLocalAddressSelector
-  absl::optional<UpstreamLocalAddress> getUpstreamLocalAddress(
+  UpstreamLocalAddress getUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& endpoint_address) const override;
 
 private:
@@ -1164,7 +1164,7 @@ combineConnectionSocketOptions(const ClusterInfo& cluster,
  * Utility function to combine the given socket options with the socket options in cluster.
  */
 Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
-    const absl::optional<UpstreamLocalAddress>& upstream_local_address,
+    const UpstreamLocalAddress& upstream_local_address,
     const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 /**

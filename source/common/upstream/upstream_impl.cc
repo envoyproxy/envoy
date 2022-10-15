@@ -314,7 +314,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   }
 }
 
-absl::optional<UpstreamLocalAddress> UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
+UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
     const Network::Address::InstanceConstSharedPtr& endpoint_address) const {
   // If there is no upstream local address specified, then return a nullptr for the address. And
   // return the socket options.
@@ -598,20 +598,16 @@ combineConnectionSocketOptions(const ClusterInfo& cluster,
 }
 
 Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptionsNew(
-    const absl::optional<UpstreamLocalAddress>& upstream_local_address,
+    const UpstreamLocalAddress& upstream_local_address,
     const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (upstream_local_address.has_value()) {
-    if (options) {
-      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-      *connection_options = *options;
-      Network::Socket::appendOptions(connection_options,
-                                     upstream_local_address.value().socket_options_);
-    } else {
-      connection_options = upstream_local_address.value().socket_options_;
-    }
+  if (options) {
+    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+    *connection_options = *options;
+    Network::Socket::appendOptions(connection_options,
+                                    upstream_local_address.socket_options_);
   } else {
-    connection_options = options;
+    connection_options = upstream_local_address.socket_options_;
   }
 
   return connection_options;
@@ -642,7 +638,7 @@ Host::CreateConnectionData HostImpl::createConnection(
         combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
         transport_socket_options->http11ProxyInfo()->proxy_address,
-        upstream_local_address.has_value() ? upstream_local_address.value().address_ : nullptr,
+        upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   } else if (address_list.size() > 1) {
@@ -655,7 +651,7 @@ Host::CreateConnectionData HostImpl::createConnection(
         combineConnectionSocketOptionsNew(upstream_local_address, options);
     connection = dispatcher.createClientConnection(
         address,
-        upstream_local_address.has_value() ? upstream_local_address.value().address_ : nullptr,
+        upstream_local_address.address_,
         socket_factory.createTransportSocket(transport_socket_options, host), connection_options,
         transport_socket_options);
   }
