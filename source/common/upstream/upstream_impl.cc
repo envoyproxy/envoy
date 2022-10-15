@@ -301,6 +301,9 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   base_socket_options_ = buildBaseSocketOptions(cluster_config, bootstrap_bind_config);
   cluster_socket_options_ = parseClusterSocketOptions(cluster_config, bootstrap_bind_config);
 
+  ASSERT(base_socket_options_ != nullptr);
+  ASSERT(cluster_socket_options_ != nullptr);
+
   if (cluster_config.upstream_bind_config().has_source_address()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
                     base_socket_options_, cluster_socket_options_);
@@ -315,17 +318,14 @@ Network::ConnectionSocket::OptionsSharedPtr
 UpstreamLocalAddressSelectorImpl::combineConnectionSocketOptions(
     const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (!local_address_options->empty()) {
-    if (options) {
-      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-      *connection_options = *options;
-      Network::Socket::appendOptions(connection_options, local_address_options);
-    } else {
-      connection_options = local_address_options;
-    }
+  Network::ConnectionSocket::OptionsSharedPtr connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+
+  if (options) {
+    connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+    *connection_options = *options;
+    Network::Socket::appendOptions(connection_options, local_address_options);
   } else {
-    connection_options = options;
+    *connection_options = *local_address_options;
   }
 
   return connection_options;
