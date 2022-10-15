@@ -615,10 +615,6 @@ Host::CreateConnectionData HostImpl::createConnection(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     HostDescriptionConstSharedPtr host) {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options =
-      combineConnectionSocketOptions(cluster, options);
-
-  auto source_address_fn = cluster.sourceAddressFn();
   auto source_address_selector = cluster.getUpstreamLocalAddressSelector();
 
   Network::ClientConnectionPtr connection;
@@ -636,8 +632,8 @@ Host::CreateConnectionData HostImpl::createConnection(
         transport_socket_options);
   } else if (address_list.size() > 1) {
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
-        dispatcher, address_list, source_address_fn, socket_factory, transport_socket_options, host,
-        connection_options);
+        dispatcher, address_list, source_address_selector, socket_factory, transport_socket_options,
+        host, options);
   } else {
     auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(address);
     Network::ConnectionSocket::OptionsSharedPtr connection_options =
