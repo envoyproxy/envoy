@@ -318,7 +318,8 @@ Network::ConnectionSocket::OptionsSharedPtr
 UpstreamLocalAddressSelectorImpl::combineConnectionSocketOptions(
     const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+  Network::ConnectionSocket::OptionsSharedPtr connection_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
 
   if (options) {
     connection_options = std::make_shared<Network::ConnectionSocket::Options>();
