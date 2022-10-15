@@ -79,6 +79,7 @@ minor_behavior_changes:
 - area: http
   change: |
     changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
+- area: http
   change: |
     the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
 - area: stats
@@ -175,8 +176,10 @@ new_features:
 - area: http
   change: |
     made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
+- area: http
   change: |
     added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
+- area: http
   change: |
     added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
 - area: dns_resolver
