@@ -43,9 +43,6 @@ behavior_changes:
     Fixed resource tracking when using the Incremental (Delta-xDS) protocol. The protocol state will be updated after
     the resources are successfully ingested and an ACK is sent. This behavior change can be reverted by setting the
     ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` runtime flag to false.
-- area: ext_auth
-  change: |
-    Client request headers to be included in the check request to the authorization server (gRPC) are matched against a list of allowed headers.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -134,8 +131,5 @@ new_features:
   change: |
     Added :ref:`HeaderBasedSessionState <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage
     :ref:`StatefulSession State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via request/response header.
-- area: ext_authz
-  change: |
-    added support to allowlist headers included in the check request to gRPC authorization server.
 
 deprecated:
