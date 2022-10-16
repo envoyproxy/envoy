@@ -16,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -98,7 +99,7 @@ public:
 
     if (config.has_allowed_headers() &&
         config.http_service().authorization_request().has_allowed_headers()) {
-      throw EnvoyException("Invalid duplicate configuration for allowed_headers.");
+      ExceptionUtil::throwEnvoyException("Invalid duplicate configuration for allowed_headers.");
     }
 
     if (config.has_grpc_service() && config.has_allowed_headers()) {

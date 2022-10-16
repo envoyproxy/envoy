@@ -453,7 +453,7 @@ attributes:
       - prefix: allowed-prefix
       - safe_regex:
           google_re2: {}
-          regex: regex-foo.? 
+          regex: regex-foo.?
 
     with_request_body:
       max_request_bytes: 1024
@@ -660,7 +660,7 @@ public:
         - prefix: allowed-prefix
         - safe_regex:
             google_re2: {}
-            regex: regex-foo.? 
+            regex: regex-foo.?
 
     authorization_response:
       allowed_upstream_headers:
@@ -684,7 +684,7 @@ public:
     - prefix: allowed-prefix
     - safe_regex:
         google_re2: {}
-        regex: regex-foo.? 
+        regex: regex-foo.?
 
   http_service:
     server_uri:
