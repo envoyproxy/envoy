@@ -83,7 +83,7 @@ private:
   buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
                          const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
   const Network::ConnectionSocket::OptionsSharedPtr
-  parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
                             const envoy::config::core::v3::BindConfig bind_config);
   void parseBindConfig(const std::string cluster_name,
                        const envoy::config::core::v3::BindConfig& bind_config,

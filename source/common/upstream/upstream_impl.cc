@@ -175,7 +175,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const envoy::config::core::v3::BindConfig& bootstrap_bind_config) {
   base_socket_options_ = buildBaseSocketOptions(cluster_config, bootstrap_bind_config);
-  cluster_socket_options_ = parseClusterSocketOptions(cluster_config, bootstrap_bind_config);
+  cluster_socket_options_ = buildClusterSocketOptions(cluster_config, bootstrap_bind_config);
 
   ASSERT(base_socket_options_ != nullptr);
   ASSERT(cluster_socket_options_ != nullptr);
@@ -268,7 +268,7 @@ UpstreamLocalAddressSelectorImpl::buildBaseSocketOptions(
 }
 
 const Network::ConnectionSocket::OptionsSharedPtr
-UpstreamLocalAddressSelectorImpl::parseClusterSocketOptions(
+UpstreamLocalAddressSelectorImpl::buildClusterSocketOptions(
     const envoy::config::cluster::v3::Cluster& cluster_config,
     const envoy::config::core::v3::BindConfig bind_config) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options =
