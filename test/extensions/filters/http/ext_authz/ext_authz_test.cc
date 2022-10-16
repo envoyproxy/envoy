@@ -1830,7 +1830,8 @@ TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithAllowedHeader
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
 }
 
-TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithLegacyAllowedHeaders) {
+TEST_F(HttpFilterTestParam,
+       DEPRECATED_FEATURE_TEST(RequestHeaderMatchersForHttpServiceWithLegacyAllowedHeaders)) {
   const Http::LowerCaseString foo{"foo"};
   initialize(R"EOF(
     transport_api_version: V3
@@ -1855,7 +1856,7 @@ TEST_F(HttpFilterTestParam, RequestHeaderMatchersForHttpServiceWithLegacyAllowed
   EXPECT_TRUE(config_->requestHeaderMatchers()->matches(foo.get()));
 }
 
-TEST_F(HttpFilterTestParam, DuplicateAllowedHeadersConfigIsInvalid) {
+TEST_F(HttpFilterTestParam, DEPRECATED_FEATURE_TEST(DuplicateAllowedHeadersConfigIsInvalid)) {
   EXPECT_THROW(initialize(R"EOF(
   http_service:
     server_uri:

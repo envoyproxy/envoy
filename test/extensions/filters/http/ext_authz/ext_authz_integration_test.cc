@@ -812,7 +812,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher
 // (uses legacy config for allowed_headers).
-TEST_P(ExtAuthzHttpIntegrationTest, LegacyDefaultCaseSensitiveStringMatcher) {
+TEST_P(ExtAuthzHttpIntegrationTest,
+       DEPRECATED_FEATURE_TEST(LegacyDefaultCaseSensitiveStringMatcher)) {
   setup();
   const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry.empty());
