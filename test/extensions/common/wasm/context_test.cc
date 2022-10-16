@@ -162,6 +162,14 @@ TEST_F(ContextTest, GetConnectionTest) {
   ctx.setNetworkWriteFilterCallbacksPtr(nullptr);
 }
 
+using google::api::expr::runtime::CelList;
+using google::api::expr::runtime::CelMap;
+
+class MockCelMap : public CelMap {
+public:
+  MOCK_METHOD(absl::StatusOr<const CelList*>, ListKeys, (), (const, override));
+}
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions

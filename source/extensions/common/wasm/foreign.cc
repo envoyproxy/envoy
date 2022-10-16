@@ -30,10 +30,10 @@ RegisterForeignFunction registerCompressForeignFunction(
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       unsigned long dest_len = compressBound(arguments.size());
       std::unique_ptr<unsigned char[]> b(new unsigned char[dest_len]);
-      RETURN_IF_FALSE(compress(b.get(), &dest_len,
-                               reinterpret_cast<const unsigned char*>(arguments.data()),
-                               arguments.size()) == Z_OK,
-                      WasmResult::SerializationFailure);
+      if (compress(b.get(), &dest_len, reinterpret_cast<const unsigned char*>(arguments.data()),
+                   arguments.size()) != Z_OK) {
+        return WasmResult::SerializationFailure;
+      }
       auto result = alloc_result(dest_len);
       memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
@@ -103,8 +103,9 @@ protected:
       auto builder = google::api::expr::runtime::CreateCelExpressionBuilder(options);
       auto status =
           google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
-      ENVOY_LOG_IF_FALSE(status.ok(), warn, "failed to register built-in functions: {}",
-                         status.message());
+      if (!status.ok()) {
+        ENVOY_LOG(warn, "failed to register built-in functions: {}", status.message());
+      }
       auto new_context = std::make_unique<ExpressionContext>(std::move(builder));
       expr_context = new_context.get();
       context->setForeignData(data_name, std::move(new_context));
@@ -157,7 +158,9 @@ public:
         [self](WasmBase&, std::string_view argument,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
-      RETURN_IF_FALSE(argument.size() == sizeof(uint32_t), WasmResult::BadArgument);
+      if (argument.size() != sizeof(uint32_t)) {
+        return WasmResult::BadArgument;
+      }
       uint32_t token = *reinterpret_cast<const uint32_t*>(argument.data());
       if (!expr_context.hasExpression(token)) {
         return WasmResult::NotFound;
@@ -177,7 +180,9 @@ public:
       }
       std::string result;
       auto serialize_status = serializeValue(value, &result);
-      RETURN_IF_NOT_OK(serialize_status, serialize_status);
+      if (serialize_status != WasmResult::Ok) {
+        return serialize_status;
+      }
       auto output = alloc_result(result.size());
       memcpy(output, result.data(), result.size()); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
@@ -195,7 +200,9 @@ public:
     WasmForeignFunction f = [self](WasmBase&, std::string_view argument,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
-      RETURN_IF_FALSE(argument.size() == sizeof(uint32_t), WasmResult::BadArgument);
+      if (argument.size() != sizeof(uint32_t)) {
+        return WasmResult::BadArgument;
+      }
       uint32_t token = *reinterpret_cast<const uint32_t*>(argument.data());
       expr_context.deleteExpression(token);
       return WasmResult::Ok;
