@@ -117,6 +117,7 @@ envoy_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
     deps = [
+        "//envoy/common:base_includes",
         "//source/extensions/common/wasm:wasm_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
