@@ -45,7 +45,7 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
                      const Network::ConnectionSocket::OptionsSharedPtr&) -> UpstreamLocalAddress {
             UpstreamLocalAddress ret;
             ret.address_ = address_;
-            ret.socket_options_ = std::make_shared<Network::ConnectionSocket::Options>();
+            ret.socket_options_ = nullptr;
             return ret;
           }));
 }

@@ -43,9 +43,7 @@ namespace Upstream {
  */
 struct UpstreamLocalAddress {
 public:
-  // When no upstream local address specified, the value is nullptr.
   Network::Address::InstanceConstSharedPtr address_;
-  // If there are socket options specified, then a empty list here.
   Network::ConnectionSocket::OptionsSharedPtr socket_options_;
 };
 
