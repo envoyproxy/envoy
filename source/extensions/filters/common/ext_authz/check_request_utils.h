@@ -110,8 +110,8 @@ public:
                              bool include_peer_certificate,
                              const Protobuf::Map<std::string, std::string>& destination_labels);
 
-  static MatcherSharedPtr
-  toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                            bool add_http_headers);
   static std::vector<Matchers::StringMatcherPtr>
   createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 

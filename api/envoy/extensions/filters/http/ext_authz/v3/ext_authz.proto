@@ -156,11 +156,13 @@ message ExtAuthz {
   string bootstrap_metadata_labels_key = 15;
 
   // Check request to authorization server will include the client request headers that have a correspondent match
-  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`.
+  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. If this option isn't specified, then
+  // all client request headers are included in the check request to a gRPC authorization server, whereas no client request headers
+  // (besides the ones allowed by default - see note below) are included in the check request to an HTTP authorization server.
   //
   // .. note::
   //
-  //  1. In addition to the the user's supplied matchers, ``Host``, ``Method``, ``Path``,
+  //  1. For requests to an HTTP authorization server: in addition to the the user's supplied matchers, ``Host``, ``Method``, ``Path``,
   //     ``Content-Length``, and ``Authorization`` are **automatically included** to the list.
   //
   // .. note::

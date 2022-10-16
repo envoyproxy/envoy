@@ -240,18 +240,22 @@ void CheckRequestUtils::createTcpCheck(
 }
 
 MatcherSharedPtr
-CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
-  const std::vector<Http::LowerCaseString> keys{
-      {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
-       Http::Headers::get().Path, Http::Headers::get().Host}};
-
+CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
+                                     bool add_http_headers) {
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
-  for (const auto& key : keys) {
-    envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_exact(key.get());
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher));
+
+  if (add_http_headers) {
+    const std::vector<Http::LowerCaseString> keys{
+        {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
+         Http::Headers::get().Path, Http::Headers::get().Host}};
+
+    for (const auto& key : keys) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(key.get());
+      matchers.push_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher));
+    }
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));

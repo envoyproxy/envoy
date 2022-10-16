@@ -91,6 +91,9 @@ new_features:
 - area: listener
   change: |
     allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+- area: ext_authz
+  change: |
+    added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
 - area: lua
   change: |
     added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling the produced trace span

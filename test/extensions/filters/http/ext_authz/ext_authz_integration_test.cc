@@ -110,8 +110,8 @@ public:
         {":scheme", "http"},           {":authority", "host"},
         {"x-duplicate", "one"},        {"x-duplicate", "two"},
         {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
-        {"allowed-prefix-two", "two"}, {"not-allowed", "three"},
-        {"authorization", "legit"}};
+        {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
+        {"regex-food", "food"},        {"regex-fool", "fool"}};
 
     // Initialize headers to append. If the authorization server returns any matching keys with one
     // of value in headers_to_add, the header entry from authorization server replaces the one in
@@ -167,8 +167,9 @@ public:
     // are merged.
     EXPECT_EQ("one", (*http_request->mutable_headers())["allowed-prefix-one"]);
     EXPECT_EQ("two", (*http_request->mutable_headers())["allowed-prefix-two"]);
-    EXPECT_EQ("legit", (*http_request->mutable_headers())["authorization"]);
     EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
+    EXPECT_EQ("food", (*http_request->mutable_headers())["regex-food"]);
+    EXPECT_EQ("fool", (*http_request->mutable_headers())["regex-fool"]);
     EXPECT_FALSE(http_request->headers().contains("not-allowed"));
 
     // Clear fields which are not relevant.
@@ -447,8 +448,13 @@ attributes:
   const std::string base_filter_config_ = R"EOF(
     allowed_headers:
       patterns:
+      - exact: X-Case-Sensitive-Header
       - exact: x-duplicate
       - prefix: allowed-prefix
+      - safe_regex:
+          google_re2: {}
+          regex: regex-foo.? 
+
     with_request_body:
       max_request_bytes: 1024
       allow_partial_message: true
@@ -475,23 +481,24 @@ public:
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-        {":method", "GET"},
-        {":path", "/"},
-        {":scheme", "http"},
-        {":authority", "host"},
-        {"x-case-sensitive-header", case_sensitive_header_value_},
-        {"baz", "foo"},
-        {"bat", "foo"},
-        {"remove-me", "upstream-should-not-see-me"},
-        {"x-duplicate", "one"},
-        {"x-duplicate", "two"},
-        {"x-duplicate", "three"},
-        {"allowed-prefix-one", "one"},
-        {"allowed-prefix-two", "two"},
-        {"not-allowed", "three"},
-        {"authorization", "legit"},
-    });
+    response_ = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"x-case-sensitive-header", case_sensitive_header_value_},
+                                       {"baz", "foo"},
+                                       {"bat", "foo"},
+                                       {"remove-me", "upstream-should-not-see-me"},
+                                       {"x-duplicate", "one"},
+                                       {"x-duplicate", "two"},
+                                       {"x-duplicate", "three"},
+                                       {"allowed-prefix-one", "one"},
+                                       {"allowed-prefix-two", "two"},
+                                       {"not-allowed", "nope"},
+                                       {"authorization", "legit"},
+                                       {"regex-food", "food"},
+                                       {"regex-fool", "fool"}});
   }
 
   void waitForExtAuthzRequest() {
@@ -523,6 +530,14 @@ public:
     EXPECT_TRUE(ext_authz_request_->headers()
                     .get(Http::LowerCaseString(std::string("not-allowed")))
                     .empty());
+    EXPECT_EQ("food", ext_authz_request_->headers()
+                          .get(Http::LowerCaseString(std::string("regex-food")))[0]
+                          ->value()
+                          .getStringView());
+    EXPECT_EQ("fool", ext_authz_request_->headers()
+                          .get(Http::LowerCaseString(std::string("regex-fool")))[0]
+                          ->value()
+                          .getStringView());
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
@@ -643,6 +658,9 @@ public:
         - exact: X-Case-Sensitive-Header
         - exact: x-duplicate
         - prefix: allowed-prefix
+        - safe_regex:
+            google_re2: {}
+            regex: regex-foo.? 
 
     authorization_response:
       allowed_upstream_headers:
@@ -664,6 +682,10 @@ public:
     - exact: X-Case-Sensitive-Header
     - exact: x-duplicate
     - prefix: allowed-prefix
+    - safe_regex:
+        google_re2: {}
+        regex: regex-foo.? 
+
   http_service:
     server_uri:
       uri: "ext_authz:9000"

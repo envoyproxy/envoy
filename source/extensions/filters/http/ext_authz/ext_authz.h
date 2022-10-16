@@ -96,11 +96,22 @@ public:
       }
     }
 
-    if (config.has_grpc_service() ||
-        (config.has_http_service() &&
-         !config.http_service().authorization_request().has_allowed_headers())) {
-      request_header_matchers_ =
-          Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(config.allowed_headers());
+    if (config.has_allowed_headers() &&
+        config.http_service().authorization_request().has_allowed_headers()) {
+      throw EnvoyException("Invalid duplicate configuration for allowed_headers.");
+    }
+
+    if (config.has_grpc_service() && config.has_allowed_headers()) {
+      request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.allowed_headers(), false);
+    } else if (config.has_http_service()) {
+      if (config.http_service().authorization_request().has_allowed_headers()) {
+        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+            config.http_service().authorization_request().allowed_headers(), true);
+      } else {
+        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+            config.allowed_headers(), true);
+      }
     }
   }
 

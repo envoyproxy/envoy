@@ -43,12 +43,6 @@ public:
   const std::chrono::milliseconds& timeout() const { return timeout_; }
 
   /**
-   * Returns a list of matchers used for selecting the request headers that should be sent to the
-   * authorization server.
-   */
-  const MatcherSharedPtr& requestHeaderMatchers() const { return request_header_matchers_; }
-
-  /**
    * Returns a list of matchers used for selecting the authorization response headers that
    * should be send back to the client.
    */

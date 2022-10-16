@@ -119,18 +119,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
       request_headers_parser_(Router::HeaderParser::configure(
           config.http_service().authorization_request().headers_to_add(),
-          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {
-
-  if (config.has_allowed_headers() &&
-      config.http_service().authorization_request().has_allowed_headers()) {
-    throw EnvoyException("Invalid duplicate configuration for allowed_headers.");
-  }
-
-  if (config.http_service().authorization_request().has_allowed_headers()) {
-    request_header_matchers_ = CheckRequestUtils::toRequestMatchers(
-        config.http_service().authorization_request().allowed_headers());
-  }
-}
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD)) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
@@ -228,15 +217,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
       continue;
     }
 
-    // for all other headers: check whether it's allowed or not
-    if (config_->requestHeaderMatchers() != nullptr) {
-      if (config_->requestHeaderMatchers()->matches(key.get())) {
-        headers->addCopy(key, header.second);
-      }
-    } else {
-      // header is allowed
-      headers->addCopy(key, header.second);
-    }
+    headers->addCopy(key, header.second);
   }
 
   config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);

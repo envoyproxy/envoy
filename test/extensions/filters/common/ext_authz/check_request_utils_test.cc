@@ -106,7 +106,7 @@ public:
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("foo");
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("hello");
     ext_autz_proto_.mutable_allowed_headers()->add_patterns()->set_exact("duplicate");
-    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers());
+    return CheckRequestUtils::toRequestMatchers(ext_autz_proto_.allowed_headers(), false);
   }
 
   Network::Address::InstanceConstSharedPtr addr_;
@@ -193,7 +193,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 }
 
 // Verify that check request merges the duplicate headers.
-TEST_F(CheckRequestUtilsTest, BasicHttpWithLegacyAllowlistedHeaders) {
+TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
   const uint64_t size = 0;
   envoy::service::auth::v3::CheckRequest request_;
 
@@ -222,7 +222,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithLegacyAllowlistedHeaders) {
 
 // Verify that check request only contains allowlisted headers,
 // and that duplicate headers are merged.
-TEST_F(CheckRequestUtilsTest, BasicHttpWithAllowlistedHeaders) {
+TEST_F(CheckRequestUtilsTest, BasicHttpWithRequestHeaderMatchers) {
   const uint64_t size = 0;
   envoy::service::auth::v3::CheckRequest request_;
 
