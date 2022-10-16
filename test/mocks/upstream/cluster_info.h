@@ -159,12 +159,9 @@ public:
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
   MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
               (const));
-  MOCK_METHOD(AddressSelectFn, sourceAddressFn, (), (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, clusterSocketOptions, (),
-              (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));

@@ -797,10 +797,6 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
-  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
-    return cluster_socket_options_;
-  };
-
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
     return connection_pool_per_downstream_connection_;
@@ -908,7 +904,6 @@ private:
   envoy::config::cluster::v3::LoadBalancingPolicy_Policy load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
@@ -1154,20 +1149,6 @@ void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host
  */
 void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event);
-
-/**
- * Utility function to combine the given socket options with the socket options in cluster.
- */
-Network::ConnectionSocket::OptionsSharedPtr
-combineConnectionSocketOptions(const ClusterInfo& cluster,
-                               const Network::ConnectionSocket::OptionsSharedPtr& options);
-
-/**
- * Utility function to combine the given socket options with the socket options in cluster.
- */
-Network::ConnectionSocket::OptionsSharedPtr
-combineConnectionSocketOptionsNew(const UpstreamLocalAddress& upstream_local_address,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 /**
  * Utility function to resolve health check address.

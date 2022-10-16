@@ -79,43 +79,6 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
-const Network::ConnectionSocket::OptionsSharedPtr
-parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
-                          const envoy::config::core::v3::BindConfig bind_config) {
-  Network::ConnectionSocket::OptionsSharedPtr cluster_options =
-      std::make_shared<Network::ConnectionSocket::Options>();
-  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
-  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
-  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
-    Network::Socket::appendOptions(cluster_options,
-                                   Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
-  }
-  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
-  if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
-      config.upstream_bind_config().freebind().value()) {
-    Network::Socket::appendOptions(cluster_options,
-                                   Network::SocketOptionFactory::buildIpFreebindOptions());
-  }
-  if (config.upstream_connection_options().has_tcp_keepalive()) {
-    Network::Socket::appendOptions(
-        cluster_options,
-        Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
-  }
-  // Cluster socket_options trump cluster manager wide.
-  if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
-      0) {
-    auto socket_options = !config.upstream_bind_config().socket_options().empty()
-                              ? config.upstream_bind_config().socket_options()
-                              : bind_config.socket_options();
-    Network::Socket::appendOptions(
-        cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
-  }
-  if (cluster_options->empty()) {
-    return nullptr;
-  }
-  return cluster_options;
-}
-
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
@@ -512,44 +475,6 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
                             : transportSocketFactory();
   return createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                           transport_socket_options, shared_from_this());
-}
-
-Network::ConnectionSocket::OptionsSharedPtr
-combineConnectionSocketOptions(const ClusterInfo& cluster,
-                               const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (cluster.clusterSocketOptions() != nullptr) {
-    if (options) {
-      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-      *connection_options = *options;
-      std::copy(cluster.clusterSocketOptions()->begin(), cluster.clusterSocketOptions()->end(),
-                std::back_inserter(*connection_options));
-    } else {
-      connection_options = cluster.clusterSocketOptions();
-    }
-  } else {
-    connection_options = options;
-  }
-  return connection_options;
-}
-
-Network::ConnectionSocket::OptionsSharedPtr
-combineConnectionSocketOptionsNew(const UpstreamLocalAddress& upstream_local_address,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (!upstream_local_address.socket_options_->empty()) {
-    if (options) {
-      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-      *connection_options = *options;
-      Network::Socket::appendOptions(connection_options, upstream_local_address.socket_options_);
-    } else {
-      connection_options = upstream_local_address.socket_options_;
-    }
-  } else {
-    connection_options = options;
-  }
-
-  return connection_options;
 }
 
 Host::CreateConnectionData HostImpl::createConnection(
@@ -1081,7 +1006,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
-      cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),

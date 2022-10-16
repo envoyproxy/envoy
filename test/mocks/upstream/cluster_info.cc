@@ -111,9 +111,6 @@ MockClusterInfo::MockClusterInfo()
           Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
   ON_CALL(*this, getUpstreamLocalAddressSelector())
       .WillByDefault(Return(upstream_local_address_selector_));
-  ON_CALL(*this, sourceAddressFn())
-      .WillByDefault(Return([addr = source_address_](
-                                const Network::Address::InstanceConstSharedPtr&) { return addr; }));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
@@ -125,7 +122,6 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
-  ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));

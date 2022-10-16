@@ -1033,13 +1033,6 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   *
-   * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
-   *         connections for this cluster.
-   */
-  virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
-
-  /**
    * @return whether to skip waiting for health checking before draining connections
    *         after a host is removed from service discovery.
    */
