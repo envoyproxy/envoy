@@ -69,93 +69,6 @@ std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   return address->asString();
 }
 
-AddressSelectFn
-getSourceAddressFnFromBindConfig(const std::string& cluster_name,
-                                 const envoy::config::core::v3::BindConfig& bind_config) {
-  if (bind_config.additional_source_addresses_size() > 0 &&
-      bind_config.extra_source_addresses_size() > 0) {
-    throw EnvoyException(
-        fmt::format("Can't specify both `extra_source_addresses` and `additional_source_addresses` "
-                    "in the {}'s upstream binding config",
-                    cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
-
-  if (bind_config.extra_source_addresses_size() > 1) {
-    throw EnvoyException(fmt::format(
-        "{}'s upstream binding config has more than one extra source addresses. Only one "
-        "extra source can be supported in BindConfig's extra_source_addresses field",
-        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
-
-  if (bind_config.additional_source_addresses_size() > 1) {
-    throw EnvoyException(fmt::format(
-        "{}'s upstream binding config has more than one additional source addresses. Only one "
-        "additional source can be supported in BindConfig's additional_source_addresses field",
-        cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-  }
-
-  std::vector<Network::Address::InstanceConstSharedPtr> source_address_list;
-  source_address_list.emplace_back(
-      Network::Address::resolveProtoSocketAddress(bind_config.source_address()));
-
-  if (bind_config.extra_source_addresses_size() == 1) {
-    source_address_list.emplace_back(Network::Address::resolveProtoSocketAddress(
-        bind_config.extra_source_addresses(0).address()));
-    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
-      throw EnvoyException(fmt::format(
-          "{}'s upstream binding config has two same IP version source addresses. Only two "
-          "different IP version source addresses can be supported in BindConfig's source_address "
-          "and extra_source_addresses fields",
-          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-    }
-  }
-
-  if (bind_config.additional_source_addresses_size() == 1) {
-    source_address_list.emplace_back(
-        Network::Address::resolveProtoSocketAddress(bind_config.additional_source_addresses(0)));
-    if (source_address_list[0]->ip()->version() == source_address_list[1]->ip()->version()) {
-      throw EnvoyException(fmt::format(
-          "{}'s upstream binding config has two same IP version source addresses. Only two "
-          "different IP version source addresses can be supported in BindConfig's source_address "
-          "and additional_source_addresses fields",
-          cluster_name.empty() ? "Bootstrap" : fmt::format("Cluster {}", cluster_name)));
-    }
-  }
-
-  return [source_address_list = std::move(source_address_list)](
-             const Network::Address::InstanceConstSharedPtr& address) {
-    if (address->type() == Network::Address::Type::Ip) {
-      for (auto& source_address : source_address_list) {
-        ASSERT(source_address->type() == Network::Address::Type::Ip);
-        if (source_address->ip()->version() == address->ip()->version()) {
-          return source_address;
-        }
-      }
-    }
-    // If this isn't IP address and no same version IP address, then fallback
-    // to legacy behavior just return the address in the `BindConfig::source_address`
-    // field.
-    return source_address_list[0];
-  };
-}
-
-AddressSelectFn getSourceAddressFn(const envoy::config::cluster::v3::Cluster& cluster,
-                                   const envoy::config::core::v3::BindConfig& bind_config) {
-  std::string cluster_name = cluster.name();
-  // The source address from cluster config takes precedence.
-  if (cluster.upstream_bind_config().has_source_address()) {
-    return getSourceAddressFnFromBindConfig(cluster_name, cluster.upstream_bind_config());
-  }
-
-  // If there's no source address in the cluster config, use any default from the bootstrap proto.
-  if (bind_config.has_source_address()) {
-    cluster_name = "";
-    return getSourceAddressFnFromBindConfig(cluster_name, bind_config);
-  }
-
-  return nullptr;
-}
-
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
   const envoy::config::core::v3::TcpKeepalive& options =
@@ -349,8 +262,9 @@ UpstreamLocalAddress UpstreamLocalAddressSelectorImpl::getUpstreamLocalAddress(
   }
 
   for (auto& local_address : upstream_local_addresses_) {
-    ASSERT(local_address.address_->ip() != nullptr && endpoint_address->ip() != nullptr);
-    if (local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
+    ASSERT(local_address.address_->ip() != nullptr);
+    if (endpoint_address->ip() != nullptr &&
+        local_address.address_->ip()->version() == endpoint_address->ip()->version()) {
       return {local_address.address_,
               combineConnectionSocketOptions(local_address.socket_options_, socket_options)};
     }
@@ -1154,7 +1068,6 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      source_address_fn_(getSourceAddressFn(config, bind_config)),
       lb_round_robin_config_(config.round_robin_lb_config()),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),

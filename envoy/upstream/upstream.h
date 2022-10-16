@@ -1018,14 +1018,6 @@ public:
   getUpstreamLocalAddressSelector() const PURE;
 
   /**
-   * Returns an source address function which select source address for upstream connections to bind
-   * to.
-   *
-   * @return return a function used to select the source address.
-   */
-  virtual AddressSelectFn sourceAddressFn() const PURE;
-
-  /**
    * @return the configuration for load balancer subsets.
    */
   virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
