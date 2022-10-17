@@ -358,6 +358,17 @@ message HeaderValueOption {
   // existing values. Otherwise it replaces any existing values.
   // This field is deprecated and please use
   // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
+  //
+  // .. attention::
+  //   The :ref:`ext_authz filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` and
+  //   :ref:`ext_proc filter <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` have
+  //   error default value (false) for this field.
+  //   And the default value of
+  //   :ref:`new append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
+  //   is always APPEND_IF_EXISTS_OR_ADD.
+  //   It means if we remove this field, the default behavior in these filter will be changed and may break our
+  //   users.
+  //   So we should keep this field and couldn't remove it until the above issue is resolved one day.
   google.protobuf.BoolValue append = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
