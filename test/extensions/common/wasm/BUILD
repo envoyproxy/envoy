@@ -124,3 +124,18 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "foreign_test",
+    srcs = ["foreign_test.cc"],
+    deps = [
+        "//source/extensions/common/wasm:wasm_hdr",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "@proxy_wasm_cpp_host//:base_lib",
+    ],
+)
