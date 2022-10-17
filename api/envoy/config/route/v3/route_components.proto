@@ -1831,7 +1831,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -2030,7 +2030,6 @@ message RateLimit {
     //
     //   ("query_match", "<descriptor_value>")
     message QueryParameterValueMatch {
-
       // The key to use in the descriptor entry. Defaults to ``query_match``.
       string descriptor_key = 4;
 
@@ -2048,7 +2047,8 @@ message RateLimit {
       // specified query parameters in the config. A match will happen if all the
       // query parameters in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated QueryParameterMatcher query_parameters = 3 [(validate.rules).repeated = {min_items: 1}];
+      repeated QueryParameterMatcher query_parameters = 3
+          [(validate.rules).repeated = {min_items: 1}];
     }
 
     oneof action_specifier {
