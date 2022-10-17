@@ -56,9 +56,28 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
 
 bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 Api::IoCallUint64Result IoUringSocketHandleImpl::readv(uint64_t /* max_length */,
-                                                       Buffer::RawSlice* /* slices */,
-                                                       uint64_t /* num_slice */) {
-  PANIC("not implemented");
+                                                       Buffer::RawSlice* slices,
+                                                       uint64_t num_slice) {
+  if (read_buf_ == nullptr) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+  uint64_t num_slices_to_read = 0;
+  uint64_t num_bytes_to_read = 0;
+  for (;
+       num_slices_to_read < num_slice && num_bytes_to_read < static_cast<uint64_t>(bytes_to_read_);
+       num_slices_to_read++) {
+    const size_t slice_length = std::min(slices[num_slices_to_read].len_,
+                                         static_cast<size_t>(bytes_to_read_ - num_bytes_to_read));
+    memcpy(slices[num_slices_to_read].mem_, read_buf_.get() + num_bytes_to_read, slice_length);
+    num_bytes_to_read += slice_length;
+  }
+  ASSERT(num_bytes_to_read <= static_cast<uint64_t>(bytes_to_read_));
+  is_read_added_ = false;
+
+  uint64_t len = bytes_to_read_;
+  bytes_to_read_ = 0;
+  return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -69,11 +88,14 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
   }
 
   if (bytes_to_read_ == 0) {
-    return Api::IoCallUint64Result(0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                                      IoSocketError::deleteIoError));
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
   }
 
-  ASSERT(read_buf_ != nullptr);
+  if (read_buf_ == nullptr) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
   auto fragment = new Buffer::BufferFragmentImpl(
       read_buf_.release(), bytes_to_read_,
       [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
@@ -85,12 +107,18 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
   uint64_t len = bytes_to_read_;
   bytes_to_read_ = 0;
-  return Api::IoCallUint64Result(len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
-Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* /*slices */,
-                                                        uint64_t /*num_slice*/) {
-  PANIC("not implemented");
+Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
+                                                        uint64_t num_slice) {
+  Buffer::OwnedImpl buffer;
+  for (uint64_t i = 0; i < num_slice; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      buffer.add(slices[i].mem_, slices[i].len_);
+    }
+  }
+  return write(buffer);
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
