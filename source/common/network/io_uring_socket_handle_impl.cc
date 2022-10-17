@@ -134,6 +134,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   }
 
   addWriteRequest();
+  // Need to ensure the write request submitted.
+  auto& uring = io_uring_factory_.get().ref();
+  uring.submit();
   return {length, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
