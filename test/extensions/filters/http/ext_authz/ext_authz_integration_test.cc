@@ -452,7 +452,6 @@ attributes:
       - exact: x-duplicate
       - prefix: allowed-prefix
       - safe_regex:
-          google_re2: {}
           regex: regex-foo.?
 
     with_request_body:
@@ -659,7 +658,6 @@ public:
         - exact: x-duplicate
         - prefix: allowed-prefix
         - safe_regex:
-            google_re2: {}
             regex: regex-foo.?
 
     authorization_response:
@@ -683,7 +681,6 @@ public:
     - exact: x-duplicate
     - prefix: allowed-prefix
     - safe_regex:
-        google_re2: {}
         regex: regex-foo.?
 
   http_service:
