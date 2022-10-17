@@ -1,11 +1,10 @@
-#include "source/extensions/common/wasm/wasm.h"
-
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
-#include "test/test_common/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
