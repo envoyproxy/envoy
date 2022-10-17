@@ -9,7 +9,6 @@
 #include "eval/public/cel_value.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
