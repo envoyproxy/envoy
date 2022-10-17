@@ -64,9 +64,9 @@ public:
 
 class ContextTest : public testing::Test {
 protected:
-  TestContext ctx;
-  MockCelMap mock_cel_map;
-  MockCelList mock_cel_list;
+  TestContext ctx_;
+  MockCelMap mock_cel_map_;
+  MockCelList mock_cel_list_;
 };
 
 // Tests the stub functions which are added just for inheritance,
@@ -74,7 +74,7 @@ protected:
 // If a function listed in this test has a specific implementation,
 // it have to be moved to the other test and have a own test case.
 TEST_F(ContextTest, StubFunctionsTest) {
-  EXPECT_EQ(ctx.FindFunctionOverloads("function").size(), 0);
+  EXPECT_EQ(ctx_.FindFunctionOverloads("function").size(), 0);
 }
 
 // getConstRequestStreamInfo and getRequestStreamInfo should return
@@ -88,17 +88,17 @@ TEST_F(ContextTest, GetRequestStreamInfoTest) {
   EXPECT_CALL(encoder_callbacks, streamInfo())
       .Times(2)
       .WillRepeatedly(testing::ReturnRef(encoder_si));
-  ctx.setEncoderFilterCallbacksPtr(&encoder_callbacks);
+  ctx_.setEncoderFilterCallbacksPtr(&encoder_callbacks);
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   Envoy::StreamInfo::MockStreamInfo decoder_si;
   EXPECT_CALL(decoder_callbacks, streamInfo())
       .Times(2)
       .WillRepeatedly(testing::ReturnRef(decoder_si));
-  ctx.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Envoy::StreamInfo::MockStreamInfo access_log_si;
-  ctx.setAccessLogStreamInfoPtr(&access_log_si);
+  ctx_.setAccessLogStreamInfoPtr(&access_log_si);
 
   Network::MockReadFilterCallbacks read_filter_callbacks;
   Envoy::Network::MockConnection read_filter_connection;
@@ -109,7 +109,7 @@ TEST_F(ContextTest, GetRequestStreamInfoTest) {
   EXPECT_CALL(read_filter_connection, streamInfo())
       .Times(2)
       .WillRepeatedly(testing::ReturnRef(read_filter_si));
-  ctx.setNetworkReadFilterCallbacksPtr(&read_filter_callbacks);
+  ctx_.setNetworkReadFilterCallbacksPtr(&read_filter_callbacks);
 
   Network::MockWriteFilterCallbacks write_filter_callbacks;
   Envoy::Network::MockConnection write_filter_connection;
@@ -120,26 +120,26 @@ TEST_F(ContextTest, GetRequestStreamInfoTest) {
   EXPECT_CALL(write_filter_connection, streamInfo())
       .Times(2)
       .WillRepeatedly(testing::ReturnRef(write_filter_si));
-  ctx.setNetworkWriteFilterCallbacksPtr(&write_filter_callbacks);
+  ctx_.setNetworkWriteFilterCallbacksPtr(&write_filter_callbacks);
 
-  EXPECT_EQ(ctx.getConstRequestStreamInfo(), &encoder_si);
-  EXPECT_EQ(ctx.getRequestStreamInfo(), &encoder_si);
-  ctx.setEncoderFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &encoder_si);
+  EXPECT_EQ(ctx_.getRequestStreamInfo(), &encoder_si);
+  ctx_.setEncoderFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConstRequestStreamInfo(), &decoder_si);
-  EXPECT_EQ(ctx.getRequestStreamInfo(), &decoder_si);
-  ctx.setDecoderFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &decoder_si);
+  EXPECT_EQ(ctx_.getRequestStreamInfo(), &decoder_si);
+  ctx_.setDecoderFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConstRequestStreamInfo(), &access_log_si);
-  ctx.setAccessLogStreamInfoPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &access_log_si);
+  ctx_.setAccessLogStreamInfoPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConstRequestStreamInfo(), &read_filter_si);
-  EXPECT_EQ(ctx.getRequestStreamInfo(), &read_filter_si);
-  ctx.setNetworkReadFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &read_filter_si);
+  EXPECT_EQ(ctx_.getRequestStreamInfo(), &read_filter_si);
+  ctx_.setNetworkReadFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConstRequestStreamInfo(), &write_filter_si);
-  EXPECT_EQ(ctx.getRequestStreamInfo(), &write_filter_si);
-  ctx.setNetworkWriteFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &write_filter_si);
+  EXPECT_EQ(ctx_.getRequestStreamInfo(), &write_filter_si);
+  ctx_.setNetworkWriteFilterCallbacksPtr(nullptr);
 }
 
 TEST_F(ContextTest, GetConnectionTest) {
@@ -149,7 +149,7 @@ TEST_F(ContextTest, GetConnectionTest) {
       .Times(1)
       .WillRepeatedly(testing::Return(
           makeOptRef(dynamic_cast<const Network::Connection&>(encoder_connection))));
-  ctx.setEncoderFilterCallbacksPtr(&encoder_callbacks);
+  ctx_.setEncoderFilterCallbacksPtr(&encoder_callbacks);
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   Envoy::Network::MockConnection decoder_connection;
@@ -157,77 +157,78 @@ TEST_F(ContextTest, GetConnectionTest) {
       .Times(1)
       .WillRepeatedly(testing::Return(
           makeOptRef(dynamic_cast<const Network::Connection&>(decoder_connection))));
-  ctx.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Envoy::StreamInfo::MockStreamInfo access_log_si;
-  ctx.setAccessLogStreamInfoPtr(&access_log_si);
+  ctx_.setAccessLogStreamInfoPtr(&access_log_si);
 
   Network::MockReadFilterCallbacks read_filter_callbacks;
   Envoy::Network::MockConnection read_filter_connection;
   EXPECT_CALL(read_filter_callbacks, connection())
       .Times(1)
       .WillRepeatedly(testing::ReturnRef(read_filter_connection));
-  ctx.setNetworkReadFilterCallbacksPtr(&read_filter_callbacks);
+  ctx_.setNetworkReadFilterCallbacksPtr(&read_filter_callbacks);
 
   Network::MockWriteFilterCallbacks write_filter_callbacks;
   Envoy::Network::MockConnection write_filter_connection;
   EXPECT_CALL(write_filter_callbacks, connection())
       .Times(1)
       .WillRepeatedly(testing::ReturnRef(write_filter_connection));
-  ctx.setNetworkWriteFilterCallbacksPtr(&write_filter_callbacks);
+  ctx_.setNetworkWriteFilterCallbacksPtr(&write_filter_callbacks);
 
-  EXPECT_EQ(ctx.getConnection(), &encoder_connection);
-  ctx.setEncoderFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConnection(), &encoder_connection);
+  ctx_.setEncoderFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConnection(), &decoder_connection);
-  ctx.setDecoderFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConnection(), &decoder_connection);
+  ctx_.setDecoderFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConnection(), &read_filter_connection);
-  ctx.setNetworkReadFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConnection(), &read_filter_connection);
+  ctx_.setNetworkReadFilterCallbacksPtr(nullptr);
 
-  EXPECT_EQ(ctx.getConnection(), &write_filter_connection);
-  ctx.setNetworkWriteFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConnection(), &write_filter_connection);
+  ctx_.setNetworkWriteFilterCallbacksPtr(nullptr);
 }
 
 TEST_F(ContextTest, SerializeValueMapTest) {
   std::string result;
-  CelValue value = CelValue::CreateMap(&mock_cel_map);
-  EXPECT_CALL(mock_cel_map, ListKeys())
+  CelValue value = CelValue::CreateMap(&mock_cel_map_);
+  EXPECT_CALL(mock_cel_map_, ListKeys())
       .WillOnce(testing::Return(absl::UnimplementedError("CelMap::ListKeys is not implemented")));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::SerializationFailure);
 
-  EXPECT_CALL(mock_cel_list, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_list_, MockIndexOperator(_))
       .WillOnce(testing::Return(CelValue::CreateNull()));
-  EXPECT_CALL(mock_cel_map, size()).WillRepeatedly(testing::Return(1));
-  EXPECT_CALL(mock_cel_map, ListKeys()).WillOnce(testing::Return(&mock_cel_list));
+  EXPECT_CALL(mock_cel_map_, size()).WillRepeatedly(testing::Return(1));
+  EXPECT_CALL(mock_cel_map_, ListKeys()).WillOnce(testing::Return(&mock_cel_list_));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::SerializationFailure);
 
-  EXPECT_CALL(mock_cel_list, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_list_, MockIndexOperator(_))
       .Times(2)
       .WillRepeatedly(testing::Return(CelValue::CreateStringView("test")));
-  EXPECT_CALL(mock_cel_map, ListKeys()).WillOnce(testing::Return(&mock_cel_list));
-  EXPECT_CALL(mock_cel_map, MockIndexOperator(_)).WillOnce(testing::Return(CelValue::CreateNull()));
+  EXPECT_CALL(mock_cel_map_, ListKeys()).WillOnce(testing::Return(&mock_cel_list_));
+  EXPECT_CALL(mock_cel_map_, MockIndexOperator(_))
+      .WillOnce(testing::Return(CelValue::CreateNull()));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::SerializationFailure);
 
-  EXPECT_CALL(mock_cel_list, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_list_, MockIndexOperator(_))
       .Times(2)
       .WillRepeatedly(testing::Return(CelValue::CreateStringView("test")));
-  EXPECT_CALL(mock_cel_map, ListKeys()).WillOnce(testing::Return(&mock_cel_list));
-  EXPECT_CALL(mock_cel_map, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_map_, ListKeys()).WillOnce(testing::Return(&mock_cel_list_));
+  EXPECT_CALL(mock_cel_map_, MockIndexOperator(_))
       .WillOnce(testing::Return(CelValue::CreateStringView("test")));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::Ok);
 }
 
 TEST_F(ContextTest, SerializeValueListTest) {
   std::string result;
-  CelValue value = CelValue::CreateList(&mock_cel_list);
+  CelValue value = CelValue::CreateList(&mock_cel_list_);
 
-  EXPECT_CALL(mock_cel_list, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_list_, MockIndexOperator(_))
       .WillOnce(testing::Return(CelValue::CreateNull()));
-  EXPECT_CALL(mock_cel_list, size()).WillRepeatedly(testing::Return(1));
+  EXPECT_CALL(mock_cel_list_, size()).WillRepeatedly(testing::Return(1));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::SerializationFailure);
 
-  EXPECT_CALL(mock_cel_list, MockIndexOperator(_))
+  EXPECT_CALL(mock_cel_list_, MockIndexOperator(_))
       .Times(1)
       .WillRepeatedly(testing::Return(CelValue::CreateStringView("test")));
   EXPECT_EQ(serializeValue(value, &result), WasmResult::Ok);
@@ -235,13 +236,13 @@ TEST_F(ContextTest, SerializeValueListTest) {
 
 TEST_F(ContextTest, FindValueTest) {
   Protobuf::Arena arena;
-  ASSERT_EQ(ctx.getRootLocalInfo(), nullptr);
-  ASSERT_EQ(ctx.getPlugin(), nullptr);
+  ASSERT_EQ(ctx_.getRootLocalInfo(), nullptr);
+  ASSERT_EQ(ctx_.getPlugin(), nullptr);
 
-  EXPECT_FALSE(ctx.FindValue("node", &arena).has_value());
-  EXPECT_FALSE(ctx.FindValue("listener_direction", &arena).has_value());
-  EXPECT_FALSE(ctx.FindValue("listener_metadata", &arena).has_value());
-  EXPECT_FALSE(ctx.FindValue("plugin_name", &arena).has_value());
+  EXPECT_FALSE(ctx_.FindValue("node", &arena).has_value());
+  EXPECT_FALSE(ctx_.FindValue("listener_direction", &arena).has_value());
+  EXPECT_FALSE(ctx_.FindValue("listener_metadata", &arena).has_value());
+  EXPECT_FALSE(ctx_.FindValue("plugin_name", &arena).has_value());
 }
 
 } // namespace Wasm
