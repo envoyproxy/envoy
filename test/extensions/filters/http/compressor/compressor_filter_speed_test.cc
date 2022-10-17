@@ -103,9 +103,6 @@ struct CompressionParams {
   uint64_t strategy;
   int64_t window_bits;
   uint64_t memory_level;
-
-  CompressionParams(int64_t l, uint64_t s, int64_t w, uint64_t m)
-      : level(l), strategy(s), window_bits(w), memory_level(m) {}
 };
 
 CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
@@ -202,6 +199,9 @@ struct Result {
 
 enum class CompressorLibs { Brotli, Gzip, Zstd };
 
+// Ignore the gmock overhead due to it has been measured with flame graphs to be pretty low.
+// And you should build with `--compilation_mode=opt --cxxopt=-g --cxxopt=-ggdb3` to get code
+// optimizations.
 static Result compressWith(enum CompressorLibs lib, std::vector<Buffer::OwnedImpl>&& chunks,
                            CompressionParams params,
                            NiceMock<Http::MockStreamDecoderFilterCallbacks>& decoder_callbacks,
@@ -320,9 +320,9 @@ compressChunks8192WithGzip/6/manual_time        16.9 ms         17.5 ms         
 */
 // SPELLCHECKER(on)
 
-static const std::array<CompressionParams, 9> gzip_compression_params = {
+static constexpr CompressionParams gzip_compression_params[] = {
     // Speed + Standard + Small Window + Low mem level
-    CompressionParams(Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1),
+    {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 9, 1},
 
     // Speed + Standard + Med window + Med mem level
     {Z_BEST_SPEED, Z_DEFAULT_STRATEGY, 12, 5},
@@ -428,9 +428,9 @@ BENCHMARK(compressChunks1024WithGzip)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-static const std::array<CompressionParams, 22> zstd_compression_params = {
+static constexpr CompressionParams zstd_compression_params[] = {
     // level1 + default
-    CompressionParams(1, 0, 0, 0),
+    {1, 0, 0, 0},
 
     // level2 + default
     {2, 0, 0, 0},
@@ -575,9 +575,9 @@ BENCHMARK(compressChunks1024WithZstd)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond);
 
-static const std::array<CompressionParams, 11> brotli_compression_params = {
+static constexpr CompressionParams brotli_compression_params[] = {
     // level1 + default
-    CompressionParams(1, 0, 0, 0),
+    {1, 0, 0, 0},
 
     // level2 + default
     {2, 0, 0, 0},
