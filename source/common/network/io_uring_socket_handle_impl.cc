@@ -328,6 +328,9 @@ void IoUringSocketHandleImpl::addWriteRequest() {
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
   vecs_to_write_ = nr_vecs;
+  // Make the IO handle start reading to avoid read timeout in procedures out of Envoy's scope
+  // including handshaking of TLS.
+  addReadRequest();
 }
 
 void IoUringSocketHandleImpl::continueWriting(Request& req, uint32_t offset) {
