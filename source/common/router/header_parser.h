@@ -12,6 +12,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/header_formatter.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -94,7 +96,7 @@ public:
                                              bool do_formatting = true) const;
 
   static std::string translateMetadataFormat(const std::string& header_value);
-  static std::string translatePerRequestState(const std::string& header_value);
+  static absl::StatusOr<std::string> translatePerRequestState(const std::string& header_value);
 
 protected:
   HeaderParser() = default;

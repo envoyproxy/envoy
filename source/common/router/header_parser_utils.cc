@@ -69,7 +69,8 @@ static const re2::RE2& getPerRequestTranslatorPattern() {
 // translates between these 2 formats.
 // TODO(cpakulski): eventually PER_REQUEST_STATE formatter should be deprecated in
 // favor of FILTER_STATE.
-std::string HeaderParser::translatePerRequestState(const std::string& header_value) {
+absl::StatusOr<std::string>
+HeaderParser::translatePerRequestState(const std::string& header_value) {
   const re2::RE2& re = getPerRequestTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
@@ -79,7 +80,9 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
-    re2::RE2::Replace(&new_header_value, re, new_format);
+    if (!re2::RE2::Replace(&new_header_value, re, new_format)) {
+      return absl::InternalError("Regex library failure");
+    }
   }
   return new_header_value;
 }

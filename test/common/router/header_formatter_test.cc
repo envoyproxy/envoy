@@ -1310,8 +1310,20 @@ TEST(HeaderParser, TestPerFilterStateTranslator) {
   };
 
   for (const auto& test_case : test_cases) {
-    EXPECT_EQ(test_case.expected_output_, HeaderParser::translatePerRequestState(test_case.input_));
+    auto result = HeaderParser::translatePerRequestState(test_case.input_);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(test_case.expected_output_, *result);
   }
+}
+
+// Tests a partial match regex, that cannot be replaced.
+TEST(HeaderParser, TestPerFilterStateTranslatorFailure) {
+
+  absl::StatusOr<std::string> translate_or_error = HeaderParser::translatePerRequestState(
+      "%PER_REQUEST_STATE(%fenvoy.type.v3.Int64Ra%TUEST_STATE(%f%ss[%%s.filters.http.router%\034f%"
+      "256\\002\\0N\\ss)%");
+  EXPECT_FALSE(translate_or_error.ok());
+  EXPECT_EQ(translate_or_error.status().message(), "Regex library failure");
 }
 
 TEST(HeaderParserTest, EvaluateHeaders) {
