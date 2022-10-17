@@ -141,6 +141,7 @@ public:
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(ClusterStats&, stats, (), (const));
+  MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));

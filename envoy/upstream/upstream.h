@@ -528,11 +528,22 @@ public:
 };
 
 /**
+ * All cluster config update related stats.
+ */
+#define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
+  COUNTER(assignment_stale)                                                                        \
+  COUNTER(assignment_timeout_received)                                                             \
+  COUNTER(update_attempt)                                                                          \
+  COUNTER(update_empty)                                                                            \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_no_rebuild)                                                                       \
+  COUNTER(update_success)                                                                          \
+  GAUGE(version, NeverImport)
+
+/**
  * All cluster stats. @see stats_macros.h
  */
 #define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
-  COUNTER(assignment_stale)                                                                        \
-  COUNTER(assignment_timeout_received)                                                             \
   COUNTER(bind_errors)                                                                             \
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
@@ -551,11 +562,6 @@ public:
   COUNTER(membership_change)                                                                       \
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
-  COUNTER(update_attempt)                                                                          \
-  COUNTER(update_empty)                                                                            \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(update_no_rebuild)                                                                       \
-  COUNTER(update_success)                                                                          \
   COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
@@ -618,7 +624,6 @@ public:
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
-  GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
@@ -669,6 +674,13 @@ public:
 #define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)        \
   HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
   HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
+
+/**
+ * Struct definition for cluster config update stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterConfigUpdateStatNames, ALL_CLUSTER_CONFIG_UPDATE_STATS);
+MAKE_STATS_STRUCT(ClusterConfigUpdateStats, ClusterConfigUpdateStatNames,
+                  ALL_CLUSTER_CONFIG_UPDATE_STATS);
 
 /**
  * Struct definition for all cluster stats. @see stats_macros.h
@@ -954,6 +966,11 @@ public:
    * factory.
    */
   virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
+
+  /**
+   * @return ClusterConfigUpdateStats& strongly named config update stats for this cluster.
+   */
+  virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.

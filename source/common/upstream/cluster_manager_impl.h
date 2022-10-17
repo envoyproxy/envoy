@@ -326,6 +326,9 @@ public:
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
+    return cluster_config_update_stat_names_;
+  }
   const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
     return cluster_load_report_stat_names_;
   }
@@ -765,6 +768,7 @@ private:
   Http::Context& http_context_;
   Router::Context& router_context_;
   ClusterStatNames cluster_stat_names_;
+  ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;

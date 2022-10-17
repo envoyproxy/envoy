@@ -911,6 +911,8 @@ ClusterInfoImpl::ClusterInfoImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
+                           *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(
           load_report_stats_store_, factory_context.clusterManager().clusterLoadReportStatNames())),

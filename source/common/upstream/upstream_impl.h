@@ -734,6 +734,7 @@ public:
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
   ClusterStats& stats() const override { return stats_; }
+  ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
 
   ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const override {
@@ -850,6 +851,7 @@ private:
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable ClusterStats stats_;
+  mutable ClusterConfigUpdateStats config_update_stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
   const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;

@@ -105,7 +105,7 @@ StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
 
 void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
-  parent_.info_->stats().update_attempt_.inc();
+  parent_.info_->configUpdateStats().update_attempt_.inc();
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
@@ -117,7 +117,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
         if (status == Network::DnsResolver::ResolutionStatus::Success) {
-          parent_.info_->stats().update_success_.inc();
+          parent_.info_->configUpdateStats().update_success_.inc();
 
           HostVector new_hosts;
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
@@ -164,7 +164,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
             parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoints_.priority());
           } else {
-            parent_.info_->stats().update_no_rebuild_.inc();
+            parent_.info_->configUpdateStats().update_no_rebuild_.inc();
           }
 
           // reset failure backoff strategy because there was a success.
@@ -179,7 +179,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         } else {
-          parent_.info_->stats().update_failure_.inc();
+          parent_.info_->configUpdateStats().update_failure_.inc();
 
           final_refresh_rate =
               std::chrono::milliseconds(parent_.failure_backoff_strategy_->nextBackOffMs());
