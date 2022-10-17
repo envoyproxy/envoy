@@ -68,7 +68,8 @@ actual mechanics of the release itself.
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                       |
 | 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                       |
 | 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist)) |
-| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | TBD                                                                   |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123)           |
+| 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                |
 
 ## Major release schedule
 
