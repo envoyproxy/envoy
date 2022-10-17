@@ -494,6 +494,11 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     ASSERT(req.iohandle_.has_value());
     auto& iohandle = req.iohandle_->get();
     iohandle.bytes_to_read_ = result;
+    // This is hacky fix, we should check the req is valid or not.
+    if (iohandle.fd_ == -1) {
+      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
+      break;
+    }
     iohandle.cb_(result > 0 ? Event::FileReadyType::Read : Event::FileReadyType::Closed);
     if (result > 0) {
       iohandle.addReadRequest();
