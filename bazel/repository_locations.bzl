@@ -920,44 +920,29 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common and com_googlesource_chromium_zlib.
-        version = "10.4.132.18",
+        # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
+        version = "10.7.193.13",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "154223731091f531a3cb1a95ab9c14225983891240220a9e232c729358badd2c",
+        sha256 = "2170df76ce5d7ecd7fb8d131370d210152f200273cba126f06d8b88fb53c9fbc",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/v8-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-07-11",
+        release_date = "2022-10-12",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
     com_googlesource_chromium_base_trace_event_common = dict(
         project_name = "Chromium's trace event headers",
         project_desc = "Chromium's trace event headers",
         project_url = "https://chromium.googlesource.com/chromium/src/base/trace_event/common/",
-        # NOTE: Update together with v8 and com_googlesource_chromium_zlib.
+        # NOTE: Update together with v8.
         # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
-        version = "d115b033c4e53666b535cbd1985ffe60badad082",
+        version = "521ac34ebd795939c7e16b37d9d3ddb40e8ed556",
         # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "976bc8efe682d821bd112861e71da3728134609193e0d334dee1afa90d3dc027",
+        sha256 = "d99726bd452d1dd6cd50ab33060774e8437d9f0fc6079589f657fe369c66ec09",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-base_trace_event_common-{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-01-19",
-        cpe = "N/A",
-    ),
-    com_googlesource_chromium_zlib = dict(
-        project_name = "Chromium's zlib",
-        project_desc = "Chromium’s fork of zlib with compression utils",
-        project_url = "https://chromium.googlesource.com/chromium/src/third_party/zlib/",
-        # NOTE: Update together with v8 and com_googlesource_chromium_base_trace_event_common.
-        # Use version and sha256 from https://storage.googleapis.com/envoyproxy-wee8/v8-<v8_version>-deps.sha256.
-        version = "64bbf988543996eb8df9a86877b32917187eba8f",
-        # Static snapshot created using https://storage.googleapis.com/envoyproxy-wee8/wee8-fetch-deps.sh.
-        sha256 = "6e70bbb25ad1c567e3b44f4ad76f50fcc8fb7d34c6e2e8858e033ffd579ac1af",
-        urls = ["https://storage.googleapis.com/envoyproxy-wee8/chromium-zlib-{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
-        extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2022-05-31",
+        release_date = "2022-10-12",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
@@ -1149,8 +1134,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "4fcf895fa2433a1cdf20704926b8b7e4039a6a04",
-        sha256 = "ff5be86afef80d834af54ba6d534f7ee6f1c97978d7e7ce312fb3a2cfbdbff65",
+        version = "b0a0594e8ab4023857393fab349170fb487ec5a9",
+        sha256 = "c09325be96fc356b46cb33120b7b94d7ec5280ce0991b1bb98217401c3c47696",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1166,7 +1151,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2022-08-05",
+        release_date = "2022-10-09",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(
