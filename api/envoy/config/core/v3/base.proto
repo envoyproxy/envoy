@@ -360,15 +360,14 @@ message HeaderValueOption {
   // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
   //
   // .. attention::
-  //   The :ref:`ext_authz filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` and
-  //   :ref:`ext_proc filter <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>` have
+  //   The :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.Authorization>` and
+  //   :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ExternalProcessor>` have
   //   error default value (``false``) for this field.
-  //   And the default value of
-  //   :ref:`new append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
+  //   And the default value of field
+  //   :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
   //   is always ``APPEND_IF_EXISTS_OR_ADD``.
-  //   It means if we remove this field, the default behavior in these filter will be changed and may break our
-  //   users.
-  //   So we should keep this field and couldn't remove it until the above issue is resolved one day.
+  //   It means that the default behavior of ``HeaderValueOption`` in these two services will be changed after
+  //   this field is removed in the future version of API.
   google.protobuf.BoolValue append = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
