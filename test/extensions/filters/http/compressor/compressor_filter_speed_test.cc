@@ -106,7 +106,7 @@ struct CompressionParams {
 
 CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               CompressionParams params) {
+                                               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -128,7 +128,7 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
 
 CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
                                                testing::NiceMock<Runtime::MockLoader>& runtime,
-                                               CompressionParams params) {
+                                               const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
@@ -144,7 +144,7 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
 
 CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats,
                                                  testing::NiceMock<Runtime::MockLoader>& runtime,
-                                                 CompressionParams params) {
+                                                 const CompressionParams& params) {
 
   envoy::extensions::filters::http::compressor::v3::Compressor compressor;
 
