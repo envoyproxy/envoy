@@ -7,8 +7,6 @@
 #include <cstdlib>
 #include <memory>
 
-#include "source/common/api/os_sys_calls_impl.h"
-
 #ifndef DLB_DISABLED
 #include "dlb.h"
 #endif
@@ -40,27 +38,12 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
 #ifdef DLB_DISABLED
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
-  int device_id = dlb_config.id();
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  struct stat buffer;
-
-  std::string device_name = fmt::format("/dev/dlb{}", device_id);
-  if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ != 0) {
-    int i = 0;
-    // auto detect available dlb devices, now the max number of dlb device id is 63.
-    const int max_id = 64;
-    for (; i < max_id; i++) {
-      device_name = fmt::format("/dev/dlb{}", i);
-      if (os_sys_calls.stat(device_name.c_str(), &buffer).return_value_ == 0) {
-        device_id = i;
-        ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", dlb_config.id(),
-                  device_id);
-        break;
-      }
-    }
-    if (i == 64) {
-      ExceptionUtil::throwEnvoyException("no available dlb hardware");
-    }
+  const int& config_id = dlb_config.id();
+  const int& device_id = detectDlbDevice(config_id, "/dev");
+  if (device_id == -1) {
+    ExceptionUtil::throwEnvoyException("no available dlb hardware");
+  } else if (device_id != config_id) {
+    ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", config_id, device_id);
   }
 
   dlb_resources_t rsrcs;

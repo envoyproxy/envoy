@@ -15,6 +15,7 @@ envoy_cc_test(
         "//contrib/network/connection_balance/dlb/source:connection_balancer",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

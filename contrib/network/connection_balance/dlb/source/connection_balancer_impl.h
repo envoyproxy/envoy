@@ -1,11 +1,14 @@
 #pragma once
 
 #include <memory>
+#include <ostream>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/server/active_tcp_listener.h"
@@ -48,6 +51,35 @@ private:
   std::string name_;
   Envoy::Event::FileEventPtr dlb_event_;
 };
+
+// The dir should always be "/dev" in production.
+// For test it is a temporary directory.
+// Return Dlb device id, -1 means error.
+static int detectDlbDevice(const int& config_id, const std::string& dir) {
+  int device_id = config_id;
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat buffer;
+
+  std::string device_path = fmt::format("{}/dlb{}", dir, device_id);
+  std::cout << "xxxx" << device_path << std::endl;
+  if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ != 0) {
+    int i = 0;
+    // auto detect available dlb devices, now the max number of dlb device id is 63.
+    const int max_id = 64;
+    for (; i < max_id; i++) {
+      device_path = fmt::format("{}/dlb{}", dir, i);
+      std::cout << "xxxx" << device_path << std::endl;
+      if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ == 0) {
+        device_id = i;
+        break;
+      }
+    }
+    if (i == 64) {
+      return -1;
+    }
+  }
+  return device_id;
+}
 
 class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,
                                     public Logger::Loggable<Logger::Id::config> {
