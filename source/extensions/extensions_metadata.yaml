@@ -58,7 +58,7 @@ envoy.bootstrap.internal_listener:
   categories:
   - envoy.bootstrap
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 envoy.bootstrap.wasm:
@@ -740,7 +740,7 @@ envoy.io_socket.user_space:
   categories:
   - envoy.io_socket
   security_posture: unknown
-  status: wip
+  status: alpha
   undocumented: true
 envoy.matching.common_inputs.environment_variable:
   categories:
@@ -985,7 +985,7 @@ envoy.transport_sockets.internal_upstream:
   categories:
   - envoy.transport_sockets.upstream
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
 envoy.transport_sockets.raw_buffer:

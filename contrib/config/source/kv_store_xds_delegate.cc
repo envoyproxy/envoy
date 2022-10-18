@@ -38,11 +38,11 @@ KeyValueStoreXdsDelegate::KeyValueStoreXdsDelegate(KeyValueStorePtr&& xds_config
     : xds_config_store_(std::move(xds_config_store)),
       scope_(root_scope.createScope("xds.kv_store.")), stats_(generateStats(*scope_)) {}
 
-std::vector<envoy::service::discovery::v3::Resource>
-KeyValueStoreXdsDelegate::getResources(const XdsSourceId& source_id,
-                                       const std::vector<std::string>& resource_names) const {
+std::vector<envoy::service::discovery::v3::Resource> KeyValueStoreXdsDelegate::getResources(
+    const XdsSourceId& source_id, const absl::flat_hash_set<std::string>& resource_names) const {
   std::vector<envoy::service::discovery::v3::Resource> resources;
-  if (resource_names.empty() || (resource_names.size() == 1 && resource_names[0] == "*")) {
+  if (resource_names.empty() ||
+      (resource_names.size() == 1 && resource_names.contains(Envoy::Config::Wildcard))) {
     // Empty names or one entry with "*" means wildcard.
     resources = getAllResources(source_id);
   } else {
