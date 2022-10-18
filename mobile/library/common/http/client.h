@@ -252,6 +252,8 @@ private:
     }
     void setFlushTimeout(std::chrono::milliseconds) override {}
 
+    Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
+
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
     // ScopeTrackedObject
