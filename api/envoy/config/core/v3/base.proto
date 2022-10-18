@@ -362,7 +362,7 @@ message HeaderValueOption {
   // .. attention::
   //   The :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>` and
   //   :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` have
-  //   error default value (``false``) for this field.
+  //   default value (``false``) for this field.
   //   And the default value of field
   //   :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`
   //   is always ``APPEND_IF_EXISTS_OR_ADD``.
