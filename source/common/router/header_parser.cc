@@ -59,7 +59,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   const auto final_header_value =
       HeaderParser::translatePerRequestState(header_value_after_metadata);
   if (!final_header_value.ok()) {
-    throw EnvoyException(fmt::format("Translation of the UPSTREAM_METADATA or DYNAMIC_METADATA "
+    throw EnvoyException(fmt::format("Translation of the PER_REQUEST_STATE "
                                      "header {} to colon format failed.",
                                      key));
   }
