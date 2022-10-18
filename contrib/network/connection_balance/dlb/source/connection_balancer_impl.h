@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <ostream>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -61,14 +60,12 @@ static int detectDlbDevice(const int& config_id, const std::string& dir) {
   struct stat buffer;
 
   std::string device_path = fmt::format("{}/dlb{}", dir, device_id);
-  std::cout << "xxxx" << device_path << std::endl;
   if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ != 0) {
     int i = 0;
     // auto detect available dlb devices, now the max number of dlb device id is 63.
     const int max_id = 64;
     for (; i < max_id; i++) {
       device_path = fmt::format("{}/dlb{}", dir, i);
-      std::cout << "xxxx" << device_path << std::endl;
       if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ == 0) {
         device_id = i;
         break;
