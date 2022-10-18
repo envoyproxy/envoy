@@ -2,6 +2,8 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "source/extensions/compression/zstd/compressor/zstd_compressor_impl.h"
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
@@ -21,7 +23,7 @@ namespace HttpFilters {
 namespace Compressor {
 class MockGzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  MockGzipCompressorFactory(
+  explicit MockGzipCompressorFactory(
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
       int64_t window_bits, uint64_t memory_level)
@@ -29,8 +31,8 @@ public:
   }
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
-    auto compressor =
-        std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(chunk_size_);
+    auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>(
+        Compression::Gzip::Compressor::DefaultChunkSize);
     compressor->init(level_, strategy_, window_bits_, memory_level_);
     return compressor;
   }
@@ -45,12 +47,11 @@ private:
   const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
   const int64_t window_bits_;
   const uint64_t memory_level_;
-  const uint64_t chunk_size_{4096};
 };
 
 class MockZstdCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  MockZstdCompressorFactory(uint32_t level, uint32_t strategy)
+  explicit MockZstdCompressorFactory(uint32_t level, uint32_t strategy)
       : level_(level), strategy_(strategy) {}
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
@@ -73,12 +74,13 @@ private:
 
 class MockBrotliCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
+  explicit MockBrotliCompressorFactory(uint32_t quality) : quality_(quality) {}
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
     return std::make_unique<Compression::Brotli::Compressor::BrotliCompressorImpl>(
-        quality_, window_bits_, input_block_bits_, disable_literal_context_modeling_, mode_,
-        chunk_size_);
+        quality_, Compression::Brotli::Compressor::DefaultWindowBits,
+        Compression::Brotli::Compressor::DefaultInputBlockBits, disable_literal_context_modeling_,
+        mode_, Compression::Brotli::Compressor::DefaultChunkSize);
   }
 
   const std::string& statsPrefix() const override {
@@ -89,12 +91,9 @@ public:
   }
 
 private:
-  const uint64_t chunk_size_{4096};
   const Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode mode_{
       Compression::Brotli::Compressor::BrotliCompressorImpl::EncoderMode::Generic};
-  const uint32_t input_block_bits_{24};
   const uint32_t quality_;
-  const uint32_t window_bits_{18};
   const bool disable_literal_context_modeling_{false};
 };
 
