@@ -17,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the wrr_locality LB policy. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#extension: envoy.clusters.lb_policy]
+// [#extension: envoy.load_balancing_policies]
 message WrrLocality {
   // The child LB policy to create for endpoint-picking within the chosen locality.
   config.cluster.v3.LoadBalancingPolicy endpoint_picking_policy = 1
