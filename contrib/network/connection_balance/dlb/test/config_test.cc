@@ -61,6 +61,18 @@ TEST_F(DlbConnectionBalanceFactoryTest, EmptyProto) {
                 factory.createEmptyConfigProto().get()));
 }
 
+TEST_F(DlbConnectionBalanceFactoryTest, MockDetectDlbDevice) {
+  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
+  dlb.set_id(1);
+
+  const std::string& dlb_path = TestEnvironment::temporaryDirectory();
+  TestEnvironment::createPath(dlb_path);
+  const std::ofstream file(dlb_path + "/" + "dlb6");
+
+  EXPECT_EQ(6, detectDlbDevice(dlb.id(), dlb_path));
+  TestEnvironment::removePath(dlb_path);
+}
+
 #ifndef DLB_DISABLED
 
 using testing::HasSubstr;
@@ -90,19 +102,6 @@ TEST_F(DlbConnectionBalanceFactoryTest, TooManyThreads) {
       factory.createConnectionBalancerFromProto(typed_config, context), EnvoyException,
       HasSubstr("Dlb connection balanncer only supports up to 32 worker threads"));
 }
-
-TEST_F(DlbConnectionBalanceFactoryTest, MockDetectDlbDevice) {
-  envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
-  dlb.set_id(1);
-
-  const std::string& dlb_path = TestEnvironment::temporaryDirectory();
-  TestEnvironment::createPath(dlb_path);
-  const std::ofstream file(dlb_path + "/" + "dlb6");
-
-  EXPECT_EQ(6, detectDlbDevice(dlb.id(), dlb_path));
-  TestEnvironment::removePath(dlb_path);
-}
-
 #endif
 
 } // namespace Dlb
