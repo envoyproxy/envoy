@@ -41,6 +41,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        ":android_network_utility_lib",
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
@@ -105,6 +106,7 @@ cc_binary(
     linkshared = True,
     deps = [
         "base_java_jni_lib",
+        ":android_network_utility_lib",
         ":java_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
@@ -125,6 +127,7 @@ cc_library(
     ],
     deps = [
         "base_java_jni_lib",
+        ":android_network_utility_lib",
     ],
     alwayslink = True,
 )
@@ -219,4 +222,24 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+)
+
+cc_library(
+    name = "android_network_utility_lib",
+    srcs = [
+        "android_network_utility.cc",
+    ],
+    hdrs = [
+        "android_network_utility.h",
+    ],
+    deps = [
+        ":jni_utility_lib",
+        "//library/common/api:c_types",
+        "//library/common/data:utility_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/jni/import:jni_import_lib",
+        "//library/common/types:c_types_lib",
+        "@envoy//bazel:boringssl",
+        "@envoy//source/common/common:assert_lib",
+    ],
 )

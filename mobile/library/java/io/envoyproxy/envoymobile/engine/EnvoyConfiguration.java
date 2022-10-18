@@ -60,6 +60,7 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
+  public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
 
   private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
@@ -144,7 +145,7 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Boolean enableSkipDNSLookupForProxiedRequests) {
+      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -181,6 +182,7 @@ public class EnvoyConfiguration {
     this.stringAccessors = stringAccessors;
     this.keyValueStores = keyValueStores;
     this.statSinks = statSinks;
+    this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
   }
 
@@ -199,7 +201,8 @@ public class EnvoyConfiguration {
   String resolveTemplate(final String configTemplate, final String platformFilterTemplate,
                          final String nativeFilterTemplate,
                          final String altProtocolCacheFilterInsert, final String gzipFilterInsert,
-                         final String brotliFilterInsert, final String socketTagFilterInsert) {
+                         final String brotliFilterInsert, final String socketTagFilterInsert,
+                         final String certValidationTemplate) {
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
@@ -225,7 +228,6 @@ public class EnvoyConfiguration {
     if (enableBrotli) {
       customFiltersBuilder.append(brotliFilterInsert);
     }
-
     if (enableSocketTagging) {
       customFiltersBuilder.append(socketTagFilterInsert);
     }
@@ -310,6 +312,9 @@ public class EnvoyConfiguration {
       configBuilder.append(String.join(",", stat_sinks_config));
       configBuilder.append("] \n");
     }
+
+    // Add a new anchor to override the default anchors in config header.
+    configBuilder.append(certValidationTemplate).append("\n");
 
     if (adminInterfaceEnabled) {
       configBuilder.append("admin: *admin_interface\n");

@@ -15,6 +15,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
+        "@envoy//source/common/common:assert_lib",
     ],
 )
 

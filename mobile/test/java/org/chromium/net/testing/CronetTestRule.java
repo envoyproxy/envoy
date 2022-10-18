@@ -33,6 +33,7 @@ import org.junit.Assert;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
+import org.chromium.net.AndroidNetworkLibrary;
 
 /**
  * Custom TestRule for Cronet instrumentation tests.
@@ -258,6 +259,7 @@ public final class CronetTestRule implements TestRule {
                                  .penaltyDeath()
                                  .build());
     }
+    AndroidNetworkLibrary.setFakeCertificateVerificationForTesting(true);
   }
 
   private void tearDown() {
@@ -272,6 +274,7 @@ public final class CronetTestRule implements TestRule {
     }
 
     resetURLStreamHandlerFactory();
+    AndroidNetworkLibrary.setFakeCertificateVerificationForTesting(false);
 
     try {
       // Run GC and finalizers a few times to pick up leaked closeables

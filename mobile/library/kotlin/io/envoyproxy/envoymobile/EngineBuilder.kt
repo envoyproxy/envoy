@@ -77,6 +77,7 @@ open class EngineBuilder(
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
+  private var enablePlatformCertificatesValidation = false
 
   /**
    * Add a log level to use with Envoy.
@@ -653,7 +654,8 @@ open class EngineBuilder(
       stringAccessors,
       keyValueStores,
       statsSinks,
-      enableSkipDNSLookupForProxiedRequests
+      enableSkipDNSLookupForProxiedRequests,
+      enablePlatformCertificatesValidation
     )
 
     return when (configuration) {
@@ -684,4 +686,19 @@ open class EngineBuilder(
     this.engineType = engineType
     return this
   }
+
+  /**
+   * Specify whether to use platform provided certificate validation APIs or Envoy built-in
+   * validation logic. Defaults to false.
+   *
+   * @param enablePlatformCertificatesValidation true if using platform APIs is desired.
+   *
+   * @return This builder.
+   */
+  fun enablePlatformCertificatesValidation(enablePlatformCertificatesValidation: Boolean):
+    EngineBuilder {
+    this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation
+    return this
+  }
+
 }

@@ -99,7 +99,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                    JniLibrary.nativeFilterTemplate(),
                                    JniLibrary.altProtocolCacheFilterInsert(),
                                    JniLibrary.gzipConfigInsert(), JniLibrary.brotliConfigInsert(),
-                                   JniLibrary.socketTagConfigInsert()),
+                                   JniLibrary.socketTagConfigInsert(),
+                                   JniLibrary.certValidationTemplate(
+                                       envoyConfiguration.enablePlatformCertificatesValidation)),
                                logLevel);
   }
 

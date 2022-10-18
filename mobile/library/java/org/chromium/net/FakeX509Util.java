@@ -19,7 +19,10 @@ public final class FakeX509Util {
   private static final Set<String> validFakeCerts = new HashSet<String>();
 
   public static final String expectedAuthType = "RSA";
-  public static final String expectedHost = "www.example.com";
+  private static String expectedHost = "www.example.com";
+
+  public static String getExpectedHost() { return expectedHost; }
+  public static void setExpectedHost(String host) { expectedHost = host; }
 
   public static void addTestRootCertificate(byte[] rootCertBytes) {
     String fakeCertificate = new String(rootCertBytes);

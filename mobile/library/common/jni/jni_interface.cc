@@ -1,11 +1,10 @@
 #include <ares.h>
 
-#include <string>
-#include <vector>
-
 #include "library/common/api/c_types.h"
+#include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
 #include "library/common/extensions/key_value/platform/c_types.h"
+#include "library/common/jni/android_network_utility.h"
 #include "library/common/jni/import/jni_import.h"
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_utility.h"
@@ -172,6 +171,17 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env,
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_socketTagConfigInsert(JNIEnv* env, jclass) {
   jstring result = env->NewStringUTF(socket_tag_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_certValidationTemplate(JNIEnv* env, jclass,
+                                                                        jboolean use_platform) {
+  if (use_platform == JNI_TRUE) {
+    jstring result = env->NewStringUTF(platform_cert_validation_context_template);
+    return result;
+  }
+  jstring result = env->NewStringUTF(default_cert_validation_context_template);
   return result;
 }
 
@@ -1147,91 +1157,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   env->ReleaseStringUTFChars(host, native_host);
   return result;
 }
-
-bool jvm_cert_is_issued_by_known_root(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
-  jmethodID jmid_isIssuedByKnownRoot =
-      env->GetMethodID(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
-  bool is_issued_by_known_root =
-      env->CallBooleanMethod(jcls_AndroidCertVerifyResult, jmid_isIssuedByKnownRoot, result);
-  env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
-  return is_issued_by_known_root;
-}
-
-envoy_cert_verify_status_t jvm_cert_get_status(JNIEnv* env, jobject j_result) {
-  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
-  jmethodID jmid_getStatus = env->GetMethodID(jcls_AndroidCertVerifyResult, "getStatus", "()I");
-  envoy_cert_verify_status_t result = static_cast<envoy_cert_verify_status_t>(
-      env->CallIntMethod(jcls_AndroidCertVerifyResult, jmid_getStatus, j_result));
-  env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
-  return result;
-}
-
-jobjectArray jvm_cert_get_certificate_chain_encoded(JNIEnv* env, jobject result) {
-  jclass jcls_AndroidCertVerifyResult = find_class("org.chromium.net.AndroidCertVerifyResult");
-  jmethodID jmid_getCertificateChainEncoded =
-      env->GetMethodID(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
-  jobjectArray certificate_chain = static_cast<jobjectArray>(
-      env->CallObjectMethod(jcls_AndroidCertVerifyResult, jmid_getCertificateChainEncoded, result));
-  env->DeleteLocalRef(jcls_AndroidCertVerifyResult);
-  return certificate_chain;
-}
-
-// Once we have a better picture of how Android's certificate verification will
-// be plugged into EM, we should decide where this function should really live.
-// Context: as of now JNI functions declared in this file are not exported through any
-// header files, instead they are stored as callbacks into plain function
-// tables. For this reason, this function, which would ideally be defined in
-// jni_utility.cc, is currently defined here.
-static void ExtractCertVerifyResult(JNIEnv* env, jobject result, envoy_cert_verify_status_t* status,
-                                    bool* is_issued_by_known_root,
-                                    std::vector<std::string>* verified_chain) {
-  *status = jvm_cert_get_status(env, result);
-
-  *is_issued_by_known_root = jvm_cert_is_issued_by_known_root(env, result);
-
-  jobjectArray chain_byte_array = jvm_cert_get_certificate_chain_encoded(env, result);
-  JavaArrayOfByteArrayToStringVector(env, chain_byte_array, verified_chain);
-}
-
-// `auth_type` and `host` are expected to be UTF-8 encoded.
-static jobject call_jvm_verify_x509_cert_chain(JNIEnv* env,
-                                               const std::vector<std::string>& cert_chain,
-                                               std::string auth_type, std::string host) {
-  jni_log("[Envoy]", "jvm_verify_x509_cert_chain");
-  jclass jcls_AndroidNetworkLibrary = find_class("org.chromium.net.AndroidNetworkLibrary");
-  jmethodID jmid_verifyServerCertificates =
-      env->GetStaticMethodID(jcls_AndroidNetworkLibrary, "verifyServerCertificates",
-                             "([[B[B[B)Lorg/chromium/net/AndroidCertVerifyResult;");
-
-  jobjectArray chain_byte_array = ToJavaArrayOfByteArray(env, cert_chain);
-  jbyteArray auth_string = ToJavaByteArray(env, auth_type);
-  jbyteArray host_string = ToJavaByteArray(env, host);
-  jobject result =
-      env->CallStaticObjectMethod(jcls_AndroidNetworkLibrary, jmid_verifyServerCertificates,
-                                  chain_byte_array, auth_string, host_string);
-
-  env->DeleteLocalRef(chain_byte_array);
-  env->DeleteLocalRef(auth_string);
-  env->DeleteLocalRef(host_string);
-  env->DeleteLocalRef(jcls_AndroidNetworkLibrary);
-  return result;
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
-// `auth_type` and `host` are expected to be UTF-8 encoded.
-static void jvm_verify_x509_cert_chain(const std::vector<std::string>& cert_chain,
-                                       std::string auth_type, std::string host,
-                                       envoy_cert_verify_status_t* status,
-                                       bool* is_issued_by_known_root,
-                                       std::vector<std::string>* verified_chain) {
-  JNIEnv* env = get_env();
-  jobject result = call_jvm_verify_x509_cert_chain(env, cert_chain, auth_type, host);
-  ExtractCertVerifyResult(get_env(), result, status, is_issued_by_known_root, verified_chain);
-  env->DeleteLocalRef(result);
-}
-#pragma clang diagnostic pop
 
 static void jvm_add_test_root_certificate(const uint8_t* cert, size_t len) {
   jni_log("[Envoy]", "jvm_add_test_root_certificate");
