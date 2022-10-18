@@ -10,8 +10,10 @@ namespace Envoy {
 namespace Router {
 
 static void bmEvaluateHeaders(benchmark::State& state) {
-  Http::TestRequestHeaderMapImpl request_header{
-      {"bar", "a"}, {"foo", "1"}, {"test1", "to_overwrite"}};
+  auto request_header = Http::RequestHeaderMapImpl::create();
+  request_header->addCopy(Http::LowerCaseString("bar"), "a");
+  request_header->addCopy(Http::LowerCaseString("foo"), 1);
+  request_header->addCopy(Http::LowerCaseString("test1"), "to_overwrite");
 
   MockTimeSystem time_system;
   // Allocate empty stream_info. It is not really used, but HeaderParser::evaluateHeaders
@@ -38,7 +40,7 @@ static void bmEvaluateHeaders(benchmark::State& state) {
   HeaderParserPtr header_parser = HeaderParser::configure(headers_to_add);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    header_parser->evaluateHeaders(request_header, request_header,
+    header_parser->evaluateHeaders(*request_header, *request_header,
                                    *Http::StaticEmptyHeaders::get().response_headers, *stream_info);
   }
 }

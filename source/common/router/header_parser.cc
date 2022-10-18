@@ -379,12 +379,12 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
 
   // First overwrite all headers which need to be overwritten.
   for (const auto& [key, value] : headers_to_overwrite) {
-    headers.setReferenceKey(value.first, value.second);
+    headers.setReferenceKey(value.first, std::move(value.second));
   }
 
   // Now add headers which should be added.
   for (const auto& header : headers_to_add) {
-    headers.addReferenceKey(header.first, header.second);
+    headers.addReferenceKey(header.first, std::move(header.second));
   }
 }
 
