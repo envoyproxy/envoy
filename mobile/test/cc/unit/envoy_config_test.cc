@@ -28,6 +28,7 @@ TEST(TestConfig, ConfigIsApplied) {
   engine_builder.addGrpcStatsDomain("asdf.fake.website")
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
+      .addDnsMinRefreshSeconds(567)
       .addDnsFailureRefreshSeconds(789, 987)
       .addDnsQueryTimeoutSeconds(321)
       .addDnsPreresolveHostnames("[hostname]")
@@ -45,6 +46,7 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &dns_refresh_rate 456s",
                                            "- &dns_fail_base_interval 789s",
                                            "- &dns_fail_max_interval 987s",
+                                           "- &dns_min_refresh_rate 567s",
                                            "- &dns_query_timeout 321s",
                                            "- &dns_preresolve_hostnames [hostname]",
                                            "- &h2_connection_keepalive_idle_interval 0.222s",
@@ -149,29 +151,175 @@ TEST(TestConfig, SetAltSvcCache) {
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;
 
-  std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  std::string config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 15s"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config_str, bootstrap);
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
   engine_builder.setStreamIdleTimeoutSeconds(42);
-  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 42s"));
-  TestUtility::loadFromYaml(config_str, bootstrap);
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
 TEST(TestConfig, PerTryIdleTimeout) {
   EngineBuilder engine_builder;
 
-  std::string config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  std::string config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 15s"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(config_str, bootstrap);
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
   engine_builder.setPerTryIdleTimeoutSeconds(42);
-  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 42s"));
-  TestUtility::loadFromYaml(config_str, bootstrap);
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableAdminInterface) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, Not(HasSubstr("admin: *admin_interface")));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableAdminInterface(true);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("admin: *admin_interface"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableInterfaceBinding) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding false"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableInterfaceBinding(true);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding true"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableDrainPostDnsRefresh) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&enable_drain_post_dns_refresh false"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableDrainPostDnsRefresh(true);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&enable_drain_post_dns_refresh true"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableH2ExtendKeepaliveTimeout) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout false"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableH2ExtendKeepaliveTimeout(true);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout true"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableHappyEyeballs) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
+  ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family V4_PREFERRED")));
+  ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family ALL"));
+  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses false")));
+  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses true"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableHappyEyeballs(false);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family V4_PREFERRED"));
+  ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family ALL")));
+  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses false"));
+  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses true")));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnforceTrustChainVerification) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&trust_chain_verification VERIFY_TRUST_CHAIN"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enforceTrustChainVerification(false);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&trust_chain_verification ACCEPT_UNTRUSTED"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, AddMaxConnectionsPerHost) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&max_connections_per_host 7"));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.addMaxConnectionsPerHost(16);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("&max_connections_per_host 16"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+std::string statsdSinkConfig(int port) {
+  std::string config = R"({ name: envoy.stat_sinks.statsd,
+      typed_config: {
+        "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
+        address: { socket_address: { address: 127.0.0.1, port_value: )" +
+                       fmt::format("{}", port) + " } } } }";
+  return config;
+}
+
+TEST(TestConfig, AddStatsSinks) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, Not(HasSubstr("&stats_sinks")));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str,
+              HasSubstr("&stats_sinks [" + statsdSinkConfig(1) + "," + statsdSinkConfig(2) + "]"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, EnableHttp3) {
+  EngineBuilder engine_builder;
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(
+      config_str,
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.enableHttp3(true);
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str,
+              HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
 TEST(TestConfig, RemainingTemplatesThrows) {

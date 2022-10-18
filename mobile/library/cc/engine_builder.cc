@@ -4,6 +4,7 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
 #include "library/common/main_interface.h"
@@ -25,6 +26,11 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
+  this->stat_sinks_ = stat_sinks;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addGrpcStatsDomain(const std::string& stats_domain) {
   this->stats_domain_ = stats_domain;
   return *this;
@@ -37,6 +43,11 @@ EngineBuilder& EngineBuilder::addConnectTimeoutSeconds(int connect_timeout_secon
 
 EngineBuilder& EngineBuilder::addDnsRefreshSeconds(int dns_refresh_seconds) {
   this->dns_refresh_seconds_ = dns_refresh_seconds;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addDnsMinRefreshSeconds(int dns_min_refresh_seconds) {
+  this->dns_min_refresh_seconds_ = dns_min_refresh_seconds;
   return *this;
 }
 
@@ -54,6 +65,11 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 EngineBuilder&
 EngineBuilder::addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames) {
   this->dns_preresolve_hostnames_ = dns_preresolve_hostnames;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addMaxConnectionsPerHost(int max_connections_per_host) {
+  this->max_connections_per_host_ = max_connections_per_host;
   return *this;
 }
 
@@ -131,6 +147,41 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
+  this->admin_interface_enabled_ = admin_interface_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
+  this->enable_happy_eyeballs_ = happy_eyeballs_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
+  this->enable_http3_ = http3_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
+  this->enable_interface_binding_ = interface_binding_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on) {
+  this->enable_drain_post_dns_refresh_ = drain_post_dns_refresh_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_verification_on) {
+  this->enforce_trust_chain_verification_ = trust_chain_verification_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on) {
+  this->h2_extend_keepalive_timeout_ = h2_extend_keepalive_timeout_on;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
 #if defined(__APPLE__)
@@ -168,22 +219,31 @@ std::string EngineBuilder::generateConfigStr() {
     {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
         {"dns_fail_base_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_base_)},
         {"dns_fail_max_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_max_)},
+        {"dns_lookup_family", enable_happy_eyeballs_ ? "ALL" : "V4_PREFERRED"},
+        {"dns_min_refresh_rate", fmt::format("{}s", this->dns_min_refresh_seconds_)},
+        {"dns_multiple_addresses", enable_happy_eyeballs_ ? "true" : "false"},
         {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
         {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", this->dns_query_timeout_seconds_)},
         {"dns_resolver_name", dns_resolver_name}, {"dns_resolver_config", dns_resolver_config},
+        {"enable_drain_post_dns_refresh", enable_drain_post_dns_refresh_ ? "true" : "false"},
+        {"enable_interface_binding", enable_interface_binding_ ? "true" : "false"},
         {"h2_connection_keepalive_idle_interval",
          fmt::format("{}s", this->h2_connection_keepalive_idle_interval_milliseconds_ / 1000.0)},
         {"h2_connection_keepalive_timeout",
          fmt::format("{}s", this->h2_connection_keepalive_timeout_seconds_)},
+        {"h2_delay_keepalive_timeout", h2_extend_keepalive_timeout_ ? "true" : "false"},
         {
             "metadata",
             fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", this->device_os_,
                         this->app_version_, this->app_id_),
         },
+        {"max_connections_per_host", fmt::format("{}", this->max_connections_per_host_)},
         {"stats_domain", this->stats_domain_},
         {"stats_flush_interval", fmt::format("{}s", this->stats_flush_seconds_)},
         {"stream_idle_timeout", fmt::format("{}s", this->stream_idle_timeout_seconds_)},
+        {"trust_chain_verification",
+         enforce_trust_chain_verification_ ? "VERIFY_TRUST_CHAIN" : "ACCEPT_UNTRUSTED"},
         {"per_try_idle_timeout", fmt::format("{}s", this->per_try_idle_timeout_seconds_)},
         {"virtual_clusters", this->virtual_clusters_},
 #if defined(__ANDROID_API__)
@@ -197,6 +257,15 @@ std::string EngineBuilder::generateConfigStr() {
   config_builder << "!ignore platform_defs:" << std::endl;
   for (const auto& [key, value] : replacements) {
     config_builder << "- &" << key << " " << value << std::endl;
+  }
+  std::vector<std::string> stat_sinks = stat_sinks_;
+  if (!stats_domain_.empty()) {
+    stat_sinks.push_back("*base_metrics_service");
+  }
+  if (!stat_sinks.empty()) {
+    config_builder << "- &stats_sinks [";
+    config_builder << absl::StrJoin(stat_sinks, ",");
+    config_builder << "] " << std::endl;
   }
 
   const std::string& cert_validation_template =
@@ -214,14 +283,23 @@ std::string EngineBuilder::generateConfigStr() {
         {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", brotli_config_insert)}},
         &config_template_);
   }
-
   if (this->socket_tagging_filter_) {
     absl::StrReplaceAll(
         {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", socket_tag_config_insert)}},
         &config_template_);
   }
+  if (this->enable_http3_) {
+    absl::StrReplaceAll(
+        {{"#{custom_filters}",
+          absl::StrCat("#{custom_filters}\n", alternate_protocols_cache_filter_insert)}},
+        &config_template_);
+  }
 
   config_builder << config_template_;
+
+  if (admin_interface_enabled_) {
+    config_builder << "admin: *admin_interface" << std::endl;
+  }
 
   auto config_str = config_builder.str();
   if (config_str.find("{{") != std::string::npos) {

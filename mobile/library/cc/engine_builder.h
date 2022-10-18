@@ -1,7 +1,9 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "engine.h"
@@ -20,12 +22,15 @@ public:
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
+  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addGrpcStatsDomain(const std::string& stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
+  EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames);
+  EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
@@ -42,6 +47,13 @@ public:
   EngineBuilder& enableGzip(bool gzip_on);
   EngineBuilder& enableBrotli(bool brotli_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
+  EngineBuilder& enableAdminInterface(bool admin_interface_on);
+  EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
+  EngineBuilder& enableHttp3(bool http3_on);
+  EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
+  EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
+  EngineBuilder& enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on);
+  EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   // this is separated from build() for the sake of testability
@@ -63,7 +75,7 @@ private:
   EngineCallbacksSharedPtr callbacks_;
 
   std::string config_template_;
-  std::string stats_domain_ = "0.0.0.0";
+  std::string stats_domain_;
   int connect_timeout_seconds_ = 30;
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
@@ -89,10 +101,21 @@ private:
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
+  bool admin_interface_enabled_ = false;
+  bool enable_happy_eyeballs_ = true;
+  bool enable_interface_binding_ = false;
+  bool enable_drain_post_dns_refresh_ = false;
+  bool enforce_trust_chain_verification_ = true;
+  bool h2_extend_keepalive_timeout_ = false;
+  bool enable_http3_ = false;
+  int dns_min_refresh_seconds_ = 60;
+  int max_connections_per_host_ = 7;
+  std::vector<std::string> stat_sinks_;
+
   // TODO(crockeo): add after filter integration
-  // private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
-  // private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
-  // private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
+  // std::vector<EnvoyHTTPFilterFactory> http_platform_filter_factories_;
+  // std::vector<EnvoyNativeFilterConfig> native_filter_chain_;
+  // std::map<std::string, EnvoyStringAccessor> string_accessors_;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;
