@@ -34,7 +34,7 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
       // The given json string may be an invalid object or with an empty object array.
       if (parsed_params == nullptr || parsed_params->asObjectArray().empty()) {
         // return original value
-        return new_header_value;
+        return header_value;
       }
       new_format = parsed_params->asObjectArray()[0]->asString();
       for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
@@ -48,11 +48,18 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
           "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
           metadata_type.as_string() + "_METADATA", new_format.c_str());
 
-      re2::RE2::Replace(&new_header_value, re, new_format);
+      if (!re2::RE2::Replace(&new_header_value, re, new_format)) {
+        ENVOY_LOG_MISC(warn,
+                       "Regex error while replacing header formatter JSON format of {} to use "
+                       "colon format. Using original notation.",
+                       metadata_type.as_string() + "_METADATA");
+
+        return header_value;
+      }
     }
     END_TRY
     catch (Json::Exception& e) {
-      return new_header_value;
+      return header_value;
     }
   }
 

@@ -1290,6 +1290,8 @@ TEST(HeaderParser, TestMetadataTranslatorExceptions) {
   static const std::string test_cases[] = {
       "%UPSTREAM_METADATA([\"a\" - \"b\"])%",
       "%UPSTREAM_METADATA(\t [ \t\t ] \t)%",
+      "%UPSTREAM_METADATA([\"udp{VTART_TIME(r%%%%%TART_TIME(r%%%%%b\\\\\\rsmonin\\rsionE(r%%%%%"
+      "b\\\\\\rsi",
   };
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case, HeaderParser::translateMetadataFormat(test_case));
@@ -1318,7 +1320,6 @@ TEST(HeaderParser, TestPerFilterStateTranslator) {
 
 // Tests a partial match regex, that cannot be replaced.
 TEST(HeaderParser, TestPerFilterStateTranslatorFailure) {
-
   absl::StatusOr<std::string> translate_or_error = HeaderParser::translatePerRequestState(
       "%PER_REQUEST_STATE(%fenvoy.type.v3.Int64Ra%TUEST_STATE(%f%ss[%%s.filters.http.router%\034f%"
       "256\\002\\0N\\ss)%");
