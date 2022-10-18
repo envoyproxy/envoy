@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <memory>
 
 #include "source/extensions/common/dubbo/message_impl.h"
@@ -22,16 +23,6 @@ using testing::ByMove;
 using testing::Return;
 
 using namespace Common::Dubbo;
-
-inline void addInt32(Buffer::Instance& buffer, uint32_t value) {
-  value = htobe32(value);
-  buffer.add(&value, 4);
-}
-
-inline void addInt64(Buffer::Instance& buffer, uint64_t value) {
-  value = htobe64(value);
-  buffer.add(&value, 8);
-}
 
 MessageMetadataSharedPtr createDubboRequst(bool one_way_request) {
   auto request = std::make_unique<RpcRequestImpl>();
@@ -231,8 +222,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
   // Decode failure.
   {
     Buffer::OwnedImpl buffer;
-    addInt64(buffer, 0);
-    addInt64(buffer, 0);
+    buffer.writeBEInt<int64_t>(0);
+    buffer.writeBEInt<int64_t>(0);
 
     EXPECT_CALL(callback, onDecodingFailure());
     decoder.decode(buffer);
@@ -251,8 +242,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
-    addInt64(buffer, 1);
-    addInt32(buffer, 8);
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(8);
 
     // No enough body bytes and do nothing.
     decoder.decode(buffer);
@@ -262,8 +253,8 @@ TEST(RequestDecoderTest, RequestDecoderTest) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
-    addInt64(buffer, 1);
-    addInt32(buffer, 8);
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(8);
     buffer.add("anything");
 
     EXPECT_CALL(*raw_serializer, deserializeRpcRequest(_, _))
@@ -288,8 +279,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
   // Decode failure.
   {
     Buffer::OwnedImpl buffer;
-    addInt64(buffer, 0);
-    addInt64(buffer, 0);
+    buffer.writeBEInt<int64_t>(0);
+    buffer.writeBEInt<int64_t>(0);
 
     EXPECT_CALL(callback, onDecodingFailure());
     decoder.decode(buffer);
@@ -308,8 +299,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
-    addInt64(buffer, 1);
-    addInt32(buffer, 8);
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(8);
 
     // No enough body bytes and do nothing.
     decoder.decode(buffer);
@@ -319,8 +310,8 @@ TEST(ResponseDecoderTest, ResponseDecoderTest) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
-    addInt64(buffer, 1);
-    addInt32(buffer, 8);
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(8);
     buffer.add("anything");
 
     EXPECT_CALL(*raw_serializer, deserializeRpcResponse(_, _))
