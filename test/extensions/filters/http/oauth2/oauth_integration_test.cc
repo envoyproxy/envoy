@@ -4,9 +4,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/escaping.h"
