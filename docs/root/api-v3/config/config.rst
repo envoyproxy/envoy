@@ -7,9 +7,9 @@ Extensions
   :glob:
   :maxdepth: 2
 
+  accesslog/filters
   formatter/formatter
   accesslog/accesslog
-  accesslog/filters
   cluster/cluster
   common/common
   compression/compression

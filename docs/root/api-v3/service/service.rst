@@ -7,9 +7,9 @@ Services
 
   auth/v3/*
   status/v3/*
-  accesslog/v3/*
   extension/v3/*
   ext_proc/v3/*
+  accesslog/v3/*
   health/v3/*
   load_stats/v3/*
   metrics/v3/*
