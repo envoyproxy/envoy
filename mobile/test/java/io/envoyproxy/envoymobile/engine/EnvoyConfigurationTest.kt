@@ -44,6 +44,12 @@ private const val SOCKET_TAG_INSERT =
   - name: SocketTag
 """
 
+private const val CERT_VALIDATION_TEMPLATE =
+"""
+  custom_validator_config:
+    name: "dumb_validator"
+"""
+
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
@@ -77,7 +83,8 @@ class EnvoyConfigurationTest {
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
     virtualClusters: String = "[test]",
-    enableSkipDNSLookupForProxiedRequests: Boolean = false
+    enableSkipDNSLookupForProxiedRequests: Boolean = false,
+    enablePlatformCertificatesValidation: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       adminInterfaceEnabled,
@@ -115,7 +122,8 @@ class EnvoyConfigurationTest {
       emptyMap(),
       emptyMap(),
       emptyList(),
-      enableSkipDNSLookupForProxiedRequests
+      enableSkipDNSLookupForProxiedRequests,
+      enablePlatformCertificatesValidation
     )
   }
 
@@ -124,7 +132,8 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+      CERT_VALIDATION_TEMPLATE
     )
     assertThat(resolvedTemplate).contains("&connect_timeout 123s")
 
@@ -187,6 +196,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("filter_name")
     assertThat(resolvedTemplate).contains("test_config")
 
+    // Cert Validation
+    assertThat(resolvedTemplate).contains("custom_validator_config")
+
     // Proxying
     assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests false")
   }
@@ -204,11 +216,13 @@ class EnvoyConfigurationTest {
       enableBrotli = true,
       enableInterfaceBinding = true,
       h2ExtendKeepaliveTimeout = true,
-      enableSkipDNSLookupForProxiedRequests = true
+      enableSkipDNSLookupForProxiedRequests = true,
+      enablePlatformCertificatesValidation = true
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+CERT_VALIDATION_TEMPLATE
     )
 
     // DNS
@@ -232,6 +246,9 @@ class EnvoyConfigurationTest {
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
 
+    // Cert Validation
+    assertThat(resolvedTemplate).contains("custom_validator_config")
+
     // Proxying
     assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests true")
   }
@@ -243,7 +260,8 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+      CERT_VALIDATION_TEMPLATE
     )
 
     assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
@@ -255,7 +273,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "")
+      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "", "")
       fail("Unresolved configuration keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")
@@ -270,7 +288,8 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+CERT_VALIDATION_TEMPLATE
     )
 
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}},{\"socket_address\":{\"address\":\"1.1.1.1\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")

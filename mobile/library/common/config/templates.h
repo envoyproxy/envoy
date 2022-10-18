@@ -85,3 +85,15 @@ extern const char* socket_tag_config_insert;
  * direct responses to mutate headers which are then later used for routing.
  */
 extern const char* route_cache_reset_filter_insert;
+
+/**
+ * Config template which uses Envoy's built-in certificates validator to verify
+ * certificate chain.
+ */
+extern const char* default_cert_validation_context_template;
+
+/**
+ * Config template which uses platform's certificates APIs to verify certificate
+ * chain.
+ */
+extern const char* platform_cert_validation_context_template;

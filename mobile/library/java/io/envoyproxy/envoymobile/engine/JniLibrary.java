@@ -316,6 +316,14 @@ public class JniLibrary {
   public static native String brotliConfigInsert();
 
   /**
+   * Provides a template to config the certification validator to be used.
+   *
+   * @param usePlatform true if the usage of platform validation APIs is desired.
+   * @return string, the config template string.
+   */
+  public static native String certValidationTemplate(boolean usePlatform);
+
+  /**
    * Provides a configuration insert that may be used to enable socket tagging.
    */
   public static native String socketTagConfigInsert();

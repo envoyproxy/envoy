@@ -514,6 +514,18 @@ to use IPv6. Note this is an experimental option and should be enabled with caut
   builder.forceIPv6(true)
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enablePlatformCertificatesValidation``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to use platform provided certificate validation interfaces. Currently only supported on Android. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enablePlatformCertificatesValidation(true)
+
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableProxying``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

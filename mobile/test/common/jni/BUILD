@@ -25,6 +25,7 @@ cc_binary(
     copts = ["-std=c++17"],
     linkshared = True,
     deps = [
+        "//library/common/jni:android_network_utility_lib",
         "//library/common/jni:base_java_jni_lib",
         "//test/common/integration:quic_test_server_interface_lib",
     ],

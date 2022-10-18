@@ -2,6 +2,8 @@
 
 #include <sstream>
 
+#include "source/common/common/assert.h"
+
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
 #include "library/common/main_interface.h"
@@ -129,6 +131,17 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
+EngineBuilder&
+EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
+#if defined(__APPLE__)
+  if (platform_certificates_validation_on) {
+    PANIC("Certificates validation using platform provided APIs is not supported in IOS.");
+  }
+#endif
+  this->platform_certificates_validation_on_ = platform_certificates_validation_on;
+  return *this;
+}
+
 std::string EngineBuilder::generateConfigStr() {
 #if defined(__APPLE__)
   std::string dns_resolver_name = "envoy.network.dns_resolver.apple";
@@ -185,6 +198,12 @@ std::string EngineBuilder::generateConfigStr() {
   for (const auto& [key, value] : replacements) {
     config_builder << "- &" << key << " " << value << std::endl;
   }
+
+  const std::string& cert_validation_template =
+      (this->platform_certificates_validation_on_ ? platform_cert_validation_context_template
+                                                  : default_cert_validation_context_template);
+  config_builder << cert_validation_template << std::endl;
+
   if (this->gzip_filter_) {
     absl::StrReplaceAll(
         {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", gzip_config_insert)}},

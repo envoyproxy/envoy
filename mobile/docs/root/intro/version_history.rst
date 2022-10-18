@@ -16,6 +16,7 @@ Bugfixes:
 
 Features:
 
+- kotlin/c++: add option to support platform provided certificates validation interfaces on Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
 - kotlin: add a ``enableSkipDNSLookupForProxiedRequests(true)`` knob for controlling whether Envoy waits on DNS response in the dynamic forward proxy filter for proxied requests. (:issue:`#2602 <2602>`)

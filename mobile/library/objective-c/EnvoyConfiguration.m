@@ -192,6 +192,10 @@
   [definitions
       appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
 
+  NSString *cert_validator_template =
+      [[NSString alloc] initWithUTF8String:default_cert_validation_context_template];
+  [definitions appendFormat:@"%@\n", cert_validator_template];
+
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
 
   if (self.grpcStatsDomain != nil) {

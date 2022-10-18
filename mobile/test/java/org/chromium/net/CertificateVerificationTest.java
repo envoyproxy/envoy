@@ -28,7 +28,8 @@ public final class CertificateVerificationTest {
     AndroidJniLibrary.load(context.getApplicationContext());
   }
 
-  private static final byte[] host = FakeX509Util.expectedHost.getBytes(StandardCharsets.UTF_8);
+  private static final byte[] host =
+      FakeX509Util.getExpectedHost().getBytes(StandardCharsets.UTF_8);
   private static final byte[] authType =
       FakeX509Util.expectedAuthType.getBytes(StandardCharsets.UTF_8);
 
