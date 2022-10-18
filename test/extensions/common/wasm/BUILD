@@ -128,6 +128,12 @@ envoy_cc_test(
 envoy_cc_test(
     name = "foreign_test",
     srcs = ["foreign_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DWASM_USE_CEL_PARSER",
+        ],
+    }),
     deps = [
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",

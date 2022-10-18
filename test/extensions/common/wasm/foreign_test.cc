@@ -22,6 +22,9 @@ protected:
 };
 
 TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
+#ifndef WASM_USE_CEL_PARSER
+  GTEST_SKIP() << "Skipping the test because the CEL parser is disabled";
+#endif
   Stats::IsolatedStoreImpl stats_store;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   Upstream::MockClusterManager cluster_manager;
@@ -36,12 +39,14 @@ TEST_F(ForeignTest, ForeignFunctionEdgeCaseTest) {
   proxy_wasm::current_context_ = &ctx_;
 
   auto function = proxy_wasm::getForeignFunction("expr_evaluate");
+  ASSERT_NE(function, nullptr);
   auto result = function(wasm, "", [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::BadArgument);
   result = function(wasm, "\xff\xff\xff\xff", [](size_t size) { return malloc(size); });
   EXPECT_NE(result, WasmResult::Ok);
 
   function = proxy_wasm::getForeignFunction("expr_delete");
+  ASSERT_NE(function, nullptr);
   result = function(wasm, "", [](size_t size) { return malloc(size); });
   EXPECT_EQ(result, WasmResult::BadArgument);
 }
