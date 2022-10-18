@@ -32,9 +32,10 @@ Prepare Test Environment
 
 #. Add a CA to Ubuntu::
 
-    ubuntu@node1:~/envoy$ sudo cp root-ca.pem /etc/ssl/certs/
+    ubuntu@node1:~/envoy$ sudo cp root-ca.pem /usr/local/share/ca-certificates/root-ca.crt
+    ubuntu@node1:~/envoy$ sudo update-ca-certificates
 
-   There are a root CA certificate and a root CA private key we have generated in advance under envoy directory, copy the .crt file into /etc/ssl/certs/. Envoy uses this CA cert/key to mimic server certificates, this makes the curl client trust the certs signed by the specified CA.
+   There are a root CA certificate and a root CA private key we have generated in advance under envoy directory. Envoy uses this CA cert/key to mimic server certificates, this makes the curl client trust the certs signed by the specified CA.
 
 #. Start Envoy listening at port 1234(The path of envoy executable file may vary depending on the way of building Envoy)::
 
