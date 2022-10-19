@@ -12,31 +12,24 @@ namespace Quic {
 using QuicConnectionIdGeneratorPtr = std::unique_ptr<quic::ConnectionIdGeneratorInterface>;
 
 /**
- * A factory interface to provide Quic connection IDs and compatible BPF code for stable packet
+ * A factory interface to provide QUIC connection IDs and compatible BPF code for stable packet
  * routing.
  */
 class EnvoyQuicConnectionIdGeneratorFactory {
 public:
   virtual ~EnvoyQuicConnectionIdGeneratorFactory() = default;
 
+  /**
+   * Create a connection ID generator object.
+   * @param worker_index an index to be encoded to QUIC connection ID for routing packets to the current listener.
+   */
   virtual QuicConnectionIdGeneratorPtr
-  createQuicConnectionIdGenerator(quic::LoadBalancerEncoder& lb_encoder,
-                                  uint32_t worker_index) PURE;
-
-  /**
-   * the length of connection IDs to be generated when there is no active config
-   */
-  virtual uint8_t getConnectionIdLengthWithoutRouteConfig() PURE;
-
-  /**
-   * Returns true if the connection ID length should be encoded in first byte of the generated
-   * connection ID.
-   */
-  virtual bool firstByteEncodesConnectionIdLength() PURE;
+  createQuicConnectionIdGenerator(uint32_t worker_index) PURE;
 
   /**
    * Create a socket option with BPF program to consistently route QUIC packets to the right listen
    * socket. Linux only.
+   * @param concurrency the total number of worker threads.
    */
   virtual Network::Socket::OptionConstSharedPtr
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) PURE;

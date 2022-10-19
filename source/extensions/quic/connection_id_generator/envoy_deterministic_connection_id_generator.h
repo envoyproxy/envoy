@@ -32,10 +32,7 @@ class EnvoyDeterministicConnectionIdGeneratorFactory
 public:
   // EnvoyQuicConnectionIdGeneratorFactory.
   QuicConnectionIdGeneratorPtr
-  createQuicConnectionIdGenerator(quic::LoadBalancerEncoder& lb_encoder,
-                                  uint32_t worker_index) override;
-  uint8_t getConnectionIdLengthWithoutRouteConfig() override;
-  bool firstByteEncodesConnectionIdLength() override;
+  createQuicConnectionIdGenerator(uint32_t worker_index) override;
   Network::Socket::OptionConstSharedPtr
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
 

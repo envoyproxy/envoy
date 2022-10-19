@@ -33,7 +33,7 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-    EnvoyQuicConnectionIdGeneratorFactory& cid_generator_factory)
+    QuicConnectionIdGeneratorPtr&& cid_generator)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           dispatcher.createUdpListener(
@@ -44,13 +44,7 @@ ActiveQuicListener::ActiveQuicListener(
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
-      quic_lb_encoder_(quic::LoadBalancerEncoder::Create(
-                           *quic::QuicRandom::GetInstance(), nullptr,
-                           cid_generator_factory.firstByteEncodesConnectionIdLength(),
-                           cid_generator_factory.getConnectionIdLengthWithoutRouteConfig())
-                           .value()),
-      connection_id_generator_(
-          cid_generator_factory.createQuicConnectionIdGenerator(quic_lb_encoder_, worker_index)) {
+      connection_id_generator_(std::move(cid_generator)) {
   ASSERT(!GetQuicFlag(quic_header_size_limit_includes_overhead));
 
   enabled_.emplace(Runtime::FeatureFlag(enabled, runtime));
@@ -293,14 +287,6 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory));
 
-  uint8_t cid_length = quic_cid_generator_factory_->getConnectionIdLengthWithoutRouteConfig();
-  if (cid_length == 0 || cid_length > quic::kQuicMaxConnectionIdWithLengthPrefixLength) {
-    throw EnvoyException(
-        absl::StrCat("Invalid connection id length for quic::LoadBalancerEncoder when it doesn't "
-                     "have route config. Connection id generator config: ",
-                     cid_generator_config.name()));
-  }
-
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
@@ -330,7 +316,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       runtime, worker_index, concurrency_, disptacher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
-      proof_source_factory_.value(), *quic_cid_generator_factory_);
+      proof_source_factory_.value(), quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
 }
 
 } // namespace Quic

@@ -37,7 +37,7 @@ public:
                      uint32_t packets_to_read_to_connection_count_ratio,
                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
-                     EnvoyQuicConnectionIdGeneratorFactory& cid_generator_factory);
+                     QuicConnectionIdGeneratorPtr&& cid_generator);
 
   ~ActiveQuicListener() override;
 
@@ -84,8 +84,7 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
-  quic::LoadBalancerEncoder quic_lb_encoder_;
-  std::unique_ptr<quic::ConnectionIdGeneratorInterface> connection_id_generator_;
+  QuicConnectionIdGeneratorPtr connection_id_generator_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

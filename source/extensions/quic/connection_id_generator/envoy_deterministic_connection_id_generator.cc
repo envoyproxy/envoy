@@ -29,18 +29,9 @@ EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
 }
 
 QuicConnectionIdGeneratorPtr
-EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGenerator(
-    quic::LoadBalancerEncoder&, uint32_t) {
+EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGenerator(uint32_t) {
   return std::make_unique<EnvoyDeterministicConnectionIdGenerator>(
       quic::kQuicDefaultConnectionIdLength);
-}
-
-uint8_t EnvoyDeterministicConnectionIdGeneratorFactory::getConnectionIdLengthWithoutRouteConfig() {
-  return quic::kLoadBalancerUnroutableLen;
-}
-
-bool EnvoyDeterministicConnectionIdGeneratorFactory::firstByteEncodesConnectionIdLength() {
-  return false;
 }
 
 Network::Socket::OptionConstSharedPtr
