@@ -9,6 +9,7 @@
 
 #include "absl/strings/escaping.h"
 #include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -396,6 +397,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
 
   // add listener with oauth2 filter and sds configs
   sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "delayed");
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 
   doAuthenticationFlow("token_secret", "hmac_secret");
 }
