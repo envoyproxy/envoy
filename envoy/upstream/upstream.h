@@ -48,7 +48,7 @@ public:
 };
 
 /**
- * A selector for select upstream local address based on the endpoint address.
+ * Used to select upstream local address based on the endpoint address.
  */
 class UpstreamLocalAddressSelector {
 public:
