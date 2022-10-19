@@ -23,7 +23,7 @@ namespace HttpFilters {
 namespace Compressor {
 class MockGzipCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  explicit MockGzipCompressorFactory(
+  MockGzipCompressorFactory(
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
       int64_t window_bits, uint64_t memory_level)
@@ -51,7 +51,7 @@ private:
 
 class MockZstdCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  explicit MockZstdCompressorFactory(uint32_t level, uint32_t strategy)
+  MockZstdCompressorFactory(uint32_t level, uint32_t strategy)
       : level_(level), strategy_(strategy) {}
 
   Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
