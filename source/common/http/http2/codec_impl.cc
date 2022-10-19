@@ -1419,7 +1419,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 }
 
 Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-  return onStreamClose(getStream(stream_id), error_code);
+  return onStreamClose(getStreamUnchecked(stream_id), error_code);
 }
 
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
