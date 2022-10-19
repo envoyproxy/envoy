@@ -69,10 +69,12 @@ def swift_repos():
         url = "https://github.com/bazelbuild/rules_apple/archive/a0f8748ce89698a599149d984999eaefd834c004.tar.gz",
     )
 
+    # https://github.com/bazelbuild/rules_swift/pull/922
     http_archive(
         name = "build_bazel_rules_swift",
-        sha256 = "51efdaf85e04e51174de76ef563f255451d5a5cd24c61ad902feeadafc7046d9",
-        url = "https://github.com/bazelbuild/rules_swift/releases/download/1.2.0/rules_swift.1.2.0.tar.gz",
+        sha256 = "422558831da7719658ab0ffb3c994d92ddc6541e3610a751613a324bb5d10ffe",
+        strip_prefix = "rules_swift-e769f8d6a4adae93c244f244480a3ae740f24384",
+        url = "https://github.com/bazelbuild/rules_swift/archive/e769f8d6a4adae93c244f244480a3ae740f24384.tar.gz",
     )
 
     http_archive(
