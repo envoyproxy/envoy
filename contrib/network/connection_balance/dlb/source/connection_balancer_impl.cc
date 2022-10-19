@@ -35,9 +35,9 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
         "please decrease the number of threads by `--concurrency`");
   }
 
-  const int& config_id = dlb_config.id();
-  const int& device_id = detectDlbDevice(config_id, "/dev");
-  if (device_id == -1) {
+  const uint& config_id = dlb_config.id();
+  const uint& device_id = detectDlbDevice(config_id, "/dev");
+  if (device_id < 0) {
     ExceptionUtil::throwEnvoyException("no available dlb hardware");
   } else if (device_id != config_id) {
     ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", config_id, device_id);

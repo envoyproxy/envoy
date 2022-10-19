@@ -54,7 +54,7 @@ private:
 // The dir should always be "/dev" in production.
 // For test it is a temporary directory.
 // Return Dlb device id, -1 means error.
-static int detectDlbDevice(const int& config_id, const std::string& dir) {
+static int detectDlbDevice(const uint config_id, const std::string& dir) {
   int device_id = config_id;
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat buffer;
