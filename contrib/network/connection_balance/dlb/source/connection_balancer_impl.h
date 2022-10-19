@@ -54,8 +54,8 @@ private:
 // The dir should always be "/dev" in production.
 // For test it is a temporary directory.
 // Return Dlb device id, -1 means error.
-static int detectDlbDevice(const uint config_id, const std::string& dir) {
-  int device_id = config_id;
+static absl::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
+  uint device_id = config_id;
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat buffer;
 
@@ -72,10 +72,10 @@ static int detectDlbDevice(const uint config_id, const std::string& dir) {
       }
     }
     if (i == 64) {
-      return -1;
+      return absl::nullopt;
     }
   }
-  return device_id;
+  return absl::optional<uint>{device_id};
 }
 
 class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,

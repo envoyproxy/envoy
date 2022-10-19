@@ -69,7 +69,9 @@ TEST_F(DlbConnectionBalanceFactoryTest, MockDetectDlbDevice) {
   TestEnvironment::createPath(dlb_path);
   const std::ofstream file(dlb_path + "/" + "dlb6");
 
-  EXPECT_EQ(6, detectDlbDevice(dlb.id(), dlb_path));
+  const auto& result = detectDlbDevice(dlb.id(), dlb_path);
+  EXPECT_EQ(true, result.has_value());
+  EXPECT_EQ(6, result.value());
   TestEnvironment::removePath(dlb_path);
 }
 

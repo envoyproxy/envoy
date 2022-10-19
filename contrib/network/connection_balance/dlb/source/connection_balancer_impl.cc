@@ -36,10 +36,13 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   }
 
   const uint& config_id = dlb_config.id();
-  const uint& device_id = detectDlbDevice(config_id, "/dev");
-  if (device_id < 0) {
+  const auto& result = detectDlbDevice(config_id, "/dev");
+  if (!result.has_value()) {
     ExceptionUtil::throwEnvoyException("no available dlb hardware");
-  } else if (device_id != config_id) {
+  }
+
+  const uint& device_id = result.value();
+  if (device_id != config_id) {
     ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", config_id, device_id);
   }
 
