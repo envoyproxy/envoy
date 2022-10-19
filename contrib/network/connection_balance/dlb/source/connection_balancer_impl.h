@@ -53,7 +53,7 @@ private:
 
 // The dir should always be "/dev" in production.
 // For test it is a temporary directory.
-// Return Dlb device id, -1 means error.
+// Return Dlb device id, absl::nullopt means error.
 static absl::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
   uint device_id = config_id;
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
