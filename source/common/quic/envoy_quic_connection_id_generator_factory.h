@@ -21,10 +21,10 @@ public:
 
   /**
    * Create a connection ID generator object.
-   * @param worker_index an index to be encoded to QUIC connection ID for routing packets to the current listener.
+   * @param worker_index an index to be encoded to QUIC connection ID for routing packets to the
+   * current listener.
    */
-  virtual QuicConnectionIdGeneratorPtr
-  createQuicConnectionIdGenerator(uint32_t worker_index) PURE;
+  virtual QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) PURE;
 
   /**
    * Create a socket option with BPF program to consistently route QUIC packets to the right listen

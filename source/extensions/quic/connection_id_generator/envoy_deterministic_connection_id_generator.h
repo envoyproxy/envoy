@@ -31,8 +31,7 @@ class EnvoyDeterministicConnectionIdGeneratorFactory
     : public EnvoyQuicConnectionIdGeneratorFactory {
 public:
   // EnvoyQuicConnectionIdGeneratorFactory.
-  QuicConnectionIdGeneratorPtr
-  createQuicConnectionIdGenerator(uint32_t worker_index) override;
+  QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
   Network::Socket::OptionConstSharedPtr
   createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
 
