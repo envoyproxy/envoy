@@ -16,7 +16,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3;authv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Attribute Context ]
+// [#protodoc-title: Attribute context]
 
 // See :ref:`network filter configuration overview <config_network_filters_ext_authz>`
 // and :ref:`HTTP filter configuration overview <config_http_filters_ext_authz>`.
