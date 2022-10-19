@@ -2466,7 +2466,6 @@ envoy_cc_library(
         ":quic_core_crypto_encryption_lib",
         ":quic_core_framer_lib",
         ":quic_core_idle_network_detector_lib",
-        ":quic_core_legacy_version_encapsulator_lib",
         ":quic_core_mtu_discovery_lib",
         ":quic_core_network_blackhole_detector_lib",
         ":quic_core_one_block_arena_lib",
@@ -2932,6 +2931,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_constants_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
@@ -3455,29 +3455,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":quic_platform_export",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_core_legacy_version_encapsulator_lib",
-    srcs = [
-        "quiche/quic/core/quic_legacy_version_encapsulator.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/quic_legacy_version_encapsulator.h",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quic_core_crypto_crypto_handshake_lib",
-        ":quic_core_crypto_encryption_lib",
-        ":quic_core_packet_creator_lib",
-        ":quic_core_packets_lib",
-        ":quic_core_types_lib",
-        ":quic_core_utils_lib",
-        ":quic_platform",
-        ":quiche_common_platform",
     ],
 )
 

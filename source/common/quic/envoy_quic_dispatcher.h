@@ -82,12 +82,6 @@ protected:
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
-  // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
-  // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
-  quic::QuicConnectionId
-  ReplaceLongServerConnectionId(const quic::ParsedQuicVersion& version,
-                                const quic::QuicConnectionId& server_connection_id,
-                                uint8_t expected_server_connection_id_length) const override;
 
 private:
   Network::ConnectionHandler& connection_handler_;
