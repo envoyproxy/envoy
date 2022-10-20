@@ -1,4 +1,4 @@
-Upstream Configuration
+Upstream configuration
 ======================
 
 .. toctree::

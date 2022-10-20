@@ -188,7 +188,7 @@ public:
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
-    EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
+    EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, coarseHealth())
         .WillRepeatedly(Return(Upstream::Host::Health::Healthy));
   }
 
@@ -238,7 +238,7 @@ public:
   createHost(const Network::Address::InstanceConstSharedPtr& host_address) {
     auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
     ON_CALL(*host, address()).WillByDefault(Return(host_address));
-    ON_CALL(*host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+    ON_CALL(*host, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
     return host;
   }
 
@@ -795,7 +795,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
+  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, coarseHealth())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -823,7 +823,7 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, health())
+  EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_, coarseHealth())
       .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
   auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
   auto new_host = createHost(new_host_address);

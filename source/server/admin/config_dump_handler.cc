@@ -362,7 +362,7 @@ void ConfigDumpHandler::addLbEndpoint(
   }
   lb_endpoint.mutable_load_balancing_weight()->set_value(host->weight());
 
-  switch (host->health()) {
+  switch (host->coarseHealth()) {
   case Upstream::Host::Health::Healthy:
     lb_endpoint.set_health_status(envoy::config::core::v3::HealthStatus::HEALTHY);
     break;
