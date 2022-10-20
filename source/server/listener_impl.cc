@@ -488,14 +488,9 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
       (address->ip()->version() != Network::Address::IpVersion::v6 ||
        (!address->ip()->isAnyAddress() &&
         address->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
-      throw EnvoyException(fmt::format(
-          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
-          address->asStringView()));
-    } else {
-      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
-                address->asStringView());
-    }
+    throw EnvoyException(fmt::format(
+        "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+        address->asStringView()));
   }
 }
 
