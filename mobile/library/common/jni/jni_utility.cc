@@ -121,7 +121,7 @@ jlongArray native_stream_intel_to_array(JNIEnv* env, envoy_stream_intel stream_i
 
 jlongArray native_final_stream_intel_to_array(JNIEnv* env,
                                               envoy_final_stream_intel final_stream_intel) {
-  jlongArray j_array = env->NewLongArray(15);
+  jlongArray j_array = env->NewLongArray(16);
   jlong* critical_array = static_cast<jlong*>(env->GetPrimitiveArrayCritical(j_array, nullptr));
   RELEASE_ASSERT(critical_array != nullptr, "unable to allocate memory in jni_utility");
 
@@ -140,6 +140,7 @@ jlongArray native_final_stream_intel_to_array(JNIEnv* env,
   critical_array[12] = static_cast<jlong>(final_stream_intel.sent_byte_count);
   critical_array[13] = static_cast<jlong>(final_stream_intel.received_byte_count);
   critical_array[14] = static_cast<jlong>(final_stream_intel.response_flags);
+  critical_array[15] = static_cast<jlong>(final_stream_intel.upstream_protocol);
 
   // Here '0' (for which there is no named constant) indicates we want to commit the changes back
   // to the JVM and free the c array, where applicable.

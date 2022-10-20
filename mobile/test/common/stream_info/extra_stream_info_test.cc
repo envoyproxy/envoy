@@ -44,8 +44,9 @@ public:
     EXPECT_EQ(a.received_byte_count, b.received_byte_count);
   }
   StalledTimeSource start_time_source_{SYSTEM_TIME_START_MS, MONOTONIC_TIME_START_MS};
-  envoy_final_stream_intel final_intel_{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0};
-  envoy_final_stream_intel expected_intel_{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0};
+  envoy_final_stream_intel final_intel_{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, -1};
+  envoy_final_stream_intel expected_intel_{-1, -1, -1, -1, -1, -1, -1, -1,
+                                           -1, -1, -1, 0,  0,  0,  0,  -1};
 };
 
 TEST_F(FinalIntelTest, Unset) {
@@ -66,6 +67,9 @@ TEST_F(FinalIntelTest, SetWithSsl) {
   stream_info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
   auto upstream_info = stream_info.upstreamInfo();
   auto& timing = upstream_info->upstreamTiming();
+
+  upstream_info->setUpstreamProtocol(Http::Protocol::Http2);
+  expected_intel_.upstream_protocol = 2;
 
   expected_intel_.stream_start_ms = SYSTEM_TIME_START_MS;
   timing.first_upstream_tx_byte_sent_ =

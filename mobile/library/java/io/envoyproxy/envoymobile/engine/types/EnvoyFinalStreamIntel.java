@@ -72,4 +72,8 @@ public interface EnvoyFinalStreamIntel {
    * for values.
    */
   public long getResponseFlags();
+
+  /* The protocol for the upstream stream, if one was established, else -1 See
+   * https://github.com/envoyproxy/envoy/blob/main/envoy/http/protocol.h#L39 for values. */
+  public long getUpstreamProtocol();
 }
