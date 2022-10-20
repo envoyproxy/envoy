@@ -3,11 +3,15 @@ package org.chromium.net.testing;
 import static junit.framework.Assert.assertTrue;
 
 import org.chromium.net.CronetEngine;
+import org.chromium.net.ExperimentalCronetEngine;
 
 /**
  * Helper class to set up url interceptors for testing purposes.
+ * TODO("https://github.com/envoyproxy/envoy-mobile/issues/1549")
  */
 public final class MockUrlRequestJobFactory {
+
+  private static final String TEST_URL = "http://0.0.0.0:10000";
 
   private final CronetEngine mCronetEngine;
 
@@ -21,30 +25,45 @@ public final class MockUrlRequestJobFactory {
   }
 
   /**
+   * Sets up URL interceptors.
+   */
+  public MockUrlRequestJobFactory(ExperimentalCronetEngine.Builder builder) {
+    // Add a filter to immediately return a response
+    mCronetEngine =
+        CronetTestUtil.getCronetEngineBuilderImpl(builder).addUrlInterceptorsForTesting().build();
+  }
+
+  /**
    * Remove URL Interceptors.
    */
   public void shutdown() {
     // Remove the filter;
+    mCronetEngine.shutdown();
   }
+
+  public CronetEngine getCronetEngine() { return mCronetEngine; }
 
   /**
    * Constructs a mock URL that hangs or fails at certain phase.
    *
    * @param phase at which request fails. It should be a value in
    *              org.chromium.net.test.FailurePhase.
-   * @param netError reported by UrlRequestJob. Passing -1, results in hang.
+   * @param @param envoyMobileError reported by the engine.
    */
-  public static String getMockUrlWithFailure(int phase, int netError) {
-    assertTrue(netError < 0);
+  public static String getMockUrlWithFailure(FailurePhase phase, long envoyMobileError) {
     switch (phase) {
-    case FailurePhase.START:
-    case FailurePhase.READ_SYNC:
-    case FailurePhase.READ_ASYNC:
+    case START:
+    case READ_SYNC:
+    case READ_ASYNC:
       break;
     default:
       throw new IllegalArgumentException("phase not in org.chromium.net.test.FailurePhase");
     }
-    return "To be implemented";
+    return TEST_URL + "/failed?" + phase + "=" + envoyMobileError;
+  }
+
+  public static String getMockUrlWithFailure(FailurePhase phase, int netError) {
+    throw new UnsupportedOperationException("To be implemented");
   }
 
   /**

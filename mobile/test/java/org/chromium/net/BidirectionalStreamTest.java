@@ -20,9 +20,9 @@ import android.util.Log;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
-import org.chromium.net.impl.Annotations.NetError;
 import org.chromium.net.impl.BidirectionalStreamNetworkException;
 import org.chromium.net.impl.CronetBidirectionalStream;
+import org.chromium.net.impl.Errors.NetError;
 import org.chromium.net.testing.CronetTestRule;
 import org.chromium.net.testing.CronetTestUtil;
 import org.chromium.net.testing.Feature;
@@ -1540,35 +1540,29 @@ public class BidirectionalStreamTest {
   @Feature({"Cronet"})
   @Test
   @OnlyRunNativeCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1594")
   public void testErrorCodes() throws Exception {
-    // TODO(Augustyniak) cannot find symbol checkSpecificErrorCode(NetError.ERR_ADDRESS_UNREACHABLE"
     // Non-BidirectionalStream specific error codes.
-    // checkSpecificErrorCode(NetError.ERR_NAME_NOT_RESOLVED,
-    //                        NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, false);
-    // checkSpecificErrorCode(NetError.ERR_INTERNET_DISCONNECTED,
-    //                        NetworkException.ERROR_INTERNET_DISCONNECTED, false);
-    // checkSpecificErrorCode(NetError.ERR_NETWORK_CHANGED, NetworkException.ERROR_NETWORK_CHANGED,
-    //                        true);
-    // checkSpecificErrorCode(NetError.ERR_CONNECTION_CLOSED,
-    // NetworkException.ERROR_CONNECTION_CLOSED,
-    //                        true);
-    // checkSpecificErrorCode(NetError.ERR_CONNECTION_REFUSED,
-    //                        NetworkException.ERROR_CONNECTION_REFUSED, false);
-    // checkSpecificErrorCode(NetError.ERR_CONNECTION_RESET,
-    // NetworkException.ERROR_CONNECTION_RESET,
-    //                        true);
-    // checkSpecificErrorCode(NetError.ERR_CONNECTION_TIMED_OUT,
-    //                        NetworkException.ERROR_CONNECTION_TIMED_OUT, true);
-    // checkSpecificErrorCode(NetError.ERR_TIMED_OUT, NetworkException.ERROR_TIMED_OUT, true);
-    // checkSpecificErrorCode(NetError.ERR_ADDRESS_UNREACHABLE,
-    //                        NetworkException.ERROR_ADDRESS_UNREACHABLE, false);
+    checkSpecificErrorCode(NetError.ERR_NAME_NOT_RESOLVED,
+                           NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, false);
+    checkSpecificErrorCode(NetError.ERR_INTERNET_DISCONNECTED,
+                           NetworkException.ERROR_INTERNET_DISCONNECTED, false);
+    checkSpecificErrorCode(NetError.ERR_NETWORK_CHANGED, NetworkException.ERROR_NETWORK_CHANGED,
+                           true);
+    checkSpecificErrorCode(NetError.ERR_CONNECTION_CLOSED, NetworkException.ERROR_CONNECTION_CLOSED,
+                           true);
+    checkSpecificErrorCode(NetError.ERR_CONNECTION_REFUSED,
+                           NetworkException.ERROR_CONNECTION_REFUSED, false);
+    checkSpecificErrorCode(NetError.ERR_CONNECTION_RESET, NetworkException.ERROR_CONNECTION_RESET,
+                           true);
+    checkSpecificErrorCode(NetError.ERR_CONNECTION_TIMED_OUT,
+                           NetworkException.ERROR_CONNECTION_TIMED_OUT, true);
+    checkSpecificErrorCode(NetError.ERR_TIMED_OUT, NetworkException.ERROR_TIMED_OUT, true);
+    checkSpecificErrorCode(NetError.ERR_ADDRESS_UNREACHABLE,
+                           NetworkException.ERROR_ADDRESS_UNREACHABLE, false);
 
-    // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1594) Missing error - code this.
     // BidirectionalStream specific retryable error codes.
-    // checkSpecificErrorCode(NetError.ERR_HTTP2_PING_FAILED, NetworkException.ERROR_OTHER, true);
-    // checkSpecificErrorCode(
-    //        NetError.ERR_QUIC_HANDSHAKE_FAILED, NetworkException.ERROR_OTHER, true);
+    checkSpecificErrorCode(NetError.ERR_HTTP2_PING_FAILED, NetworkException.ERROR_OTHER, true);
+    checkSpecificErrorCode(NetError.ERR_QUIC_HANDSHAKE_FAILED, NetworkException.ERROR_OTHER, true);
   }
 
   // Returns the contents of byteBuffer, from its position() to its limit(),
@@ -1583,11 +1577,12 @@ public class BidirectionalStreamTest {
     return new String(contents);
   }
 
-  private static void checkSpecificErrorCode(int netError, int errorCode,
+  private static void checkSpecificErrorCode(NetError netError, int errorCode,
                                              boolean immediatelyRetryable) throws Exception {
-    NetworkException exception = new BidirectionalStreamNetworkException("", errorCode, netError);
+    NetworkException exception =
+        new BidirectionalStreamNetworkException("", errorCode, netError.getErrorCode());
     assertEquals(immediatelyRetryable, exception.immediatelyRetryable());
-    assertEquals(netError, exception.getCronetInternalErrorCode());
+    assertEquals(netError.getErrorCode(), exception.getCronetInternalErrorCode());
     assertEquals(errorCode, exception.getErrorCode());
   }
 

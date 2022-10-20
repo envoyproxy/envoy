@@ -24,6 +24,7 @@ android_library(
         "CronetUploadDataStream.java",
         "CronetUrlRequest.java",
         "CronetUrlRequestContext.java",
+        "Errors.java",
         "Executors.java",
         "HttpReason.java",
         "ImplVersion.java",

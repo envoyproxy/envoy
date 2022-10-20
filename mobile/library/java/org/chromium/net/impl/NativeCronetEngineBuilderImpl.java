@@ -29,6 +29,8 @@ import org.chromium.net.ICronetEngineBuilder;
  */
 public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
 
+  // TODO(refactor) move unshared variables into their specific methods.
+  private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private boolean mAdminInterfaceEnabled = false;
@@ -81,6 +83,19 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     return this;
   }
 
+  /**
+   * Adds url interceptors to the cronetEngine
+   *
+   * @return the builder to facilitate chaining.
+   */
+  @VisibleForTesting
+  public CronetEngineBuilderImpl addUrlInterceptorsForTesting() {
+    nativeFilterChain.add(new EnvoyNativeFilterConfig(
+        "envoy.filters.http.test_read",
+        "{\"@type\": type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead}"));
+    return this;
+  }
+
   @Override
   public ExperimentalCronetEngine build() {
     if (getUserAgent() == null) {
@@ -100,7 +115,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
 
   private EnvoyConfiguration createEnvoyConfiguration() {
     List<EnvoyHTTPFilterFactory> platformFilterChain = Collections.emptyList();
-    List<EnvoyNativeFilterConfig> nativeFilterChain = Collections.emptyList();
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
     List<String> statSinks = Collections.emptyList();
