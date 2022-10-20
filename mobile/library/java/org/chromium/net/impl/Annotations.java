@@ -19,16 +19,6 @@ public final class Annotations {
     int HIGHEST = 5;
   }
 
-  /** Subset of errors defined in chromium/src/net/base/net_error_list.h */
-  @IntDef({NetError.ERR_HTTP2_PING_FAILED, NetError.ERR_QUIC_HANDSHAKE_FAILED})
-  @Retention(RetentionPolicy.SOURCE)
-  public @interface NetError {
-    int ERR_NETWORK_CHANGED = -21;
-    int ERR_HTTP2_PING_FAILED = -352;
-    int ERR_QUIC_PROTOCOL_ERROR = -356;
-    int ERR_QUIC_HANDSHAKE_FAILED = -358;
-  }
-
   /** Enum defined here: chromium/src/components/cronet/url_request_context_config.h, line 37 */
   @IntDef({HttpCacheType.DISABLED, HttpCacheType.DISK, HttpCacheType.MEMORY})
   @Retention(RetentionPolicy.SOURCE)

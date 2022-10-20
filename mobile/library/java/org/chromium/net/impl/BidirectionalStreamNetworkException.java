@@ -1,6 +1,6 @@
 package org.chromium.net.impl;
 
-import org.chromium.net.impl.Annotations.NetError;
+import org.chromium.net.impl.Errors.NetError;
 
 /**
  * Used in {@link CronetBidirectionalStream}. Implements {@link NetworkExceptionImpl}.
@@ -13,13 +13,11 @@ public final class BidirectionalStreamNetworkException extends NetworkExceptionI
 
   @Override
   public boolean immediatelyRetryable() {
-    switch (mCronetInternalErrorCode) {
-    case NetError.ERR_HTTP2_PING_FAILED:
-    case NetError.ERR_QUIC_HANDSHAKE_FAILED:
+    if (mCronetInternalErrorCode == NetError.ERR_HTTP2_PING_FAILED.getErrorCode() ||
+        mCronetInternalErrorCode == NetError.ERR_QUIC_HANDSHAKE_FAILED.getErrorCode()) {
       assert mErrorCode == ERROR_OTHER;
       return true;
-    default:
-      return super.immediatelyRetryable();
     }
+    return super.immediatelyRetryable();
   }
 }
