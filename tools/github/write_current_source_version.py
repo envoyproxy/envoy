@@ -1,10 +1,12 @@
-# Produces SOURCE_VERSION file with content from current version commit hash. As a reminder,
-# SOURCE_VERSION is required when building Envoy from an extracted release tarball (non-git).
-# See: bazel/get_workspace_status for more information.
+# This script produces SOURCE_VERSION file with content from current version commit hash. As a
+# reminder,SOURCE_VERSION is required when building Envoy from an extracted release tarball
+# (non-git). See: bazel/get_workspace_status for more information.
 #
-# The SOURCE_VERSION is produced by reading the VERSION.txt file then fetch the corresponding commit
-# hass from GitHub. Note: This script can only be executed from project root directory of an
-# extracted "release" tarball.
+# The SOURCE_VERSION file is produced by reading current version tag from VERSION.txt file then
+# fetch the corresponding commit hash from GitHub.
+#
+# Note: This script can only be executed from project root directory of an extracted "release"
+# tarball.
 
 import sys
 import json
