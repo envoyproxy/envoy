@@ -46,14 +46,14 @@ There are several use-cases for this filter.
    configurable memory buffer for this purpose, that will allow the server to flush until that buffer
    hits the "high watermark" that provokes a request for the server to slow down.
 
-   `FileSystemBufferFilter` attempts to take over when that "high watermark" event occurs, slowing
+   ``FileSystemBufferFilter`` attempts to take over when that "high watermark" event occurs, slowing
    delivery to the client without slowing receipt from the server. To avoid the high memory usage
    that behavior would usually entail, the filter offloads excess buffered data to the filesystem,
    and reloads it when the client is ready to receive it.
 
-3. The filter optionally injects an accurate `content-length` header, which requires buffering the
-   entire request or response. This aspect duplicates the behavior of `buffer_filter` - having both
-   of these filters in the same chain doesn't make sense, as `buffer_filter` explicitly requires
+3. The filter optionally injects an accurate ``content-length`` header, which requires buffering the
+   entire request or response. This aspect duplicates the behavior of ``buffer_filter`` - having both
+   of these filters in the same chain doesn't make sense, as ``buffer_filter`` explicitly requires
    that the entire request/response is buffered in memory.
 
 .. note::
@@ -65,7 +65,7 @@ There are several use-cases for this filter.
 .. note::
 
   Though the filter can theoretically be configured to perform the same behavior symmetrically,
-  Envoy currently only provides `onAboveWriteBufferHighWatermark` and `onBelowWriteBufferLowWatermark`
+  Envoy currently only provides ``onAboveWriteBufferHighWatermark`` and ``onBelowWriteBufferLowWatermark``
   events on the response stream - this means requests will always flow immediately through the filter
   into the regular filter chain's memory buffer unless using a configuration that requires that the
   entire request be buffered. An update is in the works to make these signals also available on

@@ -26,6 +26,12 @@
       "type": "shell",
       "command": "tools/vscode/refresh_compdb.sh",
       "problemMatcher": []
+    },
+    {
+      "label": "Refresh Compilation Database Exclude Contrib",
+      "type": "shell",
+      "command": "EXCLUDE_CONTRIB=true tools/vscode/refresh_compdb.sh",
+      "problemMatcher": []
     }
   ]
 }

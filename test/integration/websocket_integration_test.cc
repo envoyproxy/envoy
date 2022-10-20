@@ -177,6 +177,13 @@ void WebsocketIntegrationTest::sendBidirectionalData() {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -198,6 +205,11 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
+
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -264,6 +276,13 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -288,6 +307,13 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -316,6 +342,13 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -346,6 +379,13 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 
   // Add a small buffer filter to the standard HTTP filter chain. Websocket

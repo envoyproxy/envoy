@@ -19,6 +19,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
+    "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
 
     #
     # Sip proxy
@@ -57,4 +58,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
 }

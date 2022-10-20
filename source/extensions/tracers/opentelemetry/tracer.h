@@ -125,6 +125,15 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
+  std::string tracestate() { return span_.trace_state(); }
+
+  /**
+   * Sets the span's tracestate.
+   */
+  void setTracestate(const absl::string_view& tracestate) {
+    span_.set_trace_state(std::string{tracestate});
+  }
+
 private:
   ::opentelemetry::proto::trace::v1::Span span_;
   Tracer& parent_tracer_;

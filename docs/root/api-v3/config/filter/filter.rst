@@ -11,3 +11,4 @@ Filters
   http/http
   dubbo/dubbo
   thrift/thrift
+  generic/generic

@@ -29,34 +29,28 @@ template <class C> class EdfScheduler : public Scheduler<C> {
 public:
   // See scheduler.h for an explanation of each public method.
   std::shared_ptr<C> peekAgain(std::function<double(const C&)> calculate_weight) override {
-    if (hasEntry()) {
-      prepick_list_.push_back(std::move(queue_.top().entry_));
-      std::shared_ptr<C> ret{prepick_list_.back()};
+    std::shared_ptr<C> ret = popEntry();
+    if (ret) {
+      prepick_list_.push_back(ret);
       add(calculate_weight(*ret), ret);
-      queue_.pop();
-      return ret;
     }
-    return nullptr;
+    return ret;
   }
 
   std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) override {
     while (!prepick_list_.empty()) {
       // In this case the entry was added back during peekAgain so don't re-add.
-      if (prepick_list_.front().expired()) {
-        prepick_list_.pop_front();
-        continue;
-      }
-      std::shared_ptr<C> ret{prepick_list_.front()};
+      std::shared_ptr<C> ret = prepick_list_.front().lock();
       prepick_list_.pop_front();
-      return ret;
+      if (ret) {
+        return ret;
+      }
     }
-    if (hasEntry()) {
-      std::shared_ptr<C> ret{queue_.top().entry_};
-      queue_.pop();
+    std::shared_ptr<C> ret = popEntry();
+    if (ret) {
       add(calculate_weight(*ret), ret);
-      return ret;
     }
-    return nullptr;
+    return ret;
   }
 
   void add(double weight, std::shared_ptr<C> entry) override {
@@ -72,27 +66,28 @@ public:
 
 private:
   /**
-   * Clears expired entries, and returns true if there's still entries in the queue.
+   * Clears expired entries and pops the next unexpired entry in the queue.
    */
-  bool hasEntry() {
+  std::shared_ptr<C> popEntry() {
     EDF_TRACE("Queue pick: queue_.size()={}, current_time_={}.", queue_.size(), current_time_);
     while (true) {
       if (queue_.empty()) {
         EDF_TRACE("Queue is empty.");
-        return false;
+        return nullptr;
       }
       const EdfEntry& edf_entry = queue_.top();
       // Entry has been removed, let's see if there's another one.
-      if (edf_entry.entry_.expired()) {
+      std::shared_ptr<C> ret = edf_entry.entry_.lock();
+      if (!ret) {
         EDF_TRACE("Entry has expired, repick.");
         queue_.pop();
         continue;
       }
-      std::shared_ptr<C> ret{edf_entry.entry_};
       ASSERT(edf_entry.deadline_ >= current_time_);
       current_time_ = edf_entry.deadline_;
       EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
-      return true;
+      queue_.pop();
+      return ret;
     }
   }
 

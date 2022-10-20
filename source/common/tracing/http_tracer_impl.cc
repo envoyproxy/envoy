@@ -87,41 +87,35 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   // Set error tag when Grpc status code represents an upstream error. See
   // https://github.com/envoyproxy/envoy/issues/18877.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.update_grpc_response_error_tag")) {
-    if (grpc_status_code.has_value()) {
-      const auto& status = grpc_status_code.value();
-      if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
-        switch (status) {
-        // Each case below is considered to be a client side error, therefore should not be
-        // tagged as an upstream error. See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
-        // for more details about how each Grpc status code is defined and whether it is an
-        // upstream error or a client error.
-        case Grpc::Status::WellKnownGrpcStatus::Ok:
-        case Grpc::Status::WellKnownGrpcStatus::Canceled:
-        case Grpc::Status::WellKnownGrpcStatus::InvalidArgument:
-        case Grpc::Status::WellKnownGrpcStatus::NotFound:
-        case Grpc::Status::WellKnownGrpcStatus::AlreadyExists:
-        case Grpc::Status::WellKnownGrpcStatus::PermissionDenied:
-        case Grpc::Status::WellKnownGrpcStatus::FailedPrecondition:
-        case Grpc::Status::WellKnownGrpcStatus::Aborted:
-        case Grpc::Status::WellKnownGrpcStatus::OutOfRange:
-        case Grpc::Status::WellKnownGrpcStatus::Unauthenticated:
-          break;
-        case Grpc::Status::WellKnownGrpcStatus::Unknown:
-        case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
-        case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
-        case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
-        case Grpc::Status::WellKnownGrpcStatus::Internal:
-        case Grpc::Status::WellKnownGrpcStatus::Unavailable:
-        case Grpc::Status::WellKnownGrpcStatus::DataLoss:
-          span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
-          break;
-        }
+  if (grpc_status_code.has_value()) {
+    const auto& status = grpc_status_code.value();
+    if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
+      switch (status) {
+      // Each case below is considered to be a client side error, therefore should not be
+      // tagged as an upstream error. See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+      // for more details about how each Grpc status code is defined and whether it is an
+      // upstream error or a client error.
+      case Grpc::Status::WellKnownGrpcStatus::Ok:
+      case Grpc::Status::WellKnownGrpcStatus::Canceled:
+      case Grpc::Status::WellKnownGrpcStatus::InvalidArgument:
+      case Grpc::Status::WellKnownGrpcStatus::NotFound:
+      case Grpc::Status::WellKnownGrpcStatus::AlreadyExists:
+      case Grpc::Status::WellKnownGrpcStatus::PermissionDenied:
+      case Grpc::Status::WellKnownGrpcStatus::FailedPrecondition:
+      case Grpc::Status::WellKnownGrpcStatus::Aborted:
+      case Grpc::Status::WellKnownGrpcStatus::OutOfRange:
+      case Grpc::Status::WellKnownGrpcStatus::Unauthenticated:
+        break;
+      case Grpc::Status::WellKnownGrpcStatus::Unknown:
+      case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+      case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+      case Grpc::Status::WellKnownGrpcStatus::ResourceExhausted:
+      case Grpc::Status::WellKnownGrpcStatus::Internal:
+      case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+      case Grpc::Status::WellKnownGrpcStatus::DataLoss:
+        span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+        break;
       }
-    }
-  } else {
-    if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-      span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     }
   }
 }
@@ -210,24 +204,14 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
   span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
 
-  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
-
-  CustomTagContext ctx{request_headers, stream_info};
-
-  const CustomTagMap* custom_tag_map = tracing_config.customTags();
-  if (custom_tag_map) {
-    for (const auto& it : *custom_tag_map) {
-      it.second->applySpan(span, ctx);
-    }
-  }
+  setCommonTags(span, stream_info, tracing_config);
+  onUpstreamResponseHeaders(span, response_headers);
+  onUpstreamResponseTrailers(span, response_trailers);
 
   span.finishSpan();
 }
 
-void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
-                                             const Http::ResponseHeaderMap* response_headers,
-                                             const Http::ResponseTrailerMap* response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
+void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
   span.setTag(
       Tracing::Tags::get().HttpProtocol,
@@ -242,14 +226,26 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
     span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
   }
 
-  setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
+  setCommonTags(span, stream_info, tracing_config);
 
   span.finishSpan();
 }
 
-void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
-                                      const Http::ResponseTrailerMap* response_trailers,
-                                      const StreamInfo::StreamInfo& stream_info,
+void HttpTracerUtility::onUpstreamResponseHeaders(Span& span,
+                                                  const Http::ResponseHeaderMap* response_headers) {
+  if (response_headers && response_headers->GrpcStatus() != nullptr) {
+    addGrpcResponseTags(span, *response_headers);
+  }
+}
+
+void HttpTracerUtility::onUpstreamResponseTrailers(
+    Span& span, const Http::ResponseTrailerMap* response_trailers) {
+  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
+    addGrpcResponseTags(span, *response_trailers);
+  }
+}
+
+void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& stream_info,
                                       const Config& tracing_config) {
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
@@ -266,19 +262,19 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
-  // GRPC data.
-  if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
-    addGrpcResponseTags(span, *response_trailers);
-  } else if (response_headers && response_headers->GrpcStatus() != nullptr) {
-    addGrpcResponseTags(span, *response_headers);
-  }
-
   if (tracing_config.verbose()) {
     annotateVerbose(span, stream_info);
   }
 
   if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+
+  CustomTagContext ctx{stream_info.getRequestHeaders(), stream_info};
+  if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
+    for (const auto& it : *custom_tag_map) {
+      it.second->applySpan(span, ctx);
+    }
   }
 }
 

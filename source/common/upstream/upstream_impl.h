@@ -232,7 +232,9 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
-        used_(true) {
+        health_status_(health_status) {
+    // This EDS flags setting is still necessary for stats, configuration dump, canonical
+    // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -265,7 +267,24 @@ public:
     setOutlierDetectorImpl(std::move(outlier_detector));
   }
 
-  Host::Health health() const override {
+  Host::HealthStatus healthStatus() const override {
+    // Evaluate active health status first.
+
+    // Active unhealthy.
+    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
+        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK)) {
+      return HealthStatus::UNHEALTHY;
+    }
+    // Active degraded.
+    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
+      return HealthStatus::DEGRADED;
+    }
+
+    // Use EDS status if no any active status.
+    return health_status_;
+  }
+
+  Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
@@ -286,8 +305,10 @@ public:
 
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
-  bool used() const override { return used_; }
-  void used(bool new_used) override { used_ = new_used; }
+  bool used() const override { return handle_count_ > 0; }
+  HostHandlePtr acquireHandle() const override {
+    return std::make_unique<HostHandleImpl>(shared_from_this());
+  }
 
 protected:
   static CreateConnectionData
@@ -304,7 +325,24 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
-  std::atomic<bool> used_;
+  // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
+  // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
+  // future.
+  HealthStatus health_status_{};
+
+  struct HostHandleImpl : HostHandle {
+    HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
+      parent->handle_count_++;
+    }
+    ~HostHandleImpl() override {
+      if (const auto host = parent_.lock()) {
+        ASSERT(host->handle_count_ > 0);
+        host->handle_count_--;
+      }
+    }
+    const std::weak_ptr<const HostImpl> parent_;
+  };
+  mutable std::atomic<uint32_t> handle_count_{};
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -600,18 +638,20 @@ protected:
 class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
 public:
   UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager)
-      : server_context_(context), init_manager_(init_manager) {}
+                                 Init::Manager& init_manager, Stats::Scope& scope)
+      : server_context_(context), init_manager_(init_manager), scope_(scope) {}
 
   Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
     return server_context_;
   }
 
   Init::Manager& initManager() override { return init_manager_; }
+  Stats::Scope& scope() override { return scope_; }
 
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
   Init::Manager& init_manager_;
+  Stats::Scope& scope_;
 };
 
 /**
@@ -740,9 +780,7 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
+  AddressSelectFn sourceAddressFn() const override { return source_address_fn_; };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
@@ -842,7 +880,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  AddressSelectFn source_address_fn_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
@@ -1111,6 +1149,13 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
 Network::ConnectionSocket::OptionsSharedPtr
 combineConnectionSocketOptions(const ClusterInfo& cluster,
                                const Network::ConnectionSocket::OptionsSharedPtr& options);
+
+/**
+ * Utility function to resolve health check address.
+ */
+Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    Network::Address::InstanceConstSharedPtr host_address);
 
 } // namespace Upstream
 } // namespace Envoy

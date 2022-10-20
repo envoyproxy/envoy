@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
+Http::Code AdminImpl::handlerAdminHome(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   StatsHtmlRender html(response_headers, response, StatsParams());
   html.tableBegin(response);

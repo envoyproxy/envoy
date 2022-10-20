@@ -168,6 +168,22 @@ public:
   MOCK_METHOD(absl::string_view, name, (), (const));
 };
 
+class MockPathRewriter : public PathRewriter {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(absl::StatusOr<std::string>, rewritePath,
+              (absl::string_view path, absl::string_view rewrite_pattern), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
+  MOCK_METHOD(absl::Status, isCompatiblePathMatcher, (PathMatcherSharedPtr path_matcher), (const));
+};
+
+class MockPathMatcher : public PathMatcher {
+public:
+  MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, match, (absl::string_view path), (const));
+  MOCK_METHOD(absl::string_view, uriTemplate, (), (const));
+};
+
 class MockRetryState : public RetryState {
 public:
   MockRetryState();
@@ -278,12 +294,16 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const Config&, routeConfig, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
+              (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(void, traversePerFilterConfig,
+              (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>),
+              (const));
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
@@ -380,6 +400,8 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
+  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
+  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
@@ -417,6 +439,8 @@ public:
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
+  testing::NiceMock<MockPathMatcher> path_matcher_;
+  testing::NiceMock<MockPathRewriter> path_rewriter_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -567,6 +591,7 @@ public:
 };
 
 class MockGenericConnPool : public GenericConnPool {
+public:
   MOCK_METHOD(void, newStream, (GenericConnectionPoolCallbacks * request));
   MOCK_METHOD(bool, cancelAnyPendingStream, ());
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
@@ -579,7 +604,7 @@ class MockGenericConnPool : public GenericConnPool {
 class MockUpstreamToDownstream : public UpstreamToDownstream {
 public:
   MOCK_METHOD(const Route&, route, (), (const));
-  MOCK_METHOD(const Network::Connection&, connection, (), (const));
+  MOCK_METHOD(OptRef<const Network::Connection>, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
@@ -606,8 +631,8 @@ public:
   MOCK_METHOD(void, onPoolReady,
               (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
-               const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-               StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+               const Network::ConnectionInfoProvider& info_provider, StreamInfo::StreamInfo& info,
+               absl::optional<Http::Protocol> protocol));
   MOCK_METHOD(UpstreamToDownstream&, upstreamToDownstream, ());
 
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;

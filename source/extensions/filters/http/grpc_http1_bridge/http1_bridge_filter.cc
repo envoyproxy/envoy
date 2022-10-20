@@ -26,7 +26,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
     headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
     headers.removeContentLength(); // message length part of the gRPC frame
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);

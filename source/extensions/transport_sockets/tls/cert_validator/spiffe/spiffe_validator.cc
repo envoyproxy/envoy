@@ -185,8 +185,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     return false;
   }
   if (allow_expired_certificate_) {
-    X509_STORE_CTX_set_verify_cb(new_store_ctx.get(),
-                                 CertValidatorUtil::ignoreCertificateExpirationCallback);
+    CertValidatorUtil::setIgnoreCertificateExpiration(new_store_ctx.get());
   }
   auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {
@@ -218,7 +217,7 @@ ValidationResults SPIFFEValidator::doVerifyCertChain(
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
     SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& /*validation_context*/,
-    bool /*is_server*/) {
+    bool /*is_server*/, absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(

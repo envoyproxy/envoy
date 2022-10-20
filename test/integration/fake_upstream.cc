@@ -594,6 +594,11 @@ FakeUpstream::FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transp
         ->mutable_max_rx_datagram_size()
         ->set_value(config.udp_fake_upstream_->max_rx_datagram_size_.value());
   }
+  dispatcher_->post([this]() -> void {
+    socket_factories_[0]->doFinalPreWorkerInit();
+    handler_->addListener(absl::nullopt, listener_, runtime_);
+    server_initialized_.setReady();
+  });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
   server_initialized_.waitReady();
 }
@@ -644,9 +649,6 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  socket_factories_[0]->doFinalPreWorkerInit();
-  handler_->addListener(absl::nullopt, listener_, runtime_);
-  server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
   {

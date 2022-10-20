@@ -117,9 +117,10 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   // definition.
   ValidationResults result =
       static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
-          ->customVerifyCertChainForQuic(
-              *cert_chain, std::move(envoy_callback), verify_context->isServer(),
-              verify_context->transportSocketOptions(), verify_context->extraValidationContext());
+          ->customVerifyCertChainForQuic(*cert_chain, std::move(envoy_callback),
+                                         verify_context->isServer(),
+                                         verify_context->transportSocketOptions(),
+                                         verify_context->extraValidationContext(), hostname);
   if (result.status == ValidationResults::ValidationStatus::Pending) {
     return quic::QUIC_PENDING;
   }

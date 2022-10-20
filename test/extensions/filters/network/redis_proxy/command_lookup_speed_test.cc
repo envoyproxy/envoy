@@ -30,9 +30,14 @@ public:
   ~NoOpSplitCallbacks() override = default;
 
   bool connectionAllowed() override { return true; }
+  void onQuit() override {}
   void onAuth(const std::string&) override {}
   void onAuth(const std::string&, const std::string&) override {}
   void onResponse(Common::Redis::RespValuePtr&&) override {}
+  Common::Redis::Client::Transaction& transaction() override { return transaction_; }
+
+private:
+  Common::Redis::Client::NoOpTransaction transaction_;
 };
 
 class NullRouterImpl : public Router {

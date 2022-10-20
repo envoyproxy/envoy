@@ -149,3 +149,6 @@ upstream, in this case to google.com.
 
 Envoy waits for the HTTP tunnel to be established (i.e. a successful response to the  CONNECT request is received),
 before start streaming the downstream TCP data to the upstream.
+
+If you want to decapsulate a CONNECT request and also do HTTP processing on the decapsulated payload, the easiest way
+to accomplish it is to use :ref:`internal listeners <config_internal_listener>`.

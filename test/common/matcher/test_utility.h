@@ -168,6 +168,39 @@ public:
   Registry::InjectFactory<InputMatcherFactory> inject_factory_;
 };
 
+// Custom matcher to perform string comparison.
+class CustomStringMatcher : public InputMatcher {
+public:
+  explicit CustomStringMatcher(const std::string& str) : str_value_(str) {}
+  bool match(absl::optional<absl::string_view> str) override { return str_value_ == str; }
+
+private:
+  std::string str_value_;
+};
+
+/**
+ * A self-injecting factory for the CustomStringMatcher InputMatcher.
+ */
+class CustomStringMatcherFactory : public InputMatcherFactory {
+public:
+  CustomStringMatcherFactory() : inject_factory_(*this) {}
+
+  InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message& config,
+                              Server::Configuration::ServerFactoryContext&) override {
+    const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
+    return [string]() { return std::make_unique<CustomStringMatcher>(string.value()); };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+
+  std::string name() const override { return "custom_match"; }
+
+  Registry::InjectFactory<InputMatcherFactory> inject_factory_;
+};
+
 /**
  * Creates a SingleFieldMatcher for use in test.
  * @param input the optional input that should be provided to the SingleFieldMatcher

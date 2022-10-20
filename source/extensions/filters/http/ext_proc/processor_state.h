@@ -114,6 +114,7 @@ public:
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                              CallbackState next_state = CallbackState::Idle);
+  void stopMessageTimer();
 
   // Idempotent methods for watermarking the body
   virtual void requestWatermark() PURE;

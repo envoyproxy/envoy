@@ -545,14 +545,12 @@ ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata) 
     return SipFilters::ResponseStatus::MoreData;
   } catch (const AppException& ex) {
     ENVOY_LOG(error, "sip response application error: {}", ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     sendLocalReply(ex, false);
     return SipFilters::ResponseStatus::Reset;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     onError(ex.what());
     return SipFilters::ResponseStatus::Reset;

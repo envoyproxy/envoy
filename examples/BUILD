@@ -17,10 +17,12 @@ filegroup(
             "cache/responses.yaml",
             "dynamic-config-fs/**/*",
             "jaeger-native-tracing/*",
+            "opentelemetry/otel-collector-config.yaml",
             "**/*docker-compose*.yaml",
             # Contrib extensions tested over in contrib.
             "mysql/*",
             "postgres/*",
+            "kafka/*.yaml",
         ],
     ),
 )
@@ -31,6 +33,7 @@ genrule(
         [
             "mysql/*.yaml",
             "postgres/*.yaml",
+            "kafka/*.yaml",
         ],
         exclude = [
             "**/*docker-compose*.yaml",

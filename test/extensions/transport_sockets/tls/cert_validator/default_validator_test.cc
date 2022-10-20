@@ -180,7 +180,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
                                                  nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
+  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/store_ctx.get(),
                                                             /*ssl_extended_info=*/nullptr,
                                                             /*leaf_cert=*/*cert,
                                                             /*transport_socket_options=*/nullptr),
@@ -192,7 +193,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
                                     /*ssl_extended_info=*/nullptr,
-                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                 .status);
 }
 
@@ -211,7 +212,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
             default_validator
                 ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &extended_socket_info,
-                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false)
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
                 .status);
   EXPECT_EQ(extended_socket_info.certificateValidationStatus(),
             Ssl::ClientValidationStatus::NotValidated);

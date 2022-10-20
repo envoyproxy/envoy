@@ -34,7 +34,7 @@ class ConnectionImpl;
  */
 class StreamEncoderImpl : public virtual StreamEncoder,
                           public Stream,
-                          Logger::Loggable<Logger::Id::http>,
+                          public Logger::Loggable<Logger::Id::http>,
                           public StreamCallbackHelper,
                           public Http1StreamEncoderOptions {
 public:
@@ -62,12 +62,14 @@ public:
   void readDisable(bool disable) override;
   uint32_t bufferLimit() const override;
   absl::string_view responseDetails() override { return details_; }
-  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
+  const Network::ConnectionInfoProvider& connectionInfoProvider() override;
   void setFlushTimeout(std::chrono::milliseconds) override {
     // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
     // connection, invoking any watermarks as necessary. There is no internal buffering that would
     // require a flush timeout not already covered by other timeouts.
   }
+
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
     // TODO(kbaichoo): implement account tracking for H1. Particularly, binding

@@ -115,10 +115,36 @@ configure_make(
 )
 
 configure_make(
-    name = "ragel",
+    name = "colm",
+    autogen = True,
+    configure_in_place = True,
     configure_options = [
         "AUTOMAKE=automake",
         "ACLOCAL=aclocal",
+        "--disable-shared",
+        "--enable-static",
+    ],
+    # Workaround for the issue with statically linked libstdc++
+    # using -l:libstdc++.a.
+    env = {
+        "CXXFLAGS": "-lstdc++ -Wno-unused-command-line-argument",
+    },
+    lib_source = "@net_colm_open_source_colm//:all",
+    out_binaries = ["colm"],
+    tags = ["skip_on_windows"],
+)
+
+configure_make(
+    name = "ragel",
+    autogen = True,
+    configure_in_place = True,
+    configure_options = [
+        "AUTOMAKE=automake",
+        "ACLOCAL=aclocal",
+        "--disable-manual",
+        "--disable-shared",
+        "--enable-static",
+        "--with-colm=$EXT_BUILD_DEPS/colm",
     ],
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
@@ -128,6 +154,7 @@ configure_make(
     lib_source = "@net_colm_open_source_ragel//:all",
     out_binaries = ["ragel"],
     tags = ["skip_on_windows"],
+    deps = [":colm"],
 )
 
 # ICU used by the language detection filter (i18n).

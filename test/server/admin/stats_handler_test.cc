@@ -82,13 +82,15 @@ public:
    */
   CodeResponse handlerStats(absl::string_view url) {
     MockInstance instance;
+    EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
     EXPECT_CALL(instance, statsConfig()).WillRepeatedly(ReturnRef(stats_config_));
     EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(Return(false));
     EXPECT_CALL(instance, stats()).WillRepeatedly(ReturnRef(*store_));
     EXPECT_CALL(instance, api()).WillRepeatedly(ReturnRef(api_));
     EXPECT_CALL(api_, customStatNamespaces()).WillRepeatedly(ReturnRef(custom_namespaces_));
     StatsHandler handler(instance);
-    Admin::RequestPtr request = handler.makeRequest(url, admin_stream_);
+    request_headers_.setPath(url);
+    Admin::RequestPtr request = handler.makeRequest(admin_stream_);
     Http::TestResponseHeaderMapImpl response_headers;
     Http::Code code = request->start(response_headers);
     Buffer::OwnedImpl data;
@@ -131,6 +133,7 @@ public:
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
   Stats::CustomStatNamespacesImpl custom_namespaces_;
+  Http::TestRequestHeaderMapImpl request_headers_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
   TestScopedRuntime scoped_runtime_;

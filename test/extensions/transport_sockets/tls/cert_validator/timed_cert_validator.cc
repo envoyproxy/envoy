@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -13,14 +15,17 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& validation_context, bool is_server) {
+    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    absl::string_view host_name) {
   if (callback == nullptr) {
     ASSERT(ssl_extended_info);
     callback = ssl_extended_info->createValidateResultCallback();
   }
   ASSERT(callback_ == nullptr);
   callback_ = std::move(callback);
-  validation_context_ = validation_context;
+  if (expected_host_name_.has_value()) {
+    EXPECT_EQ(expected_host_name_.value(), host_name);
+  }
   // Store cert chain for the delayed validation.
   for (size_t i = 0; i < sk_X509_num(&cert_chain); i++) {
     X509* cert = sk_X509_value(&cert_chain, i);
@@ -30,8 +35,8 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
     cert_chain_in_str_.emplace_back(reinterpret_cast<char*>(der), len);
     OPENSSL_free(der);
   }
-  validation_timer_ =
-      callback_->dispatcher().createTimer([&ssl_ctx, transport_socket_options, is_server, this]() {
+  validation_timer_ = callback_->dispatcher().createTimer(
+      [&ssl_ctx, transport_socket_options, is_server, host = std::string(host_name), this]() {
         bssl::UniquePtr<STACK_OF(X509)> certs(sk_X509_new_null());
         for (auto& cert_str : cert_chain_in_str_) {
           const uint8_t* inp = reinterpret_cast<uint8_t*>(cert_str.data());
@@ -42,8 +47,7 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
           }
         }
         ValidationResults result = DefaultCertValidator::doVerifyCertChain(
-            *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, validation_context_,
-            is_server);
+            *certs, nullptr, nullptr, transport_socket_options, ssl_ctx, {}, is_server, host);
         callback_->onCertValidationResult(
             result.status == ValidationResults::ValidationStatus::Successful,
             (result.error_details.has_value() ? result.error_details.value() : ""),

@@ -511,6 +511,17 @@ protected:
   void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
     header_string.setCopyUnvalidatedForTestOnly(value);
   }
+
+  bool skipForUhv() {
+#ifdef ENVOY_ENABLE_UHV
+    if (http2_implementation_ == Http2Impl::Oghttp2) {
+      initialize();
+      return true;
+    }
+#endif
+
+    return false;
+  }
 };
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
@@ -620,6 +631,10 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 
 // nghttp2 rejects trailers with :status.
 TEST_P(Http2CodecImplTest, TrailerStatus) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -693,6 +708,10 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
 
 // nghttp2 treats 101 inside an HTTP/2 stream as an invalid HTTP header field.
 TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -827,6 +846,10 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
+  if (skipForUhv()) {
+    return;
+  }
+
   expect_buffered_data_on_teardown_ = true;
   initialize();
 
@@ -861,6 +884,10 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
+  if (skipForUhv()) {
+    return;
+  }
+
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
 
@@ -4251,6 +4278,40 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
     server_->getStream(1)->readDisable(false);
     EXPECT_TRUE(process_buffered_data_callback->enabled());
   }
+}
+
+TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
+  // Per https://datatracker.ietf.org/doc/html/rfc9113#section-8.2.1,
+  // leading & trailing whitespace characters in headers are not valid, but this is a new
+  // validation and may break existing deployments.
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
+  std::string header_value{" foo "};
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  HeaderString header_string("bar");
+  setHeaderStringUnvalidated(header_string, header_value);
+  request_headers.addViaMove(HeaderString(absl::string_view("bar")), std::move(header_string));
+
+  MockResponseDecoder response_decoder;
+  RequestEncoder* request_encoder = &client_->newStream(response_decoder);
+  StreamEncoder* response_encoder;
+  MockStreamCallbacks server_stream_callbacks;
+  MockRequestDecoder request_decoder;
+
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks);
+        return request_decoder;
+      }));
+
+  // Codec should accept request with padded header value
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder->encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(server_stream_callbacks, onResetStream(_, _)).Times(0);
+  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {

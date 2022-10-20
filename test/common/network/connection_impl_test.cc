@@ -27,6 +27,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -306,6 +307,15 @@ TEST_P(ConnectionImplTest, UniqueId) {
   uint64_t first_id = client_connection_->id();
   setUpBasicConnection();
   EXPECT_NE(first_id, client_connection_->id());
+  disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetSslConnection) {
+  setUpBasicConnection();
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  client_connection_->connectionInfoSetter().setSslConnection(ssl_info);
+  EXPECT_EQ(ssl_info, client_connection_->ssl());
+  EXPECT_EQ(ssl_info, client_connection_->connectionInfoProvider().sslConnection());
   disconnect(false);
 }
 
@@ -3051,7 +3061,8 @@ TEST_F(InternalClientConnectionImplTest,
   const Network::SocketInterface* sock_interface = Network::socketInterface(
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", "endpoint_id_0",
+                                                                sock_interface);
 
   ASSERT_DEATH(
       {

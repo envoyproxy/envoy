@@ -16,7 +16,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/tap/v3
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Tap Sink Service]
+// [#protodoc-title: Tap sink service]
 
 // [#not-implemented-hide:] A tap service to receive incoming taps. Envoy will call
 // StreamTaps to deliver captured taps to the server

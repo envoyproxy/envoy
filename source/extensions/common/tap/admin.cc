@@ -42,7 +42,7 @@ AdminHandler::~AdminHandler() {
   ASSERT(rc);
 }
 
-Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+Http::Code AdminHandler::handler(Http::HeaderMap&, Buffer::Instance& response,
                                  Server::AdminStream& admin_stream) {
   if (attached_request_ != nullptr) {
     // TODO(mattlklein123): Consider supporting concurrent admin /tap streams. Right now we support

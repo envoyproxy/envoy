@@ -376,7 +376,11 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     return WasmResult::SerializationFailure;
   case CelValue::Type::kMap: {
     const auto& map = *value.MapOrDie();
-    const auto& keys = *map.ListKeys();
+    auto keys_list = map.ListKeys();
+    if (!keys_list.ok()) {
+      return WasmResult::SerializationFailure;
+    }
+    const auto& keys = *keys_list.value();
     std::vector<std::pair<std::string, std::string>> pairs(map.size(), std::make_pair("", ""));
     for (auto i = 0; i < map.size(); i++) {
       if (serializeValue(keys[i], &pairs[i].first) != WasmResult::Ok) {
@@ -745,7 +749,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -820,7 +824,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     map->addCopy(lower_key, std::string(p.second));
   }
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -833,7 +837,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -847,7 +851,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
   if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
   return WasmResult::Ok;
 }
@@ -975,6 +979,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -1016,6 +1021,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_request =
       grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
@@ -1059,6 +1065,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   Protobuf::RepeatedPtrField<HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
+  options.setSendXff(false);
 
   auto grpc_stream = grpc_client->startRaw(toAbslStringView(service_name),
                                            toAbslStringView(method_name), handler, options);
@@ -1113,9 +1120,9 @@ StreamInfo::StreamInfo* Context::getRequestStreamInfo() const {
 
 const Network::Connection* Context::getConnection() const {
   if (encoder_callbacks_) {
-    return encoder_callbacks_->connection();
+    return encoder_callbacks_->connection().ptr();
   } else if (decoder_callbacks_) {
-    return decoder_callbacks_->connection();
+    return decoder_callbacks_->connection().ptr();
   } else if (network_read_filter_callbacks_) {
     return &network_read_filter_callbacks_->connection();
   } else if (network_write_filter_callbacks_) {
@@ -1631,6 +1638,12 @@ void Context::failStream(WasmStreamType stream_type) {
 WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                       Pairs additional_headers, uint32_t grpc_status,
                                       std::string_view details) {
+  // This flag is used to avoid calling sendLocalReply() twice, even if wasm code has this
+  // logic. We can't reuse "local_reply_sent_" here because it can't avoid calling nested
+  // sendLocalReply() during encodeHeaders().
+  if (local_reply_hold_) {
+    return WasmResult::BadArgument;
+  }
   // "additional_headers" is a collection of string_views. These will no longer
   // be valid when "modify_headers" is finally called below, so we must
   // make copies of all the headers.
@@ -1655,10 +1668,17 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
                                   modify_headers = std::move(modify_headers), grpc_status,
                                   details = StringUtil::replaceAllEmptySpace(
                                       absl::string_view(details.data(), details.size()))] {
+      // When the wasm vm fails, failStream() is called if the plugin is fail-closed, we need
+      // this flag to avoid calling sendLocalReply() twice.
+      if (local_reply_sent_) {
+        return;
+      }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status, details);
+      local_reply_sent_ = true;
     });
   }
+  local_reply_hold_ = true;
   return WasmResult::Ok;
 }
 

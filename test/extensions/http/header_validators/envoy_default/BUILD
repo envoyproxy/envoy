@@ -13,7 +13,13 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "header_validator_test",
-    srcs = ["header_validator_test.cc"],
+    srcs = [
+        "header_validator_factory_test.cc",
+        "header_validator_test.cc",
+        "header_validator_test.h",
+        "http1_header_validator_test.cc",
+        "http2_header_validator_test.cc",
+    ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//source/common/network:utility_lib",

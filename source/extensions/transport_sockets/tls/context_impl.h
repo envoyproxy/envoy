@@ -97,7 +97,8 @@ public:
   ValidationResults customVerifyCertChainForQuic(
       STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback, bool is_server,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-      const CertValidator::ExtraValidationContext& validation_context);
+      const CertValidator::ExtraValidationContext& validation_context,
+      const std::string& host_name);
 
   static void keylogCallback(const SSL* ssl, const char* line);
 

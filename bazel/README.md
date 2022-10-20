@@ -472,7 +472,7 @@ be disabled by specifying local execution. Example command line with
 
 ```
 bazel test -c dbg //test/server:backtrace_test
---run_under=`pwd`/tools/stack_decode.py --strategy=TestRunner=local
+--run_under=//tools:stack_decode --strategy=TestRunner=local
 --cache_test_results=no --test_output=all
 ```
 
@@ -558,7 +558,7 @@ that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
 * `opt`: `-O2 -DNDEBUG -ggdb3 -gsplit-dwarf`, for production builds and performance benchmarking.
-* `dbg`: `-O0 -ggdb3 -gsplit-dwarf`, no optimization and debug symbols.
+* `dbg`: `-O0 -ggdb3 -gsplit-dwarf`, only debug symbols, no optimization.
 
 You can use the `-c <compilation_mode>` flag to control this, e.g.
 

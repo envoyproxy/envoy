@@ -7,6 +7,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/envoy_deterministic_connection_id_generator.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -84,6 +85,7 @@ private:
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  EnvoyDeterministicConnectionIdGenerator connection_id_generator_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

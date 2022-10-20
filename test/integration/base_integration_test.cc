@@ -389,7 +389,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
       deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
       validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_);
+      use_real_stats_, use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -468,38 +468,25 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-// Assuming logs are newline delineated, return the start index of the nth entry.
-// If there are not n entries, it will return file.length() (end of the string
-// index)
-size_t entryIndex(const std::string& file, uint32_t entry) {
-  size_t index = 0;
-  for (uint32_t i = 0; i < entry; ++i) {
-    index = file.find('\n', index);
-    if (index == std::string::npos || index == file.length()) {
-      return file.length();
-    }
-    ++index;
-  }
-  return index;
-}
-
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
                                                   bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
-    size_t index = entryIndex(contents, entry);
-    if (contents.length() > index) {
-      if (!allow_excess_entries) {
-        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
-            << "Waiting for entry " << entry << " but it was not the last entry";
-      }
-      return contents.substr(index);
+    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    if (entries.size() >= entry + 1) {
+      // Often test authors will waitForAccessLog() for multiple requests, and
+      // not increment the entry number for the second wait. Guard against that.
+      EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
+          << "Waiting for entry index " << entry << " but it was not the last entry as there were "
+          << entries.size() << "\n"
+          << contents;
+      return entries[entry];
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: ", contents));
+  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
   return "";
 }
 
@@ -578,9 +565,14 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    FakeStream* stream) {
+  if (stream == nullptr) {
+    stream = xds_stream_.get();
+  }
+
   envoy::service::discovery::v3::DiscoveryRequest discovery_request;
-  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+  VERIFY_ASSERTION(stream->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
     EXPECT_TRUE(discovery_request.has_node());

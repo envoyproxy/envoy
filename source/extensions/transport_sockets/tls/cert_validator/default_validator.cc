@@ -115,7 +115,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       // the hood. Therefore, to ignore cert expiration, we need to set the callback
       // for X509_verify_cert to ignore that error.
       if (config_->allowExpiredCertificate()) {
-        X509_STORE_set_verify_cb(store, CertValidatorUtil::ignoreCertificateExpirationCallback);
+        CertValidatorUtil::setIgnoreCertificateExpiration(store);
       }
     }
   }
@@ -211,10 +211,12 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
-  return verifyCertAndUpdateStatus(ssl_extended_info, &leaf_cert, transport_socket_options, nullptr,
-                                   nullptr)
-             ? 1
-             : 0;
+  if (!verifyCertAndUpdateStatus(ssl_extended_info, &leaf_cert, transport_socket_options, nullptr,
+                                 nullptr)) {
+    X509_STORE_CTX_set_error(store_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+    return 0;
+  }
+  return 1;
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
@@ -310,7 +312,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
     Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
-    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server) {
+    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
     if (ssl_extended_info) {
       ssl_extended_info->setCertificateValidationStatus(

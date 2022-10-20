@@ -138,6 +138,11 @@ public:
    * internal listener, the address id is that listener name.
    */
   virtual const std::string& addressId() const PURE;
+
+  /**
+   * @return The optional endpoint id of the internal address.
+   */
+  virtual const std::string& endpointId() const PURE;
 };
 
 enum class Type { Ip, Pipe, EnvoyInternal };

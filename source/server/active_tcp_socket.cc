@@ -36,8 +36,6 @@ ActiveTcpSocket::~ActiveTcpSocket() {
   }
 }
 
-Event::Dispatcher& ActiveTcpSocket::dispatcher() { return listener_.dispatcher(); }
-
 void ActiveTcpSocket::onTimeout() {
   listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());

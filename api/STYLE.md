@@ -34,6 +34,9 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
+* For extensions that are a work-in-progress or the config proto documentation is hidden with
+  `[#not-implemented-hide:]`, set its `status` field to `wip` in `extensions_metadata.yaml`.
+
 * Use a `(xds.annotations.v3.file_status).work_in_progress`,
   `(xds.annotations.v3.message_status).work_in_progress`, or
   `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,

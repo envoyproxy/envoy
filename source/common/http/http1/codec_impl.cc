@@ -375,8 +375,8 @@ void StreamEncoderImpl::readDisable(bool disable) {
 
 uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
-const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().connectionInfoProvider().localAddress();
+const Network::ConnectionInfoProvider& StreamEncoderImpl::connectionInfoProvider() {
+  return connection_.connection().connectionInfoProvider();
 }
 
 static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
@@ -465,6 +465,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
 
     std::string url = absl::StrCat(scheme->value().getStringView(), "://",
                                    host->value().getStringView(), path->value().getStringView());
+    ENVOY_CONN_LOG(trace, "Sending fully qualified URL: {}", connection_.connection(), url);
     connection_.buffer().addFragments(
         {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
   } else {
@@ -510,7 +511,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024);
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
   }
@@ -687,7 +688,16 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
-    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
+    absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+      if (parser_->errorMessage() == "headers size exceeds limit" ||
+          parser_->errorMessage() == "trailers size exceeds limit") {
+        error = Http1ResponseCodeDetails::get().HeadersTooLarge;
+      } else if (parser_->errorMessage() == "header value contains invalid chars") {
+        error = Http1ResponseCodeDetails::get().InvalidCharacters;
+      }
+    }
+    RETURN_IF_ERROR(sendProtocolError(error));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
     codec_status_ =
@@ -861,6 +871,10 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   // remove the received Content-Length field prior to forwarding such
   // a message.
 
+#ifndef ENVOY_ENABLE_UHV
+  // This check is moved into default header validator.
+  // TODO(yanavlasov): use runtime override here when UHV is moved into the main build
+
   // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
   // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
   // is chunked - remove Content-Length and serve request.
@@ -874,6 +888,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
   }
+#endif
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.

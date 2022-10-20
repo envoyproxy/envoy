@@ -270,6 +270,17 @@ TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
             headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
 }
 
+TEST_F(ConnectionManagerUtilityTest, AlphaNumCharRefererPassesSanitization) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"referer", "android-app+1.0://example.com/"}};
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("android-app+1.0://example.com/",
+            headers.get(Http::CustomHeaders::get().Referer)[0]->value().getStringView());
+}
+
 // Verify that we don't append XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {

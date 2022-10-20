@@ -12,7 +12,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Socket Option ]
+// [#protodoc-title: Socket option]
 
 // Generic socket option message. This would be used to set socket options that
 // might not exist in upstream kernels or precompiled Envoy binaries.
@@ -74,4 +74,9 @@ message SocketOption {
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
   SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
+}
+
+// [#not-implemented-hide:]
+message SocketOptionsOverride {
+  repeated SocketOption socket_options = 1;
 }

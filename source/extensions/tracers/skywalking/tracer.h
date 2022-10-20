@@ -41,7 +41,8 @@ public:
    *
    * @return The unique ptr to the newly created span.
    */
-  Tracing::SpanPtr startSpan(absl::string_view name, TracingContextPtr tracing_context);
+  Tracing::SpanPtr startSpan(absl::string_view name, absl::string_view protocol,
+                             TracingContextPtr tracing_context);
 
 private:
   TraceSegmentReporterPtr reporter_;
@@ -51,16 +52,27 @@ using TracerPtr = std::unique_ptr<Tracer>;
 
 class Span : public Tracing::Span {
 public:
-  Span(absl::string_view name, TracingContextPtr tracing_context, Tracer& parent_tracer)
+  Span(absl::string_view name, absl::string_view protocol, TracingContextPtr tracing_context,
+       Tracer& parent_tracer)
       : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
         span_entity_(tracing_context_->createEntrySpan()) {
     span_entity_->startSpan({name.data(), name.size()});
+    skywalking::v3::SpanLayer layer;
+    if (absl::StrContains(protocol, "HTTP")) {
+      // TraceContext.protocol of http is parsed from http message, which value could be HTTP/1.1,
+      // etc.
+      layer = skywalking::v3::SpanLayer::Http;
+    } else if (!skywalking::v3::SpanLayer_Parse(std::string(protocol), &layer)) {
+      layer = skywalking::v3::SpanLayer::Unknown;
+    }
+    span_entity_->setSpanLayer(layer);
   }
-  Span(absl::string_view name, Span& parent_span, TracingContextPtr tracing_context,
-       Tracer& parent_tracer)
+  Span(absl::string_view name, skywalking::v3::SpanLayer span_layer, Span& parent_span,
+       TracingContextPtr tracing_context, Tracer& parent_tracer)
       : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
         span_entity_(tracing_context_->createExitSpan(parent_span.spanEntity())) {
     span_entity_->startSpan({name.data(), name.size()});
+    span_entity_->setSpanLayer(span_layer);
   }
 
   // Tracing::Span

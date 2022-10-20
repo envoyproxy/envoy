@@ -162,7 +162,7 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
   PST will kick off point releases unless the bug is deemed unlikely to be encountered
   in production (e.g. only triggered by trace logs) at which point there will instead be an email
   to envoy-announce and users can request point releases if they believe they will be affected.
-  Publicaly announced bugs which only affect debug binaries will neither trigger point
+  Publicly announced bugs which only affect debug binaries will neither trigger point
   releases nor announce emails.
 
 ### Fix Disclosure Process

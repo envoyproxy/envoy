@@ -1528,6 +1528,8 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
     // with outstanding window will contribute to a slow connection-window leak.
+    ENVOY_CONN_LOG(debug, "Recouping {} bytes of flow control window for stream {}.", connection_,
+                   stream->unconsumed_bytes_, stream_id);
     if (use_new_codec_wrapper_) {
       adapter_->MarkDataConsumedForStream(stream_id, stream->unconsumed_bytes_);
       stream->unconsumed_bytes_ = 0;
@@ -1973,6 +1975,11 @@ ConnectionImpl::Http2Options::Http2Options(
   og_options_.max_header_field_size = max_headers_kb * 1024;
   og_options_.allow_extended_connect = http2_options.allow_connect();
 
+#ifdef ENVOY_ENABLE_UHV
+  // UHV - disable header validations in oghttp2
+  og_options_.validate_http_headers = false;
+#endif
+
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -1980,6 +1987,11 @@ ConnectionImpl::Http2Options::Http2Options(
   // number of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
+
+  // RFC9113 invalidates trailing whitespace in header values but this is a new validation which
+  // can break existing deployments.
+  // Disable this validation for now.
+  nghttp2_option_set_no_rfc9113_leading_and_trailing_ws_validation(options_, 1);
 
   // The max send header block length is configured to an arbitrarily high number so as to never
   // trigger the check within nghttp2, as we check request headers length in

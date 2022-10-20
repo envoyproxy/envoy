@@ -19,7 +19,7 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   return quic_address.IsInitialized()
              ? Network::Address::addressFromSockAddrOrDie(quic_address.generic_address(),
                                                           quic_address.host().address_family() ==
-                                                                  quic::IpAddressFamily::IP_V4
+                                                                  quiche::IpAddressFamily::IP_V4
                                                               ? sizeof(sockaddr_in)
                                                               : sizeof(sockaddr_in6),
                                                           -1, false)
