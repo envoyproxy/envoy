@@ -10,6 +10,7 @@
 #include "engine_callbacks.h"
 #include "key_value_store.h"
 #include "log_level.h"
+#include "string_accessor.h"
 
 namespace Envoy {
 namespace Platform {
@@ -39,6 +40,7 @@ public:
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
   EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
   EngineBuilder& addKeyValueStore(const std::string& name, KeyValueStoreSharedPtr key_value_store);
+  EngineBuilder& addStringAccessor(const std::string& name, StringAccessorSharedPtr accessor);
   EngineBuilder& setAppVersion(const std::string& app_version);
   EngineBuilder& setAppId(const std::string& app_id);
   EngineBuilder& setDeviceOs(const std::string& app_id);
@@ -63,9 +65,10 @@ public:
 
   // TODO(crockeo): add after filter integration
   // EngineBuilder& addPlatformFilter(name: String = UUID.randomUUID().toString(), factory: () ->
-  // Filter): EngineBuilder& addNativeFilter(name: String = UUID.randomUUID().toString(),
-  // typedConfig: String): EngineBuilder& addStringAccessor(name: String, accessor:
-  // EnvoyStringAccessor): EngineBuilder {
+  // Filter):
+  // EngineBuilder& addNativeFilter(name: String = UUID.randomUUID().toString(),
+  // typedConfig: String):
+
 protected:
   void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }
   void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
@@ -115,7 +118,7 @@ private:
   // TODO(crockeo): add after filter integration
   // std::vector<EnvoyHTTPFilterFactory> http_platform_filter_factories_;
   // std::vector<EnvoyNativeFilterConfig> native_filter_chain_;
-  // std::map<std::string, EnvoyStringAccessor> string_accessors_;
+  absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

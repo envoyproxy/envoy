@@ -43,6 +43,7 @@ envoy_cc_library(
         "stream_callbacks.cc",
         "stream_client.cc",
         "stream_prototype.cc",
+        "string_accessor.cc",
         "upstream_http_protocol.cc",
     ],
     hdrs = [
@@ -69,6 +70,7 @@ envoy_cc_library(
         "stream_callbacks.h",
         "stream_client.h",
         "stream_prototype.h",
+        "string_accessor.h",
         "trailers.h",
         "upstream_http_protocol.h",
     ],
@@ -77,6 +79,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//library/common:envoy_main_interface_lib_no_stamp",
+        "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",
     ],

@@ -8,7 +8,9 @@
 #include "gtest/gtest.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/log_level.h"
+#include "library/common/api/external.h"
 #include "library/common/config/internal.h"
+#include "library/common/data/utility.h"
 
 #if defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
@@ -323,7 +325,7 @@ TEST(TestConfig, EnableHttp3) {
 }
 
 TEST(TestConfig, RemainingTemplatesThrows) {
-  auto engine_builder = EngineBuilder("{{ template_that_i_will_not_fill }}");
+  EngineBuilder engine_builder("{{ template_that_i_will_not_fill }}");
   try {
     engine_builder.generateConfigStr();
     FAIL() << "Expected std::runtime_error";
@@ -333,7 +335,7 @@ TEST(TestConfig, RemainingTemplatesThrows) {
 }
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
-  auto engine_builder = EngineBuilder();
+  EngineBuilder engine_builder;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   engine_builder.enablePlatformCertificatesValidation(false);
   auto config_str1 = engine_builder.generateConfigStr();
@@ -355,5 +357,39 @@ TEST(TestConfig, EnablePlatformCertificatesValidation) {
 #endif
 }
 
+// Implementation of StringAccessor which tracks the number of times it was used.
+class TestStringAccessor : public StringAccessor {
+public:
+  explicit TestStringAccessor(std::string data) : data_(data) {}
+  ~TestStringAccessor() override = default;
+
+  // StringAccessor
+  const std::string& get() const override {
+    ++count_;
+    return data_;
+  }
+
+  int count() { return count_; }
+
+private:
+  std::string data_;
+  mutable int count_ = 0;
+};
+
+TEST(TestConfig, StringAccessors) {
+  std::string name("accessor_name");
+  EngineBuilder engine_builder;
+  std::string data_string = "envoy string";
+  auto accessor = std::make_shared<TestStringAccessor>(data_string);
+  engine_builder.addStringAccessor(name, accessor);
+  EngineSharedPtr engine = engine_builder.build();
+  auto c_accessor = static_cast<envoy_string_accessor*>(Envoy::Api::External::retrieveApi(name));
+  ASSERT_TRUE(c_accessor != nullptr);
+  EXPECT_EQ(0, accessor->count());
+  envoy_data data = c_accessor->get_string(c_accessor->context);
+  EXPECT_EQ(1, accessor->count());
+  EXPECT_EQ(data_string, Data::Utility::copyToString(data));
+  release_envoy_data(data);
+}
 } // namespace
 } // namespace Envoy

@@ -21,6 +21,7 @@ Features:
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
 - kotlin: add a ``enableSkipDNSLookupForProxiedRequests(true)`` knob for controlling whether Envoy waits on DNS response in the dynamic forward proxy filter for proxied requests. (:issue:`#2602 <2602>`)
 - api: Add various methods to C++ EngineBuilder to bring it to parity with the Java and Obj-C builders. (:issue:`#2498 <2498>`)
+- api: Add support for String Accessors to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
 
 0.5.0 (September 2, 2022)
