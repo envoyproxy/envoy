@@ -309,7 +309,10 @@ public class EnvoyConfiguration {
 
     if (!stat_sinks_config.isEmpty()) {
       configBuilder.append("- &stats_sinks [");
-      configBuilder.append(String.join(",", stat_sinks_config));
+      configBuilder.append(stat_sinks_config.get(0));
+      for (int i = 1; i < stat_sinks_config.size(); i++) {
+        configBuilder.append(',').append(stat_sinks_config.get(i));
+      }
       configBuilder.append("] \n");
     }
 
