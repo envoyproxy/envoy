@@ -144,7 +144,7 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
   // TODO (soulxu): Add runtime flag here.
   if (Io::isIoUringSupported()) {
     std::shared_ptr<Io::IoUringFactoryImpl> io_uring_factory =
-        std::make_unique<Io::IoUringFactoryImpl>(DefaultIoUringSize, UseSubmissionQueuePolling,
+        std::make_shared<Io::IoUringFactoryImpl>(DefaultIoUringSize, UseSubmissionQueuePolling,
                                                  context.threadLocal());
     io_uring_factory_ = io_uring_factory;
 
