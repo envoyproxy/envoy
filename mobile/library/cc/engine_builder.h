@@ -57,7 +57,7 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   // this is separated from build() for the sake of testability
-  std::string generateConfigStr();
+  std::string generateConfigStr() const;
 
   EngineSharedPtr build();
 
