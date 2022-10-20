@@ -6,7 +6,6 @@
 # hass from GitHub. Note: This script can only be executed from project root directory of an
 # extracted "release" tarball.
 
-import os
 import sys
 import json
 
@@ -17,8 +16,7 @@ from pathlib import Path
 if Path(".git").exists():
     print(
         "Failed to create SOURCE_VERSION. "
-        "Run this script from an extracted release tarball directory."
-    )
+        "Run this script from an extracted release tarball directory.")
     sys.exit(1)
 
 # Check if we have VERSION.txt available
@@ -26,8 +24,7 @@ current_version_file = Path("VERSION.txt")
 if not current_version_file.exists():
     print(
         "Failed to read VERSION.txt. "
-        "Run this script from project root of an extracted release tarball directory."
-    )
+        "Run this script from project root of an extracted release tarball directory.")
     sys.exit(1)
 
 current_version = current_version_file.read_text().rstrip()
@@ -37,14 +34,12 @@ if current_version.endswith("-dev"):
     print(
         "Failed to create SOURCE_VERSION. "
         "The current VERSION.txt contains version with '-dev' suffix. "
-        "Run this script from an extracted release tarball directory."
-    )
+        "Run this script from an extracted release tarball directory.")
     sys.exit(1)
 
 # Fetch the current version commit information from GitHub.
-with request.urlopen(
-    "https://api.github.com/repos/envoyproxy/envoy/commits/v" + current_version
-) as response:
+with request.urlopen("https://api.github.com/repos/envoyproxy/envoy/commits/v"
+                     + current_version) as response:
     commit_info = json.loads(response.read())
     source_version_file = Path("SOURCE_VERSION")
     with source_version_file.open("w", encoding="utf-8") as source_version:
