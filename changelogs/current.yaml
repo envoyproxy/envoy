@@ -12,6 +12,10 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+  - area: ecds
+    change: |
+      removed ``envoy.reloadable_features.top_level_ecds_stats`` and legacy code paths.
+
   - area: http
     change: |
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
