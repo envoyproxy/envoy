@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     # Fetch the current version commit information from GitHub.
     with urllib.request.urlopen("https://api.github.com/repos/envoyproxy/envoy/commits/v"
-                        + current_version) as response:
+                                + current_version) as response:
         commit_info = json.loads(response.read())
         source_version_file = pathlib.Path("SOURCE_VERSION")
         with source_version_file.open("w", encoding="utf-8") as source_version:
