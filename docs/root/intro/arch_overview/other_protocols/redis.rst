@@ -194,7 +194,7 @@ For details on each command's usage see the official
   LREM, List
   LSET, List
   LTRIM, List
-  MUTLI, Transaction
+  MULTI, Transaction
   RPOP, List
   RPUSH, List
   RPUSHX, List
