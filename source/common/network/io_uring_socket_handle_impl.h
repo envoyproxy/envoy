@@ -132,6 +132,7 @@ private:
   uint32_t vecs_to_write_{0};
   bool is_write_added_{false};
   std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
+  bool remote_closed_{false};
 };
 
 } // namespace Network

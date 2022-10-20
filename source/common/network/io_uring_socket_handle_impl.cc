@@ -83,7 +83,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::readv(uint64_t /* max_length */
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
   const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
-  if (max_length == 0) {
+  if (max_length == 0 || remote_closed_) {
     return Api::ioCallUint64ResultNoError();
   }
 
@@ -499,7 +499,11 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       break;
     }
-    iohandle.cb_(result > 0 ? Event::FileReadyType::Read : Event::FileReadyType::Closed);
+
+    if (result == 0) {
+      iohandle.remote_closed_ = true;
+    }
+    iohandle.cb_(Event::FileReadyType::Read);
     if (result > 0) {
       iohandle.addReadRequest();
     }
