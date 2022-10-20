@@ -522,6 +522,13 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     ASSERT(req.iov_ != nullptr);
     ASSERT(req.iohandle_.has_value());
     auto& iohandle = req.iohandle_->get();
+
+    // This is hacky fix, we should check the req is valid or not.
+    if (iohandle.fd_ == -1) {
+      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
+      break;
+    }
+
     if (result < 0) {
       delete[] req.iov_;
       iohandle.cb_(Event::FileReadyType::Closed);
