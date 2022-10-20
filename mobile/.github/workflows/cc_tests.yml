@@ -26,6 +26,6 @@ jobs:
           ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
-            --config=remote-ci-linux \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/cc/...

@@ -27,7 +27,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //:android_dist
@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
@@ -91,7 +91,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
@@ -125,7 +125,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/baseline:hello_envoy_kt
@@ -159,7 +159,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ./bazelw build \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //test/kotlin/apps/experimental:hello_envoy_kt

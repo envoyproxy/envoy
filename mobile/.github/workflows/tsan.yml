@@ -47,5 +47,5 @@ jobs:
             --test_output=all \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            --config=remote-ci-linux-tsan \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-tsan") \
             //test/common/...

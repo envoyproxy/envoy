@@ -33,7 +33,7 @@ jobs:
               --config=release-android \
               --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
               --define=pom_version="${current_release_version:1}" \
-              --config=remote-ci-macos \
+              $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
               --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
               //:android_dist
       - name: 'Tar artifacts'
@@ -123,7 +123,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=release-ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
       - name: 'Move Envoy.xcframework.zip'
@@ -139,7 +139,7 @@ jobs:
           ./bazelw build \
             --output_groups=+swift_symbol_graph \
             --config=release-ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/swift:ios_lib
           ./tools/docc.sh bazel-bin/library/swift/ios_lib.symbolgraph
