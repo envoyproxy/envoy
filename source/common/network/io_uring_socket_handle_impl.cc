@@ -313,7 +313,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::resetFileEvents() { file_event_adapter_.reset(); }
 
-Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int /*how*/) { PANIC("not implemented"); }
+Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) { return Api::OsSysCallsSingleton::get().shutdown(fd_, how); }
 
 void IoUringSocketHandleImpl::addReadRequest() {
   if (!is_read_enabled_ || !SOCKET_VALID(fd_) || is_read_added_) {
