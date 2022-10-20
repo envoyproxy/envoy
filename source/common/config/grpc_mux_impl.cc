@@ -108,7 +108,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 }
 
 void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
-                                         const std::vector<std::string>& resource_names) {
+                                         const absl::flat_hash_set<std::string>& resource_names) {
   if (!xds_resources_delegate_.has_value()) {
     return;
   }
@@ -393,8 +393,8 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       // connectivity is established with the xDS server.
       loadConfigFromDelegate(
           /*type_url=*/api_state.first,
-          std::vector<std::string>{api_state.second->request_.resource_names().begin(),
-                                   api_state.second->request_.resource_names().end()});
+          absl::flat_hash_set<std::string>{api_state.second->request_.resource_names().begin(),
+                                           api_state.second->request_.resource_names().end()});
       previously_fetched_data_ = true;
     }
   }

@@ -655,7 +655,7 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, SelectOverrideHostTestInLb) {
 
   {
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Unhealthy));
+    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Unhealthy));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())
@@ -674,7 +674,7 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, SelectOverrideHostTestInLb) {
 
   {
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())
@@ -2793,7 +2793,7 @@ TEST(LoadBalancerContextBaseTest, SelectOverrideHostTest) {
   {
     // The status of host is not as expected.
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Unhealthy));
+    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Unhealthy));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())
@@ -2807,7 +2807,7 @@ TEST(LoadBalancerContextBaseTest, SelectOverrideHostTest) {
   {
     // Get expected host.
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())

@@ -286,6 +286,20 @@ TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(ProtocolIntegrationTest, RouterOnlyTracing) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.set_start_child_span(true);
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+}
+
 TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
   config_helper_.prependFilter(R"EOF(
   name: add-body-filter

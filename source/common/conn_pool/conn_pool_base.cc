@@ -77,7 +77,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
   // upstream selection logic may result in bypassing this upstream entirely.
   // If an Envoy user wants preconnecting for degraded upstreams this could be
   // added later via extending the preconnect config.
-  if (host_->health() != Upstream::Host::Health::Healthy) {
+  if (host_->coarseHealth() != Upstream::Host::Health::Healthy) {
     return pending_streams_.size() > connecting_stream_capacity_;
   }
 

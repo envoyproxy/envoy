@@ -231,7 +231,10 @@ public:
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
-                            priority, time_source) {
+                            priority, time_source),
+        health_status_(health_status) {
+    // This EDS flags setting is still necessary for stats, configuration dump, canonical
+    // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -264,7 +267,24 @@ public:
     setOutlierDetectorImpl(std::move(outlier_detector));
   }
 
-  Host::Health health() const override {
+  Host::HealthStatus healthStatus() const override {
+    // Evaluate active health status first.
+
+    // Active unhealthy.
+    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
+        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK)) {
+      return HealthStatus::UNHEALTHY;
+    }
+    // Active degraded.
+    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
+      return HealthStatus::DEGRADED;
+    }
+
+    // Use EDS status if no any active status.
+    return health_status_;
+  }
+
+  Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
@@ -305,6 +325,10 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
+  // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
+  // future.
+  HealthStatus health_status_{};
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
