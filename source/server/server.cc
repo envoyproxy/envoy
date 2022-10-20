@@ -505,7 +505,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   if (VersionInfo::sslFipsCompliant()) {
     server_compilation_settings_stats_->fips_mode_.set(1);
   } else {
-    // Set this explicitly so that "used" flag is set.
+    // Set this explicitly so that "used" flag is set so that it can be pushed to stats sinks.
     server_compilation_settings_stats_->fips_mode_.set(0);
   }
 
