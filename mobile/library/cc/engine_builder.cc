@@ -12,6 +12,14 @@
 namespace Envoy {
 namespace Platform {
 
+namespace {
+// Inserts `filter_config` into the "custom_filters" target in `config_template`.
+void insertCustomFilter(const std::string& filter_config, std::string& config_template) {
+  absl::StrReplaceAll({{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", filter_config)}},
+                      &config_template);
+}
+} // namespace
+
 EngineBuilder::EngineBuilder(std::string config_template)
     : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template) {}
 EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {}
@@ -193,7 +201,7 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
   return *this;
 }
 
-std::string EngineBuilder::generateConfigStr() {
+std::string EngineBuilder::generateConfigStr() const {
 #if defined(__APPLE__)
   std::string dns_resolver_name = "envoy.network.dns_resolver.apple";
   std::string dns_resolver_config =
@@ -273,29 +281,21 @@ std::string EngineBuilder::generateConfigStr() {
                                                   : default_cert_validation_context_template);
   config_builder << cert_validation_template << std::endl;
 
+  std::string config_template = config_template_;
   if (this->gzip_filter_) {
-    absl::StrReplaceAll(
-        {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", gzip_config_insert)}},
-        &config_template_);
+    insertCustomFilter(gzip_config_insert, config_template);
   }
   if (this->brotli_filter_) {
-    absl::StrReplaceAll(
-        {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", brotli_config_insert)}},
-        &config_template_);
+    insertCustomFilter(brotli_config_insert, config_template);
   }
   if (this->socket_tagging_filter_) {
-    absl::StrReplaceAll(
-        {{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", socket_tag_config_insert)}},
-        &config_template_);
+    insertCustomFilter(socket_tag_config_insert, config_template);
   }
   if (this->enable_http3_) {
-    absl::StrReplaceAll(
-        {{"#{custom_filters}",
-          absl::StrCat("#{custom_filters}\n", alternate_protocols_cache_filter_insert)}},
-        &config_template_);
+    insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
   }
 
-  config_builder << config_template_;
+  config_builder << config_template;
 
   if (admin_interface_enabled_) {
     config_builder << "admin: *admin_interface" << std::endl;
