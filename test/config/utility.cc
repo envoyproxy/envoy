@@ -1420,11 +1420,10 @@ void ConfigHelper::initializeTls(
           filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
-      if (options.max_verify_depth_.has_value()) {
-        cert_yaml += R"EOF(
-        max_verify_depth: )EOF" + std::to_string(options.max_verify_depth_.value());
-      }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+      if (options.max_verify_depth_.has_value()) {
+        validation_context->mutable_max_verify_depth()->set_value(options.max_verify_depth_.value());
+      }
     } else {
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
