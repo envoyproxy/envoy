@@ -1,6 +1,12 @@
 #pragma once
 
+#include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
+
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
+
+#if defined(__linux__)
+#include <linux/filter.h>
+#endif
 
 namespace Envoy {
 namespace Quic {
@@ -19,6 +25,21 @@ public:
   absl::optional<quic::QuicConnectionId>
   MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                            const quic::ParsedQuicVersion& version) override;
+};
+
+class EnvoyDeterministicConnectionIdGeneratorFactory
+    : public EnvoyQuicConnectionIdGeneratorFactory {
+public:
+  // EnvoyQuicConnectionIdGeneratorFactory.
+  QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
+  Network::Socket::OptionConstSharedPtr
+  createCompatibleLinuxBpfSocketOption(uint32_t concurrency) override;
+
+private:
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+  sock_fprog prog_;
+  std::vector<sock_filter> filter_;
+#endif
 };
 
 } // namespace Quic

@@ -18,7 +18,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/common/matching/v3;matchingv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Extension Matcher]
+// [#protodoc-title: Extension matcher]
 
 // Wrapper around an existing extension that provides an associated matcher. This allows
 // decorating an existing extension with a matcher, which can be used to match against

@@ -572,7 +572,7 @@ HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* ho
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
-  if (status[static_cast<size_t>(host->health())]) {
+  if (status[static_cast<size_t>(host->coarseHealth())]) {
     return host;
   }
   return nullptr;
@@ -840,7 +840,7 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
     // Check if host existence time is within slow start window.
     if (host->creationTime() > latest_host_added_time_ &&
         host_create_duration <= slow_start_window_ &&
-        host->health() == Upstream::Host::Health::Healthy) {
+        host->coarseHealth() == Upstream::Host::Health::Healthy) {
       latest_host_added_time_ = host->creationTime();
     }
   }
@@ -995,7 +995,7 @@ double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host&
   auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - host.creationTime());
   if (host_create_duration < slow_start_window_ &&
-      host.health() == Upstream::Host::Health::Healthy) {
+      host.coarseHealth() == Upstream::Host::Health::Healthy) {
     aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
     if (aggression_ <= 0.0 || std::isnan(aggression_)) {
       ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
