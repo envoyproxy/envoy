@@ -1528,6 +1528,8 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
     // with outstanding window will contribute to a slow connection-window leak.
+    ENVOY_CONN_LOG(debug, "Recouping {} bytes of flow control window for stream {}.", connection_,
+                   stream->unconsumed_bytes_, stream_id);
     if (use_new_codec_wrapper_) {
       adapter_->MarkDataConsumedForStream(stream_id, stream->unconsumed_bytes_);
       stream->unconsumed_bytes_ = 0;
