@@ -18,7 +18,7 @@ static void bmEvaluateHeaders(benchmark::State& state) {
   MockTimeSystem time_system;
   // Allocate empty stream_info. It is not really used, but HeaderParser::evaluateHeaders
   // does not invoke formatter when pointer to stream_info is null.
-  auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_system);
+  const auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_system);
 
   // Prepare config with headers to add and overwrite.
   Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption> headers_to_add;

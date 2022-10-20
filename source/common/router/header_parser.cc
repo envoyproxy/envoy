@@ -251,6 +251,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
 HeaderParserPtr
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
+  std::set<absl::string_view> headers_to_overwrite;
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -267,6 +268,18 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
                           : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
     } else {
       append_action = header_value_option.append_action();
+    }
+
+    // There should be only one OVERWRITE_IF_EXISTS_OR_ADD per each header.
+    if (append_action == HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD) {
+      if (headers_to_overwrite.find(header_value_option.header().key()) !=
+          headers_to_overwrite.end()) {
+        throw EnvoyException(
+            fmt::format("Multiple OVERWRITE_IF_EXISTS_OR_ADD actions for header {} are not allowed",
+                        header_value_option.header().key()));
+      } else {
+        headers_to_overwrite.emplace(header_value_option.header().key());
+      }
     }
 
     HttpHeaderFormatterPtr header_formatter;
@@ -342,49 +355,65 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
-  // Create local copy of headers to add and replace. This is required
-  // to execute all formatters using the original received headers.
-  // Only after all the formatters produced the new values of the headers, the headers are set.
-  std::vector<std::pair<const Http::LowerCaseString&, std::string>> headers_to_add;
-  absl::flat_hash_map<absl::string_view, std::pair<const Http::LowerCaseString&, std::string>>
-      headers_to_overwrite;
-
-  for (const auto& [key, entry] : headers_to_add_) {
-    const std::string value =
-        stream_info != nullptr
-            ? entry.formatter_->format(request_headers, response_headers, *stream_info)
-            : entry.original_value_;
-    if (!value.empty() || entry.add_if_empty_) {
-      switch (entry.append_action_) {
-        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers_to_add.emplace_back(key, value);
-        break;
-      case HeaderValueOption::ADD_IF_ABSENT:
-        if (auto header_entry = headers.get(key); header_entry.empty()) {
+  if (stream_info != nullptr) {
+    // Create local copy of headers to add and replace. This is required
+    // to execute all formatters using the original received headers.
+    // Only after all the formatters produced the new values of the headers, the headers are set.
+    std::vector<std::pair<const Http::LowerCaseString&, const std::string>> headers_to_add,
+        headers_to_overwrite;
+    for (const auto& [key, entry] : headers_to_add_) {
+      const std::string value =
+          entry.formatter_->format(request_headers, response_headers, *stream_info);
+      if (!value.empty() || entry.add_if_empty_) {
+        switch (entry.append_action_) {
+          PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
           headers_to_add.emplace_back(key, value);
+          break;
+        case HeaderValueOption::ADD_IF_ABSENT:
+          if (auto header_entry = headers.get(key); header_entry.empty()) {
+            headers_to_add.emplace_back(key, value);
+          }
+          break;
+        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+          headers_to_overwrite.emplace_back(key, value);
+          break;
         }
-        break;
-      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        // TODO(cpakulski): Hash map is used to track multiple OVERWRITE actions
-        // and store only the last one. It would be more efficient to do it
-        // when config is processed. All OVERWRITE actions for the same header could be dropped
-        // except the last one.
-        headers_to_overwrite.erase(key);
-        headers_to_overwrite.try_emplace(key, key, value);
-        break;
       }
     }
-  }
 
-  // First overwrite all headers which need to be overwritten.
-  for (const auto& [key, value] : headers_to_overwrite) {
-    headers.setReferenceKey(value.first, std::move(value.second));
-  }
+    // First overwrite all headers which need to be overwritten.
+    for (const auto& header : headers_to_overwrite) {
+      headers.setReferenceKey(header.first, header.second);
+    }
 
-  // Now add headers which should be added.
-  for (const auto& header : headers_to_add) {
-    headers.addReferenceKey(header.first, std::move(header.second));
+    // Now add headers which should be added.
+    for (const auto& header : headers_to_add) {
+      headers.addReferenceKey(header.first, header.second);
+    }
+  } else {
+    // The logic below is very similar to code executed when stream_info != nullptr,
+    // It is possible to combine two branches of "if" statement into more elegant code,
+    // but based on performance testing, using separate branches depending on value
+    // of stream_info resulted in the most efficient code.
+    for (const auto& [key, entry] : headers_to_add_) {
+      if (!entry.original_value_.empty() || entry.add_if_empty_) {
+        switch (entry.append_action_) {
+          PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+          headers.addReferenceKey(key, entry.original_value_);
+          break;
+        case HeaderValueOption::ADD_IF_ABSENT:
+          if (auto header_entry = headers.get(key); header_entry.empty()) {
+            headers.addReferenceKey(key, entry.original_value_);
+          }
+          break;
+        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+          headers.setReferenceKey(key, entry.original_value_);
+          break;
+        }
+      }
+    }
   }
 }
 
