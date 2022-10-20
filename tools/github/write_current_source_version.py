@@ -14,7 +14,7 @@ from urllib import request
 from pathlib import Path
 
 if __name__ == "__main__":
-    # Simple check if a .git directory exists. We should only rely on information from "git".
+    # Simple check if a .git directory exists. When we are in a Git repo, we should rely on git.
     if Path(".git").exists():
         print(
             "Failed to create SOURCE_VERSION. "
