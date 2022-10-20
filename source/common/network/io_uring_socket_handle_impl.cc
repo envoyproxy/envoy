@@ -92,6 +92,10 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                IoSocketError::deleteIoError)};
   }
 
+  if (bytes_to_read_ < 0) {
+    return {0, Api::IoErrorPtr(new IoSocketError(bytes_to_read_), IoSocketError::deleteIoError)};
+  }
+
   if (read_buf_ == nullptr) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
