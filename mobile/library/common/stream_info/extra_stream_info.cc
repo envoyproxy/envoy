@@ -61,6 +61,10 @@ void setFinalStreamIntel(StreamInfo& stream_info, TimeSource& time_source,
     }
     setFromOptional(final_intel.ssl_end_ms, timing.upstream_handshake_complete_, offset_ms);
     final_intel.socket_reused = upstream_info->upstreamNumStreams() > 1;
+    if (stream_info.upstreamInfo()->upstreamProtocol().has_value()) {
+      final_intel.upstream_protocol =
+          static_cast<int64_t>(stream_info.upstreamInfo()->upstreamProtocol().value());
+    }
   }
 
   setFromOptional(

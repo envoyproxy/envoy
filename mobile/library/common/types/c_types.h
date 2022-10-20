@@ -213,6 +213,13 @@ typedef struct {
   // https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
   // for the ResponseFlag enum.
   uint64_t response_flags;
+  // The upstream protocol, if an upstream connection was established. Field
+  // entries are based off of Envoy's Http::Protocol
+  // Http10 == 0
+  // Http11 == 1
+  // Http2 == 2
+  // Http3 == 3
+  int64_t upstream_protocol;
 } envoy_final_stream_intel;
 
 #ifdef __cplusplus

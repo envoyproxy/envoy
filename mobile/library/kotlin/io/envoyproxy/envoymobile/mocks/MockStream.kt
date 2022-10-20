@@ -34,6 +34,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
     override fun getSentByteCount(): Long { return 0 }
     override fun getReceivedByteCount(): Long { return 0 }
     override fun getResponseFlags(): Long { return 0 }
+    override fun getUpstreamProtocol(): Long { return 0 }
   }
   /**
    * Closure that will be called when request headers are sent.

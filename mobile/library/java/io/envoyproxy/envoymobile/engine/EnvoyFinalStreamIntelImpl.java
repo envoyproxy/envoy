@@ -18,6 +18,7 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   private long sentByteCount;
   private long receivedByteCount;
   private long responseFlags;
+  private long upstreamProtocol;
 
   EnvoyFinalStreamIntelImpl(long[] values) {
     streamStartMs = values[0];
@@ -35,6 +36,7 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
     sentByteCount = values[12];
     receivedByteCount = values[13];
     responseFlags = values[14];
+    upstreamProtocol = values[15];
   }
 
   @Override
@@ -96,5 +98,9 @@ class EnvoyFinalStreamIntelImpl implements EnvoyFinalStreamIntel {
   @Override
   public long getResponseFlags() {
     return responseFlags;
+  }
+  @Override
+  public long getUpstreamProtocol() {
+    return upstreamProtocol;
   }
 }
