@@ -1,5 +1,3 @@
-# Copyright 2020 Envoyproxy Authors
-
 # Produces SOURCE_VERSION file with content from current version commit hash. As a reminder,
 # SOURCE_VERSION is required when building Envoy from an extracted release tarball (non-git).
 # See: bazel/get_workspace_status for more information.
