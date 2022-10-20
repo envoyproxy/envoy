@@ -20,6 +20,9 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
   - area: http
     change: |
+      removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+  - area: http
+    change: |
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
 
 new_features:
