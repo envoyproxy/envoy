@@ -23,7 +23,7 @@ jobs:
           ./bazelw shutdown
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/swift:ios_framework
         name: 'Build Envoy.framework distributable'
@@ -43,7 +43,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/hello_world:app
         name: 'Build swift app'
@@ -53,7 +53,7 @@ jobs:
         run: |
           ./bazelw run \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/hello_world:app &> /tmp/envoy.log &
         name: 'Run swift app'
@@ -78,7 +78,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/baseline:app
         name: 'Build swift app'
@@ -88,7 +88,7 @@ jobs:
         run: |
           ./bazelw run \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/baseline:app &> /tmp/envoy.log &
         name: 'Run swift app'
@@ -113,7 +113,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/experimental:app
         name: 'Build swift app'
@@ -123,7 +123,7 @@ jobs:
         run: |
           ./bazelw run \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
         name: 'Run swift app'
@@ -148,7 +148,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/async_await:app
         name: 'Build swift app'
@@ -158,7 +158,7 @@ jobs:
         run: |
           ./bazelw run \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/async_await:app &> /tmp/envoy.log &
         name: 'Run swift app'
@@ -183,7 +183,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app
         name: 'Build objective-c app'
@@ -193,7 +193,7 @@ jobs:
         run: |
           ./bazelw run \
             --config=ios \
-            --config=remote-ci-macos \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app &> /tmp/envoy.log &
         name: 'Run objective-c app'

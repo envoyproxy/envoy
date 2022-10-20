@@ -28,7 +28,7 @@ jobs:
         run: |
           ./bazelw build \
             --config=sizeopt \
-            --config=remote-ci-linux-clang \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
       - uses: actions/upload-artifact@v2
@@ -59,7 +59,7 @@ jobs:
           git checkout main && git pull origin main && git submodule update
           ./bazelw build \
             --config=sizeopt \
-            --config=remote-ci-linux-clang \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
       - uses: actions/upload-artifact@v2
