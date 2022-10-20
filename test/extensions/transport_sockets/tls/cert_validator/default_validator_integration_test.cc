@@ -97,7 +97,6 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedWithTrustRootOnly) 
 }
 
 // With only root ca trusted, certificate validation is expected to fail with max depth,
-// but it succeeds
 TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
@@ -108,10 +107,9 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedWithTrustRootOnly) {
   initialize();
   auto conn = makeSslClientConnection({});
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
-  ASSERT_TRUE(codec->connected());
-  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
-  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
-  codec->close();
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
+
 }
 } // namespace Ssl
 } // namespace Envoy
