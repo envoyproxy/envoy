@@ -164,9 +164,18 @@ public:
   };
 
   /**
-   * @return the health of the host.
+   * @return the coarse health status of the host.
    */
-  virtual Health health() const PURE;
+  virtual Health coarseHealth() const PURE;
+
+  using HealthStatus = envoy::config::core::v3::HealthStatus;
+
+  /**
+   * @return more specific health status of host. This status is hybrid of EDS status and runtime
+   * active status (from active health checker or outlier detection). Active status will be taken as
+   * a priority.
+   */
+  virtual HealthStatus healthStatus() const PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
