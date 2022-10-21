@@ -48,9 +48,6 @@ open class EngineBuilder(
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
-  private var dnsFallbackNameservers = listOf<String>()
-  private var dnsFilterUnroutableFamilies = true
-  private var dnsUseSystemResolver = true
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = "[]"
@@ -193,47 +190,6 @@ open class EngineBuilder(
    */
   fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames
-    return this
-  }
-
-  /**
-   * Add a list of IP addresses to use as fallback DNS name servers.
-   *
-   * @param dnsFallbackNameservers addresses to use.
-   *
-   * @return this builder.
-   */
-  fun addDNSFallbackNameservers(dnsFallbackNameservers: List<String>): EngineBuilder {
-    this.dnsFallbackNameservers = dnsFallbackNameservers
-    return this
-  }
-
-  /**
-   * Specify whether to filter unroutable IP families during DNS resolution or not.
-   * Defaults to true.
-   *
-   * @param dnsFilterUnroutableFamilies whether to filter or not.
-   *
-   * @return this builder.
-   */
-  fun enableDNSFilterUnroutableFamilies(dnsFilterUnroutableFamilies: Boolean): EngineBuilder {
-    this.dnsFilterUnroutableFamilies = dnsFilterUnroutableFamilies
-    return this
-  }
-
-  /**
-   * Specify whether to use the getaddrinfo-based system DNS resolver or the c-ares resolver.
-   * Defaults to true.
-   *
-   * Note that if this is set, the values of `dnsFallbackNameservers` and
-   * `dnsFilterUnroutableFamilies` will be ignored.
-   *
-   * @param dnsUseSystemResolver whether to use the system DNS resolver.
-   *
-   * @return this builder.
-   */
-  fun enableDNSUseSystemResolver(dnsUseSystemResolver: Boolean): EngineBuilder {
-    this.dnsUseSystemResolver = dnsUseSystemResolver
     return this
   }
 
@@ -628,9 +584,6 @@ open class EngineBuilder(
       dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
-      dnsFallbackNameservers,
-      dnsFilterUnroutableFamilies,
-      dnsUseSystemResolver,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,

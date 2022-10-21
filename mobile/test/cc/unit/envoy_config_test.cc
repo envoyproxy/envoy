@@ -80,19 +80,6 @@ TEST(TestConfig, ConfigIsValid) {
 #endif
 }
 
-#if !defined(__APPLE__)
-TEST(TestConfig, SetUseDnsCAresResolver) {
-  EngineBuilder engine_builder;
-  engine_builder.useDnsSystemResolver(false);
-  std::string config_str = engine_builder.generateConfigStr();
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.network.dns_resolver.cares"));
-  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.getaddrinfo")));
-}
-#endif
-
 TEST(TestConfig, SetGzip) {
   EngineBuilder engine_builder;
 

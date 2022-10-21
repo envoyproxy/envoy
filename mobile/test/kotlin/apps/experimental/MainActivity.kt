@@ -58,7 +58,6 @@ class MainActivity : Activity() {
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
       .enableInterfaceBinding(true)
-      .enableDNSUseSystemResolver(false)
       .enableSocketTagging(true)
       .enableProxying(true)
       .enableSkipDNSLookupForProxiedRequests(true)

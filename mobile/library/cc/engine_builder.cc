@@ -208,27 +208,6 @@ EngineBuilder& EngineBuilder::addStringAccessor(const std::string& name,
 }
 
 std::string EngineBuilder::generateConfigStr() const {
-#if defined(__APPLE__)
-  std::string dns_resolver_name = "envoy.network.dns_resolver.apple";
-  std::string dns_resolver_config =
-      "{\"@type\":\"type.googleapis.com/"
-      "envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig\"}";
-#else
-  std::string dns_resolver_name = "";
-  std::string dns_resolver_config = "";
-  if (this->use_system_resolver_) {
-    dns_resolver_name = "envoy.network.dns_resolver.getaddrinfo";
-    dns_resolver_config =
-        "{\"@type\":\"type.googleapis.com/"
-        "envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}";
-  } else {
-    dns_resolver_name = "envoy.network.dns_resolver.cares";
-    dns_resolver_config =
-        "{\"@type\":\"type.googleapis.com/"
-        "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\"}";
-  }
-#endif
-
   std::vector<std::pair<std::string, std::string>> replacements {
     {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
         {"dns_fail_base_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_base_)},
@@ -239,7 +218,6 @@ std::string EngineBuilder::generateConfigStr() const {
         {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
         {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", this->dns_query_timeout_seconds_)},
-        {"dns_resolver_name", dns_resolver_name}, {"dns_resolver_config", dns_resolver_config},
         {"enable_drain_post_dns_refresh", enable_drain_post_dns_refresh_ ? "true" : "false"},
         {"enable_interface_binding", enable_interface_binding_ ? "true" : "false"},
         {"h2_connection_keepalive_idle_interval",

@@ -62,9 +62,6 @@ class EnvoyConfigurationTest {
     dnsQueryTimeoutSeconds: Int = 321,
     dnsMinRefreshSeconds: Int = 12,
     dnsPreresolveHostnames: String = "[hostname]",
-    dnsFallbackNameservers: List<String> = emptyList(),
-    enableDnsFilterUnroutableFamilies: Boolean = true,
-    dnsUseSystemResolver: Boolean = true,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = false,
     enableGzip: Boolean = true,
@@ -96,9 +93,6 @@ class EnvoyConfigurationTest {
       dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
-      dnsFallbackNameservers,
-      enableDnsFilterUnroutableFamilies,
-      dnsUseSystemResolver,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,
@@ -148,8 +142,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses false")
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
-    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.getaddrinfo")
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig\"}")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
 
     // Interface Binding
@@ -206,9 +198,6 @@ class EnvoyConfigurationTest {
   @Test
   fun `configuration resolves with alternate values`() {
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      dnsFallbackNameservers = listOf("8.8.8.8"),
-      enableDnsFilterUnroutableFamilies = false,
-      dnsUseSystemResolver = false,
       enableDrainPostDnsRefresh = true,
       enableHappyEyeballs = true,
       enableHttp3 = true,
@@ -226,7 +215,6 @@ CERT_VALIDATION_TEMPLATE
     )
 
     // DNS
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": false}")
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
@@ -254,21 +242,6 @@ CERT_VALIDATION_TEMPLATE
   }
 
   @Test
-  fun `configuration resolves with c ares DNS resolver`() {
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      dnsUseSystemResolver = false
-    )
-
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
-      CERT_VALIDATION_TEMPLATE
-    )
-
-    assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[],\"use_resolvers_as_fallback\": false, \"filter_unroutable_families\": true}")
-  }
-
-  @Test
   fun `resolve templates with invalid templates will throw on build`() {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
@@ -278,20 +251,5 @@ CERT_VALIDATION_TEMPLATE
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")
     }
-  }
-
-  @Test
-  fun `resolving multiple dns fallback nameservers`() {
-    val envoyConfiguration = buildTestEnvoyConfiguration(
-      dnsFallbackNameservers = listOf("8.8.8.8", "1.1.1.1"),
-      dnsUseSystemResolver = false
-    )
-
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
-CERT_VALIDATION_TEMPLATE
-    )
-
-    assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}},{\"socket_address\":{\"address\":\"1.1.1.1\"}}],\"use_resolvers_as_fallback\": true, \"filter_unroutable_families\": true}")
   }
 }
