@@ -30,6 +30,7 @@ enum class ParserState {
   String,                    // consuming an array element string
   ExpectArrayDelimiterOrEnd, // expect array delimiter (,) or end of array (])
   ExpectArgsEnd,             // expect closing ) in %VAR(...)%
+  UnexpectedState,           // testing fuzz
   ExpectVariableEnd          // expect closing % in %VAR(...)%
 };
 
@@ -99,6 +100,17 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
     const bool has_next_ch = (pos + 1) < format.size();
 
     switch (state) {
+    case ParserState::UnexpectedState:
+          // Skip over whitespace searching for the start of JSON array args.
+      if (ch == '[') {
+        // Search for first argument string
+        state = ParserState::ExpectString;
+      } else if (!isspace(ch)) {
+        // Consume it as a string argument.
+        state = ParserState::String;
+      }
+      break;
+
     case ParserState::Literal:
       // Searching for start of %VARIABLE% expression.
       if (ch != '%') {
