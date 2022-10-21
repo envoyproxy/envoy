@@ -154,7 +154,7 @@ message FilterChainMatch {
   // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
   // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
   //
-  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
+  // Note that partial wildcards are not supported, and values like ``*w.example.com`` and `*` are invalid.
   //
   // .. attention::
   //
