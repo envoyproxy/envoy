@@ -8,15 +8,13 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
     const std::vector<Http::CodecType>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
 
-  const auto addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing =
+  const auto addHttp2TestParametersWithDeferredProcessing =
       [&ret](Network::Address::IpVersion ip_version, Http::CodecType downstream_protocol,
              Http::CodecType upstream_protocol) {
-        for (Http2Impl impl : {Http2Impl::WrappedNghttp2, Http2Impl::Oghttp2}) {
-          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                               impl, false});
-          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
-                                               impl, true});
-        }
+        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                             Http2Impl::Oghttp2, false});
+        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                             Http2Impl::Oghttp2, true});
         ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
                                              Http2Impl::Nghttp2, true});
       };
@@ -29,8 +27,8 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
                                              Http2Impl::Nghttp2, false});
         if (downstream_protocol == Http::CodecType::HTTP2 ||
             upstream_protocol == Http::CodecType::HTTP2) {
-          addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
-              ip_version, downstream_protocol, upstream_protocol);
+          addHttp2TestParametersWithDeferredProcessing(ip_version, downstream_protocol,
+                                                       upstream_protocol);
         }
 #else
         if (downstream_protocol == Http::CodecType::HTTP3 ||
@@ -41,8 +39,8 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
                                                Http2Impl::Nghttp2, false});
           if (downstream_protocol == Http::CodecType::HTTP2 ||
               upstream_protocol == Http::CodecType::HTTP2) {
-            addHttp2TestParametersWithNewCodecWrapperOrDeferredProcessing(
-                ip_version, downstream_protocol, upstream_protocol);
+            addHttp2TestParametersWithDeferredProcessing(ip_version, downstream_protocol,
+                                                         upstream_protocol);
           }
         }
 #endif
@@ -80,8 +78,6 @@ absl::string_view implementationToString(Http2Impl impl) {
   switch (impl) {
   case Http2Impl::Nghttp2:
     return "Nghttp2";
-  case Http2Impl::WrappedNghttp2:
-    return "WrappedNghttp2";
   case Http2Impl::Oghttp2:
     return "Oghttp2";
   }
