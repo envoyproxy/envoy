@@ -121,7 +121,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected early.
+          // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+          // early.
           ASSERT(v4_compatible_addr != nullptr);
           tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
                                                         per_address_details);
@@ -164,7 +165,8 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             }
           } else {
             auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-            // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected early.
+            // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+            // early.
             ASSERT(v4_compatible_addr != nullptr);
             // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
             // remove the v4 compatible addr item directly.
