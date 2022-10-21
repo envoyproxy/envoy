@@ -8,14 +8,34 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: grpc_json_transcoder
+  change: |
+    fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
 
 new_features:
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: upstream
+  change: |
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
+
+- area: http
+  change: |
+    allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
 
 deprecated:
