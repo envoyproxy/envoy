@@ -627,16 +627,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     // If the content-type is not set, set it.
     // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
     // set a content type header, set the content type to be based on the changed body.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
-      if (response_headers->ContentType() == nullptr ||
-          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
-        response_headers->setReferenceContentType(content_type);
-      }
-    } else {
-      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-        response_headers->setReferenceContentType(content_type);
-      }
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
     }
   } else {
     response_headers->removeContentLength();
