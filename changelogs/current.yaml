@@ -2,47 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: build
-  change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: stats http local_rate_limit
-  change: |
-    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
-    is properly extracted. This changes the Prometheus name from
-    envoy_http_local_rate_limit_myprefix_rate_limited{} to envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
-- area: stats network local_rate_limit
-  change: |
-    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
-    is properly extracted. This changes the Prometheus name from
-    envoy_local_rate_limit_myprefix_rate_limited{} to envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
-- area: http
-  change: |
-    Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
-    This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
-- area: tls
-  change: |
-    Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
-- area: gcp_authn
-  change: |
-    Add GCP Authentication filter which can be used to fetch authentication tokens from Google Compute Engine(GCE) metadata server.
-- area: http
-  change: |
-    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
-    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
-    streaming calls. This behavior change can be reverted by setting the
-    ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
-- area: original_dst
-  change: |
-    ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by
-    the connection pools. For HTTP pools, please set :ref:`idle_timeout <faq_configuration_connection_timeouts>` to
-    limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
-    behavior change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
-- area: config
-  change: |
-    Fixed resource tracking when using the Incremental (Delta-xDS) protocol. The protocol state will be updated after
-    the resources are successfully ingested and an ACK is sent. This behavior change can be reverted by setting the
-    ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -74,8 +33,6 @@ new_features:
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
-    added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check for HTTP health check.
-    Added :ref:`response_buffer_size <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP health check response buffer size.
 
 - area: ext_authz
   change: |
