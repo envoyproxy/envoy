@@ -164,11 +164,6 @@
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
-  // No additional values are currently needed for Apple-based DNS resolver.
-  [definitions
-      appendFormat:@"- &dns_resolver_config "
-                   @"{\"@type\":\"type.googleapis.com/"
-                   @"envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig\"}\n"];
   [definitions appendFormat:@"- &enable_interface_binding %@\n",
                             self.enableInterfaceBinding ? @"true" : @"false"];
   [definitions appendFormat:@"- &trust_chain_verification %@\n", self.enforceTrustChainVerification

@@ -114,8 +114,8 @@ R"(- &dns_resolver_name envoy.network.dns_resolver.apple
 - &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig"}
 )"
 #else
-R"(- &dns_resolver_name envoy.network.dns_resolver.cares
-- &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig"}
+R"(- &dns_resolver_name envoy.network.dns_resolver.getaddrinfo
+- &dns_resolver_config {"@type":"type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig"}
 )"
 #endif
 R"(- &enable_drain_post_dns_refresh false
