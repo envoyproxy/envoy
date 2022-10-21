@@ -817,7 +817,7 @@ TEST_P(ExtAuthzHttpIntegrationTest,
 }
 
 // (uses legacy config for allowed_headers).
-TEST_P(ExtAuthzHttpIntegrationTest, LegacyDirectReponse) {
+TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectReponse)) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -838,7 +838,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, LegacyDirectReponse) {
 }
 
 // (uses legacy config for allowed_headers).
-TEST_P(ExtAuthzHttpIntegrationTest, LegacyRedirectResponse) {
+TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyRedirectResponse)) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
