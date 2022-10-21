@@ -11,6 +11,9 @@ bug_fixes:
 - area: grpc_json_transcoder
   change: |
     fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
+- area: router
+  change: |
+    fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
