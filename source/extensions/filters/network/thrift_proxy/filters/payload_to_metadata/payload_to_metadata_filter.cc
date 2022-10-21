@@ -62,23 +62,20 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  FieldSelector field_selector = rule_.field_selector();
+  const FieldSelector* field_selector = &rule_.field_selector();
   TrieSharedPtr node = root;
   while (true) {
-    int16_t id = static_cast<int16_t>(field_selector.id().value());
+    int16_t id = static_cast<int16_t>(field_selector->id().value());
     if (node->children_.find(id) == node->children_.end()) {
       node->children_[id] = std::make_shared<Trie>(node);
     }
     node = node->children_[id];
-    node->name_ = field_selector.name();
-    if (!field_selector.has_child()) {
+    node->name_ = field_selector->name();
+    if (!field_selector->has_child()) {
       break;
     }
 
-    // operation= hits protobuf compile-error on merging operand to the object,
-    // so use Swap to prevent the merge.
-    FieldSelector child = field_selector.child();
-    field_selector.Swap(&child);
+    field_selector = &field_selector->child();
   }
 
   node->rule_ids_.push_back(rule_id_);
@@ -220,7 +217,7 @@ bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, con
 
   if (value.size() >= MAX_PAYLOAD_VALUE_LEN) {
     // Too long, go away.
-    ENVOY_LOG(debug, "metadata value is too long");
+    ENVOY_LOG(error, "metadata value is too long");
     return false;
   }
 

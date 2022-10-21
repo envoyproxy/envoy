@@ -56,6 +56,8 @@ is triggered. i.e., no metadata is added for this :ref:`rule
 
 Currently payload to metadata filter doesn't support container type payload, i.e., list, set and map.
 
+We limit the size of a single metadata value which is added by this filter to 1024 bytes.
+
 This filter is designed to support payload passthrough. Performing payload to metadata filter
 can do deserialization once, and pass the metadata to other filters. This means that load balancing
 decisions, consumed from log and routing could all use payload information with a single parse.
