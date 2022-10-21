@@ -181,7 +181,7 @@ private:
   bool checkAndRejectIfRequestTranscoderFailed(const std::string& details);
   bool checkAndRejectIfResponseTranscoderFailed();
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
-  void maybeSendHttpBodyRequestMessage();
+  void maybeSendHttpBodyRequestMessage(Buffer::Instance* data);
   /**
    * Builds response from HttpBody protobuf.
    * Returns true if at least one gRPC frame has processed.
