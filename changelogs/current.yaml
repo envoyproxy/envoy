@@ -17,48 +17,6 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
 
 new_features:
-- area: header_formatters
-  change: |
-    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access logger's parser and
-    header values are obtained using access log's substitution formatters. This feature can be reversed by setting runtime guard
-    ``envoy.reloadable_features.unified_header_formatter`` to false.
-- area: http
-  change: |
-    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work as an upstream filter.
-  change: |
-    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
-  change: |
-    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream filters.
-- area: dns_resolver
-  change: |
-    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
-- area: gzip
-  change: |
-    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
-- area: access_log
-  change: |
-    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
-- area: build
-  change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: listener
-  change: |
-    added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
-- area: load balancer
-  change: |
-    added a new field to subset load balancer config: :ref:`metadata_fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
-- area: thrift
-  change: |
-    added stats for downstream connection close to detect SR drop.
-- area: thrift
-  change: |
-    added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
-- area: compression
-  change: |
-    added support for :ref:`choose_first<envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`.
-- area: cors
-  change: |
-    added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
 - area: upstream
   change: |
     added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
