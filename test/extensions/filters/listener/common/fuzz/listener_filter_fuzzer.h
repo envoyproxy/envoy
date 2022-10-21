@@ -84,18 +84,18 @@ public:
     return filter_chain_.get();
   }
 
+  void fuzz(Network::ListenerFilterPtr filter,
+            const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
+
+private:
   void write(const std::string& s) {
     Buffer::OwnedImpl buf(s);
     conn_->write(buf, false);
   }
 
-  void connect(Network::ListenerFilterPtr filter);
+  void connect();
   void disconnect();
 
-  void fuzz(Network::ListenerFilterPtr filter,
-            const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
-
-private:
   testing::NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
@@ -105,6 +105,7 @@ private:
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
+  Network::ListenerFilterPtr filter_{nullptr};
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
