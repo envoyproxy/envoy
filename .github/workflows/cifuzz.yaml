@@ -2,9 +2,7 @@ name: CIFuzz
 on:
   pull_request:
     branches:
-      - master
-      - 'releases/**'
-      - CIFuzz-Integration
+      - main
     paths:
       - '**.c'
       - '**.cc'
