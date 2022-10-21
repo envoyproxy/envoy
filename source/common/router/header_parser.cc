@@ -251,7 +251,7 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
 HeaderParserPtr
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
-  std::set<absl::string_view> headers_to_overwrite;
+  absl::flat_hash_set<absl::string_view> headers_to_overwrite;
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
