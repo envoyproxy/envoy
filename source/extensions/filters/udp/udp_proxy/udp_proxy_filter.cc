@@ -166,12 +166,12 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
     }
   } else {
     active_session = active_session_it->get();
-    if (active_session->host().health() == Upstream::Host::Health::Unhealthy) {
+    if (active_session->host().coarseHealth() == Upstream::Host::Health::Unhealthy) {
       // If a host becomes unhealthy, we optimally would like to replace it with a new session
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
       auto host = chooseHost(data.addresses_.peer_);
-      if (host != nullptr && host->health() != Upstream::Host::Health::Unhealthy &&
+      if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
         removeSession(active_session);
