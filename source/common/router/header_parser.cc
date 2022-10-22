@@ -53,20 +53,13 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
 
   // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
   // format (a:b)
-  const std::string header_value_after_metadata =
-      HeaderParser::translateMetadataFormat(header_value.value());
+  std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
   // Change PER_REQUEST_STATE to FILTER_STATE.
-  const auto final_header_value =
-      HeaderParser::translatePerRequestState(header_value_after_metadata);
-  if (!final_header_value.ok()) {
-    throw EnvoyException(fmt::format("Translation of the PER_REQUEST_STATE "
-                                     "header {} to colon format failed.",
-                                     key));
-  }
+  final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter parse the final_header_value.
   return std::make_unique<HttpHeaderFormatterImpl>(
-      std::make_unique<Envoy::Formatter::FormatterImpl>(*final_header_value, true));
+      std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true));
 }
 
 // Implements a state machine to parse custom headers. Each character of the custom header format
