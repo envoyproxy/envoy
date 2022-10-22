@@ -648,6 +648,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
     : connection_manager_(connection_manager),
+      connection_manager_tracing_config_(connection_manager_.config_.tracingConfig()),
       stream_id_(connection_manager.random_generator_.random()),
       filter_manager_(*this, connection_manager_.read_callbacks_->connection().dispatcher(),
                       connection_manager_.read_callbacks_->connection(), stream_id_,
@@ -1139,7 +1140,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   // Check if tracing is enabled at all.
-  if (connection_manager_.config_.tracingConfig()) {
+  if (connection_manager_tracing_config_ != nullptr) {
     traceRequest();
   }
 
@@ -1179,8 +1180,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     }
   }
 
-  if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-      Tracing::OperationName::Egress) {
+  if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Egress) {
     // For egress (outbound) requests, pass the decorator's operation name (if defined and
     // propagation enabled) as a request header to enable the receiving service to use it in its
     // server span.
@@ -1369,11 +1369,10 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  if (!connection_manager_.config_.tracingConfig()) {
+  if (connection_manager_tracing_config_ == nullptr) {
     return;
   }
-  const Tracing::CustomTagMap& conn_manager_tags =
-      connection_manager_.config_.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap& conn_manager_tags = connection_manager_tracing_config_->custom_tags_;
   const Tracing::CustomTagMap* route_tags = nullptr;
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
@@ -1519,9 +1518,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  if (connection_manager_.config_.tracingConfig()) {
-    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-        Tracing::OperationName::Ingress) {
+  if (connection_manager_tracing_config_ != nullptr) {
+    if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Ingress) {
       // For ingress (inbound) responses, if the request headers do not include a
       // decorator operation (override), and the decorated operation should be
       // propagated, then pass the decorator's operation name (if defined)
@@ -1529,7 +1527,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       if (decorated_operation_ && state_.decorated_propagate_) {
         headers.setEnvoyDecoratorOperation(*decorated_operation_);
       }
-    } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+    } else if (connection_manager_tracing_config_->operation_name_ ==
                Tracing::OperationName::Egress) {
       const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
 
@@ -1636,10 +1634,8 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
-  if (!connection_manager_.config_.tracingConfig()) {
-    return Tracing::OperationName::Egress;
-  }
-  return connection_manager_.config_.tracingConfig()->operation_name_;
+  ASSERT(connection_manager_tracing_config_ != nullptr);
+  return connection_manager_tracing_config_->operation_name_;
 }
 
 const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
@@ -1647,15 +1643,13 @@ const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() c
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig() &&
-         connection_manager_.config_.tracingConfig()->verbose_;
+  ASSERT(connection_manager_tracing_config_ != nullptr);
+  return connection_manager_tracing_config_->verbose_;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
-  if (!connection_manager_.config_.tracingConfig()) {
-    return Tracing::DefaultMaxPathTagLength;
-  }
-  return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+  ASSERT(connection_manager_tracing_config_ != nullptr);
+  return connection_manager_tracing_config_->max_path_tag_length_;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
@@ -1676,7 +1670,12 @@ Tracing::Span& ConnectionManagerImpl::ActiveStream::activeSpan() {
   }
 }
 
-Tracing::Config& ConnectionManagerImpl::ActiveStream::tracingConfig() { return *this; }
+OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig() const {
+  if (connection_manager_tracing_config_ != nullptr) {
+    return makeOptRef<const Tracing::Config>(*this);
+  }
+  return {};
+}
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 

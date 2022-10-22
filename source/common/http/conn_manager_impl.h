@@ -202,12 +202,16 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
 
+  private:
+    // Keep these methods private to ensure that these methods are only called by the reference
+    // returned by the public tracingConfig() method.
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
     const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
 
+  public:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
@@ -283,8 +287,7 @@ private:
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
-    // TODO(alyssawilk) this should be an optional reference.
-    Tracing::Config& tracingConfig() override;
+    OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
 
@@ -363,6 +366,7 @@ private:
     bool validateHeaders();
 
     ConnectionManagerImpl& connection_manager_;
+    const TracingConnectionManagerConfig* connection_manager_tracing_config_{};
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;

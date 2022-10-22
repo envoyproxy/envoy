@@ -360,7 +360,7 @@ public:
   /**
    * @return tracing configuration.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * @return the ScopeTrackedObject for this stream.
