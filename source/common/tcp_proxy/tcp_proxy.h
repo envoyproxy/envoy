@@ -279,6 +279,7 @@ public:
   }
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
+  Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
 private:
   struct SimpleRouteImpl : public Route {

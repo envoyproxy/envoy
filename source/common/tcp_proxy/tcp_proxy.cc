@@ -22,6 +22,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/network/application_protocol.h"
@@ -34,6 +35,13 @@
 
 namespace Envoy {
 namespace TcpProxy {
+
+const std::string& tcpProxyName() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.tcp_proxy");
+}
+const std::string& tcpConnectionUuidKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "connection_uuid");
+}
 
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
@@ -638,6 +646,11 @@ Network::FilterStatus Filter::onNewConnection() {
         [this]() -> void { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
   }
+
+  // Set UUID for the connection. This is used for logging and tracing.
+  Envoy::Config::Metadata::mutableMetadataValue(getStreamInfo().dynamicMetadata(), tcpProxyName(),
+                                                tcpConnectionUuidKey())
+      .set_string_value(config_->randomGenerator().uuid());
 
   ASSERT(upstream_ == nullptr);
   route_ = pickRoute();

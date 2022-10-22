@@ -43,6 +43,11 @@ message TCPAccessLogEntry {
 
   // If this log entry is final log entry that flushed after the connection closed or
   // intermediate log entry that flushed periodically during the connection.
+  // There may be multiple intermediate log entries and only one final log entry for each
+  // TCP connection.
+  // And if it is necessary, some IDs or identifiers can be added to the log entry
+  // :ref:`metadata <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.metadata>` to
+  // correlate all these intermediate log entries and final log entry.
   bool intermediate_log_entry = 3;
 }
 
