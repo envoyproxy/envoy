@@ -12,8 +12,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/header_formatter.h"
 
-#include "absl/status/statusor.h"
-
 namespace Envoy {
 namespace Router {
 
