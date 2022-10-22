@@ -88,6 +88,12 @@ Config::SharedConfig::SharedConfig(
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
 
+  if (config.has_access_log_flush_interval()) {
+    const uint64_t flush_interval =
+        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
+  }
+
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
     on_demand_config_ =
         std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
@@ -178,6 +184,10 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
+  // Disable access log flush timer if it is enabled.
+  disableAccessLogFlushTimer();
+
+  // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
@@ -623,6 +633,12 @@ Network::FilterStatus Filter::onNewConnection() {
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
 
+  if (config_->accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onAccessLogFlushInterval(); });
+    resetAccessLogFlushTimer();
+  }
+
   ASSERT(upstream_ == nullptr);
   route_ = pickRoute();
   return establishUpstreamConnection();
@@ -752,6 +768,27 @@ void Filter::onMaxDownstreamConnectionDuration() {
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void Filter::onAccessLogFlushInterval() {
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+  }
+  resetAccessLogFlushTimer();
+}
+
+void Filter::resetAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    ASSERT(config_->accessLogFlushInterval().has_value());
+    access_log_flush_timer_->enableTimer(config_->accessLogFlushInterval().value());
+  }
+}
+
+void Filter::disableAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->disableTimer();
+    access_log_flush_timer_.reset();
+  }
 }
 
 void Filter::resetIdleTimer() {

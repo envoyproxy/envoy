@@ -40,6 +40,10 @@ message TCPAccessLogEntry {
 
   // Properties of the TCP connection.
   ConnectionProperties connection_properties = 2;
+
+  // If this log entry is final log entry that flushed after the connection closed or
+  // intermediate log entry that flushed periodically during the connection.
+  bool intermediate_log_entry = 3;
 }
 
 message HTTPAccessLogEntry {

@@ -12,7 +12,12 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: postgres_tcp
           cluster: postgres_cluster
-
+          access_log_flush_interval: 0.01s
+          access_log:
+          - name: envoy.file_access_log
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+              path: /dev/stdout
   clusters:
   - name: postgres_cluster
     type: STRICT_DNS
@@ -23,22 +28,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: proxy-postgres-backend.example.com
-                port_value: 5432
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          tls_certificates:
-          - certificate_chain:
-              filename: certs/clientcert.pem
-            private_key:
-              filename: certs/clientkey.pem
-          validation_context:
-            match_typed_subject_alt_names:
-            - san_type: DNS
-              matcher:
-                exact: proxy-postgres-backend.example.com
-            trusted_ca:
-              filename: certs/cacert.pem
+                address: httpbin.org
+                port_value: 80
