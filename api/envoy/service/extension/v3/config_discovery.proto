@@ -18,6 +18,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Extension config discovery service (ECDS)]
 
+// A service supports dynamically discover extension configuration and applies to
+// Envoy. Currently, ECDS is supported in HTTP filter and Listener filter
+// :ref:`Extension Config Discovery Service (ECDS) API <config_overview_extension_discovery>`.
+// The overall extension config discovery service works like this:
+//
+// 1. Envoy receives the ECDS configuration either from LDS or from static config, which has any
+//    number of listener filters and HTTP filters configured as ECDS filter. The actual
+//    configuration of these filters needs to be fetched from the xDS server.
+// 2. Envoy then sends the DiscoveryRequest message to the xDS server to retrieve the configuration.
+// 3. xDS server sends back the DiscoveryResponse to Envoy with the actual extension configuration.
+// 4. Envoy instantiates the filter factories with the received configuration.
+// 5. Next time when Envoy processing traffic, it builds the filter chains with the new configuration.
+
 // Return extension configurations.
 service ExtensionConfigDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.config.core.v3.TypedExtensionConfig";
