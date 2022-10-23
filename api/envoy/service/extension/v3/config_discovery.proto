@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Extension config discovery service (ECDS)]
 
 // A service supports dynamically discover extension configuration and applies to
-// Envoy. Currently, ECDS is supported in HTTP filter and Listener filter
+// Envoy. Currently, ECDS is supported in HTTP filter and Listener filter. Please check
 // :ref:`Extension Config Discovery Service (ECDS) API <config_overview_extension_discovery>`.
 // The overall extension config discovery service works like this:
 //
