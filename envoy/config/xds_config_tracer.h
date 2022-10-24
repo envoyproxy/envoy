@@ -36,7 +36,7 @@ struct TraceDetails {
 /**
  * An interface for hooking into xDS update events to provide the ablility to use some
  * external logger or processor in xDS update.
- * 
+ *
  * Instance of this interface get invoked on the main Envoy thread. Thus, it is important
  * for implementations of this interface to not execute any blocking operations on the same
  * thread.
@@ -48,7 +48,7 @@ public:
   /**
    * Log the decoded SotW xDS resources that are about to ingested.
    * @param type_url The type url of xDS message.
-   * @param resources List of decoded resources that reflect the new state.
+   * @param resources List of decoded resources that reflect the latest state.
    * @param details The log point state and details.
    */
   virtual void log(const absl::string_view type_url,
