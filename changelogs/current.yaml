@@ -23,6 +23,9 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
   - area: http
     change: |
+      removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
+  - area: http
+    change: |
       removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
   - area: http
     change: |
