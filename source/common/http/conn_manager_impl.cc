@@ -54,7 +54,7 @@
 namespace Envoy {
 namespace Http {
 
-bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
     return false;
   }
@@ -924,7 +924,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);

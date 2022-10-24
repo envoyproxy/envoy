@@ -202,7 +202,7 @@ public:
    * @param headers supplies the decoded headers map.
    * @param end_stream supplies whether this is a header only request.
    */
-  virtual void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) PURE;
+  virtual void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) PURE;
 
   /**
    * Called with a decoded trailers frame. This implicitly ends the stream.

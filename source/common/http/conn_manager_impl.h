@@ -192,7 +192,7 @@ private:
     void maybeEndDecode(bool end_stream);
 
     // Http::RequestDecoder
-    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
@@ -367,12 +367,12 @@ private:
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
 
-    RequestHeaderMapPtr request_headers_;
+    RequestHeaderMapSharedPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
     ResponseHeaderMapPtr informational_headers_;
-    ResponseHeaderMapPtr response_headers_;
-    ResponseTrailerMapPtr response_trailers_;
+    ResponseHeaderMapSharedPtr response_headers_;
+    ResponseTrailerMapSharedPtr response_trailers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.
