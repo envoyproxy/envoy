@@ -150,10 +150,11 @@ TEST_F(KeyValueStoreTest, Persist) {
 }
 
 TEST_F(KeyValueStoreTest, PersistWithTTL) {
+  test_time_.setSystemTime(std::chrono::milliseconds(0));
   store_->addOrUpdate("foo", "bar", std::chrono::seconds(2));
   store_->addOrUpdate("ee", "ba", std::chrono::seconds(1));
   flush_timer_->invokeCallback(); // flush manually
-  test_time_.setMonotonicTime(std::chrono::milliseconds(1000));
+  test_time_.setSystemTime(std::chrono::milliseconds(1000));
   // Keys should expire based on the absolute time.
   // 'ee' should expire on load because it's been 1 second.
   createStore();

@@ -32,8 +32,7 @@ absl::optional<absl::string_view> getToken(absl::string_view& contents, std::str
 }
 
 bool checkForTtl(absl::string_view& contents) {
-  if (contents.size() > KV_STORE_TTL_KEY.length() &&
-      contents.substr(0, KV_STORE_TTL_KEY.length()) == KV_STORE_TTL_KEY) {
+  if (absl::StartsWith(contents, KV_STORE_TTL_KEY)) {
     contents.remove_prefix(KV_STORE_TTL_KEY.length());
     return true;
   }
@@ -72,16 +71,17 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
     if (checkForTtl(contents)) {
       uint64_t ttl_int;
       auto token = getToken(contents, error);
-      if (token.has_value() && absl::SimpleAtoi(token.value(), &ttl_int)) {
+      if (!token.has_value()) {
+        ENVOY_LOG(warn, error);
+        return false;
+      }
+      if (absl::SimpleAtoi(token.value(), &ttl_int)) {
         ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::time_point<std::chrono::steady_clock>(std::chrono::seconds(ttl_int)) -
-            time_source_.monotonicTime()));
+            std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(ttl_int)) -
+            time_source_.systemTime()));
       } else {
-        if (!token.has_value()) {
-          ENVOY_LOG(warn, error);
-        } else {
-          ENVOY_LOG(warn, "TTL was read from disk but failed to convert to integer");
-        }
+        ENVOY_LOG(warn, "TTL was read from disk but failed to convert to integer");
+        return false;
       }
     }
     if (!ttl.has_value() || ttl > std::chrono::seconds(0)) {
@@ -104,7 +104,7 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   absl::optional<std::chrono::seconds> absolute_ttl = absl::nullopt;
   if (ttl) {
     absolute_ttl.emplace(ttl.value() + std::chrono::duration_cast<std::chrono::seconds>(
-                                           time_source_.monotonicTime().time_since_epoch()));
+                                           time_source_.systemTime().time_since_epoch()));
   }
 
   // Attempt to insert the entry into the store. If it already exists, remove
