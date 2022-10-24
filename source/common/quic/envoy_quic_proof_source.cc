@@ -101,7 +101,7 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
   // TODO(danzh) modify QUICHE to make quic session or ALPN accessible to avoid hard-coded ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
-      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3");
+      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3", time_source_);
   const Network::FilterChain* filter_chain =
       filter_chain_manager_->findFilterChain(*connection_socket);
 

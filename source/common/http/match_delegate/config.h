@@ -30,8 +30,7 @@ public:
     bool skipFilter() const { return skip_filter_; }
     void onStreamInfo(const StreamInfo::StreamInfo& stream_info) {
       if (has_match_tree_ && matching_data_ == nullptr) {
-        matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(
-            stream_info.downstreamAddressProvider());
+        matching_data_ = std::make_shared<Envoy::Http::Matching::HttpMatchingDataImpl>(stream_info);
       }
     }
     void setBaseFilter(Envoy::Http::StreamFilterBase* base_filter) { base_filter_ = base_filter; }

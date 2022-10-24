@@ -13,6 +13,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -33,13 +34,17 @@ TEST_P(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
   absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
-  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
+  Event::SimulatedTimeSystem time_system;
+  auto conn_socket_ =
+      ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {}, time_system);
   conn_socket_.setRequestedServerName(serverName);
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
 }
 
 TEST_P(ConnectionSocketImplTest, IpVersion) {
-  ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr);
+  Event::SimulatedTimeSystem time_system;
+  ClientSocketImpl socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                          time_system);
   EXPECT_EQ(socket.ipVersion(), GetParam());
 }
 

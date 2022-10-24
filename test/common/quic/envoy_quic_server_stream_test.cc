@@ -41,7 +41,7 @@ public:
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(connection_helper_, alarm_factory_, writer_,
                          quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_,
-                         connection_id_generator_),
+                         connection_id_generator_, dispatcher_->timeSource()),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stats_(

@@ -134,12 +134,14 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       TimeSource& time_source) {
   if (local_addr == nullptr) {
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
+      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{},
+      time_source);
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {
@@ -227,15 +229,14 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
   return sign_alg;
 }
 
-Network::ConnectionSocketPtr
-createServerConnectionSocket(Network::IoHandle& io_handle,
-                             const quic::QuicSocketAddress& self_address,
-                             const quic::QuicSocketAddress& peer_address,
-                             const std::string& hostname, absl::string_view alpn) {
+Network::ConnectionSocketPtr createServerConnectionSocket(
+    Network::IoHandle& io_handle, const quic::QuicSocketAddress& self_address,
+    const quic::QuicSocketAddress& peer_address, const std::string& hostname,
+    absl::string_view alpn, TimeSource& time_source) {
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
       std::make_unique<QuicIoHandleWrapper>(io_handle),
       quicAddressToEnvoyAddressInstance(self_address),
-      quicAddressToEnvoyAddressInstance(peer_address));
+      quicAddressToEnvoyAddressInstance(peer_address), time_source);
   connection_socket->setDetectedTransportProtocol("quic");
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});

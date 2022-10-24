@@ -5306,7 +5306,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
                                      Network::Address::InstanceConstSharedPtr{
-                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)});
+                                         new Network::Address::Ipv4Instance("127.0.0.1", 5678)},
+                                     time_system_);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -5391,7 +5392,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), time_system_);
 
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _));
@@ -5457,7 +5458,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), time_system_);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -5506,7 +5507,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
   auto io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
   Network::AcceptedSocketImpl socket(
       std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
-      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
+      std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), time_system_);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;
@@ -5591,7 +5592,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   Network::AcceptedSocketImpl socket(
       std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
-      std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
+      std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678), time_system_);
 
   EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
     return socket;

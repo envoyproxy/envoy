@@ -342,7 +342,7 @@ public:
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
-        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        std::move(socket), Network::Test::createRawBufferSocket());
     TestDnsServerQuery* query =
         new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
                                record_ttl_, refused_, error_on_a_, error_on_aaaa_);

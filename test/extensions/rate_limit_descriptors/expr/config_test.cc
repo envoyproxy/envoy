@@ -9,6 +9,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,10 +29,11 @@ public:
     envoy::config::route::v3::RateLimit rate_limit;
     TestUtility::loadFromYaml(yaml, rate_limit);
     TestUtility::validate(rate_limit);
-    rate_limit_entry_ = std::make_unique<Router::RateLimitPolicyEntryImpl>(
-        rate_limit, ProtobufMessage::getStrictValidationVisitor());
+    rate_limit_entry_ =
+        std::make_unique<Router::RateLimitPolicyEntryImpl>(rate_limit, factory_context_);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<Router::RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;

@@ -503,6 +503,7 @@ envoy_cc_benchmark_binary(
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],

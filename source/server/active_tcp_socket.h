@@ -89,13 +89,13 @@ public:
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override;
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
-    return stream_info_->dynamicMetadata();
+    return socket_->streamInfo().dynamicMetadata();
   };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override {
-    return stream_info_->dynamicMetadata();
+    return socket_->streamInfo().dynamicMetadata();
   };
-  StreamInfo::FilterState& filterState() override { return *stream_info_->filterState().get(); }
-  StreamInfo::StreamInfo* streamInfo() const { return stream_info_.get(); }
+  StreamInfo::FilterState& filterState() override { return *socket_->streamInfo().filterState(); }
+  StreamInfo::StreamInfo* streamInfo() const { return &socket_->streamInfo(); }
   bool connected() const { return connected_; }
   bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
 
@@ -118,7 +118,6 @@ private:
   std::list<ListenerFilterWrapperPtr> accept_filters_;
   std::list<ListenerFilterWrapperPtr>::iterator iter_;
   Event::TimerPtr timer_;
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool connected_{false};
 
   Network::ListenerFilterBufferImplPtr listener_filter_buffer_;

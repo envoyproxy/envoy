@@ -123,12 +123,11 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
-  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(), nullptr);
-  EXPECT_DEATH(
-      ConnectionImpl(*dispatcher,
-                     std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-                     Network::Test::createRawBufferSocket(), stream_info, false),
-      ".*assert failure: SOCKET_VALID\\(fd\\)");
+  EXPECT_DEATH(ConnectionImpl(*dispatcher,
+                              std::make_unique<ConnectionSocketImpl>(
+                                  std::move(io_handle), nullptr, nullptr, dispatcher->timeSource()),
+                              Network::Test::createRawBufferSocket(), false),
+               ".*assert failure: SOCKET_VALID\\(fd\\)");
 }
 
 class TestClientConnectionImpl : public Network::ClientConnectionImpl {
@@ -177,7 +176,7 @@ protected:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+              std::move(socket), Network::Test::createRawBufferSocket());
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
 
@@ -369,7 +368,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+            std::move(socket), Network::Test::createRawBufferSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         server_connection_->addReadFilter(add_and_remove_filter);
@@ -396,7 +395,7 @@ TEST_P(ConnectionImplTest, UnregisterRegisterDuringConnectCallback) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+            std::move(socket), Network::Test::createRawBufferSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
 
@@ -466,8 +465,9 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
       .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
   Stats::MockCounter timeout_counter;
@@ -487,8 +487,9 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   // This should be a no-op. No timer should be created.
@@ -511,8 +512,9 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
       .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   bool timer_destroyed = false;
   mock_timer->timer_destroyed_ = &timer_destroyed;
@@ -555,7 +557,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         socket->addOption(option);
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+            std::move(socket), Network::Test::createRawBufferSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
 
@@ -604,7 +606,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         socket->addOption(option);
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+            std::move(socket), Network::Test::createRawBufferSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
 
@@ -702,7 +704,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+            std::move(socket), Network::Test::createRawBufferSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->setConnectionStats(server_connection_stats.toBufferStats());
         server_connection_->addReadFilter(read_filter_);
@@ -739,8 +741,9 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   EXPECT_CALL(*mocks.file_event_, setEnabled(_));
   connection->readDisable(true);
@@ -1699,8 +1702,10 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
       }));
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
-      dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::make_unique<NiceMock<MockTransportSocket>>(), stream_info_, true));
+      dispatcher,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::make_unique<NiceMock<MockTransportSocket>>(), true));
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(0));
 
@@ -1731,8 +1736,9 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
 #ifndef NDEBUG
   // Ignore timer enabled() calls used to check timer state in ASSERTs.
@@ -1792,8 +1798,9 @@ TEST_P(ConnectionImplTest, IgnoreSpuriousFdWriteEventsDuringFlushWriteAndDelay) 
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
 #ifndef NDEBUG
   // Ignore timer enabled() calls used to check timer state in ASSERTs.
@@ -1884,8 +1891,9 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   InSequence s1;
 
@@ -1920,8 +1928,9 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   InSequence s1;
 
@@ -1972,8 +1981,8 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
         new Network::Address::Ipv6Instance("::1:2:3:4", 56789, nullptr)};
   }
 
-  auto connection_socket =
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, server_addr);
+  auto connection_socket = std::make_unique<ConnectionSocketImpl>(
+      std::move(io_handle), local_addr, server_addr, dispatcher_->timeSource());
   connection_socket->setRequestedServerName("envoyproxy.io");
 
   // Start measuring memory and dump state.
@@ -2008,8 +2017,9 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                             dispatcher_->timeSource()),
+      std::move(mocks.transport_socket_), true);
 
   // Start measuring memory and dump state.
   Stats::TestUtil::MemoryTest memory_test;
@@ -2071,8 +2081,10 @@ public:
         }));
     IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
     connection_ = std::make_unique<ConnectionImpl>(
-        dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-        TransportSocketPtr(transport_socket_), stream_info_, true);
+        dispatcher_,
+        std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr,
+                                               dispatcher_.timeSource()),
+        TransportSocketPtr(transport_socket_), true);
     connection_->addConnectionCallbacks(callbacks_);
     // File events will trigger setTrackedObject on the dispatcher.
     EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
@@ -2900,7 +2912,7 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+              std::move(socket), Network::Test::createRawBufferSocket());
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addReadFilter(read_filter_);
           EXPECT_EQ("", server_connection_->nextProtocol());

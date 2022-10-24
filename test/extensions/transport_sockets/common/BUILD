@@ -16,5 +16,6 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

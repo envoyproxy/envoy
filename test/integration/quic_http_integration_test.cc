@@ -714,7 +714,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, nullptr));
+      createConnectionSocket(server_addr_, local_addr, nullptr, dispatcher_->timeSource()));
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
@@ -743,7 +743,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   auto options = std::make_shared<Network::Socket::Options>();
   options->push_back(option);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, options));
+      createConnectionSocket(server_addr_, local_addr, options, dispatcher_->timeSource()));
   EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }

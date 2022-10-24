@@ -2,6 +2,7 @@
 #include "source/common/network/listen_socket_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +25,8 @@ TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
   server.sin_port = htons(80);
 
   Address::InstanceConstSharedPtr addr(new Address::Ipv4Instance(&server));
-  auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr);
+  Event::SimulatedTimeSystem time_system;
+  auto socket_ = std::make_shared<Envoy::Network::ClientSocketImpl>(addr, nullptr, time_system);
   socket_->setBlockingForTest(true);
   EXPECT_TRUE(socket_->connect(addr).return_value_ == 0);
 

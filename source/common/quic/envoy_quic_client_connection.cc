@@ -20,9 +20,11 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     quic::ConnectionIdGeneratorInterface& generator)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
-          createConnectionSocket(initial_peer_address, local_addr, options), generator) {}
+    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, supported_versions,
+                                dispatcher,
+                                createConnectionSocket(initial_peer_address, local_addr, options,
+                                                       dispatcher.timeSource()),
+                                generator) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
@@ -140,9 +142,9 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket =
-      createConnectionSocket(connectionSocket()->connectionInfoProvider().remoteAddress(),
-                             new_local_address, connectionSocket()->options());
+  auto probing_socket = createConnectionSocket(
+      connectionSocket()->connectionInfoProvider().remoteAddress(), new_local_address,
+      connectionSocket()->options(), dispatcher_.timeSource());
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));

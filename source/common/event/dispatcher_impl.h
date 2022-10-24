@@ -64,8 +64,7 @@ public:
   void clearDeferredDeleteList() override;
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info) override;
+                         Network::TransportSocketPtr&& transport_socket) override;
   Network::ClientConnectionPtr createClientConnection(
       Network::Address::InstanceConstSharedPtr address,
       Network::Address::InstanceConstSharedPtr source_address,

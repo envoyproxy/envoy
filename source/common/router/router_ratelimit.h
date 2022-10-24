@@ -185,7 +185,7 @@ private:
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
   RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
-                           ProtobufMessage::ValidationVisitor& validator);
+                           Server::Configuration::ServerFactoryContext& context);
 
   // Router::RateLimitPolicyEntry
   uint64_t stage() const override { return stage_; }
@@ -212,7 +212,7 @@ class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-      ProtobufMessage::ValidationVisitor& validator);
+      Server::Configuration::ServerFactoryContext& context);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

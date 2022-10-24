@@ -134,12 +134,10 @@ ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance&
 }
 
 void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_chain,
-                                            Network::ServerConnectionPtr server_conn_ptr,
-                                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+                                            Network::ServerConnectionPtr server_conn_ptr) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  auto active_connection =
-      std::make_unique<ActiveTcpConnection>(active_connections, std::move(server_conn_ptr),
-                                            dispatcher().timeSource(), std::move(stream_info));
+  auto active_connection = std::make_unique<ActiveTcpConnection>(
+      active_connections, std::move(server_conn_ptr), dispatcher().timeSource());
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(

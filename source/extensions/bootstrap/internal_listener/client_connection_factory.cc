@@ -40,7 +40,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
   auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
       dispatcher,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_client), source_address,
-                                                      address),
+                                                      address, dispatcher.timeSource()),
       source_address, std::move(transport_socket), options, transport_options);
 
   if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
@@ -64,8 +64,8 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     return client_conn;
   }
 
-  auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(std::move(io_handle_server),
-                                                                       address, source_address);
+  auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
+      std::move(io_handle_server), address, source_address, dispatcher.timeSource());
   internal_listener->onAccept(std::move(accepted_socket));
   return client_conn;
 }

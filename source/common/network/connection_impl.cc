@@ -64,11 +64,10 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                               TransportSocketPtr&& transport_socket,
-                               StreamInfo::StreamInfo& stream_info, bool connected)
+                               TransportSocketPtr&& transport_socket, bool connected)
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      stream_info_(stream_info), filter_manager_(*this, *socket_),
+      filter_manager_(*this, *socket_),
       write_buffer_(dispatcher.getWatermarkFactory().createBuffer(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
@@ -810,10 +809,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            ConnectionSocketPtr&& socket,
-                                           TransportSocketPtr&& transport_socket,
-                                           StreamInfo::StreamInfo& stream_info, bool connected)
-    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                                           TransportSocketPtr&& transport_socket, bool connected)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), connected) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                                             Stats::Counter& timeout_stat) {
@@ -845,7 +842,7 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
-  stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
+  streamInfo().setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");
@@ -857,9 +854,10 @@ ClientConnectionImpl::ClientConnectionImpl(
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-    : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                           source_address, std::move(transport_socket), options,
-                           transport_options) {}
+    : ClientConnectionImpl(
+          dispatcher,
+          std::make_unique<ClientSocketImpl>(remote_address, options, dispatcher.timeSource()),
+          source_address, std::move(transport_socket), options, transport_options) {}
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
@@ -867,11 +865,8 @@ ClientConnectionImpl::ClientConnectionImpl(
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_options)
-    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
-                     false),
-      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
-
-  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), false) {
+  streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
@@ -912,7 +907,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (transport_options) {
     for (const auto& object : transport_options->downstreamSharedFilterStateObjects()) {
       // This does not throw as all objects are distinctly named and the stream info is empty.
-      stream_info_.filterState()->setData(object.name_, object.data_, object.state_type_,
+      streamInfo().filterState()->setData(object.name_, object.data_, object.state_type_,
                                           StreamInfo::FilterState::LifeSpan::Connection,
                                           object.stream_sharing_);
     }
@@ -923,7 +918,7 @@ void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
                        socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = transport_socket_->connect(*socket_);
-  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -953,7 +948,7 @@ void ClientConnectionImpl::connect() {
 }
 
 void ClientConnectionImpl::onConnected() {
-  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  streamInfo().upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
   // There are no meaningful socket source address semantics for non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
     socket_->connectionInfoProvider().maybeSetInterfaceName(ioHandle());

@@ -129,9 +129,10 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(const Network::Connec
 }
 
 bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
-    const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
-    StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
-  Http::Matching::HttpMatchingDataImpl data(connection.connectionInfoProvider());
+    [[maybe_unused]] const Network::Connection& connection,
+    const Envoy::Http::RequestHeaderMap& headers, StreamInfo::StreamInfo& info,
+    std::string* effective_policy_id) const {
+  Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
   const auto& result = Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   ASSERT(result.match_state_ == Envoy::Matcher::MatchState::MatchComplete);

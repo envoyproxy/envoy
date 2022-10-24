@@ -16,5 +16,6 @@ envoy_cc_test(
         "//source/common/http/matching:inputs_lib",
         "//source/common/network:address_lib",
         "//source/common/network:socket_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

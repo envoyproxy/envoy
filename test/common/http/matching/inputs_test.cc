@@ -5,6 +5,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -13,10 +14,11 @@ namespace Matching {
 
 TEST(MatchingData, HttpRequestHeadersDataInput) {
   HttpRequestHeadersDataInput input("header");
-  Network::ConnectionInfoSetterImpl connection_info_provider(
+  StreamInfo::MockStreamInfo info;
+  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(connection_info_provider);
+  HttpMatchingDataImpl data(info);
 
   {
     TestRequestHeaderMapImpl request_headers({{"header", "bar"}});
@@ -37,10 +39,11 @@ TEST(MatchingData, HttpRequestHeadersDataInput) {
 
 TEST(MatchingData, HttpRequestTrailersDataInput) {
   HttpRequestTrailersDataInput input("header");
-  Network::ConnectionInfoSetterImpl connection_info_provider(
+  StreamInfo::MockStreamInfo info;
+  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(connection_info_provider);
+  HttpMatchingDataImpl data(info);
 
   {
     TestRequestTrailerMapImpl request_trailers({{"header", "bar"}});
@@ -61,10 +64,11 @@ TEST(MatchingData, HttpRequestTrailersDataInput) {
 
 TEST(MatchingData, HttpResponseHeadersDataInput) {
   HttpResponseHeadersDataInput input("header");
-  Network::ConnectionInfoSetterImpl connection_info_provider(
+  StreamInfo::MockStreamInfo info;
+  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(connection_info_provider);
+  HttpMatchingDataImpl data(info);
 
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -85,10 +89,11 @@ TEST(MatchingData, HttpResponseHeadersDataInput) {
 
 TEST(MatchingData, HttpResponseTrailersDataInput) {
   HttpResponseTrailersDataInput input("header");
-  Network::ConnectionInfoSetterImpl connection_info_provider(
+  StreamInfo::MockStreamInfo info;
+  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(80),
       std::make_shared<Network::Address::Ipv4Instance>(80));
-  HttpMatchingDataImpl data(connection_info_provider);
+  HttpMatchingDataImpl data(info);
 
   {
     TestResponseTrailerMapImpl response_trailers({{"header", "bar"}});

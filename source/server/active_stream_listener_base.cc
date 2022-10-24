@@ -24,8 +24,7 @@ void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
   }
 }
 
-void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& socket,
-                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& socket) {
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
@@ -33,16 +32,17 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
     ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
               socket->connectionInfoProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
+    socket->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
+    socket->streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, socket->streamInfo());
     socket->close();
     return;
   }
-  stream_info->setFilterChainName(filter_chain->name());
+  socket->streamInfo().setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
-  auto server_conn_ptr = dispatcher().createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info);
+  auto server_conn_ptr =
+      dispatcher().createServerConnection(std::move(socket), std::move(transport_socket));
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(
@@ -57,7 +57,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
                    server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
     server_conn_ptr->close(Network::ConnectionCloseType::NoFlush);
   }
-  newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
+  newActiveConnection(*filter_chain, std::move(server_conn_ptr));
 }
 
 ActiveConnections::ActiveConnections(OwnedActiveStreamListenerBase& listener,
@@ -71,10 +71,8 @@ ActiveConnections::~ActiveConnections() {
 
 ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
                                          Network::ConnectionPtr&& new_connection,
-                                         TimeSource& time_source,
-                                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
-    : stream_info_(std::move(stream_info)), active_connections_(active_connections),
-      connection_(std::move(new_connection)),
+                                         TimeSource& time_source)
+    : active_connections_(active_connections), connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
@@ -93,7 +91,8 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
 }
 
 ActiveTcpConnection::~ActiveTcpConnection() {
-  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_);
+  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_,
+                                     connection_->streamInfo());
   auto& listener = active_connections_.listener_;
   listener.stats_.downstream_cx_active_.dec();
   listener.stats_.downstream_cx_destroy_.inc();

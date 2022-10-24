@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "source/common/common/dump_state_utils.h"
+
 namespace Envoy {
 namespace Network {
 

@@ -31,23 +31,25 @@ public:
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Network::Socket& listen_socket,
-                                quic::ConnectionIdGeneratorInterface& generator)
+                                quic::ConnectionIdGeneratorInterface& generator,
+                                TimeSource& time_source)
       : MockEnvoyQuicServerConnection(
             helper, alarm_factory, writer,
             quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
             quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345), supported_versions,
-            listen_socket, generator) {}
+            listen_socket, generator, time_source) {}
 
   MockEnvoyQuicServerConnection(
       quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
       quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
       quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
-      Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
+      Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator,
+      TimeSource& time_source)
       : EnvoyQuicServerConnection(
             quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29"),
+                                         "example.com", "h3-29", time_source),
             generator) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {

@@ -161,7 +161,8 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       TimeSource& time_source);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.
@@ -174,11 +175,10 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
 
 // Return a connection socket which read and write via io_handle, but doesn't close it when the
 // socket gets closed nor set options on the socket.
-Network::ConnectionSocketPtr
-createServerConnectionSocket(Network::IoHandle& io_handle,
-                             const quic::QuicSocketAddress& self_address,
-                             const quic::QuicSocketAddress& peer_address,
-                             const std::string& hostname, absl::string_view alpn);
+Network::ConnectionSocketPtr createServerConnectionSocket(
+    Network::IoHandle& io_handle, const quic::QuicSocketAddress& self_address,
+    const quic::QuicSocketAddress& peer_address, const std::string& hostname,
+    absl::string_view alpn, TimeSource& time_source);
 
 // Alter QuicConfig based on all the options in the supplied config.
 void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,

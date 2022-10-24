@@ -2,7 +2,6 @@
 
 #include "envoy/network/filter.h"
 
-#include "source/common/stream_info/stream_info_impl.h"
 #include "source/server/active_stream_listener_base.h"
 
 namespace Envoy {
@@ -13,10 +12,7 @@ ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
                                  bool hand_off_restored_destination_connections)
     : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-      iter_(accept_filters_.end()),
-      stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
-          listener_.dispatcher().timeSource(), socket_->connectionInfoProviderSharedPtr(),
-          StreamInfo::FilterState::LifeSpan::Connection)) {
+      iter_(accept_filters_.end()) {
   listener_.stats_.downstream_pre_cx_active_.inc();
 }
 
@@ -62,8 +58,8 @@ void ActiveTcpSocket::unlink() {
     removed->timer_->disableTimer();
   }
   // Emit logs if a connection is not established.
-  if (!connected_ && stream_info_ != nullptr) {
-    ActiveStreamListenerBase::emitLogs(*listener_.config_, *stream_info_);
+  if (!connected_ && socket_ != nullptr) {
+    ActiveStreamListenerBase::emitLogs(*listener_.config_, socket_->streamInfo());
   }
   listener_.dispatcher().deferredDelete(std::move(removed));
 }
@@ -170,7 +166,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
 
 void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
                                          const ProtobufWkt::Struct& value) {
-  stream_info_->setDynamicMetadata(name, value);
+  socket_->streamInfo().setDynamicMetadata(name, value);
 }
 
 void ActiveTcpSocket::newConnection() {
@@ -208,7 +204,8 @@ void ActiveTcpSocket::newConnection() {
     }
     accept_filters_.clear();
     // Create a new connection on this listener.
-    listener_.newConnection(std::move(socket_), std::move(stream_info_));
+    listener_.newConnection(std::move(socket_));
+    socket_ = nullptr;
   }
 }
 } // namespace Server

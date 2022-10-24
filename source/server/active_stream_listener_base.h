@@ -55,8 +55,7 @@ public:
   /**
    * Create a new connection from a socket accepted by the listener.
    */
-  void newConnection(Network::ConnectionSocketPtr&& socket,
-                     std::unique_ptr<StreamInfo::StreamInfo> stream_info);
+  void newConnection(Network::ConnectionSocketPtr&& socket);
 
   /**
    * Remove the socket from this listener. Should be called when the socket passes the listener
@@ -125,11 +124,9 @@ protected:
    *
    * @param filter_chain The network filter chain linking to the connection.
    * @param server_conn_ptr The server connection.
-   * @param stream_info The stream info of the active connection.
    */
   virtual void newActiveConnection(const Network::FilterChain& filter_chain,
-                                   Network::ServerConnectionPtr server_conn_ptr,
-                                   std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+                                   Network::ServerConnectionPtr server_conn_ptr) PURE;
 
   std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
   Network::ListenerPtr listener_;
@@ -170,15 +167,13 @@ struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
                              public Network::ConnectionCallbacks,
                              Logger::Loggable<Logger::Id::conn_handler> {
   ActiveTcpConnection(ActiveConnections& active_connections,
-                      Network::ConnectionPtr&& new_connection, TimeSource& time_system,
-                      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
+                      Network::ConnectionPtr&& new_connection, TimeSource& time_system);
   ~ActiveTcpConnection() override;
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   ActiveConnections& active_connections_;
   Network::ConnectionPtr connection_;
   Stats::TimespanPtr conn_length_;

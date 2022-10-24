@@ -2,7 +2,6 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/server/active_listener_base.h"
@@ -72,8 +71,7 @@ public:
                       bool hand_off_restored_destination_connections, bool rebalanced) override;
 
   void newActiveConnection(const Network::FilterChain& filter_chain,
-                           Network::ServerConnectionPtr server_conn_ptr,
-                           std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
+                           Network::ServerConnectionPtr server_conn_ptr) override;
 
   /**
    * Update the listener config. The follow up connections will see the new config. The existing

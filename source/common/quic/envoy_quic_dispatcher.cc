@@ -86,8 +86,9 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   quic::QuicConfig quic_config = config();
   // TODO(danzh) use passed-in ALPN instead of hard-coded h3 after proof source interfaces takes in
   // ALPN.
-  Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
-      listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
+  Network::ConnectionSocketPtr connection_socket =
+      createServerConnectionSocket(listen_socket_.ioHandle(), self_address, peer_address,
+                                   std::string(parsed_chlo.sni), "h3", dispatcher_.timeSource());
   const Network::FilterChain* filter_chain =
       listener_config_->filterChainManager().findFilterChain(*connection_socket);
 

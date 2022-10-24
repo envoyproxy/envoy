@@ -17,6 +17,10 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace StreamInfo {
+class StreamInfo;
+} // namespace StreamInfo
+
 namespace Network {
 
 /**
@@ -83,6 +87,12 @@ public:
    * return value is cwnd(in packets) times the connection's MSS.
    */
   virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+
+  /**
+   * @return the stream info for the connection including its dynamic metadata and the filter state.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 using ConnectionSocketPtr = std::unique_ptr<ConnectionSocket>;

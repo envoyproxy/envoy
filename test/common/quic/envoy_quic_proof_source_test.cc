@@ -148,7 +148,7 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
+        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
         true, listener_config_.listenerScope(),
@@ -183,6 +183,7 @@ public:
   }
 
 protected:
+  Event::GlobalTimeSystem time_system_;
   std::string hostname_{"www.fake.com"};
   quic::QuicSocketAddress server_address_;
   quic::QuicSocketAddress client_address_;

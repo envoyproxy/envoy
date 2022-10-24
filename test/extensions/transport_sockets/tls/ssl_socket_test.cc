@@ -383,8 +383,8 @@ void testUtil(const TestUtilOptions& options) {
         // configureInitialCongestionWindow is an unimplemented empty function, this is just to
         // increase code coverage.
         ssl_socket->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
-        server_connection = dispatcher->createServerConnection(std::move(socket),
-                                                               std::move(ssl_socket), stream_info);
+        server_connection =
+            dispatcher->createServerConnection(std::move(socket), std::move(ssl_socket));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -740,8 +740,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
         Network::TransportSocketPtr transport_socket =
             server_ssl_socket_factory.createDownstreamTransportSocket();
         EXPECT_FALSE(transport_socket->startSecureTransport());
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), std::move(transport_socket), stream_info);
+        server_connection =
+            dispatcher->createServerConnection(std::move(socket), std::move(transport_socket));
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -2657,8 +2657,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
         Buffer::OwnedImpl data("hello");
         server_connection->write(data, false);
@@ -2727,8 +2726,7 @@ TEST_P(SslSocketTest, HalfClose) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2809,8 +2807,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -2897,8 +2894,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->enableHalfClose(true);
         server_connection->addReadFilter(server_read_filter);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
@@ -3013,8 +3009,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3107,7 +3102,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                 ? server_ssl_socket_factory1
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createDownstreamTransportSocket(), stream_info);
+            std::move(socket), tsf.createDownstreamTransportSocket());
       }));
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
@@ -3152,7 +3147,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                 ? server_ssl_socket_factory1
                 : server_ssl_socket_factory2;
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), tsf.createDownstreamTransportSocket(), stream_info2);
+            std::move(socket), tsf.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3242,8 +3237,7 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
 
         const SslHandshakerImpl* ssl_socket =
             dynamic_cast<const SslHandshakerImpl*>(server_connection->ssl().get());
@@ -3852,7 +3846,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
                 ? server_ssl_socket_factory
                 : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
+            std::move(accepted_socket), tsf.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -3894,7 +3888,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
                 ? server_ssl_socket_factory
                 : server2_ssl_socket_factory;
         server_connection = dispatcher_->createServerConnection(
-            std::move(accepted_socket), tsf.createDownstreamTransportSocket(), stream_info_);
+            std::move(accepted_socket), tsf.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
@@ -3979,8 +3973,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -4025,8 +4018,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -4209,8 +4201,7 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory.createDownstreamTransportSocket());
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -5314,8 +5305,7 @@ protected:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
-              stream_info_);
+              std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket());
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
@@ -5390,8 +5380,7 @@ protected:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           server_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
-              stream_info_);
+              std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket());
           server_connection_->setBufferLimits(read_buffer_limit);
           server_connection_->addConnectionCallbacks(server_callbacks_);
           server_connection_->addReadFilter(read_filter_);
@@ -5511,8 +5500,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket());
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);
         EXPECT_EQ("", server_connection_->nextProtocol());
@@ -5542,8 +5530,7 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection_ = dispatcher_->createServerConnection(
-            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket(),
-            stream_info_);
+            std::move(socket), server_ssl_socket_factory_->createDownstreamTransportSocket());
         server_connection_->setBufferLimits(read_buffer_limit);
         server_connection_->addConnectionCallbacks(server_callbacks_);
         server_connection_->addReadFilter(read_filter_);

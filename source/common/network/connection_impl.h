@@ -12,7 +12,6 @@
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/connection_impl_base.h"
-#include "source/common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -50,8 +49,7 @@ public:
 class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                 TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                 bool connected);
+                 TransportSocketPtr&& transport_socket, bool connected);
 
   ~ConnectionImpl() override;
 
@@ -100,8 +98,8 @@ public:
     return socket_->options();
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return socket_->streamInfo(); }
+  const StreamInfo::StreamInfo& streamInfo() const override { return socket_->streamInfo(); }
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
@@ -171,7 +169,6 @@ protected:
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
-  StreamInfo::StreamInfo& stream_info_;
   FilterManagerImpl filter_manager_;
 
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
@@ -238,8 +235,7 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, bool connected);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
@@ -279,8 +275,6 @@ public:
 
 private:
   void onConnected() override;
-
-  StreamInfo::StreamInfoImpl stream_info_;
 };
 
 } // namespace Network

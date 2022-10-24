@@ -13,6 +13,7 @@
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -40,7 +41,8 @@ class MockConnectionSocket : public Network::ConnectionSocket {
 public:
   MockConnectionSocket()
       : connection_info_provider_(
-            std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
+            std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)),
+        stream_info_(std::make_unique<StreamInfo::MockStreamInfo>()) {}
 
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
@@ -130,6 +132,8 @@ public:
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
   absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
   void dumpState(std::ostream&, int) const override {}
+  StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
 
 private:
   Network::IoHandlePtr io_handle_;
@@ -139,6 +143,7 @@ private:
   std::string ja3_hash_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
+  std::unique_ptr<StreamInfo::MockStreamInfo> stream_info_;
 };
 const char YamlHeader[] = R"EOF(
     address:

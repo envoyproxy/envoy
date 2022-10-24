@@ -87,8 +87,7 @@ public:
   void decNumConnections() override { config_->openConnections().dec(); }
 
   void newActiveConnection(const Network::FilterChain& filter_chain,
-                           Network::ServerConnectionPtr server_conn_ptr,
-                           std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
+                           Network::ServerConnectionPtr server_conn_ptr) override;
 };
 
 } // namespace InternalListener

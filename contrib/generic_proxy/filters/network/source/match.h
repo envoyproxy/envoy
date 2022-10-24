@@ -40,7 +40,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<Request>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
     return []() { return std::make_unique<ServiceMatchDataInput>(); };
   }
 
@@ -66,7 +67,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<Request>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&,
+                           Server::Configuration::ServerFactoryContext&) override {
     return []() { return std::make_unique<MethodMatchDataInput>(); };
   }
 
@@ -103,9 +105,9 @@ public:
 
   Matcher::DataInputFactoryCb<Request>
   createDataInputFactoryCb(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& visitor) override {
-    const auto& config =
-        MessageUtil::downcastAndValidate<const PropertyDataInputProto&>(message, visitor);
+                           Server::Configuration::ServerFactoryContext& context) override {
+    const auto& config = MessageUtil::downcastAndValidate<const PropertyDataInputProto&>(
+        message, context.messageValidationVisitor());
     const std::string name = config.property_name();
 
     return [name]() { return std::make_unique<PropertyMatchDataInput>(name); };

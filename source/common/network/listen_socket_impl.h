@@ -14,6 +14,7 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -182,13 +183,20 @@ class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
-                       const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(std::move(io_handle), local_address, remote_address) {}
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       TimeSource& time_source)
+      : SocketImpl(std::move(io_handle), local_address, remote_address),
+        stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+            time_source, connection_info_provider_,
+            StreamInfo::FilterState::LifeSpan::Connection)) {}
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const SocketCreationOptions& options)
-      : SocketImpl(type, local_address, remote_address, options) {
+                       const SocketCreationOptions& options, TimeSource& time_source)
+      : SocketImpl(type, local_address, remote_address, options),
+        stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
+            time_source, connection_info_provider_,
+            StreamInfo::FilterState::LifeSpan::Connection)) {
     connection_info_provider_->setLocalAddress(local_address);
   }
 
@@ -235,17 +243,21 @@ public:
     DUMP_DETAILS(connection_info_provider_);
   }
 
+  StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
+
 protected:
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
 };
 
 // ConnectionSocket used with server connections.
 class AcceptedSocketImpl : public ConnectionSocketImpl {
 public:
   AcceptedSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address,
-                     const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address) {
+                     const Address::InstanceConstSharedPtr& remote_address, TimeSource& time_source)
+      : ConnectionSocketImpl(std::move(io_handle), local_address, remote_address, time_source) {
     ++global_accepted_socket_count_;
   }
 
@@ -266,9 +278,9 @@ private:
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
-                   const OptionsSharedPtr& options)
+                   const OptionsSharedPtr& options, TimeSource& time_source)
       : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
-                             nullptr, remote_address) {
+                             nullptr, remote_address, time_source) {
     if (options) {
       addOptions(options);
     }

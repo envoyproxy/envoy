@@ -11,6 +11,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "benchmark/benchmark.h"
@@ -74,7 +75,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   ConfigSharedPtr cfg(std::make_shared<Config>(store, proto_config));
   Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
-  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
+  Event::SimulatedTimeSystem time_system;
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr, time_system);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket);
   Network::ListenerFilterBufferImpl buffer(

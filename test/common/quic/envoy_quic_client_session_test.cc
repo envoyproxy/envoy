@@ -71,7 +71,8 @@ public:
                                                         54321)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
+            quic_version_, *dispatcher_,
+            createConnectionSocket(peer_addr_, self_addr_, nullptr, dispatcher_->timeSource()),
             connection_id_generator_)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),

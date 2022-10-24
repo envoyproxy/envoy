@@ -4,6 +4,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -49,7 +50,8 @@ TEST_F(PassthroughTest, FailureReasonDefersToInnerSocket) {
 // Test connect method defers to inner socket
 TEST_F(PassthroughTest, ConnectDefersToInnerSocket) {
   auto io_handle = std::make_unique<Network::IoSocketHandleImpl>();
-  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
+  Event::SimulatedTimeSystem time_system;
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr, time_system);
   ON_CALL(*inner_socket_, connect(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
 
   EXPECT_CALL(*inner_socket_, connect(testing::Ref(socket)));

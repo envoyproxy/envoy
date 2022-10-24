@@ -113,7 +113,6 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
-        "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -137,6 +136,7 @@ envoy_cc_library(
     deps = [
         ":connection_base_lib",
         ":connection_lib",
+        "//source/common/common:dump_state_utils",
     ],
 )
 
@@ -280,6 +280,7 @@ envoy_cc_library(
         "//envoy/network:exception_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
+        "//source/common/stream_info:stream_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
