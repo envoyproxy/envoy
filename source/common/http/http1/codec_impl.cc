@@ -871,6 +871,10 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   // remove the received Content-Length field prior to forwarding such
   // a message.
 
+#ifndef ENVOY_ENABLE_UHV
+  // This check is moved into default header validator.
+  // TODO(yanavlasov): use runtime override here when UHV is moved into the main build
+
   // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
   // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
   // is chunked - remove Content-Length and serve request.
@@ -884,6 +888,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
   }
+#endif
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
@@ -1191,9 +1196,6 @@ Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(active_request_ == nullptr);
     active_request_ = std::make_unique<ActiveRequest>(*this, std::move(bytes_meter_before_stream_));
-    if (resetStreamCalled()) {
-      return codecClientError("cannot create new streams after calling reset");
-    }
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
 
     // Check for pipelined request flood as we prepare to accept a new request.

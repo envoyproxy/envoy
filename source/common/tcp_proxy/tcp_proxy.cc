@@ -628,6 +628,8 @@ Network::FilterStatus Filter::onNewConnection() {
   return establishUpstreamConnection();
 }
 
+bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
+
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {

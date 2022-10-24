@@ -72,6 +72,18 @@ public:
   }
 };
 
+class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+public:
+  MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
+
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
+              (const Network::Address::InstanceConstSharedPtr& address,
+               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
+              (const));
+
+  Network::Address::InstanceConstSharedPtr& address_;
+};
+
 class MockClusterInfo : public ClusterInfo {
 public:
   MockClusterInfo();
@@ -145,12 +157,11 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(AddressSelectFn, sourceAddressFn, (), (const));
+  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+              (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, clusterSocketOptions, (),
-              (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
@@ -203,6 +214,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
