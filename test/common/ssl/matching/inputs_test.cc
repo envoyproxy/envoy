@@ -15,10 +15,7 @@ using testing::ReturnRef;
 
 TEST(Authentication, UriSanInput) {
   UriSanInput<Http::HttpMatchingData> input;
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   Http::Matching::HttpMatchingDataImpl data(info);
 
   {
@@ -64,10 +61,7 @@ TEST(Authentication, UriSanInput) {
 
 TEST(Authentication, DnsSanInput) {
   DnsSanInput<Http::HttpMatchingData> input;
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   Http::Matching::HttpMatchingDataImpl data(info);
 
   {
@@ -113,10 +107,7 @@ TEST(Authentication, DnsSanInput) {
 
 TEST(Authentication, SubjectInput) {
   SubjectInput<Http::HttpMatchingData> input;
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   Http::Matching::HttpMatchingDataImpl data(info);
 
   {

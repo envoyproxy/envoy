@@ -158,13 +158,17 @@ MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      connection_info_provider_(
-          std::make_shared<ConnectionInfoSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
-                                                     std::make_shared<Address::Ipv4Instance>(80))) {
+      stream_info_(std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>()) {
+  connection_info_provider_ = stream_info_->downstream_connection_info_provider_;
+  connection_info_provider_->setLocalAddress(std::make_shared<Address::Ipv4Instance>(80));
+  connection_info_provider_->setRemoteAddress(std::make_shared<Address::Ipv4Instance>(80));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(
+          stream_info_->downstream_connection_info_provider_->localAddress()->ip()->version()));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(*stream_info_));
+  ON_CALL(testing::Const(*this), streamInfo()).WillByDefault(ReturnRef(*stream_info_));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;

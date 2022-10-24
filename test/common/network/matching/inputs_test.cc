@@ -36,9 +36,10 @@ TEST(MatchingData, DestinationIPInput) {
 }
 
 TEST(MatchingData, HttpDestinationIPInput) {
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080),
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
+  info.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080));
+  info.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
   info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 8081));

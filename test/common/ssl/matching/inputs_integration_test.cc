@@ -117,10 +117,7 @@ TEST_F(HttpInputsIntegrationTest, UriSanInput) {
 
   initialize("UriSanInput", host);
 
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
   info.downstream_connection_info_provider_->setSslConnection(ssl);
   std::vector<std::string> uri_sans{host};
@@ -138,10 +135,7 @@ TEST_F(HttpInputsIntegrationTest, DnsSanInput) {
 
   initialize("DnsSanInput", host);
 
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
   info.downstream_connection_info_provider_->setSslConnection(ssl);
   std::vector<std::string> dns_sans{host};
@@ -158,10 +152,7 @@ TEST_F(HttpInputsIntegrationTest, SubjectInput) {
 
   initialize("SubjectInput", host);
 
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ = std::make_shared<Network::ConnectionInfoSetterImpl>(
-      std::make_shared<Network::Address::Ipv4Instance>(80),
-      std::make_shared<Network::Address::Ipv4Instance>(80));
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
   info.downstream_connection_info_provider_->setSslConnection(ssl);
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(testing::ReturnRef(host));

@@ -325,12 +325,14 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  ConnectionInfoSetter& connectionInfoProvider() override {
+    return *stream_info_->downstream_connection_info_provider_;
+  }
   const ConnectionInfoProvider& connectionInfoProvider() const override {
-    return *connection_info_provider_;
+    return *stream_info_->downstream_connection_info_provider_;
   }
   ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
-    return connection_info_provider_;
+    return stream_info_->downstream_connection_info_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
   MOCK_METHOD(absl::string_view, detectedTransportProtocol, (), (const));
@@ -369,6 +371,7 @@ public:
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
 
   IoHandlePtr io_handle_;
+  std::unique_ptr<NiceMock<StreamInfo::MockStreamInfo>> stream_info_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
 };
 

@@ -622,11 +622,11 @@ matcher_tree:
       context, factory_context, validation_visitor);
   auto match_tree = matcher_factory.create(matcher);
 
+  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   const Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
-  StreamInfo::MockStreamInfo info;
-  info.downstream_connection_info_provider_ =
-      std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
+  info.downstream_connection_info_provider_->setLocalAddress(address);
+  info.downstream_connection_info_provider_->setRemoteAddress(address);
   Http::Matching::HttpMatchingDataImpl data(info);
 
   const auto result = match_tree()->match(data);
