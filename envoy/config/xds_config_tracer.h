@@ -17,7 +17,7 @@ namespace Config {
 
 // The status of a Delta/DiscoveryResponse.
 enum TraceState {
-  // Successfully got the resources.
+  // Successfully got the resources or message.
   RECEIVE = 0,
   // Successfully ingest the resouces.
   INGESTED = 1,
@@ -34,25 +34,41 @@ struct TraceDetails {
 };
 
 /**
- *
+ * An interface for hooking into xDS update events to provide the ablility to use some
+ * external logger or processor in xDS update.
+ * 
+ * Instance of this interface get invoked on the main Envoy thread. Thus, it is important
+ * for implementations of this interface to not execute any blocking operations on the same
+ * thread.
  */
 class XdsConfigTracer {
 public:
   virtual ~XdsConfigTracer() = default;
 
   /**
-   * Log a decode resources.
+   * Log the decoded SotW xDS resources that are about to ingested.
    * @param type_url The type url of xDS message.
    * @param resources List of decoded resources that reflect the new state.
-   * @param details if the config should be rejected.
+   * @param details The log point state and details.
    */
   virtual void log(const absl::string_view type_url,
                    const std::vector<DecodedResourcePtr>& resources,
                    const TraceDetails& details) PURE;
 
+  /**
+   * Log point for SotW xDS discovery response.
+   * applied on the Envoy instance, and are about to be ACK'ed.
+   * @param message The SotW discovery response message body.
+   * @param details The log point state and details.
+   */
   virtual void log(const envoy::service::discovery::v3::DiscoveryResponse& message,
                    const TraceDetails& details) PURE;
 
+  /**
+   * Log point for Delta xDS discovery response message.
+   * @param message The Delta discovery response message body.
+   * @param details The log point state and details.
+   */
   virtual void log(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
                    const TraceDetails& details) PURE;
 };
@@ -61,14 +77,14 @@ using XdsConfigTracerPtr = std::unique_ptr<XdsConfigTracer>;
 using XdsConfigTracerOptRef = OptRef<XdsConfigTracer>;
 
 /**
- * A factory abstract class for creating instances of ConfigValidators.
+ * A factory abstract class for creating instances of XdsConfigTracer.
  */
 class XdsConfigTracerFactory : public Config::TypedFactory {
 public:
   ~XdsConfigTracerFactory() override = default;
 
   /**
-   * Creates a ConfigValidator using the given config.
+   * Creates an XdsConfigTracer using the given config.
    */
   virtual XdsConfigTracerPtr
   createXdsConfigTracer(const ProtobufWkt::Any& config,
