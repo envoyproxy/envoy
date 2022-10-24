@@ -22,7 +22,7 @@ namespace {
 
 constexpr absl::string_view DelimiterForInlineHeaders{","};
 constexpr absl::string_view DelimiterForInlineCookies{"; "};
-const static int kMinHeadersForLazyMap = 3; // Arbitrary hard-coded value.
+const static int kMinHeadersForLazyMap = 3; // Optimal hard-coded value based on benchmarks.
 
 bool validatedLowerCaseString(absl::string_view str) {
   auto lower_case_str = LowerCaseString(str);

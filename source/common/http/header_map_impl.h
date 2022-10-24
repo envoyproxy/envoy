@@ -181,8 +181,8 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
-   * When the list size is greater or equal to the default min size (3), all headers are added to a
-   * map, to allow fast access given a header key. Once the map is initialized, it will be used even
+   * When the list size is greater or equal to 3, all headers are added to a map, to allow fast
+   * access given a header key. Once the map is initialized, it will be used even
    * if the number of headers decreases below the threshold.
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
