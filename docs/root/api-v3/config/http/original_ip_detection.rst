@@ -1,5 +1,5 @@
-Original IP Detection
-=====================
+HTTP original IP detection
+==========================
 
 .. toctree::
   :glob:

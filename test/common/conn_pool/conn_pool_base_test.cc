@@ -296,7 +296,7 @@ TEST_F(ConnPoolImplBaseTest, NoPreconnectIfUnhealthy) {
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
   host_->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(host_->health(), Upstream::Host::Health::Unhealthy);
+  EXPECT_EQ(host_->coarseHealth(), Upstream::Host::Health::Unhealthy);
 
   // On new stream, create 1 connection.
   EXPECT_CALL(pool_, instantiateActiveClient);
@@ -311,9 +311,9 @@ TEST_F(ConnPoolImplBaseTest, NoPreconnectIfDegraded) {
   // Create more than one connection per new stream.
   ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
 
-  EXPECT_EQ(host_->health(), Upstream::Host::Health::Healthy);
+  EXPECT_EQ(host_->coarseHealth(), Upstream::Host::Health::Healthy);
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_EQ(host_->health(), Upstream::Host::Health::Degraded);
+  EXPECT_EQ(host_->coarseHealth(), Upstream::Host::Health::Degraded);
 
   // On new stream, create 1 connection.
   EXPECT_CALL(pool_, instantiateActiveClient);

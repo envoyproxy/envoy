@@ -101,14 +101,13 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
 
   const XdsConfigSourceId source_id{target_xds_authority_, type_url_};
   TRY_ASSERT_MAIN_THREAD {
-    const std::vector<std::string> resource_names{names_tracked_.begin(), names_tracked_.end()};
     std::vector<envoy::service::discovery::v3::Resource> resources =
-        xds_resources_delegate_->getResources(source_id, resource_names);
+        xds_resources_delegate_->getResources(source_id, names_tracked_);
 
     std::vector<DecodedResourcePtr> decoded_resources;
     const auto scoped_update = ttl_.scopedTtlUpdate();
     std::string version_info;
-    int unaccounted = names_tracked_.size();
+    size_t unaccounted = names_tracked_.size();
     if (names_tracked_.size() == 1 && names_tracked_.contains(Envoy::Config::Wildcard)) {
       // For wildcard requests, there are no expectations for the number of resources returned.
       unaccounted = 0;

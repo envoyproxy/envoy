@@ -31,7 +31,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ON_CALL(host, metadata()).WillByDefault(Return(metadata));
 
-  ON_CALL(host, health()).WillByDefault(Return(Upstream::Host::Health::Healthy));
+  ON_CALL(host, coarseHealth()).WillByDefault(Return(Upstream::Host::Health::Healthy));
 
   ON_CALL(host, weight()).WillByDefault(Return(weight));
   ON_CALL(host, priority()).WillByDefault(Return(priority));
