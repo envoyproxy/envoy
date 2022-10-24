@@ -590,6 +590,7 @@ envoy_cc_test_library(
         ":socket_interface_swap_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/listener/original_dst:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
@@ -608,6 +609,7 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
