@@ -19,9 +19,9 @@ namespace Config {
 enum TraceState {
   // Successfully got the resources or message.
   RECEIVE = 0,
-  // Successfully ingest the resouces.
+  // Successfully ingested the resouces.
   INGESTED = 1,
-  // Fail to apply the resources.
+  // Failed to apply the resources.
   FAILED = 2,
 };
 
@@ -46,7 +46,7 @@ public:
   virtual ~XdsConfigTracer() = default;
 
   /**
-   * Log the decoded SotW xDS resources that are about to ingested.
+   * Log the decoded SotW xDS resources that are about to be ingested.
    * @param type_url The type url of xDS message.
    * @param resources List of decoded resources that reflect the latest state.
    * @param details The log point state and details.
@@ -57,7 +57,6 @@ public:
 
   /**
    * Log point for SotW xDS discovery response.
-   * applied on the Envoy instance, and are about to be ACK'ed.
    * @param message The SotW discovery response message body.
    * @param details The log point state and details.
    */
@@ -65,7 +64,7 @@ public:
                    const TraceDetails& details) PURE;
 
   /**
-   * Log point for Delta xDS discovery response message.
+   * Log point for Delta xDS discovery response message when received, ingested, and failed.
    * @param message The Delta discovery response message body.
    * @param details The log point state and details.
    */
