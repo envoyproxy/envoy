@@ -4,8 +4,6 @@ package envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadat
 
 import "envoy/type/matcher/v3/regex.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -90,11 +88,8 @@ message PayloadToMetadata {
     // field name to log
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // field id to match. Limit to the range of int16 to fit thrift format.
-    google.protobuf.Int32Value id = 2 [
-      (validate.rules).int32 = {lte: 32767 gte: -32768},
-      (validate.rules).message = {required: true}
-    ];
+    // field id to match
+    int32 id = 2 [(validate.rules).int32 = {lte: 32767 gte: -32768}];
 
     // next node of the field selector
     FieldSelector child = 3;

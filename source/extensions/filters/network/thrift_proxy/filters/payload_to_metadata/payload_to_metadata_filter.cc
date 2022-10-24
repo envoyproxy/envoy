@@ -65,7 +65,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, TrieSharedPtr root)
   const FieldSelector* field_selector = &rule_.field_selector();
   TrieSharedPtr node = root;
   while (true) {
-    int16_t id = static_cast<int16_t>(field_selector->id().value());
+    int16_t id = static_cast<int16_t>(field_selector->id());
     if (node->children_.find(id) == node->children_.end()) {
       node->children_[id] = std::make_shared<Trie>(node);
     }
