@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Config {
 
-// The status of a Delta/DiscoveryResponse.
+// The status of processing Delta/DiscoveryResponse.
 enum TraceState {
   // Successfully got the resources or message.
   RECEIVE = 0,

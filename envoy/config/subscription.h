@@ -61,7 +61,7 @@ public:
   virtual bool hasResource() const PURE;
 
   /**
-   * @return bool does the xDS discovery respon
+   * @return absl::optional<envoy::config::core::v3::Metadata> of a resource.
    */
   virtual absl::optional<envoy::config::core::v3::Metadata> metadata() const PURE;
 };
