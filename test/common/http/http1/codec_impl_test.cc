@@ -3283,41 +3283,6 @@ TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     // Delete active request.
     connection_.dispatcher_.clearDeferredDeleteList();
   }
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
-
-  // Always call readDisable if lazy read disable flag is set to false.
-  {
-    initialize();
-
-    NiceMock<MockRequestDecoder> decoder;
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
-
-    EXPECT_CALL(decoder, decodeHeaders_(_, true));
-    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
-
-    EXPECT_CALL(connection_, readDisable(true));
-
-    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
-
-    auto status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-
-    std::string output;
-    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
-
-    EXPECT_CALL(connection_, readDisable(false));
-    // Delete active request.
-    connection_.dispatcher_.clearDeferredDeleteList();
-  }
 }
 
 // Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
