@@ -81,7 +81,8 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
                 status_code: 299
-                uri: "https://foo.example/gateway_error"
+                host: "https://foo.example"
+                path: "/gateway_error"
                 response_headers_to_add:
                 - header:
                     key: "foo2"
@@ -103,7 +104,8 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
                 status_code: 292
-                uri: "https://foo.example/internal_server_error"
+                host: "https://foo.example"
+                path: "/internal_server_error"
                 response_headers_to_add:
                 - header:
                     key: "foo3"

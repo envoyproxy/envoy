@@ -158,8 +158,8 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("some.route");
-  auto response =
-      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(20));
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,

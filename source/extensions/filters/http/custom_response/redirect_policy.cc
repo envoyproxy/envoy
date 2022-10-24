@@ -31,12 +31,14 @@ RedirectPolicy::RedirectPolicy(
         config,
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
-      stats_(stat_names_, context.scope(), stats_prefix), http_uri_(config.uri()) {
+      stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),
+      path_(config.path()) {
 
   Http::Utility::Url absolute_url;
-  if (!absolute_url.initialize(http_uri_, false)) {
+  auto uri = absl::StrCat(host_, path_);
+  if (!absolute_url.initialize(uri, false)) {
     throw EnvoyException(
-        absl::StrCat("Invalid uri specified for redirection for custom response: ", http_uri_));
+        absl::StrCat("Invalid uri specified for redirection for custom response: ", uri));
   }
 
   if (config.has_status_code()) {
@@ -82,9 +84,9 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
   Http::Utility::Url absolute_url;
-  if (!absolute_url.initialize(http_uri_, false)) {
-    IS_ENVOY_BUG(
-        absl::StrCat("Redirect for custom response failed: invalid location {}", http_uri_));
+  if (!absolute_url.initialize(absl::StrCat(host_, path_), false)) {
+    IS_ENVOY_BUG(absl::StrCat("Redirect for custom response failed: invalid location {}",
+                              absl::StrCat(host_, path_)));
     return Http::FilterHeadersStatus::Continue;
   }
   // Don't change the scheme from the original request
@@ -94,6 +96,7 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   const std::string original_host(downstream_headers->getHostValue());
   const std::string original_path(downstream_headers->getPathValue());
   const bool scheme_is_set = (downstream_headers->Scheme() != nullptr);
+  // Replace the original host, scheme and path.
   Cleanup restore_original_headers(
       [original_host, original_path, scheme_is_set, scheme_is_http, downstream_headers]() {
         downstream_headers->setHost(original_host);
@@ -104,20 +107,19 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
         }
       });
 
-  // Replace the original host, scheme and path.
   downstream_headers->setScheme(absolute_url.scheme());
   downstream_headers->setHost(absolute_url.hostAndPort());
 
-  auto path_and_query = absolute_url.pathAndQueryParams();
+  auto path_and_query = path_;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_reject_path_with_fragment")) {
     // Envoy treats internal redirect as a new request and will reject it if URI path
     // contains #fragment. However the Location header is allowed to have #fragment in URI path.
     // To prevent Envoy from rejecting internal redirect, strip the #fragment from Location URI if
     // it is present.
-    auto fragment_pos = path_and_query.find('#');
-    path_and_query = path_and_query.substr(0, fragment_pos);
+    auto fragment_pos = path_.find('#');
+    path_and_query = path_.substr(0, fragment_pos);
   }
-  downstream_headers->setPath(path_and_query);
+  downstream_headers->setPath(path_);
 
   if (decoder_callbacks->downstreamCallbacks()) {
     decoder_callbacks->downstreamCallbacks()->clearRouteCache();

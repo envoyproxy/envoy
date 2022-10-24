@@ -41,12 +41,16 @@ public:
   Envoy::Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                                  CustomResponseFilter&) const override;
 
+  const std::string& host() const { return host_; }
+  const std::string& path() const { return path_; }
+
 private:
   CustomResponseRedirectStatNames stat_names_;
   CustomResponseRedirectStats stats_;
 
   // Remote source the request should be redirected to.
-  const std::string http_uri_;
+  const std::string host_;
+  const std::string path_;
 
   absl::optional<Http::Code> status_code_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;

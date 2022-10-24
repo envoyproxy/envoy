@@ -34,21 +34,28 @@ message CustomResponse {
   // Custom response policy to redirect the original response to a different
   // upstream.
   message RedirectPolicy {
-    // The Http URI to redirect the original request to, to get the custom
-    // response.
-    // It should be a full FQDN with protocol, host and path.
+    // The host that will serve the custom response.
     //
     // Example:
     //
     // .. code-block:: yaml
     //
-    //    uri: https://www.mydomain.com/path/to/404.txt
+    //    uri: https://www.mydomain.com
     //
-    string uri = 1 [(validate.rules).string = {min_len: 1}];
+    string host = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The path for the custom response.
+    //
+    // Example:
+    //
+    //  .. code-block:: yaml
+    //
+    //  path: /path/to/503_response.txt
+    string path = 2 [(validate.rules).string = {min_len: 1}];
 
     // The new response status code if specified. This is used to override the
     // status code of the redirect response if it is not an error status.
-    google.protobuf.UInt32Value status_code = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+    google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
     // HTTP headers to add to the response. This allows the
     // response policy to append, to add or to override headers of
@@ -56,7 +63,7 @@ message CustomResponse {
     // remote body, before it is sent to a downstream client.
     // Note that these are not applied if the redirected response is an error
     // response.
-    repeated config.core.v3.HeaderValueOption response_headers_to_add = 3
+    repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
         [(validate.rules).repeated = {max_items: 1000}];
   }
 
