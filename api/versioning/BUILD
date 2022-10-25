@@ -16,6 +16,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/action/v3:pkg",
+        "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/dubbo/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/router/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg",
