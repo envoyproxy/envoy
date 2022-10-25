@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
@@ -326,7 +327,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "regex_lib",
     srcs = ["regex.cc"],
     hdrs = ["regex.h"],

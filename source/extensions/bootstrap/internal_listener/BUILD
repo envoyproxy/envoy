@@ -19,7 +19,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "internal_listener_registry",
     srcs = [
         "internal_listener_registry.cc",
@@ -35,7 +35,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "client_connection_factory",
     srcs = [
         "client_connection_factory.cc",

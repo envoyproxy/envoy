@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -23,7 +24,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "abort_action_config",
     srcs = ["abort_action_config.cc"],
     hdrs = ["abort_action_config.h"],

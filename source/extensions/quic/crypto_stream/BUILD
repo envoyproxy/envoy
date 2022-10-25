@@ -1,7 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
-    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -11,7 +10,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "envoy_quic_crypto_server_stream_lib",
     srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],
@@ -45,7 +44,7 @@ envoy_cc_extension(
     ),
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "envoy_quic_crypto_client_stream_lib",
     srcs = ["envoy_quic_crypto_client_stream.cc"],
     hdrs = ["envoy_quic_crypto_client_stream.h"],

@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -140,7 +141,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "default_client_connection_factory",
     srcs = [
         "default_client_connection_factory.cc",
@@ -219,7 +220,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "socket_interface_lib",
     hdrs = ["socket_interface.h"],
     deps = [
@@ -230,7 +231,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "default_socket_interface_lib",
     srcs = [
         "io_socket_handle_impl.cc",

@@ -12,6 +12,8 @@ load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
+    "LIBRARY_DEFAULT_ALWAYSLINK",
 )
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -52,11 +54,25 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
         **kargs
     )
 
+# Extensions that Envoy will currently not work without. These have public visibility.
+def envoy_cc_core_extension(
+        name,
+        tags = [],
+        visibility = ["//visibility:public"],
+        **kwargs):
+    envoy_cc_extension(
+        name = name,
+        tags = tags,
+        visibility = visibility,
+        **kwargs
+    )
+
 def envoy_cc_extension(
         name,
         tags = [],
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
+        alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
         **kwargs):
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
@@ -66,6 +82,7 @@ def envoy_cc_extension(
         name = name,
         tags = tags,
         visibility = visibility,
+        alwayslink = alwayslink,
         **kwargs
     )
     native.cc_library(
@@ -83,6 +100,7 @@ def envoy_cc_contrib_extension(
         tags = [],
         extra_visibility = [],
         visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY,
+        alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
         **kwargs):
     envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
 
@@ -101,6 +119,7 @@ def envoy_cc_library(
         strip_include_prefix = None,
         include_prefix = None,
         textual_hdrs = None,
+        alwayslink = LIBRARY_DEFAULT_ALWAYSLINK,
         defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
@@ -122,7 +141,7 @@ def envoy_cc_library(
             envoy_external_dep_path("abseil_strings"),
             envoy_external_dep_path("fmtlib"),
         ],
-        alwayslink = 1,
+        alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,

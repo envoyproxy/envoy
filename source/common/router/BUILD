@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -27,7 +28,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -332,7 +333,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "upstream_codec_filter_lib",
     srcs = [
         "upstream_codec_filter.cc",

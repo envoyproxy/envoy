@@ -3,6 +3,10 @@ date: Pending
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+  - area: build
+    change: |
+      changed envoy libraries to not always link. This can be reverted by setting LIBRARY_DEFAULT_ALWAYSLINK = 1 in extensions_build_config.bzl
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 

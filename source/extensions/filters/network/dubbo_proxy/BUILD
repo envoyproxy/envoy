@@ -37,7 +37,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "dubbo_protocol_impl_lib",
     srcs = ["dubbo_protocol_impl.cc"],
     hdrs = ["dubbo_protocol_impl.h"],
@@ -66,7 +66,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "dubbo_hessian2_serializer_impl_lib",
     srcs = ["dubbo_hessian2_serializer_impl.cc"],
     hdrs = [

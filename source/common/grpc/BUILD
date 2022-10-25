@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_google_grpc_external_deps",
     "envoy_package",
@@ -193,7 +194,7 @@ envoy_cc_library(
     ] + envoy_google_grpc_external_deps(),
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "google_grpc_creds_lib",
     srcs = ["google_grpc_creds_impl.cc"],
     hdrs = ["google_grpc_creds_impl.h"],

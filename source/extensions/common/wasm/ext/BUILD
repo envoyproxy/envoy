@@ -19,6 +19,7 @@ envoy_cc_library(
         "@proxy_wasm_cpp_sdk//:api_lib",
         "@proxy_wasm_cpp_sdk//:common_lib",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -32,6 +33,7 @@ envoy_cc_library(
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 # NB: this target is compiled to Wasm. Hence the generic rule.

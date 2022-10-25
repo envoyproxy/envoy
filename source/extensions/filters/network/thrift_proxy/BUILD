@@ -190,7 +190,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "auto_protocol_lib",
     srcs = [
         "auto_protocol_impl.cc",
@@ -208,7 +208,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "binary_protocol_lib",
     srcs = [
         "binary_protocol_impl.cc",
@@ -223,7 +223,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "compact_protocol_lib",
     srcs = [
         "compact_protocol_impl.cc",
@@ -239,7 +239,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "twitter_protocol_lib",
     srcs = [
         "twitter_protocol_impl.cc",
@@ -332,7 +332,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "auto_transport_lib",
     srcs = [
         "auto_transport_impl.cc",
@@ -353,7 +353,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "framed_transport_lib",
     srcs = [
         "framed_transport_impl.cc",
@@ -368,7 +368,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "header_transport_lib",
     srcs = [
         "header_transport_impl.cc",
@@ -384,7 +384,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "unframed_transport_lib",
     srcs = [
         "unframed_transport_impl.cc",

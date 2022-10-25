@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -16,7 +17,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_core_extension(
     name = "inputs_lib",
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],

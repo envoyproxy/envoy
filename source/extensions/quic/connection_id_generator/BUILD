@@ -26,7 +26,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "envoy_deterministic_connection_id_generator_config_lib",
     srcs = ["envoy_deterministic_connection_id_generator_config.cc"],
     hdrs = ["envoy_deterministic_connection_id_generator_config.h"],
