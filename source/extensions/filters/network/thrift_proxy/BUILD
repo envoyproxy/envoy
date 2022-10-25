@@ -220,6 +220,7 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":protocol_interface",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -236,6 +237,7 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":protocol_interface",
         "//source/common/common:macros",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
