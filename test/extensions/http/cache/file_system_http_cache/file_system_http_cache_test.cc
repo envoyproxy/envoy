@@ -334,6 +334,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   inserter->insertTrailers(response_trailers_, expect_true_callback_);
   EXPECT_EQ(0, true_callbacks_called_);
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(6);
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
   // Open file
   mock_async_file_manager_->nextActionCompletes(
@@ -352,6 +353,8 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   // Updated pre-header (which triggers createHardLink)
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
+  // Unlink
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   // createHardLink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   // Should have been 4 callbacks; insertHeaders, insertBody, insertBody, insertTrailers.

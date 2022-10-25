@@ -9,9 +9,9 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
-const absl::flat_hash_set<absl::string_view> headersNotToUpdate() {
+const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate() {
   CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<absl::string_view>,
+      absl::flat_hash_set<Http::LowerCaseString>,
       // Content range should not be changed upon validation
       Http::Headers::get().ContentRange,
 
@@ -38,24 +38,26 @@ void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry, const CacheFileHe
   //    (I doubt this is correct behavior; it mimics simple_http_cache's behavior,
   //    and is currently required by the cache tests.)
   // 4. headers from headersNotToUpdate are left unchanged.
-  absl::flat_hash_set<absl::string_view> updated_header_fields;
+  absl::flat_hash_set<Http::LowerCaseString> updated_header_fields;
   for (const auto& incoming_response_header : response.headers()) {
-    const std::string& key = incoming_response_header.key();
+    Http::LowerCaseString key{incoming_response_header.key()};
     if (headersNotToUpdate().contains(key)) {
       continue;
     }
     if (!updated_header_fields.contains(key)) {
-      auto it = std::find_if(entry.mutable_headers()->begin(), entry.mutable_headers()->end(),
-                             [&key](const CacheFileHeader_Header& h) { return h.key() == key; });
+      auto it = entry.mutable_headers()->begin();
+      while (it != entry.mutable_headers()->end() && Http::LowerCaseString{it->key()} != key) {
+        ++it;
+      }
       if (it == entry.mutable_headers()->end()) {
         auto h = entry.add_headers();
-        h->set_key(key);
+        h->set_key(key.get());
         h->set_value(incoming_response_header.value());
       } else {
         it->set_value(incoming_response_header.value());
         ++it;
         while (it != entry.mutable_headers()->end()) {
-          if (it->key() == key) {
+          if (Http::LowerCaseString{it->key()} == key) {
             it = entry.mutable_headers()->erase(it);
           } else {
             ++it;
@@ -65,7 +67,7 @@ void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry, const CacheFileHe
       updated_header_fields.insert(key);
     } else {
       auto h = entry.add_headers();
-      h->set_key(key);
+      h->set_key(key.get());
       h->set_value(incoming_response_header.value());
     }
   }
