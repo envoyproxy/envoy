@@ -231,6 +231,14 @@ struct StreamInfoImpl : public StreamInfo {
     return virtual_cluster_name_;
   }
 
+  void setDeferredLoggingInfo(DeferredLoggingInfo deferredLoggingInfo) override {
+    deferred_logging_info_ =
+        absl::make_optional<DeferredLoggingInfo>(std::move(deferredLoggingInfo));
+  }
+  const absl::optional<DeferredLoggingInfo>& deferredLoggingInfo() const override {
+    return deferred_logging_info_;
+  }
+
   bool healthCheck() const override { return health_check_request_; }
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
@@ -356,6 +364,7 @@ struct StreamInfoImpl : public StreamInfo {
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
+  absl::optional<DeferredLoggingInfo> deferred_logging_info_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {

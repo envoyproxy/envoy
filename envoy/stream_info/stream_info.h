@@ -453,6 +453,12 @@ public:
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
 };
 
+struct DeferredLoggingInfo {
+  Http::RequestHeaderMapSharedPtr request_header_map = nullptr;
+  Http::ResponseHeaderMapSharedPtr response_header_map = nullptr;
+  Http::ResponseTrailerMapSharedPtr response_trailer_map = nullptr;
+};
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -758,6 +764,16 @@ public:
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @param deferredLoggingInfo request/response info for deferred logging.
+   */
+  virtual void setDeferredLoggingInfo(const DeferredLoggingInfo deferredLoggingInfo) PURE;
+
+  /**
+   * @return request/response info for deferred logging.
+   */
+  virtual const absl::optional<DeferredLoggingInfo>& deferredLoggingInfo() const PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

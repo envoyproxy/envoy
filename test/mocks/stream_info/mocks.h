@@ -93,6 +93,8 @@ public:
   MOCK_METHOD(const absl::optional<std::string>&, virtualClusterName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
+  MOCK_METHOD(void, setDeferredLoggingInfo, (DeferredLoggingInfo deferredLoggingInfo));
+  MOCK_METHOD(const absl::optional<DeferredLoggingInfo>&, deferredLoggingInfo, (), (const));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
@@ -158,6 +160,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint32_t> attempt_count_;
   absl::optional<std::string> virtual_cluster_name_;
+  absl::optional<DeferredLoggingInfo> deferred_logging_info_;
   DownstreamTiming downstream_timing_;
 };
 
