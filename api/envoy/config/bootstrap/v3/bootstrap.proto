@@ -343,7 +343,7 @@ message Bootstrap {
   // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig xds_delegate_extension = 35;
 
-  // Optional XdsConfigTracer configuration, which allows tracking xDS responses in external components, 
+  // Optional XdsConfigTracer configuration, which allows tracking xDS responses in external components,
   // e.g., external logger, tracer, or monitor. It provides the log point when receive, ingest, or fail to
   // process xDS resources and messages.
   // If a value is not specified, no XdsConfigTracer will be used.
