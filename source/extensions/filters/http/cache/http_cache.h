@@ -253,7 +253,7 @@ public:
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
   //
-  // The on_complete callback should be called with true if the update is successful,
+  // The on_complete callback is called with true if the update is successful,
   // false if the update was not performed.
   virtual void updateHeaders(const LookupContext& lookup_context,
                              const Http::ResponseHeaderMap& response_headers,
