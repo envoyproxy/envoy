@@ -29,6 +29,7 @@ ConfigHelper::ConfigModifierFunction setOriginalDstCluster(int port) {
 
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     listener->mutable_address()->mutable_socket_address()->set_address("0.0.0.0");
+    listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
 
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.listener.original_dst");
