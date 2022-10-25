@@ -11,7 +11,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
@@ -3945,56 +3944,5 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 }
 #endif
-
-TEST_P(ProtocolIntegrationTest, OriginalDst) {
-  if (version_ != Network::Address::IpVersion::v4) {
-    return;
-  }
-  auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v4);
-  Network::DownstreamTransportSocketFactoryPtr factory =
-      upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                    : Network::Test::createRawBufferDownstreamSocketFactory();
-  fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(std::move(factory), address,
-                                                              configWithType(upstreamProtocol())));
-
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
-    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-    // cluster.mutable_original_dst_lb_config()->set_use_http_header(true);
-    cluster.mutable_original_dst_lb_config()->mutable_upstream_port_override()->set_value(
-        fake_upstreams_[0]->localAddress()->ip()->port());
-    cluster.clear_load_assignment();
-
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_address()->mutable_socket_address()->set_address("0.0.0.0");
-
-    auto* listener_filter = listener->add_listener_filters();
-    listener_filter->set_name("envoy.filters.listener.original_dst");
-    envoy::extensions::filters::listener::original_dst::v3::OriginalDst original_dst;
-    listener_filter->mutable_typed_config()->PackFrom(original_dst);
-  });
-  initialize();
-
-  for (int i = 0; i < 10; ++i) {
-    default_request_headers_.setCopy(
-        Envoy::Http::LowerCaseString("x-envoy-original-dst-host"),
-        absl::StrCat("127.0.0.", i + 1, ":", fake_upstreams_[0]->localAddress()->ip()->port()));
-    Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.{}:{}", i + 1, lookupPort("http"))),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
-        nullptr));
-
-    connection->enableHalfClose(enableHalfClose());
-
-    codec_client_ = makeHttpConnection(std::move(connection));
-    auto response =
-        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    fake_upstream_connection_.reset();
-    codec_client_->close();
-  }
-}
 
 } // namespace Envoy

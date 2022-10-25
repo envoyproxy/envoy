@@ -47,21 +47,21 @@ TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
   if (version_ != Network::Address::IpVersion::v4) {
     return;
   }
+  ASSERT(!upstream_tls_);
   auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v4);
-  Network::DownstreamTransportSocketFactoryPtr factory =
-      upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                    : Network::Test::createRawBufferDownstreamSocketFactory();
-  fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(std::move(factory), address,
-                                                              configWithType(upstreamProtocol())));
+  fake_upstreams_.emplace_back(
+      std::make_unique<FakeUpstream>(Network::Test::createRawBufferDownstreamSocketFactory(),
+                                     address, configWithType(upstreamProtocol())));
 
   config_helper_.addConfigModifier(
       setOriginalDstCluster(fake_upstreams_[0]->localAddress()->ip()->port()));
   initialize();
 
-  const int32_t kMaxConnections = 100;
+  const int32_t kMaxConnections = 10;
   for (int i = 0; i < kMaxConnections; ++i) {
+    std::string address_str = fmt::format("127.0.0.{}", i + 1);
     Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("tcp://127.0.0.{}:{}", i + 1, lookupPort("http"))),
+        Network::Utility::resolveUrl(fmt::format("tcp://{}:{}", address_str, lookupPort("http"))),
         Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
         nullptr));
 
@@ -70,6 +70,11 @@ TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
     codec_client_ = makeHttpConnection(std::move(connection));
     auto response =
         sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_EQ(address_str, fake_upstream_connection_->connection()
+                               .connectionInfoProvider()
+                               .localAddress()
+                               ->ip()
+                               ->addressAsString());
     ASSERT_TRUE(fake_upstream_connection_->close());
     fake_upstream_connection_.reset();
     codec_client_->close();
@@ -93,23 +98,28 @@ TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
 
   // Create an upstream on 0.0.0.0
   auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v4);
-  Network::DownstreamTransportSocketFactoryPtr factory =
-      upstream_tls_ ? createUpstreamTlsContext(upstreamConfig())
-                    : Network::Test::createRawBufferDownstreamSocketFactory();
-  fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(std::move(factory), address,
-                                                              configWithType(upstreamProtocol())));
+  ASSERT(!upstream_tls_);
+  fake_upstreams_.emplace_back(
+      std::make_unique<FakeUpstream>(Network::Test::createRawBufferDownstreamSocketFactory(),
+                                     address, configWithType(upstreamProtocol())));
 
   config_helper_.addConfigModifier(
       setOriginalDstCluster(fake_upstreams_[0]->localAddress()->ip()->port()));
   initialize();
 
-  const int32_t kMaxConnections = 100;
+  const int32_t kMaxConnections = 10;
   for (int i = 0; i < kMaxConnections; ++i) {
     // Set up the connection
-    IntegrationTcpClientPtr tcp_client = makeTcpConnection(
-        lookupPort("listener_0"), nullptr, nullptr, fmt::format("127.0.0.{}", i + 1));
+    std::string address_str = fmt::format("127.0.0.{}", i + 1);
+    IntegrationTcpClientPtr tcp_client =
+        makeTcpConnection(lookupPort("listener_0"), nullptr, nullptr, address_str);
     FakeRawConnectionPtr fake_upstream_connection;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+    EXPECT_EQ(address_str, fake_upstream_connection->connection()
+                               .connectionInfoProvider()
+                               .localAddress()
+                               ->ip()
+                               ->addressAsString());
 
     // Write bidirectional data.
     ASSERT_TRUE(fake_upstream_connection->write("hello"));
