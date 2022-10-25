@@ -41,6 +41,8 @@ public:
   EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
   EngineBuilder& addKeyValueStore(const std::string& name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(const std::string& name, StringAccessorSharedPtr accessor);
+  EngineBuilder& addNativeFilter(const std::string& name, const std::string& typed_config);
+  EngineBuilder& addPlatformFilter(const std::string& name);
   EngineBuilder& setAppVersion(const std::string& app_version);
   EngineBuilder& setAppId(const std::string& app_id);
   EngineBuilder& setDeviceOs(const std::string& app_id);
@@ -63,17 +65,19 @@ public:
 
   EngineSharedPtr build();
 
-  // TODO(crockeo): add after filter integration
-  // EngineBuilder& addPlatformFilter(name: String = UUID.randomUUID().toString(), factory: () ->
-  // Filter):
-  // EngineBuilder& addNativeFilter(name: String = UUID.randomUUID().toString(),
-  // typedConfig: String):
-
 protected:
   void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }
   void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
 
 private:
+  struct NativeFilterConfig {
+    NativeFilterConfig(const std::string& name, const std::string& typed_config)
+        : name_(name), typed_config_(typed_config) {}
+
+    std::string name_;
+    std::string typed_config_;
+  };
+
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
@@ -115,9 +119,8 @@ private:
   int max_connections_per_host_ = 7;
   std::vector<std::string> stat_sinks_;
 
-  // TODO(crockeo): add after filter integration
-  // std::vector<EnvoyHTTPFilterFactory> http_platform_filter_factories_;
-  // std::vector<EnvoyNativeFilterConfig> native_filter_chain_;
+  std::vector<NativeFilterConfig> native_filter_chain_;
+  std::vector<std::string> platform_filters_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
 };
 
