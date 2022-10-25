@@ -76,7 +76,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
   EXPECT_EQ("test@example.com", headers.get_("x-jwt-claim-sub"));
-  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));;
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // Test to set the payload (hence dynamic metadata) with the header and payload extracted from the
@@ -194,7 +194,6 @@ rules:
       {"other-auth-userinfo", ""},
       {"x-jwt-claim-sub", ""},
       {"x-jwt-claim-issuer", ""},
-      
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);

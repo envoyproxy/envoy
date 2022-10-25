@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -279,6 +279,13 @@ message JwtProvider {
   JwtCacheConfig jwt_cache_config = 12;
 
   // Add JWT Claim to HTTP Header
+  // Specify the Claim name you want to copy in which HTTP header. For examples, following config:
+  //
+  // .. code-block:: yaml
+  //
+  //   claim_to_header:
+  //   - name: x-jwt-claim-nested-claim
+  //     claim: claim.nested.key
 
   repeated JwtClaimToHeader claim_to_header = 15;
 }
@@ -724,11 +731,10 @@ message PerRouteConfig {
 
 // This message specifies a combination of header name and claim name.
 message JwtClaimToHeader {
-  
   // The HTTP header name.
   string name = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // JWT Claim
-  string claim = 2 [(validate.rules).string = {min_len: 1}];;
+  string claim = 2 [(validate.rules).string = {min_len: 1}];
 }

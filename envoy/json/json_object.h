@@ -97,13 +97,13 @@ public:
    */
   virtual bool isBoolean(const std::string& name) const PURE;
 
-    /**
+  /**
    * Determine if an object has type string.
    * @return bool is the object an string?
    */
   virtual bool isString(const std::string& name) const PURE;
 
-    /**
+  /**
    * Determine if an object has type int.
    * @return bool is the object an int?
    */

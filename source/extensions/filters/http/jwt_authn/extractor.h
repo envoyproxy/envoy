@@ -85,7 +85,7 @@ public:
 
   /**
    * Remove headers that configures to send JWT Claims.
-   * 
+   *
    * @param headers is the http request headers.
    */
   virtual void sanitizeClaimHeaders(Http::HeaderMap& headers) const PURE;

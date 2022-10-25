@@ -144,7 +144,8 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
 
-  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
 
   expectVerifyStatus(Status::Ok, headers);
 
@@ -160,7 +161,8 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
 
-  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
 
   expectVerifyStatus(Status::Ok, headers);
 
@@ -168,7 +170,6 @@ TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
   EXPECT_FALSE(headers.has("x-jwt-claim-nested-wrong"));
 }
-
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.
 TEST_F(AuthenticatorTest, TestForwardJwt) {

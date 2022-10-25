@@ -66,7 +66,6 @@ const char PublicKey[] = R"(
 }
 )";
 
-
 // A good config.
 const char ExampleConfig[] = R"(
 providers:
@@ -218,14 +217,18 @@ const char OtherGoodToken[] =
     "drRvLcvlT5gB4adOIOlmhm8xtXgYpvqrXfmMJCHbP9no7JATFaTEAkmA3OOxDsaOju4BFgMtRZtDM8p12QQG0rFl_FE-"
     "2FqYX9qA4q41HJ4vxTSxgObeLGA";
 
-const char NestedGoodToken[] = 
+const char NestedGoodToken[] =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2V"
-    "ydmljZSIsImV4cCI6MjAwMTAwMTAwMSwibmVzdGVkIjp7ImtleS0xIjoidmFsdWUxIiwibmVzdGVkLTIiOnsia2V5LTIiOiJ"
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2"
+    "V"
+    "ydmljZSIsImV4cCI6MjAwMTAwMTAwMSwibmVzdGVkIjp7ImtleS0xIjoidmFsdWUxIiwibmVzdGVkLTIiOnsia2V5LTIiO"
+    "iJ"
     "2YWx1ZTIiLCJrZXktMyI6dHJ1ZSwia2V5LTQiOjk5OTl9fX0.IWZiZ0dCqFG13fGKSu8t7nBHTFTXvtBXOp68gIcO-"
     "1K3k0dhuWwX6umIDm_1W9Y8NdztS-4jH4ULqRdR9QQFkxE7727USTHexN2sAqqxmAa1zdu2F-v3__VD8yONngWEWmw_"
-    "n-RbP0H1NEBcQf4uYuLIXWi-buGBzcyxwpEPLFnCRarunCEMSp3loPCm-SOBNf2ISeQ0h_dpQ9dnWWxVvVA8T_AxROSto_8eF_"
-    "o1zEnAbr8emLHDeeSFJNqhktT0ZTvv0__stILRAobYRO5ztRBUs4WJ6cgX7rGSMFo5cgP1RMrQKpfHKP9WFHpHhogQ4UXi7ndCxTM6r0GBinZRiA";
+    "n-RbP0H1NEBcQf4uYuLIXWi-buGBzcyxwpEPLFnCRarunCEMSp3loPCm-SOBNf2ISeQ0h_dpQ9dnWWxVvVA8T_AxROSto_"
+    "8eF_"
+    "o1zEnAbr8emLHDeeSFJNqhktT0ZTvv0__"
+    "stILRAobYRO5ztRBUs4WJ6cgX7rGSMFo5cgP1RMrQKpfHKP9WFHpHhogQ4UXi7ndCxTM6r0GBinZRiA";
 
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"

@@ -42,6 +42,7 @@ JwtProvider
 * *from_params*: extract JWT from query parameters.
 * *from_cookies*: extract JWT from HTTP request cookies.
 * *forward_payload_header*: forward the JWT payload in the specified HTTP header.
+* *claim_to_header*: copy JWT claim to HTTP header.
 * *jwt_cache_config*: Enables JWT cache, its size can be specified by *jwt_cache_size*. Only valid JWT tokens are cached.
 
 Default Extract Location
@@ -121,6 +122,11 @@ Another config example using inline JWKS:
       - name: jwt-assertion
       forward: true
       forward_payload_header: x-jwt-payload
+      claim_to_header:
+      - name: x-jwt-claim-sub
+        claim: sub
+      - name: x-jwt-claim-nested-key
+        claim: nested.claim.key
 
 Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as::
 
@@ -129,6 +135,10 @@ Above example uses config inline string to specify JWKS. The JWT token will be e
 JWT payload will be added to the request header as following format::
 
     x-jwt-payload: base64url_encoded(jwt_payload_in_JSON)
+
+JWT Claim ("sub" and "nested.claim.key") will be added to HTTP headers as following format::
+    x-jwt-claim-sub: <JWT Claim>
+    x-jwt-claim-nested-key: <JWT Claim>
 
 RequirementRule
 ~~~~~~~~~~~~~~~
