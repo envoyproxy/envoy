@@ -8,7 +8,6 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -117,13 +116,14 @@ TEST_F(HttpInputsIntegrationTest, UriSanInput) {
 
   initialize("UriSanInput", host);
 
-  testing::NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  info.downstream_connection_info_provider_->setSslConnection(ssl);
+  connection_info_provider.setSslConnection(ssl);
   std::vector<std::string> uri_sans{host};
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillOnce(Return(uri_sans));
-
-  Http::Matching::HttpMatchingDataImpl data(info);
+  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -135,12 +135,14 @@ TEST_F(HttpInputsIntegrationTest, DnsSanInput) {
 
   initialize("DnsSanInput", host);
 
-  testing::NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  info.downstream_connection_info_provider_->setSslConnection(ssl);
+  connection_info_provider.setSslConnection(ssl);
   std::vector<std::string> dns_sans{host};
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
-  Http::Matching::HttpMatchingDataImpl data(info);
+  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
@@ -152,11 +154,13 @@ TEST_F(HttpInputsIntegrationTest, SubjectInput) {
 
   initialize("SubjectInput", host);
 
-  testing::NiceMock<StreamInfo::MockStreamInfo> info;
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
   std::shared_ptr<Ssl::MockConnectionInfo> ssl = std::make_shared<Ssl::MockConnectionInfo>();
-  info.downstream_connection_info_provider_->setSslConnection(ssl);
+  connection_info_provider.setSslConnection(ssl);
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(testing::ReturnRef(host));
-  Http::Matching::HttpMatchingDataImpl data(info);
+  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
 
   const auto result = match_tree_()->match(data);
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);

@@ -245,7 +245,7 @@ public:
    */
   virtual DataInputFactoryCb<DataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           Server::Configuration::ServerFactoryContext& context) PURE;
+                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist

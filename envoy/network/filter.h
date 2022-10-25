@@ -553,7 +553,6 @@ public:
   virtual ~MatchingData() = default;
 
   virtual const ConnectionSocket& socket() const PURE;
-  const StreamInfo::StreamInfo& streamInfo() const { return socket().streamInfo(); }
 
   const ConnectionInfoProvider& connectionInfoProvider() const {
     return socket().connectionInfoProvider();

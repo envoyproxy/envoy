@@ -14,7 +14,6 @@
 #include "test/mocks/matcher/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -622,12 +621,10 @@ matcher_tree:
       context, factory_context, validation_visitor);
   auto match_tree = matcher_factory.create(matcher);
 
-  testing::NiceMock<StreamInfo::MockStreamInfo> info;
   const Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.0.1", 8080);
-  info.downstream_connection_info_provider_->setLocalAddress(address);
-  info.downstream_connection_info_provider_->setRemoteAddress(address);
-  Http::Matching::HttpMatchingDataImpl data(info);
+  Network::ConnectionInfoSetterImpl connection_info(address, address);
+  Http::Matching::HttpMatchingDataImpl data(connection_info);
 
   const auto result = match_tree()->match(data);
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

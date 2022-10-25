@@ -13,10 +13,11 @@ namespace GenericProxy {
 namespace {
 
 TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ServiceMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input = factory.createDataInputFactoryCb(*proto_config, factory_context)();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
 
@@ -28,10 +29,11 @@ TEST(ServiceMatchDataInputTest, ServiceMatchDataInputTest) {
 }
 
 TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   MethodMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
-  auto input = factory.createDataInputFactoryCb(*proto_config, factory_context)();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
 
@@ -43,7 +45,7 @@ TEST(MethodMatchDataInputTest, MethodMatchDataInputTest) {
 }
 
 TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   PropertyMatchDataInputFactory factory;
   auto proto_config = factory.createEmptyConfigProto();
 
@@ -51,7 +53,8 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
 
   typed_proto_config.set_property_name("key_0");
 
-  auto input = factory.createDataInputFactoryCb(*proto_config, factory_context)();
+  auto input =
+      factory.createDataInputFactoryCb(*proto_config, factory_context.messageValidationVisitor())();
 
   FakeStreamCodecFactory::FakeRequest request;
 

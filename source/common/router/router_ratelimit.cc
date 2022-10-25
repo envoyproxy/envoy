@@ -58,7 +58,7 @@ public:
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info);
+    Http::Matching::HttpMatchingDataImpl data(info.downstreamAddressProvider());
     data.onRequestHeaders(headers);
     auto result = data_input_->get(data);
     if (result.data_) {
@@ -243,7 +243,7 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
-    Server::Configuration::ServerFactoryContext& context)
+    ProtobufMessage::ValidationVisitor& validator)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
   for (const auto& action : config.actions()) {
@@ -281,7 +281,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
         // dual registered as an extension descriptor and an HTTP matcher input
         // function, the descriptor extension takes priority.
         RateLimitDescriptorValidationVisitor validation_visitor;
-        Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(context,
+        Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validator,
                                                                          validation_visitor);
         Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
             input_factory.createDataInput(action.extension());
@@ -290,9 +290,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
         break;
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
-          action.extension().typed_config(), context.messageValidationVisitor(), *factory);
+          action.extension().typed_config(), validator, *factory);
       RateLimit::DescriptorProducerPtr producer =
-          factory->createDescriptorProducerFromProto(*message, context.messageValidationVisitor());
+          factory->createDescriptorProducerFromProto(*message, validator);
       if (producer) {
         actions_.emplace_back(std::move(producer));
       } else {
@@ -352,11 +352,11 @@ void RateLimitPolicyEntryImpl::populateLocalDescriptors(
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
-    Server::Configuration::ServerFactoryContext& context)
+    ProtobufMessage::ValidationVisitor& validator)
     : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, context));
+        new RateLimitPolicyEntryImpl(rate_limit, validator));
     uint64_t stage = rate_limit_policy_entry->stage();
     ASSERT(stage < rate_limit_entries_reference_.size());
     rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);

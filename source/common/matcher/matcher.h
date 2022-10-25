@@ -83,9 +83,9 @@ public:
  **/
 template <class DataType> class MatchInputFactory {
 public:
-  MatchInputFactory(Server::Configuration::ServerFactoryContext& factory_context,
+  MatchInputFactory(ProtobufMessage::ValidationVisitor& validator,
                     MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : factory_context_(factory_context), validation_visitor_(validation_visitor) {}
+      : validator_(validator), validation_visitor_(validation_visitor) {}
 
   DataInputFactoryCb<DataType> createDataInput(const xds::core::v3::TypedExtensionConfig& config) {
     return createDataInputBase(config);
@@ -115,13 +115,12 @@ private:
   template <class TypedExtensionConfigType>
   DataInputFactoryCb<DataType> createDataInputBase(const TypedExtensionConfigType& config) {
     auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
-    auto& validator = factory_context_.messageValidationVisitor();
     if (factory != nullptr) {
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
 
       ProtobufTypes::MessagePtr message =
-          Config::Utility::translateAnyToFactoryConfig(config.typed_config(), validator, *factory);
-      auto data_input = factory->createDataInputFactoryCb(*message, factory_context_);
+          Config::Utility::translateAnyToFactoryConfig(config.typed_config(), validator_, *factory);
+      auto data_input = factory->createDataInputFactoryCb(*message, validator_);
       return data_input;
     }
 
@@ -130,14 +129,14 @@ private:
     auto& common_input_factory =
         Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), validator, common_input_factory);
+        config.typed_config(), validator_, common_input_factory);
     auto common_input =
-        common_input_factory.createCommonProtocolInputFactoryCb(*message, validator);
+        common_input_factory.createCommonProtocolInputFactoryCb(*message, validator_);
     return
         [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
   }
 
-  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
   MatchTreeValidationVisitor<DataType>& validation_visitor_;
 };
 
@@ -153,7 +152,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
-        match_input_factory_(factory_context, validation_visitor) {}
+        match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
   template <class MatcherType> MatchTreeFactoryCb<DataType> create(const MatcherType& config) {

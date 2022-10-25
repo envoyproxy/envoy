@@ -61,8 +61,7 @@ public:
       : TestDataInputStringFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&,
-                           Server::Configuration::ServerFactoryContext&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
   }
 
@@ -84,8 +83,7 @@ public:
       : TestDataInputBoolFactory(
             {DataInputGetResult::DataAvailability::AllDataAvailable, std::string(data)}) {}
   DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&,
-                           Server::Configuration::ServerFactoryContext&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
     return [&]() { return std::make_unique<TestInput>(result_); };
   }
 

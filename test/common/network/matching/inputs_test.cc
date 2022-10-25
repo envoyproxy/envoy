@@ -36,16 +36,14 @@ TEST(MatchingData, DestinationIPInput) {
 }
 
 TEST(MatchingData, HttpDestinationIPInput) {
-  testing::NiceMock<StreamInfo::MockStreamInfo> info;
-  info.downstream_connection_info_provider_->setLocalAddress(
-      std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080));
-  info.downstream_connection_info_provider_->setRemoteAddress(
+  ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Address::Ipv4Instance>("127.0.0.1", 8080),
       std::make_shared<Address::Ipv4Instance>("10.0.0.1", 9090));
-  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+  connection_info_provider.setDirectRemoteAddressForTest(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 8081));
   auto host = "example.com";
-  info.downstream_connection_info_provider_->setRequestedServerName(host);
-  Http::Matching::HttpMatchingDataImpl data(info);
+  connection_info_provider.setRequestedServerName(host);
+  Http::Matching::HttpMatchingDataImpl data(connection_info_provider);
   {
     DestinationIPInput<Http::HttpMatchingData> input;
     const auto result = input.get(data);
@@ -89,7 +87,7 @@ TEST(MatchingData, HttpDestinationIPInput) {
     EXPECT_EQ(result.data_, host);
   }
 
-  info.downstream_connection_info_provider_->setRemoteAddress(
+  connection_info_provider.setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8081));
   {
     SourceTypeInput<Http::HttpMatchingData> input;
