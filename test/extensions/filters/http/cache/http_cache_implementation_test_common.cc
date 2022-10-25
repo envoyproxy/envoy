@@ -171,7 +171,7 @@ Http::ResponseHeaderMapPtr HttpCacheImplementationTest::getHeaders(LookupContext
   context.getHeaders([headers_promise](LookupResult&& lookup_result) {
     EXPECT_NE(lookup_result.cache_entry_status_, CacheEntryStatus::Unusable);
     EXPECT_NE(lookup_result.headers_, nullptr);
-    headers_promise->set_value(move(lookup_result.headers_));
+    headers_promise->set_value(std::move(lookup_result.headers_));
   });
   auto future = headers_promise->get_future();
   EXPECT_EQ(std::future_status::ready, future.wait_for(std::chrono::seconds(5)));
@@ -273,7 +273,7 @@ TEST_P(HttpCacheImplementationTest, PutGet) {
       {"cache-control", "public,max-age=3600"}};
 
   const std::string body1("Value");
-  ASSERT_THAT(insert(move(name_lookup_context), response_headers, body1), IsOk());
+  ASSERT_THAT(insert(std::move(name_lookup_context), response_headers, body1), IsOk());
   name_lookup_context = lookup(request_path1);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
 
@@ -282,7 +282,7 @@ TEST_P(HttpCacheImplementationTest, PutGet) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   const std::string new_body1("NewValue");
-  ASSERT_THAT(insert(move(name_lookup_context), response_headers, new_body1), IsOk());
+  ASSERT_THAT(insert(std::move(name_lookup_context), response_headers, new_body1), IsOk());
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1));
 }
 
@@ -497,7 +497,7 @@ TEST_P(HttpCacheImplementationTest, VaryOnDisallowedKey) {
   LookupContextPtr first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
   const std::string body("one");
-  ASSERT_THAT(insert(move(first_value_vary), response_headers, body), Not(IsOk()));
+  ASSERT_THAT(insert(std::move(first_value_vary), response_headers, body), Not(IsOk()));
   first_value_vary = lookup(request_path);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
@@ -740,7 +740,7 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
       {"cache-control", "public,max-age=3600"}};
   const std::string body1("Value");
   Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
-  ASSERT_THAT(insert(move(name_lookup_context), response_headers, body1, response_trailers),
+  ASSERT_THAT(insert(std::move(name_lookup_context), response_headers, body1, response_trailers),
               IsOk());
   name_lookup_context = lookup(request_path1);
   EXPECT_TRUE(
@@ -751,8 +751,9 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   const std::string new_body1("NewValue");
-  ASSERT_THAT(insert(move(name_lookup_context), response_headers, new_body1, response_trailers),
-              IsOk());
+  ASSERT_THAT(
+      insert(std::move(name_lookup_context), response_headers, new_body1, response_trailers),
+      IsOk());
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(lookup(request_path1).get(), new_body1,
                                                      response_trailers));
   EXPECT_TRUE(lookup_result_.has_trailers_);
@@ -768,7 +769,7 @@ TEST_P(HttpCacheImplementationTest, EmptyTrailers) {
       {"date", formatter_.fromTime(time_system_.systemTime())},
       {"cache-control", "public,max-age=3600"}};
   const std::string body1("Value");
-  ASSERT_THAT(insert(move(name_lookup_context), response_headers, body1), IsOk());
+  ASSERT_THAT(insert(std::move(name_lookup_context), response_headers, body1), IsOk());
   name_lookup_context = lookup(request_path1);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
   EXPECT_FALSE(lookup_result_.has_trailers_);
