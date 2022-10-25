@@ -138,8 +138,7 @@ public:
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  ConnectionImplTest()
-      : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
+  ConnectionImplTest() : api_(Api::createApiForTest(time_system_)) {}
 
   ~ConnectionImplTest() override {
     EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
@@ -292,7 +291,6 @@ protected:
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
-  StreamInfo::StreamInfoImpl stream_info_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_ = nullptr;
 };
 
@@ -475,7 +473,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   server_connection->setTransportSocketConnectTimeout(std::chrono::seconds(3), timeout_counter);
   EXPECT_CALL(*transport_socket, closeSocket(ConnectionEvent::LocalClose));
   mock_timer->invokeCallback();
-  EXPECT_THAT(stream_info_.connectionTerminationDetails(),
+  EXPECT_THAT(server_connection->streamInfo().connectionTerminationDetails(),
               Optional(HasSubstr("transport socket timeout")));
   EXPECT_EQ(server_connection->transportFailureReason(), "connect timeout");
 }
