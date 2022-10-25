@@ -30,7 +30,7 @@ public:
   // fileId is a fixed value used to identify that this is a cache file.
   uint32_t fileId() const { return getUint32(contents_.file_id_); }
   // cacheVersionId is a value that should be consistent between versions of the file
-  // cache implementation. Changing version in code will invalidate at startup all cache
+  // cache implementation. Changing version in code will invalidate all cache
   // entries where the version ID does not match.
   uint32_t cacheVersionId() const { return getUint32(contents_.cache_version_id_); }
   // Size of the serialized proto message capturing headers and metadata.
@@ -44,10 +44,13 @@ public:
   void setHeadersSize(size_t sz) { setUint32(contents_.header_size_, sz); }
   void setTrailersSize(size_t sz) { setUint32(contents_.trailer_size_, sz); }
   void setBodySize(size_t sz) { setUint64(contents_.body_size_, sz); }
-  static size_t offsetToBody() { return size(); }
+  static size_t offsetToHeaders() { return size(); }
+  size_t offsetToBody() const { return offsetToHeaders() + headerSize(); }
   size_t offsetToTrailers() const { return offsetToBody() + bodySize(); }
-  size_t offsetToHeaders() const { return offsetToTrailers() + trailerSize(); }
   absl::string_view stringView() const { return {contents_.as_str_, size()}; }
+  bool isValid() const {
+    return fileId() == expectedFileId && cacheVersionId() == expectedCacheVersionId;
+  }
 
 private:
   union {

@@ -4,7 +4,8 @@
 
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/http/cache/file_system_http_cache/cache_entry.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_entry_file.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,32 +24,11 @@ using HttpFilters::Cache::LookupHeadersCallback;
 using HttpFilters::Cache::LookupRequest;
 using HttpFilters::Cache::LookupTrailersCallback;
 
-// A LookupContext that always just returns no-result.
-class NoOpLookupContext : public LookupContext {
+class FileLookupContext : public LookupContext {
 public:
-  NoOpLookupContext(LookupRequest&& lookup, bool refuse_inserts)
-      : lookup_(std::move(lookup)), refuse_inserts_(refuse_inserts) {}
-
-  // From LookupContext
-  void getHeaders(LookupHeadersCallback&& cb) override;
-  void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override;
-  void getTrailers(LookupTrailersCallback&& cb) override;
-  void onDestroy() override {}
-
-  const LookupRequest& lookup() const { return lookup_; }
-  bool refuseInserts() const { return refuse_inserts_; }
-
-private:
-  const LookupRequest lookup_;
-  const bool refuse_inserts_;
-};
-
-class FileLookupContext : public NoOpLookupContext {
-public:
-  FileLookupContext(FileSystemHttpCache& cache, std::shared_ptr<CacheEntryFile> cache_entry,
-                    LookupRequest&& lookup, bool refuse_inserts)
-      : NoOpLookupContext(std::move(lookup), refuse_inserts), cache_(cache),
-        cache_entry_(std::move(cache_entry)) {}
+  FileLookupContext(FileSystemHttpCache& cache, LookupRequest&& lookup, bool work_in_progress)
+      : cache_(cache), key_(lookup.key()), lookup_(std::move(lookup)),
+        work_in_progress_(work_in_progress) {}
 
   // From LookupContext
   void getHeaders(LookupHeadersCallback&& cb) final;
@@ -59,33 +39,45 @@ public:
   // tests it is not.
   ~FileLookupContext() override { onDestroy(); }
 
+  const LookupRequest& lookup() const { return lookup_; }
+  const Key& key() const { return key_; }
+  bool workInProgress() const { return work_in_progress_; }
+
 private:
+  void getHeadersWithLock(LookupHeadersCallback cb) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+
   // In the event that the cache failed to retrieve, remove the cache entry from the
   // cache so we don't keep repeating the same failure.
-  void invalidateCacheEntry();
+  void invalidateCacheEntry() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+
+  std::string filepath() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   // We can safely use a reference here, because the shared_ptr to a cache is guaranteed to outlive
   // all filters that use it.
   FileSystemHttpCache& cache_;
 
-  std::shared_ptr<CacheEntryFile> cache_entry_;
   // File actions may be initiated in the file thread or the filter thread, and cancelled or
   // completed from either, therefore must be guarded by a mutex.
   absl::Mutex mu_;
   AsyncFileHandle file_handle_ ABSL_GUARDED_BY(mu_);
-  CancelFunction action_in_flight_ ABSL_GUARDED_BY(mu_);
+  CancelFunction cancel_action_in_flight_ ABSL_GUARDED_BY(mu_);
+  CacheFileFixedBlock header_block_ ABSL_GUARDED_BY(mu_);
+  Key key_ ABSL_GUARDED_BY(mu_);
+
+  const LookupRequest lookup_;
+  const bool work_in_progress_;
 };
 
-// TODO(ravenblack): CacheEntryInProgressReader should be implemented to prevent
+// TODO(ravenblack): A CacheEntryInProgressReader should be implemented to prevent
 // "thundering herd" problem.
 //
 // First the insert needs to be performed not by using the existing request but by
 // issuing its own request[s], otherwise the first client to request a resource could
-// provoke failure for any other clients by closing its request before the cache
-// population is completed.
+// provoke failure for any other clients sharing that data-stream, by closing its
+// request before the cache population is completed.
 //
 // The plan is to make the entire cache insert happen "out of band", and to populate
-// the cache with an CacheEntryInProgress object allowing clients to stream from it in
+// the cache with a CacheEntryInProgress object, allowing clients to stream from it in
 // parallel.
 //
 // This may require intercepting at the initialization of LookupContext to trigger

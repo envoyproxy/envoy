@@ -27,9 +27,8 @@ ConfigProto cleanConfig(const ConfigProto& original) {
 class CacheSingleton : public Envoy::Singleton::Instance {
 public:
   CacheSingleton(
-      TimeSource& time_source,
       std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory>&& async_file_manager_factory)
-      : time_source_(time_source), async_file_manager_factory_(async_file_manager_factory) {}
+      : async_file_manager_factory_(async_file_manager_factory) {}
 
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
                                            const ConfigProto& config) {
@@ -43,9 +42,8 @@ public:
     }
     if (!cache) {
       cache = std::make_shared<FileSystemHttpCache>(
-          singleton, std::move(clean_config), time_source_,
+          singleton, std::move(clean_config),
           async_file_manager_factory_->getAsyncFileManager(config.manager_config()));
-      cache->populateFromDisk();
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
       throw EnvoyException(
@@ -56,7 +54,6 @@ public:
   }
 
 private:
-  TimeSource& time_source_;
   std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory> async_file_manager_factory_;
   absl::Mutex mu_;
   // We keep weak_ptr here so the caches can be destroyed if the config is updated to stop using
@@ -85,7 +82,6 @@ public:
     std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(
         SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
           return std::make_shared<CacheSingleton>(
-              context.timeSource(),
               Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()));
         });
     return caches->get(caches, config);

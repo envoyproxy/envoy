@@ -6,7 +6,6 @@
 
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/http/cache/file_system_http_cache/cache_entry.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
@@ -21,18 +20,37 @@ namespace FileSystemHttpCache {
 using ConfigProto =
     envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
+class CacheEntryFile;
+
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,
                             public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   FileSystemHttpCache(Singleton::InstanceSharedPtr owner, ConfigProto config,
-                      TimeSource& time_source,
                       std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager);
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
                                      Http::StreamDecoderFilterCallbacks& callbacks) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
                                      Http::StreamEncoderFilterCallbacks& callbacks) override;
+
+  // Replaces the headers of a cache entry.
+  //
+  // To avoid races between readers and writers, this unfortunately must be performed by
+  // making a full copy of the original cache entry, and then replacing the original with
+  // that new file.
+  //
+  // For example, if we simply overwrote the headers in place, a reader might be about to
+  // read the headers expecting them to have one length, then read them with a different
+  // length (or in a partially overwritten state).
+  //
+  // If we opened the file, unlinked it, modified it, and relinked it, a reader might still
+  // have already had the original version open and still get the same race as above.
+  //
+  // Therefore the only way to reliably ensure that there are no readers of the file while
+  // it is being written (other than something involving system-wide locks that would have
+  // other issues), is to rewrite the contents to a new file. This may be expensive
+  // for large cache files.
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata) override;
@@ -41,71 +59,59 @@ public:
   // For the factory to ensure there aren't incompatible configs on the same path.
   const ConfigProto& config() { return config_; }
 
-  // If the cache entry is already a `CacheEntryWorkInProgress`, returns a nullptr,
-  // indicating insert should be cancelled. This prevents us from accidentally
-  // performing many parallel writes of the same content.
+  // Inserts the key into entries_being_written_, excluding it from being written to by
+  // another task until the returned Cleanup is destroyed.
   //
-  // If the cache entry is empty, sets it to a `CacheEntryWorkInProgress`, and returns
-  // a `CacheEntryFile` with enough details to create and write the cache file. When
-  // the writing is complete, the returned `CacheEntryFile` should be passed back in
-  // through `updateEntryToFile`.
-  //
-  // If the cache entry is already a `CacheEntryFile`, a new `CacheEntryFile` is
-  // returned with sufficient details to populate a replacement, and the existing entry
-  // is replaced with a `CacheEntryWorkInProgress` that contains a pointer to the
-  // previous `CacheEntryFile` so it can still be read while the update is occurring.
-  ABSL_MUST_USE_RESULT std::shared_ptr<CacheEntryFile> setCacheEntryWorkInProgress(const Key& key)
+  // If the key is already in entries_being_written_, returns nullptr, indicating that
+  // the caller should not continue with the write.
+  ABSL_MUST_USE_RESULT std::shared_ptr<Cleanup> maybeStartWritingEntry(const Key& key)
       ABSL_LOCKS_EXCLUDED(cache_mu_);
+
+  // Returns a key of the base key plus vary_identifier, if a vary_identifier can be
+  // generated from the inputs. Otherwise returns nullopt.
+  static absl::optional<Key>
+  makeVaryKey(const Key& base, const VaryAllowList& vary_allow_list,
+              const absl::btree_set<absl::string_view>& vary_header_values,
+              const Http::RequestHeaderMap& request_headers);
 
   // Writes a vary cache file in the background, and inserts a `CacheEntryVaryRedirect` at `key`
   // if one is not already present.
   // If the `varied_key` cache entry is unpopulated, populates it with a `CacheEntryWorkInProgress`
   // and returns a new `CacheEntryFile` for that key. Returns a nullptr if the `varied_key` cache
   // entry is already populated.
-  ABSL_MUST_USE_RESULT std::shared_ptr<CacheEntryFile>
+  ABSL_MUST_USE_RESULT std::shared_ptr<Cleanup>
   setCacheEntryToVary(const Key& key, const Http::ResponseHeaderMap& response_headers,
-                      const Key& varied_key) ABSL_LOCKS_EXCLUDED(cache_mu_);
-
-  // Removes the `CacheEntryWorkInProgress` at `key`.
-  // It is an error to call this with a `key` that doesn't point at a `CacheEntryWorkInProgress`.
-  void removeCacheEntryInProgress(const Key& key) ABSL_LOCKS_EXCLUDED(cache_mu_);
-
-  // Replaces the `CacheEntryWorkInProgress` at `key` with the given `CacheEntryFile`.
-  // It is an error to call this with a `key` that doesn't point at a `CacheEntryWorkInProgress`
-  // or a `CacheEntryFile` to be replaced.
-  void updateEntryToFile(const Key& key, std::shared_ptr<CacheEntryFile>&& file_entry)
+                      const Key& varied_key, std::shared_ptr<Cleanup> cleanup)
       ABSL_LOCKS_EXCLUDED(cache_mu_);
 
   static absl::string_view name();
 
-  enum class PurgeOption { PurgeFile, KeepFile };
-  void removeCacheEntry(const Key& key, std::shared_ptr<CacheEntryFile> value,
-                        PurgeOption purge_option) ABSL_LOCKS_EXCLUDED(cache_mu_);
-
-  void purgeCacheFile(std::shared_ptr<CacheEntryFile> cache_entry);
-
-  std::string generateFilename(const Key& key);
+  std::string generateFilename(const Key& key) const;
   absl::string_view cachePath() const;
-
-  void populateFromDisk();
+  std::shared_ptr<Common::AsyncFiles::AsyncFileManager> asyncFileManager() const {
+    return async_file_manager_;
+  }
 
 private:
-  void removeLeastRecentlyUsed();
-  void updateHeadersInFile(std::string filename, CacheEntryFile::HeaderData header_data);
-  void writeVaryNodeToDisk(const Key& key, std::shared_ptr<CacheEntryVaryRedirect> vary_node);
-  ABSL_MUST_USE_RESULT std::shared_ptr<CacheEntryFile>
-  setCacheEntryWorkInProgressLocked(const Key& key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(cache_mu_);
+  void writeVaryNodeToDisk(const Key& key, const Http::ResponseHeaderMap& response_headers,
+                           std::shared_ptr<Cleanup> cleanup);
 
-  // An incrementing value to prevent hash collisions from causing file conflicts.
-  std::atomic<uint32_t> filename_suffix_ = 0;
   // A shared_ptr to keep the cache singleton alive as long as any of its caches are in use.
   const Singleton::InstanceSharedPtr owner_;
   const ConfigProto config_;
-  TimeSource& time_source_;
 
   absl::Mutex cache_mu_;
-  absl::flat_hash_map<Key, CacheEntrySharedPtr, MessageUtil, MessageUtil>
-      cache_ ABSL_GUARDED_BY(cache_mu_);
+  // When a new cache entry is being written, its key will be here with no HeaderData,
+  // and the cache file will not be present. The cache miss will be detected normally, and
+  // this should be checked before writing; cancel the write if another thread is already
+  // writing the same entry, or if the file exists at write-time.
+  // When a cache entry is in the process of having its headers updated, its key will be
+  // here with populated HeaderData; this should be checked after finding the cache hit,
+  // because if headers are being written we should not read them from the file as the
+  // data might be partially updated.
+  absl::flat_hash_set<Key, MessageUtil, MessageUtil>
+      entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
+  size_t operations_in_flight_ ABSL_GUARDED_BY(cache_mu_) = 0;
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
 };

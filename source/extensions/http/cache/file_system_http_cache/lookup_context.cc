@@ -1,5 +1,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
+#include "cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
@@ -10,106 +11,150 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-void NoOpLookupContext::getHeaders(LookupHeadersCallback&& cb) { cb(LookupResult{}); }
-
-void NoOpLookupContext::getBody(const AdjustedByteRange&, LookupBodyCallback&&) {
-  IS_ENVOY_BUG("NoOpLookupContext should never act beyond getHeaders");
-}
-
-void NoOpLookupContext::getTrailers(LookupTrailersCallback&&) {
-  IS_ENVOY_BUG("NoOpLookupContext should never act beyond getHeaders");
+std::string FileLookupContext::filepath() {
+  return absl::StrCat(cache_.cachePath(), cache_.generateFilename(key_));
 }
 
 void FileLookupContext::getHeaders(LookupHeadersCallback&& cb) {
-  auto header_data = cache_entry_->getHeaderData();
-  cb(lookup().makeLookupResult(headersFromHeaderProto(header_data.proto),
-                               metadataFromHeaderProto(header_data.proto),
-                               header_data.block.bodySize(), header_data.block.trailerSize() > 0));
+  if (work_in_progress_) {
+    // Don't use a cache entry if it has write operations in flight.
+    cb(LookupResult{});
+    return;
+  }
+  absl::MutexLock lock(&mu_);
+  getHeadersWithLock(std::move(cb));
+}
+
+void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
+  mu_.AssertHeld();
+  cancel_action_in_flight_ = cache_.asyncFileManager()->openExistingFile(
+      filepath(), Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
+      [this, cb](absl::StatusOr<AsyncFileHandle> open_result) {
+        absl::MutexLock lock(&mu_);
+        cancel_action_in_flight_ = nullptr;
+        if (!open_result.ok()) {
+          cb(LookupResult{});
+          return;
+        }
+        file_handle_ = std::move(open_result.value());
+        auto queued = file_handle_->read(
+            0, CacheFileFixedBlock::size(),
+            [this, cb](absl::StatusOr<Buffer::InstancePtr> read_result) {
+              absl::MutexLock lock(&mu_);
+              cancel_action_in_flight_ = nullptr;
+              if (!read_result.ok() ||
+                  read_result.value()->length() != CacheFileFixedBlock::size()) {
+                invalidateCacheEntry();
+                cb(LookupResult{});
+                return;
+              }
+              header_block_.populateFromStringView(read_result.value()->toString());
+              if (!header_block_.isValid()) {
+                invalidateCacheEntry();
+                cb(LookupResult{});
+                return;
+              }
+              auto queued = file_handle_->read(
+                  header_block_.offsetToHeaders(), header_block_.headerSize(),
+                  [this, cb](absl::StatusOr<Buffer::InstancePtr> read_result) {
+                    absl::MutexLock lock(&mu_);
+                    cancel_action_in_flight_ = nullptr;
+                    if (!read_result.ok() ||
+                        read_result.value()->length() != header_block_.headerSize()) {
+                      invalidateCacheEntry();
+                      cb(LookupResult{});
+                      return;
+                    }
+                    auto header_proto = headerProtoFromBuffer(*read_result.value());
+                    if (header_proto.headers_size() == 1 &&
+                        header_proto.headers().at(0).key() == "vary") {
+                      auto maybe_vary_key = cache_.makeVaryKey(
+                          key_, lookup().varyAllowList(),
+                          absl::StrSplit(header_proto.headers().at(0).value(), ','),
+                          lookup().requestHeaders());
+                      if (!maybe_vary_key.has_value()) {
+                        cb(LookupResult{});
+                        return;
+                      }
+                      key_ = maybe_vary_key.value();
+                      auto fh = std::move(file_handle_);
+                      file_handle_ = nullptr;
+                      // close should be cancelable to make this safe.
+                      // (it should still close the file, but cancel the callback.)
+                      auto queued = fh->close([this, cb](absl::Status) {
+                        absl::MutexLock lock(&mu_);
+                        // Restart getHeaders with the new key.
+                        return getHeadersWithLock(cb);
+                      });
+                      ASSERT(queued.ok(), queued.ToString());
+                      return;
+                    }
+                    cb(lookup().makeLookupResult(
+                        headersFromHeaderProto(header_proto), metadataFromHeaderProto(header_proto),
+                        header_block_.bodySize(), header_block_.trailerSize() > 0));
+                  });
+              ASSERT(queued.ok(), queued.status().ToString());
+              cancel_action_in_flight_ = queued.value();
+            });
+        ASSERT(queued.ok(), queued.status().ToString());
+        cancel_action_in_flight_ = queued.value();
+      });
 }
 
 void FileLookupContext::invalidateCacheEntry() {
-  cache_.removeCacheEntry(lookup().key(), std::move(cache_entry_),
-                          FileSystemHttpCache::PurgeOption::PurgeFile);
+  cache_.asyncFileManager()->unlink(filepath(), [](absl::Status) {});
 }
 
 void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) {
   absl::MutexLock lock(&mu_);
-  ASSERT(!action_in_flight_);
-  auto read_chunk = [this, cb, range]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-    action_in_flight_ =
-        file_handle_
-            ->read(CacheFileFixedBlock::offsetToBody() + range.begin(), range.length(),
-                   [this, cb, range](absl::StatusOr<Buffer::InstancePtr> read_result) {
-                     {
-                       absl::MutexLock lock(&mu_);
-                       action_in_flight_ = nullptr;
-                     }
-                     if (!read_result.ok() || read_result.value()->length() != range.length()) {
-                       invalidateCacheEntry();
-                       // Calling callback with nullptr fails the request.
-                       cb(nullptr);
-                       return;
-                     }
-                     cb(std::move(read_result.value()));
-                   })
-            .value();
-  };
-  if (file_handle_) {
-    read_chunk();
-  } else {
-    action_in_flight_ = cache_entry_->fileManager().openExistingFile(
-        absl::StrCat(cache_.cachePath(), cache_entry_->filename()),
-        AsyncFileManager::Mode::ReadOnly,
-        [this, cb, read_chunk](absl::StatusOr<AsyncFileHandle> open_result) {
-          if (!open_result.ok()) {
-            invalidateCacheEntry();
-            // Calling callback with nullptr fails the request.
-            cb(nullptr);
-            return;
-          }
-          absl::MutexLock lock(&mu_);
-          file_handle_ = open_result.value();
-          read_chunk();
-        });
-  }
+  ASSERT(!cancel_action_in_flight_);
+  auto queued = file_handle_->read(
+      header_block_.offsetToBody() + range.begin(), range.length(),
+      [this, cb, range](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        absl::MutexLock lock(&mu_);
+        cancel_action_in_flight_ = nullptr;
+        if (!read_result.ok() || read_result.value()->length() != range.length()) {
+          invalidateCacheEntry();
+          // Calling callback with nullptr fails the request.
+          cb(nullptr);
+          return;
+        }
+        cb(std::move(read_result.value()));
+      });
+  ASSERT(queued.ok(), queued.status().ToString());
+  cancel_action_in_flight_ = queued.value();
 }
 
 void FileLookupContext::getTrailers(LookupTrailersCallback&& cb) {
   ASSERT(cb);
   absl::MutexLock lock(&mu_);
-  ASSERT(!action_in_flight_);
-  auto header_data = cache_entry_->getHeaderData();
-  auto sz = header_data.block.trailerSize();
-  action_in_flight_ = file_handle_
-                          ->read(header_data.block.offsetToTrailers(), sz,
-                                 [this, cb, sz](absl::StatusOr<Buffer::InstancePtr> read_result) {
-                                   {
+  ASSERT(!cancel_action_in_flight_);
+  auto queued = file_handle_->read(header_block_.offsetToTrailers(), header_block_.trailerSize(),
+                                   [this, cb](absl::StatusOr<Buffer::InstancePtr> read_result) {
                                      absl::MutexLock lock(&mu_);
-                                     action_in_flight_ = nullptr;
-                                   }
-                                   if (!read_result.ok() || read_result.value()->length() != sz) {
-                                     invalidateCacheEntry();
-                                     // There is no failure response for getTrailers, so we just say
-                                     // there were no trailers in the event of this failure.
-                                     cb(Http::ResponseTrailerMapImpl::create());
-                                     return;
-                                   }
-                                   CacheFileTrailer trailer;
-                                   trailer.ParseFromString(read_result.value()->toString());
-                                   cb(trailersFromTrailerProto(trailer));
-                                 })
-                          .value();
+                                     cancel_action_in_flight_ = nullptr;
+                                     if (!read_result.ok() || read_result.value()->length() !=
+                                                                  header_block_.trailerSize()) {
+                                       invalidateCacheEntry();
+                                       // There is no failure response for getTrailers, so we just
+                                       // say there were no trailers in the event of this failure.
+                                       cb(Http::ResponseTrailerMapImpl::create());
+                                       return;
+                                     }
+                                     CacheFileTrailer trailer;
+                                     trailer.ParseFromString(read_result.value()->toString());
+                                     cb(trailersFromTrailerProto(trailer));
+                                   });
+  ASSERT(queued.ok(), queued.status().ToString());
+  cancel_action_in_flight_ = queued.value();
 }
 
 void FileLookupContext::onDestroy() {
   CancelFunction cancel;
-  AsyncFileHandle handle;
   {
     absl::MutexLock lock(&mu_);
-    cancel = std::move(action_in_flight_);
-    action_in_flight_ = nullptr;
-    handle = file_handle_;
-    file_handle_ = nullptr;
+    cancel = std::move(cancel_action_in_flight_);
+    cancel_action_in_flight_ = nullptr;
   }
   while (cancel) {
     // We mustn't hold the lock while calling cancel, as it can potentially wait for
@@ -119,15 +164,17 @@ void FileLookupContext::onDestroy() {
       // It's possible that while calling cancel, another action was started - if
       // that happened, we must cancel that one too!
       absl::MutexLock lock(&mu_);
-      cancel = std::move(action_in_flight_);
-      action_in_flight_ = nullptr;
-      handle = file_handle_;
-      file_handle_ = nullptr;
+      cancel = std::move(cancel_action_in_flight_);
+      cancel_action_in_flight_ = nullptr;
     }
   }
-  if (handle) {
-    auto status = handle->close([](absl::Status) {});
-    ASSERT(status.ok(), status.ToString());
+  {
+    absl::MutexLock lock(&mu_);
+    if (file_handle_) {
+      auto status = file_handle_->close([](absl::Status) {});
+      ASSERT(status.ok(), status.ToString());
+      file_handle_ = nullptr;
+    }
   }
 }
 

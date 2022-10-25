@@ -4,7 +4,8 @@
 
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/http/cache/file_system_http_cache/cache_entry.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_entry_file.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 
 namespace Envoy {
@@ -16,7 +17,7 @@ namespace FileSystemHttpCache {
 using ::Envoy::Extensions::Common::AsyncFiles::AsyncFileHandle;
 using ::Envoy::Extensions::Common::AsyncFiles::CancelFunction;
 
-class NoOpLookupContext;
+class FileLookupContext;
 class FileSystemHttpCache;
 
 // Because the cache implementation doesn't use a "ready" callback from insertHeaders,
@@ -75,17 +76,17 @@ private:
   void writeChunk(std::shared_ptr<InsertOperationQueue> p, QueuedFileChunk&& chunk)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void writeNextChunk(std::shared_ptr<InsertOperationQueue> p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
-  std::shared_ptr<CacheEntryFile> cache_entry_ ABSL_GUARDED_BY(mu_);
+  std::shared_ptr<Cleanup> cleanup_ ABSL_GUARDED_BY(mu_);
   std::deque<QueuedFileChunk> queue_ ABSL_GUARDED_BY(mu_);
   AsyncFileHandle file_handle_ ABSL_GUARDED_BY(mu_);
   CancelFunction cancel_action_in_flight_ ABSL_GUARDED_BY(mu_);
   CacheFileFixedBlock header_block_ ABSL_GUARDED_BY(mu_);
-  off_t write_pos_ ABSL_GUARDED_BY(mu_);
+  CacheFileHeader header_proto_ ABSL_GUARDED_BY(mu_);
   // key_ may be updated to a varyKey during insertHeaders.
   Key key_ ABSL_GUARDED_BY(mu_);
   const std::shared_ptr<FileSystemHttpCache> cache_;
   // Request-related values. These are only used during the header callback, so they
-  // can be references as they exist in the filter which cannot be destroyed before that.
+  // can be a reference as they exist in the filter which cannot be destroyed before that.
   const Http::RequestHeaderMap& request_headers_;
   const VaryAllowList& vary_allow_list_;
 };
@@ -108,7 +109,7 @@ public:
 class FileInsertContext : public InsertContext {
 public:
   FileInsertContext(std::shared_ptr<FileSystemHttpCache> cache,
-                    std::unique_ptr<NoOpLookupContext> lookup_context);
+                    std::unique_ptr<FileLookupContext> lookup_context);
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, InsertCallback insert_complete,
                      bool end_stream) override;
@@ -116,10 +117,10 @@ public:
                   bool end_stream) override;
   void insertTrailers(const Http::ResponseTrailerMap& trailers,
                       InsertCallback insert_complete) override;
-  void onDestroy() override {} // Destruction of queue_ is all the cleanup.
+  void onDestroy() override {} // Destruction of queue_ and cleanup_ is all the cleanup.
 
 private:
-  std::unique_ptr<NoOpLookupContext> lookup_context_;
+  std::unique_ptr<FileLookupContext> lookup_context_;
   std::shared_ptr<InsertOperationQueue> queue_;
 };
 

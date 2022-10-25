@@ -9,9 +9,9 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
-const absl::flat_hash_set<Envoy::Http::LowerCaseString> headersNotToUpdate() {
+const absl::flat_hash_set<absl::string_view> headersNotToUpdate() {
   CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<Http::LowerCaseString>,
+      absl::flat_hash_set<absl::string_view>,
       // Content range should not be changed upon validation
       Http::Headers::get().ContentRange,
 
@@ -28,11 +28,8 @@ const absl::flat_hash_set<Envoy::Http::LowerCaseString> headersNotToUpdate() {
 }
 } // namespace
 
-void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
-                                       const Http::ResponseHeaderMap& response_headers,
-                                       const ResponseMetadata& metadata) {
-  TimestampUtil::systemClockToTimestamp(metadata.response_time_,
-                                        *entry.mutable_metadata_response_time());
+void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry, const CacheFileHeader& response) {
+  *entry.mutable_metadata_response_time() = response.metadata_response_time();
   // This behavior:
   // 1. retains the order of existing header fields if they have only one value.
   // 2. if an existing header had more than one value, the first one's order is retained,
@@ -41,43 +38,37 @@ void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry,
   //    (I doubt this is correct behavior; it mimics simple_http_cache's behavior,
   //    and is currently required by the cache tests.)
   // 4. headers from headersNotToUpdate are left unchanged.
-  absl::flat_hash_set<Http::LowerCaseString> updated_header_fields;
-  response_headers.iterate(
-      [&entry, &updated_header_fields](
-          const Http::HeaderEntry& incoming_response_header) -> Http::HeaderMap::Iterate {
-        Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
-        absl::string_view incoming_value{incoming_response_header.value().getStringView()};
-        if (headersNotToUpdate().contains(lower_case_key)) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        if (!updated_header_fields.contains(lower_case_key)) {
-          auto it = entry.mutable_headers()->begin();
-          while (it != entry.mutable_headers()->end() && it->key() != lower_case_key.get()) {
-            ++it;
-          }
-          if (it == entry.mutable_headers()->end()) {
-            auto h = entry.add_headers();
-            h->set_key(std::string{lower_case_key.get()});
-            h->set_value(std::string{incoming_value});
+  absl::flat_hash_set<absl::string_view> updated_header_fields;
+  for (const auto& incoming_response_header : response.headers()) {
+    const std::string& key = incoming_response_header.key();
+    if (headersNotToUpdate().contains(key)) {
+      continue;
+    }
+    if (!updated_header_fields.contains(key)) {
+      auto it = std::find_if(entry.mutable_headers()->begin(), entry.mutable_headers()->end(),
+                             [&key](const CacheFileHeader_Header& h) { return h.key() == key; });
+      if (it == entry.mutable_headers()->end()) {
+        auto h = entry.add_headers();
+        h->set_key(key);
+        h->set_value(incoming_response_header.value());
+      } else {
+        it->set_value(incoming_response_header.value());
+        ++it;
+        while (it != entry.mutable_headers()->end()) {
+          if (it->key() == key) {
+            it = entry.mutable_headers()->erase(it);
           } else {
-            it->set_value(std::string{incoming_value});
             ++it;
-            while (it != entry.mutable_headers()->end()) {
-              if (it->key() == lower_case_key.get()) {
-                it = entry.mutable_headers()->erase(it);
-              } else {
-                ++it;
-              }
-            }
           }
-          updated_header_fields.insert(lower_case_key);
-        } else {
-          auto h = entry.add_headers();
-          h->set_key(std::string{lower_case_key.get()});
-          h->set_value(std::string{incoming_value});
         }
-        return Http::HeaderMap::Iterate::Continue;
-      });
+      }
+      updated_header_fields.insert(key);
+    } else {
+      auto h = entry.add_headers();
+      h->set_key(key);
+      h->set_value(incoming_response_header.value());
+    }
+  }
 }
 
 CacheFileHeader protoFromHeadersAndMetadata(const Key& key,
@@ -155,6 +146,12 @@ ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
       epoch_time + std::chrono::milliseconds(Protobuf::util::TimeUtil::TimestampToMilliseconds(
                        header.metadata_response_time()));
   return metadata;
+}
+
+CacheFileHeader headerProtoFromBuffer(Buffer::Instance& buffer) {
+  CacheFileHeader ret;
+  ret.ParseFromString(buffer.toString());
+  return ret;
 }
 
 } // namespace FileSystemHttpCache

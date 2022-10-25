@@ -11,17 +11,13 @@ import "source/extensions/filters/http/cache/key.proto";
 // 4 byte header size
 // 4 byte trailer size
 // 8 byte body size
+// serialized CacheFileHeader
 // body
 // serialized CacheFileTrailer
-// serialized CacheFileHeader
 //
 // The opening block is necessary to allow the sizes to be at the front of the file, but
 // (necessarily) written last - you can't easily insert things into a serialized proto, so
-// a flat layout is necessary.
-//
-// The CacheFileHeader is at the end of the file to allow it to be easily replaced during
-// updateHeaders. To avoid races, the CacheFileHeader is kept in memory during ordinary
-// usage, and only loaded from disk as part of populateFromDisk during cache warm-up.
+// a flat layout for this block is necessary.
 //
 // One slightly special case is the cache file for an entry with 'vary' headers involved
 // - for this case at the 'hub' entry there is no trailer or body, and the only header
