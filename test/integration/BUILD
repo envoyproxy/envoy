@@ -617,10 +617,6 @@ envoy_cc_test(
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
-    ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 32,
@@ -1883,10 +1879,6 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3([
         "quic_protocol_integration_test.cc",
     ]),
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
-    ],
     data = ["//test/config/integration/certs"],
     shard_count = 12,
     tags = [

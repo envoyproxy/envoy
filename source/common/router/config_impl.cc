@@ -960,6 +960,13 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   // TODO(perf): can we avoid the string copy for the common case?
   std::string path(headers.getPathValue());
   if (!rewrite.empty()) {
+    if (regex_rewrite_redirect_ != nullptr) {
+      // As the rewrite constant may contain the result of a regex rewrite for a redirect, we must
+      // replace the full path if this is the case. This is because the matched path does not need
+      // to correspond to the full path, e.g. in the case of prefix matches.
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(), rewrite);
+    }
     ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                            : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), rewrite);
