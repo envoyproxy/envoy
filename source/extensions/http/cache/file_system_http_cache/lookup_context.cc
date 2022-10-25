@@ -36,6 +36,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
           cb(LookupResult{});
           return;
         }
+        ASSERT(!file_handle_);
         file_handle_ = std::move(open_result.value());
         auto queued = file_handle_->read(
             0, CacheFileFixedBlock::size(),
