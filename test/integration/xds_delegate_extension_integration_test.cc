@@ -46,7 +46,7 @@ public:
 
   std::vector<envoy::service::discovery::v3::Resource>
   getResources(const Config::XdsSourceId& source_id,
-               const std::vector<std::string>& resource_names) const override {
+               const absl::flat_hash_set<std::string>& resource_names) const override {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& resource_name : resource_names) {
       auto it = ResourcesMap.find(makeKey(source_id, resource_name));
@@ -56,6 +56,10 @@ public:
     }
     return resources;
   }
+
+  void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
+                            const std::string& /*resource_name*/,
+                            const absl::optional<EnvoyException>& /*exception*/) override {}
 
   static std::atomic<int> OnConfigUpdatedCount;
   static std::map<std::string, envoy::service::discovery::v3::Resource> ResourcesMap;
@@ -82,12 +86,13 @@ public:
 
   Config::XdsResourcesDelegatePtr createXdsResourcesDelegate(const ProtobufWkt::Any&,
                                                              ProtobufMessage::ValidationVisitor&,
-                                                             Api::Api&) override {
+                                                             Api::Api&,
+                                                             Event::Dispatcher&) override {
     return std::make_unique<TestXdsResourcesDelegate>();
   }
 };
 
-class XdsDelegateExtensionIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+class XdsDelegateExtensionIntegrationTest : public Grpc::UnifiedOrLegacyMuxIntegrationParamTest,
                                             public HttpIntegrationTest {
 public:
   XdsDelegateExtensionIntegrationTest()
@@ -96,6 +101,10 @@ public:
     // TODO(abeyad): Add test for Unified SotW when the UnifiedMux support is implemented.
     use_lds_ = false;
     create_xds_upstream_ = true;
+
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
 
     // Make the default cluster HTTP2.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -189,7 +198,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsDelegateExtensionIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Verifies that, if an XdsResourcesDelegate is configured, then it is invoked whenever there is a
 // set of updated resources in the DiscoveryResponse from an xDS server.

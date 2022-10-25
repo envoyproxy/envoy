@@ -106,6 +106,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "passthrough_decoder_event_handler_lib",
+    hdrs = ["passthrough_decoder_event_handler.h"],
+    deps = [
+        ":decoder_events_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
@@ -298,6 +306,7 @@ envoy_cc_library(
         "//envoy/tcp:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 

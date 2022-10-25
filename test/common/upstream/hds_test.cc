@@ -578,12 +578,9 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_.admin(), params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.server_context_.localInfo(),
-            params.server_context_.mainThreadDispatcher(), params.stats_,
-            params.server_context_.singletonManager(), params.tls_,
-            params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-            params.server_context_.options(), params.server_context_.accessLogManager());
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
@@ -1034,12 +1031,9 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_.admin(), params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(), params.server_context_.localInfo(),
-            params.server_context_.mainThreadDispatcher(), params.stats_,
-            params.server_context_.singletonManager(), params.tls_,
-            params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-            params.server_context_.options(), params.server_context_.accessLogManager());
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =

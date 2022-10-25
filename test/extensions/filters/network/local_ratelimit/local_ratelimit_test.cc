@@ -92,6 +92,8 @@ token_bucket:
 
   // Second connection should be rate limited.
   ActiveFilter active_filter2(config_);
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded));
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_,

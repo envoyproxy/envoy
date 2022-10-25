@@ -2,6 +2,7 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
+#include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
@@ -38,7 +39,9 @@ public:
 // initialized.
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
-  explicit InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context);
+  InternalListenerExtension(
+      Server::Configuration::ServerFactoryContext& server_context,
+      const envoy::extensions::bootstrap::internal_listener::v3::InternalListener& config);
 
   ~InternalListenerExtension() override = default;
 
@@ -48,6 +51,7 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
   std::shared_ptr<TlsInternalListenerRegistry> tls_registry_;
+  uint32_t buffer_size_;
 };
 
 // The factory creates the `InternalListenerExtension` instance when envoy starts.

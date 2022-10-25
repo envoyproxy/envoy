@@ -872,24 +872,6 @@ TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
                             "ipv4_compat: 0.0.0.0:13333");
 }
 
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "0.0.0.0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -928,24 +910,6 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
     address:
       socket_address:
         address: "::0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "::1"
         port_value: 13333
         ipv4_compat: true
     filter_chains:

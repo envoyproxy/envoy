@@ -212,17 +212,17 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
   EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
         init_handle = target.createHandle("test");
       }));
 
-  auto client_secret_provider =
-      secret_manager.findOrCreateGenericSecretProvider(config_source, "client", secret_context);
+  auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
+      config_source, "client", secret_context, init_manager);
   auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
-  auto token_secret_provider =
-      secret_manager.findOrCreateGenericSecretProvider(config_source, "token", secret_context);
+  auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
+      config_source, "token", secret_context, init_manager);
   auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
 
   SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);

@@ -377,25 +377,6 @@ absl::flat_hash_set<Http::Code> InternalRedirectPolicyImpl::buildRedirectRespons
   return ret;
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& config,
-                               Runtime::Loader& loader)
-    : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
-      allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-      max_age_(config.max_age()) {
-  for (const auto& string_match : config.allow_origin_string_match()) {
-    allow_origins_.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            string_match));
-  }
-  if (config.has_allow_credentials()) {
-    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
-  }
-  if (config.has_allow_private_network_access()) {
-    allow_private_network_access_ =
-        PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
-  }
-}
-
 void validateMirrorClusterSpecifier(
     const envoy::config::route::v3::RouteAction::RequestMirrorPolicy& config) {
   if (!config.cluster().empty() && !config.cluster_header().empty()) {
@@ -534,8 +515,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      total_cluster_weight_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 0UL)),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
@@ -593,9 +572,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
 
-    if (total_cluster_weight_ > 0 && total_weight != total_cluster_weight_) {
-      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       total_cluster_weight_));
+    // Reject the config if the total_weight of all clusters is 0.
+    if (total_weight == 0) {
+      throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
     total_cluster_weight_ = total_weight;
@@ -669,7 +648,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
         "Specify only one of prefix_rewrite, regex_rewrite or path_rewrite_policy");
   }
 
-  if (!route.route().prefix_rewrite().empty() && path_matcher_ != nullptr) {
+  if (!prefix_rewrite_.empty() && path_matcher_ != nullptr) {
     throw EnvoyException("Cannot use prefix_rewrite with matcher extension");
   }
 
@@ -861,7 +840,11 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers,
+                                   stream_info.getRequestHeaders() == nullptr
+                                       ? *Http::StaticEmptyHeaders::get().request_headers
+                                       : *stream_info.getRequestHeaders(),
+                                   headers, stream_info);
   }
 }
 
@@ -977,6 +960,13 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   // TODO(perf): can we avoid the string copy for the common case?
   std::string path(headers.getPathValue());
   if (!rewrite.empty()) {
+    if (regex_rewrite_redirect_ != nullptr) {
+      // As the rewrite constant may contain the result of a regex rewrite for a redirect, we must
+      // replace the full path if this is the case. This is because the matched path does not need
+      // to correspond to the full path, e.g. in the case of prefix matches.
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(), rewrite);
+    }
     ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                            : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), rewrite);
@@ -1407,10 +1397,7 @@ void RouteEntryImplBase::validateClusters(
 void RouteEntryImplBase::traversePerFilterConfig(
     const std::string& filter_name,
     std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  auto maybe_vhost_config = vhost_.perFilterConfig(filter_name);
-  if (maybe_vhost_config != nullptr) {
-    cb(*maybe_vhost_config);
-  }
+  vhost_.traversePerFilterConfig(filter_name, cb);
 
   auto maybe_route_config = per_filter_configs_.get(filter_name);
   if (maybe_route_config != nullptr) {
@@ -1773,8 +1760,24 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
-const RouteSpecificFilterConfig* VirtualHostImpl::perFilterConfig(const std::string& name) const {
-  return per_filter_configs_.get(name);
+const RouteSpecificFilterConfig*
+VirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
+  auto* per_filter_config = per_filter_configs_.get(name);
+  return per_filter_config != nullptr ? per_filter_config
+                                      : global_route_config_.perFilterConfig(name);
+}
+void VirtualHostImpl::traversePerFilterConfig(
+    const std::string& filter_name,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+  // Parent first.
+  if (auto* maybe_rc_config = global_route_config_.perFilterConfig(filter_name);
+      maybe_rc_config != nullptr) {
+    cb(*maybe_rc_config);
+  }
+  if (auto* maybe_vhost_config = per_filter_configs_.get(filter_name);
+      maybe_vhost_config != nullptr) {
+    cb(*maybe_vhost_config);
+  }
 }
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
@@ -2020,7 +2023,9 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
-      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
+      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()),
+      per_filter_configs_(config.typed_per_filter_config(), optional_http_filters, factory_context,
+                          validator) {
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {

@@ -1,0 +1,9 @@
+extends: default
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  indentation:
+    spaces: consistent
+    indent-sequences: false

@@ -1,7 +1,7 @@
 .. _http_tracers:
 
-HTTP Tracers
-==============
+HTTP tracers
+============
 
 .. note::
 
