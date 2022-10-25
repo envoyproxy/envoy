@@ -167,12 +167,15 @@ absl::Status HttpCacheImplementationTest::insert(absl::string_view request_path,
 
 Http::ResponseHeaderMapPtr HttpCacheImplementationTest::getHeaders(LookupContext& context) {
   Http::ResponseHeaderMapPtr response_headers_ptr;
-  context.getHeaders([&response_headers_ptr](LookupResult&& lookup_result) {
+  auto headers_promise = std::make_shared<std::promise<Http::ResponseHeaderMapPtr>>();
+  context.getHeaders([headers_promise](LookupResult&& lookup_result) {
     EXPECT_NE(lookup_result.cache_entry_status_, CacheEntryStatus::Unusable);
     EXPECT_NE(lookup_result.headers_, nullptr);
-    response_headers_ptr = move(lookup_result.headers_);
+    headers_promise->set_value(move(lookup_result.headers_));
   });
-  return response_headers_ptr;
+  auto future = headers_promise->get_future();
+  EXPECT_EQ(std::future_status::ready, future.wait_for(std::chrono::seconds(5)));
+  return future.get();
 }
 
 std::string HttpCacheImplementationTest::getBody(LookupContext& context, uint64_t start,
