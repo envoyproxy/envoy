@@ -10,28 +10,51 @@ Route mirroring policies
 This simple example demonstrates Envoy's request mirroring capability using
 `request mirror policies <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-routeaction-requestmirrorpolicy>`__.
 
-Incoming requests are received by ``envoy-front-proxy`` service. The envoy instance running
-in this container is configured with two routes (:download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`):
+Incoming requests are received by ``envoy-front-proxy`` service.
+
+Requests for the path ``/service/1`` are statically mirrored.
+
+Each request is handled by the ``service1`` cluster, and in addition, forwarded to
+the ``service1-mirror`` cluster:
 
 .. literalinclude:: _include/route-mirror/front-envoy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
-   :emphasize-lines: 5-17
-   :caption: Envoy configuration with route mirror policy
+   :emphasize-lines: 6-11
+   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
 
-A request for the path ``/service/1`` is forwarded to the ``service1`` cluster.
-In addition, the request is also forwarded to the ``service1-mirror`` cluster.
+Requests for the path ``/service/2`` are dynamically mirrored according to the presence and value of
+the ``x-mirror-cluster`` header.
 
-A request for the path ``/service/2`` is forwarded to the ``service2`` cluster.
-If a header ``x-mirror-cluster`` is specified in the request, envoy extracts the
-header value and forwards the request to a cluster with the same name, if found.
-For example, if we send a header with a request as ``x-mirror-cluster: service2-mirror``,
+All reqests for this path are forwarded to the ``service2`` cluster, and are also mirrored
+to the cluster named in the header.
+
+For example, if we send a request with the header ``x-mirror-cluster: service2-mirror``,
 the request will be forwarded to the ``service2-mirror`` cluster.
 
-Envoy will only return the response it receives from the ``service1`` and ``service2`` clusters.
-The response returned by the ``service1-mirror`` or the ``service2-mirror`` clusters
-are not sent back to the client.
+.. literalinclude:: _include/route-mirror/front-envoy.yaml
+   :language: yaml
+   :lines: 16-34
+   :linenos:
+   :emphasize-lines: 12-17
+   :caption: Envoy configuration with header based route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+
+The pattern to allow a request header to determine the cluster it is mirrored to
+is most useful in a trusted environment. For example, a higher level Envoy instance (or
+another application acting as a proxy) might automatically add this header to requests for upstream
+processing by another Envoy instance configured with request mirror policies.
+
+.. note::
+
+   Envoy will only return the response it receives from the primary cluster to the client.
+
+   For this example, responses from ``service1`` and ``service2`` clusters will be sent
+   to the client. A response returned by the ``service1-mirror`` or the ``service2-mirror``
+   cluster is not sent back to the client.
+
+   This also means that any problems in request processing in the mirror cluster doesn't affect the
+   response received by the client.
 
 Step 1: Build the sandbox
 *************************
@@ -60,40 +83,35 @@ Change to the ``examples/route-mirror`` directory.
 Step 2: Make a request to the statically mirrored route
 *******************************************************
 
-Send a request to ``service1``:
+Let's send a request to the ``envoy-front-proxy`` service which forwards the request to
+``service1`` and also sends the request to the service 1 mirror, ``service1-mirror``.
 
 .. code-block:: console
 
-  $ pwd
-  envoy/examples/route-mirror
   $ curl localhost:10000/service/1
   Hello from behind Envoy (service 1)!
-
-The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
-``service1`` and also sends the request to the service 1 mirror, ``service1-mirror``.
 
 Step 3: View logs for the statically mirrored request
 *****************************************************
 
-View the logs for the ``service1`` and ``service1-mirror`` services:
+The logs from the ``service1`` and ``service1-mirror`` services shows that
+both the ``service1`` and ``service1-mirror`` services got the request made
+in Step 2.
 
 .. code-block:: console
 
-   $ docker-compose logs service1
+   $ pwd
+   envoy/examples/route-mirror
 
+   $ docker-compose logs service1
    ...
    Host: localhost:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
    $ docker-compose logs service1-mirror
-
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
-
-The above logs from the ``service1`` and ``service1-mirror`` services show that
-both the ``service1`` and ``service1-mirror`` services got the request made
-in Step 1.
 
 You can also see that for the request to the ``service1-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
@@ -105,23 +123,25 @@ Step 4: Make a request to the route mirrored by request header
 In this step, we will see a demonstration where the request specifies via a header, ``x-mirror-cluster``,
 the cluster that envoy will mirror the request to.
 
+Let's send a request to the ``envoy-front-proxy`` service which forwards the request to
+``service2`` and also mirrors the request to the cluster named, ``service2-mirror``.
+
 .. code-block:: console
 
-  $ pwd
-  envoy/examples/route-mirror
   $ curl --header "x-mirror-cluster: service2-mirror" localhost:10000/service/2
   Hello from behind Envoy (service 2)!
-
-The command above sends a request to the ``envoy-front-proxy`` service which forwards the request to
-``service2`` and also mirrors the request to the cluster named, ``service2-mirror``.
 
 
 Step 5: View logs for the request mirrored by request header
 ************************************************************
 
-View the logs for the ``service2`` and ``service2-mirror`` services:
+The logs show that both the ``service2`` and ``service2-mirror`` services
+got the request.
 
 .. code-block:: console
+
+   $ pwd
+   envoy/examples/route-mirror
 
    $ docker-compose logs service2
    ...
@@ -132,9 +152,6 @@ View the logs for the ``service2`` and ``service2-mirror`` services:
    ...
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
-
-The above logs show that both the ``service2`` and ``service2-mirror`` services
-got the request.
 
 You can also see that for the request to the ``service2-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
@@ -148,14 +165,15 @@ a request to ``service1`` will not automatically be mirrored to ``service2-mirro
 
 .. code-block:: console
 
-  $ pwd
-  envoy/examples/route-mirror
   $ curl localhost:10000/service/2
   Hello from behind Envoy (service 2)!
 
-View the logs for the ``service2`` and ``service2-mirror`` services:
+View the logs for the ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
+
+   $ pwd
+   envoy/examples/route-mirror
 
    $ docker-compose logs service2
    ...
@@ -165,20 +183,21 @@ View the logs for the ``service2`` and ``service2-mirror`` services:
    $ docker-compose logs service2-mirror
    # No new logs
 
- Similarly, if we specify a value for the ``x-mirror-cluster`` header such that there
- is no such cluster defined with that name, ``service2-mirror`` will not receive
- the request:
+Similarly, if we specify a value for the ``x-mirror-cluster`` header such that there
+is no such cluster defined with that name, ``service2-mirror`` will not receive
+the request:
 
 .. code-block:: console
 
-  $ pwd
-  envoy/examples/route-mirror
   $ curl --header "x-mirror-cluster: service2-mirror-non-existent" localhost:10000/service/2
   Hello from behind Envoy (service 2)!
 
-View the logs for the ``service2`` and ``service2-mirror`` services:
+View the logs for the ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
+
+   $ pwd
+   envoy/examples/route-mirror
 
    $ docker-compose logs service2
    ...
@@ -192,4 +211,3 @@ View the logs for the ``service2`` and ``service2-mirror`` services:
 
    :ref:`Envoy request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
     Learn more Envoy's request mirroring policy.
-
