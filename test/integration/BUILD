@@ -590,7 +590,6 @@ envoy_cc_test_library(
         ":socket_interface_swap_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/listener/original_dst:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
@@ -617,10 +616,6 @@ envoy_cc_test(
     name = "protocol_integration_test",
     srcs = [
         "instantiate_protocol_integration_test.cc",
-    ],
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
@@ -1884,10 +1879,6 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3([
         "quic_protocol_integration_test.cc",
     ]),
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
-    ],
     data = ["//test/config/integration/certs"],
     shard_count = 12,
     tags = [
