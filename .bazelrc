@@ -31,6 +31,9 @@ build --action_env=PATH --host_action_env=PATH
 build --enable_platform_specific_config
 build --test_summary=terse
 
+# TODO(keith): Remove once we have updated brotli past https://github.com/google/brotli/pull/985
+build --per_file_copt=external/org_brotli/c/dec/decode.c@-Wno-strict-prototypes --per_file_copt=external/org_brotli/c/common/dictionary.c@-Wno-strict-prototypes
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
