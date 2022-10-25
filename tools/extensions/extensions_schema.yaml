@@ -115,6 +115,8 @@ categories:
 - envoy.path.match
 - envoy.path.rewrite
 - envoy.tls_handshakers
+- envoy.generic_proxy.filters
+- envoy.generic_proxy.codecs
 
 status_values:
 - name: stable
