@@ -29,6 +29,10 @@ header value and forwards the request to a cluster with the same name, if found.
 For example, if we send a header with a request as ``x-mirror-cluster: service2-mirror``,
 the request will be forwarded to the ``service2-mirror`` cluster.
 
+Envoy will only return the response it receives from the ``service1`` and ``service2`` clusters.
+The response returned by the ``service1-mirror`` or the ``service2-mirror`` clusters
+are not sent back to the client.
+
 Step 1: Build the sandbox
 *************************
 
@@ -136,8 +140,53 @@ You can also see that for the request to the ``service2-mirror`` service, the
 ``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
 hostname.
 
+Step 6: Missing or invalid cluster name in request header
+*********************************************************
+
 If you do not specify the ``x-mirror-cluster`` in the request to ``service2``,
-``service2-mirror`` will not receive the request.
+a request to ``service1`` will not automatically be mirrored to ``service2-mirror``.
+
+.. code-block:: console
+
+  $ pwd
+  envoy/examples/route-mirror
+  $ curl localhost:10000/service/2
+  Hello from behind Envoy (service 2)!
+
+View the logs for the ``service2`` and ``service2-mirror`` services:
+
+.. code-block:: console
+
+   $ docker-compose logs service2
+   ...
+   Host: localhost:10000
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
+
+   $ docker-compose logs service2-mirror
+   # No new logs
+
+ Similarly, if we specify a value for the ``x-mirror-cluster`` header such that there
+ is no such cluster defined with that name, ``service2-mirror`` will not receive
+ the request:
+
+.. code-block:: console
+
+  $ pwd
+  envoy/examples/route-mirror
+  $ curl --header "x-mirror-cluster: service2-mirror-non-existent" localhost:10000/service/2
+  Hello from behind Envoy (service 2)!
+
+View the logs for the ``service2`` and ``service2-mirror`` services:
+
+.. code-block:: console
+
+   $ docker-compose logs service2
+   ...
+   Host: localhost:10000
+   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
+
+   $ docker-compose logs service2-mirror
+   # No new logs
 
 .. seealso::
 
