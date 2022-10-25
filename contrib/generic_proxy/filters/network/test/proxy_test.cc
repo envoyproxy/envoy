@@ -30,10 +30,10 @@ TEST(BasicFilterConfigTest, CreatingCodecFactory) {
 
   {
     const std::string yaml_config = R"EOF(
-      name: envoy.generic_proxy.codec.fake
+      name: envoy.generic_proxy.codecs.fake
       typed_config:
         "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: envoy.generic_proxy.codec.fake.type
+        type_url: envoy.generic_proxy.codecs.fake.type
         value: {}
       )EOF";
     NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -50,10 +50,10 @@ TEST(BasicFilterConfigTest, CreatingCodecFactory) {
     Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
     const std::string yaml_config = R"EOF(
-      name: envoy.generic_proxy.codec.fake
+      name: envoy.generic_proxy.codecs.fake
       typed_config:
         "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: envoy.generic_proxy.codec.fake.type
+        type_url: envoy.generic_proxy.codecs.fake.type
         value: {}
       )EOF";
     NiceMock<Server::Configuration::MockFactoryContext> factory_context;
