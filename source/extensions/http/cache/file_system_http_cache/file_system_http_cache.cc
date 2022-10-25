@@ -102,11 +102,12 @@ public:
   HeaderUpdateContext(const FileSystemHttpCache& cache, const Key& key,
                       std::shared_ptr<Cleanup> cleanup,
                       const Http::ResponseHeaderMap& response_headers,
-                      const ResponseMetadata& metadata)
+                      const ResponseMetadata& metadata, std::function<void(bool)> on_complete)
       : filepath_(absl::StrCat(cache.cachePath(), cache.generateFilename(key))),
         cache_path_(cache.cachePath()), cleanup_(cleanup),
         async_file_manager_(cache.asyncFileManager()),
-        response_(protoFromHeadersAndMetadata(key, response_headers, metadata)) {}
+        response_(protoFromHeadersAndMetadata(key, response_headers, metadata)),
+        on_complete_(on_complete) {}
 
   void begin(std::shared_ptr<HeaderUpdateContext> ctx) {
     async_file_manager_->openExistingFile(filepath_,
@@ -140,7 +141,8 @@ private:
   void unlinkOriginal(std::shared_ptr<HeaderUpdateContext> ctx) {
     async_file_manager_->unlink(filepath_, [ctx, this](absl::Status unlink_result) {
       if (!unlink_result.ok()) {
-        fail("unlink failed", unlink_result);
+        ENVOY_LOG(warn, "file_system_http_cache: {} for update cache file {}: {}", "unlink failed",
+                  filepath_, unlink_result);
         // But keep going, because unlink might have failed because the file was already
         // deleted after we opened it. Worth a try to replace it!
       }
@@ -250,13 +252,16 @@ private:
     auto queued = write_handle_->createHardLink(filepath_, [ctx, this](absl::Status link_result) {
       if (!link_result.ok()) {
         fail("failed to link new cache file", link_result);
+        return;
       }
+      on_complete_(true);
     });
     ASSERT(queued.ok());
   }
   void fail(absl::string_view msg, absl::Status status) {
     ENVOY_LOG(warn, "file_system_http_cache: {} for update cache file {}: {}", msg, filepath_,
               status);
+    on_complete_(false);
   }
   std::string filepath_;
   std::string cache_path_;
@@ -267,17 +272,20 @@ private:
   CacheFileHeader header_proto_;
   AsyncFileHandle read_handle_;
   AsyncFileHandle write_handle_;
+  std::function<void(bool)> on_complete_;
 };
 
 void FileSystemHttpCache::updateHeaders(const LookupContext& lookup_context,
                                         const Http::ResponseHeaderMap& response_headers,
-                                        const ResponseMetadata& metadata) {
+                                        const ResponseMetadata& metadata,
+                                        std::function<void(bool)> on_complete) {
   const Key& key = dynamic_cast<const FileLookupContext&>(lookup_context).key();
   auto cleanup = maybeStartWritingEntry(key);
   if (!cleanup) {
     return;
   }
-  auto ctx = std::make_shared<HeaderUpdateContext>(*this, key, cleanup, response_headers, metadata);
+  auto ctx = std::make_shared<HeaderUpdateContext>(*this, key, cleanup, response_headers, metadata,
+                                                   on_complete);
   ctx->begin(ctx);
 }
 

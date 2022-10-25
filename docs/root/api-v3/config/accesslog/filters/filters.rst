@@ -1,5 +1,5 @@
-Extension Filters
-=================
+Access log extension filters
+============================
 
 .. toctree::
   :glob:

@@ -4745,7 +4745,7 @@ TEST_F(RouterTest, DirectResponse) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_EQ(1UL, router_.stats().rq_direct_response_.value());
 }
 
 TEST_F(RouterTest, DirectResponseWithBody) {
@@ -4770,7 +4770,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_EQ(1UL, router_.stats().rq_direct_response_.value());
 }
 
 TEST_F(RouterTest, DirectResponseWithLocation) {
@@ -4794,7 +4794,7 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_EQ(1UL, router_.stats().rq_direct_response_.value());
 }
 
 TEST_F(RouterTest, DirectResponseWithoutLocation) {
@@ -4817,7 +4817,7 @@ TEST_F(RouterTest, DirectResponseWithoutLocation) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_FALSE(callbacks_.stream_info_.attemptCount().has_value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
+  EXPECT_EQ(1UL, router_.stats().rq_direct_response_.value());
 }
 
 // Verifies that we propagate the upstream connection filter state to the upstream and downstream

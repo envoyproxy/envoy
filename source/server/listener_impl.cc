@@ -488,14 +488,9 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
       (address->ip()->version() != Network::Address::IpVersion::v6 ||
        (!address->ip()->isAnyAddress() &&
         address->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
-      throw EnvoyException(fmt::format(
-          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
-          address->asStringView()));
-    } else {
-      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
-                address->asStringView());
-    }
+    throw EnvoyException(fmt::format(
+        "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+        address->asStringView()));
   }
 }
 
@@ -609,7 +604,8 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
                            "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
+        validation_visitor_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from

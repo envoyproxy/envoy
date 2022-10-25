@@ -156,8 +156,8 @@ void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host)
   if (lb_factory_) {
     lb_factory_->onHostHealthUpdate();
   }
-  if (host && (host->health() == Upstream::Host::Health::Degraded ||
-               host->health() == Upstream::Host::Health::Unhealthy)) {
+  if (host && (host->coarseHealth() == Upstream::Host::Health::Degraded ||
+               host->coarseHealth() == Upstream::Host::Health::Unhealthy)) {
     refresh_manager_->onHostDegraded(cluster_name_);
   }
   ClusterImplBase::reloadHealthyHostsHelper(host);
@@ -301,7 +301,7 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
                                              parent_.info()->statsScope(), parent_.auth_username_,
-                                             parent_.auth_password_);
+                                             parent_.auth_password_, false);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());

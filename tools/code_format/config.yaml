@@ -186,7 +186,6 @@ paths:
     - source/common/common/regex.cc
     - source/common/common/utility.cc
     - source/common/formatter/substitution_formatter.cc
-    - source/common/router/header_parser_utils.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
@@ -295,9 +294,11 @@ visibility_excludes:
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
+- source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD
 - source/extensions/path/uri_template_lib/BUILD
 - source/extensions/path/match/uri_template/BUILD
 - source/extensions/path/rewrite/uri_template/BUILD
+- source/extensions/quic/connection_id_generator/BUILD

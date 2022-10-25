@@ -65,7 +65,13 @@ void HttpCacheImplementationTest::updateHeaders(
     absl::string_view request_path, const Http::TestResponseHeaderMapImpl& response_headers,
     const ResponseMetadata& metadata) {
   LookupContextPtr lookup_context = lookup(request_path);
-  cache()->updateHeaders(*lookup_context, response_headers, metadata);
+  auto update_promise = std::make_shared<std::promise<bool>>();
+  cache()->updateHeaders(*lookup_context, response_headers, metadata,
+                         [update_promise](bool result) { update_promise->set_value(result); });
+  auto update_future = update_promise->get_future();
+  if (std::future_status::ready != update_future.wait_for(std::chrono::seconds(5))) {
+    EXPECT_TRUE(false) << "timed out in updateHeaders " << request_path;
+  }
 }
 
 LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_path) {

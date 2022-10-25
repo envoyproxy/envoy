@@ -21,7 +21,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/health
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Health Discovery Service (HDS)]
+// [#protodoc-title: Health discovery service (HDS)]
 
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts
