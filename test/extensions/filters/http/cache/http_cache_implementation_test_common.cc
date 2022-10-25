@@ -226,11 +226,9 @@ testing::AssertionResult HttpCacheImplementationTest::expectLookupSuccessWithHea
   if (!lookup_context) {
     return AssertionFailure() << "Expected nonnull lookup_context";
   }
-
-  Http::ResponseHeaderMapPtr actual_headers_ptr = getHeaders(*lookup_context);
-  if (!TestUtility::headerMapEqualIgnoreOrder(headers, *actual_headers_ptr)) {
+  if (!TestUtility::headerMapEqualIgnoreOrder(headers, *lookup_result_.headers_)) {
     return AssertionFailure() << "Expected headers: " << headers
-                              << "\nActual:  " << *actual_headers_ptr;
+                              << "\nActual:  " << *lookup_result_.headers_;
   }
   return AssertionSuccess();
 }
@@ -581,7 +579,6 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
   // An age header is inserted by `makeLookUpResult`
   response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "0");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
-
   // Update the date field in the headers
   time_system_.advanceTimeWait(Seconds(3600));
   const SystemTime time_2 = time_system_.systemTime();
