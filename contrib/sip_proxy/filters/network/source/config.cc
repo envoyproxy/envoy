@@ -74,17 +74,15 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = nullptr;
-  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos = nullptr;
-
   // Map of upstream transactions per worker thread
-  upstream_transaction_infos = std::make_shared<SipProxy::UpstreamTransactionInfos>(
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = 
+      std::make_shared<SipProxy::UpstreamTransactionInfos>(
       context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
                                  proto_config.settings(), transaction_timeout, 32000)));
   upstream_transaction_infos->init();
 
   // Map of downstream connections per worker thread
-  downstream_connection_infos =
+  std::shared_ptr<SipProxy::DownstreamConnectionInfos> downstream_connection_infos =
       std::make_shared<SipProxy::DownstreamConnectionInfos>(context.threadLocal());
   downstream_connection_infos->init();
 

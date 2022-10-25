@@ -32,7 +32,7 @@ namespace SipProxy {
 class SipTraTest : public testing::Test {
 public:
   SipTraTest() : stream_info_(time_source_, nullptr) {}
-  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> initTraHandler() {
+  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> initTraHandler(bool stream_start_failing = false) {
     std::string tra_yaml = R"EOF(
                grpc_service:
                  envoy_grpc:
@@ -61,7 +61,11 @@ public:
         .WillRepeatedly(Return(async_client->async_request_.get()));
 
     async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
-    EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(Return(async_stream_.get()));
+    if (stream_start_failing) {
+      EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(Return(async_stream_.get()));
+    } else {
+      EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillRepeatedly(Return(nullptr));
+    }
 
     auto grpc_client = std::make_unique<TrafficRoutingAssistant::GrpcClientImpl>(
         async_client, dispatcher_, std::chrono::milliseconds(2000));
@@ -210,6 +214,11 @@ TEST_F(SipTraTest, TraSubscribe) {
   tra_handler->subscribeTrafficRoutingAssistant("lskpmc");
 }
 
+TEST_F(SipTraTest, TraSubscribeFailingToGetStream) {
+  auto tra_handler = initTraHandler(true);
+  tra_handler->subscribeTrafficRoutingAssistant("lskpmc");
+}
+
 TEST_F(SipTraTest, GrpcClientOnSuccessRetrieveRsp) {
   envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceResponse
       service_response_config;
@@ -352,7 +361,10 @@ TEST_F(SipTraTest, Misc) {
 
   absl::flat_hash_map<std::string, std::string> data;
   data.emplace(std::make_pair("S1F1", "10.0.0.1"));
-  grpc_client.createTrafficRoutingAssistant("lskpmc", data, absl::nullopt, span_, stream_info_);
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
+  metadata->setMethodType(MethodType::Register);
+  metadata->addMsgHeader(HeaderType::From, "user@sip.com");
+  grpc_client.createTrafficRoutingAssistant("lskpmc", data, metadata->traContext(), span_, stream_info_);
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_cb->onCreateInitialMetadata(request_headers);

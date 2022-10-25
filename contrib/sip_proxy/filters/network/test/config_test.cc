@@ -167,6 +167,8 @@ TEST_F(SipFilterConfigTest, SipProtocolOptions) {
   const std::string yaml = R"EOF(
 session_affinity: true
 registration_affinity: true
+upstream_transactions:
+  enabled: true
 customized_affinity:
   entries:
   - key_name: test
@@ -187,6 +189,8 @@ customized_affinity:
 
   EXPECT_EQ(true, options->sessionAffinity());
   EXPECT_EQ(true, options->registrationAffinity());
+  EXPECT_EQ(false, options->customizedAffinity().stop_load_balance());
+  EXPECT_EQ(true, options->upstreamTransactionsEnabled());
 }
 
 } // namespace SipProxy

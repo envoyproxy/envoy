@@ -93,6 +93,8 @@ public:
   MOCK_METHOD(FilterStatus, transportEnd, ());
   MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(FilterStatus, messageEnd, ());
+
+  SipFilters::DecoderFilterCallbacks* callbacks_{};
 };
 
 class MockDecoderFilterCallbacks : public DecoderFilterCallbacks {

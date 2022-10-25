@@ -26,6 +26,7 @@ void SipHeader::parseHeader() {
   if (std::size_t found = header.find(" SIP"); found != absl::string_view::npos) {
     header = header.substr(0, found);
   }
+
   // Has message Type in header
   // Eg: Route: <sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp; \
   // x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>
@@ -251,11 +252,6 @@ absl::string_view MessageMetadata::getDomainFromHeaderParameter(HeaderType type,
 }
 
 bool MessageMetadata::isValid(bool check_tra_context) {
-  // Check message type has been identified as request or response
-  if ((msgType() != MsgType::Request) && (msgType() != MsgType::Response)) {
-    error_message_ = "Message not identified as request or response";
-    return false;
-  }
   // Check if it contains Via header (required for getting transaction ID)
   if (!hasMsgHeader(HeaderType::Via)) {
     error_message_ = "Missing Via header";

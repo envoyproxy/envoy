@@ -381,6 +381,7 @@ private:
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus transportEnd() override;
 
     // PendingListHandler
     void pushIntoPendingList(const std::string& type, const std::string& key,
@@ -429,6 +430,7 @@ private:
 
     // DecoderEventHandler
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus transportEnd() override;
 
     // PendingListHandler
     void pushIntoPendingList(const std::string& type, const std::string& key,
@@ -509,7 +511,7 @@ private:
     upstreamData(MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
                  const absl::optional<std::string>& return_destination) override;
 
-    void resetDownstreamConnection() override{};
+    void resetDownstreamConnection() override;
 
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
 
@@ -525,7 +527,9 @@ private:
       return parent_.upstream_transaction_infos_;
     }
 
-    void onReset() override{};
+    void onReset() override {
+      ASSERT(false, "onReset() not implemented");
+    };
 
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       ASSERT(false, "traHandler() not implemented");
@@ -535,6 +539,7 @@ private:
     void continueHandling(const std::string& key, bool try_next_affinity) override {
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(try_next_affinity);
+      ASSERT(false, "continueHandling() not implemented");
     }
 
     MessageMetadataSharedPtr metadata() override {
@@ -550,6 +555,7 @@ private:
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(activetrans);
       UNREFERENCED_PARAMETER(func);
+      ASSERT(false, "pushIntoPendingList() not implemented");
     }
     void onResponseHandleForPendingList(
         const std::string& type, const std::string& key,
@@ -557,12 +563,12 @@ private:
       UNREFERENCED_PARAMETER(type);
       UNREFERENCED_PARAMETER(key);
       UNREFERENCED_PARAMETER(func);
+      ASSERT(false, "onResponseHandleForPendingList() not implemented");
     }
     void eraseActiveTransFromPendingList(std::string& transaction_id) override {
       UNREFERENCED_PARAMETER(transaction_id);
+      ASSERT(false, "eraseActiveTransFromPendingList() not implemented");
     }
-
-    std::string getDownstreamConnectionId() { return downstream_conn_id_; }
 
   private:
     ConnectionManager& parent_;
@@ -614,7 +620,8 @@ public:
   void init();
   ~DownstreamConnectionInfos() = default;
 
-  void insertDownstreamConnection(std::string conn_id, ConnectionManager& conn_manager);
+  void insertDownstreamConnection(std::string conn_id, 
+                                  std::shared_ptr<SipFilters::DecoderFilterCallbacks> callback);
   size_t size();
 
   void deleteDownstreamConnection(std::string&& conn_id);

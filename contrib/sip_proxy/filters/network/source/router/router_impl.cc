@@ -774,7 +774,8 @@ void UpstreamConnection::delDecoderFilterCallbacks(SipFilters::DecoderFilterCall
 
 void UpstreamConnection::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                         bool end_stream) {
-  if (conn_data_->connection().state() == Network::Connection::State::Closed) {
+  if ((conn_data_ == nullptr) || 
+      (conn_data_->connection().state() == Network::Connection::State::Closed)) {
     ENVOY_LOG(warn, "Connection state is closed for upstream local reply");
     return;
   }

@@ -183,7 +183,8 @@ void ConnectionManager::storeDownstreamConnectionInCache() {
       read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
       "@" + random_generator_.uuid();
   local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
-  downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, *this);
+  auto downstream_conn = std::make_shared<ConnectionManager::DownstreamConnection>(*this, downstream_conn_id);
+  downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, downstream_conn);
 
   ENVOY_LOG(info, "Cached downstream connection with thread_id={}, downstream_connection_id={}",
             thread_id, downstream_conn_id);
@@ -305,8 +306,6 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   case DirectResponse::ResponseType::Exception:
     stats_.response_exception_.inc();
     break;
-  default:
-    PANIC("not reached");
   }
   stats_.counterFromElements("", "local-generated-response").inc();
 }
@@ -502,7 +501,6 @@ FilterStatus ConnectionManager::ActiveTrans::transportBegin(MessageMetadataShare
 
 FilterStatus ConnectionManager::ActiveTrans::transportEnd() {
   ASSERT(metadata_ != nullptr);
-  parent_.stats_.request_.inc();
 
   FilterStatus status;
   filter_action_ = [](DecoderEventHandler* filter) -> FilterStatus {
@@ -558,7 +556,12 @@ ConnectionManager::DownstreamActiveTrans::transportBegin(MessageMetadataSharedPt
   }
 
   return ActiveTrans::transportBegin(metadata);
-  ;
+}
+
+FilterStatus
+ConnectionManager::DownstreamActiveTrans::transportEnd() {
+  parent_.stats_.request_.inc();
+  return ActiveTrans::transportEnd();
 }
 
 Router::RouteConstSharedPtr ConnectionManager::DownstreamActiveTrans::route() {
@@ -645,6 +648,12 @@ ConnectionManager::UpstreamActiveTrans::transportBegin(MessageMetadataSharedPtr 
   return ActiveTrans::transportBegin(metadata);
 }
 
+FilterStatus
+ConnectionManager::UpstreamActiveTrans::transportEnd() {
+  parent_.stats_.upstream_response_.inc();
+  return ActiveTrans::transportEnd();
+}
+
 void ConnectionManager::UpstreamActiveTrans::onError(const std::string& what) {
   UNREFERENCED_PARAMETER(what);
   if (metadata_) {
@@ -659,7 +668,7 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
   Buffer::OwnedImpl buffer;
 
   metadata_->setEP(return_destination_);
-  response.encode(*metadata_, buffer);
+  const DirectResponse::ResponseType result = response.encode(*metadata_, buffer);
 
   MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>(buffer.toString());
   response_metadata->setMsgType(MsgType::Response);
@@ -671,16 +680,28 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
     return;
   }
 
-  if (auto status = messageBegin(response_metadata); status == FilterStatus::StopIteration) {
+  if (auto status = ActiveTrans::messageBegin(response_metadata); status == FilterStatus::StopIteration) {
     return;
   }
 
-  if (auto status = messageEnd(); status == FilterStatus::StopIteration) {
+  if (auto status = ActiveTrans::messageEnd(); status == FilterStatus::StopIteration) {
     return;
   }
 
-  if (auto status = transportEnd(); status == FilterStatus::StopIteration) {
+  if (auto status = ActiveTrans::transportEnd(); status == FilterStatus::StopIteration) {
     return;
+  }
+
+  switch (result) {
+  case DirectResponse::ResponseType::SuccessReply:
+    stats().upstream_response_success_.inc();
+    break;
+  case DirectResponse::ResponseType::ErrorReply:
+    stats().upstream_response_error_.inc();
+    break;
+  case DirectResponse::ResponseType::Exception:
+    stats().upstream_response_exception_.inc();
+    break;
   }
   stats().counterFromElements("", "upstream-local-generated-response").inc();
 
@@ -714,6 +735,8 @@ SipFilters::ResponseStatus ConnectionManager::UpstreamActiveTrans::upstreamData(
               buffer.toString());
     parent_.read_callbacks_->connection().write(buffer, false);
 
+    parent_.stats_.upstream_request_.inc();
+
     return SipFilters::ResponseStatus::Complete;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "SIP response error: {}", parent_.read_callbacks_->connection(),
@@ -745,6 +768,10 @@ std::shared_ptr<SipSettings> ConnectionManager::DownstreamConnection::settings()
   return parent_.config_.settings();
 }
 
+void ConnectionManager::DownstreamConnection::resetDownstreamConnection() {
+  parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
 void ConnectionManager::DownstreamConnection::startUpstreamResponse() {}
 
 SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData(
@@ -772,24 +799,19 @@ void DownstreamConnectionInfos::init() {
   tls_->set(
       [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
         UNREFERENCED_PARAMETER(dispatcher);
-        if (auto this_shared_ptr = this_weak_ptr.lock()) {
-          return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
-        }
-        return nullptr;
+        auto this_shared_ptr = this_weak_ptr.lock();
+        return std::make_shared<ThreadLocalDownstreamConnectionInfo>(this_shared_ptr);
       });
 }
 
 void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
-                                                           ConnectionManager& conn_manager) {
-  if (hasDownstreamConnection(conn_id)) {
-    return;
+                                                           std::shared_ptr<SipFilters::DecoderFilterCallbacks> callback) {
+  if (!hasDownstreamConnection(conn_id)) {
+    ENVOY_LOG(trace, "Insert into Downstream connection map {}", conn_id);
+
+    tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
+        std::make_pair(conn_id, callback));
   }
-
-  ENVOY_LOG(trace, "Insert into Downstream connection map {}", conn_id);
-
-  tls_->getTyped<ThreadLocalDownstreamConnectionInfo>().downstream_connection_info_map_.emplace(
-      std::make_pair(conn_id, std::make_shared<ConnectionManager::DownstreamConnection>(
-                                  conn_manager, conn_id)));
 }
 
 size_t DownstreamConnectionInfos::size() {
@@ -842,11 +864,9 @@ void SipProxy::UpstreamTransactionInfos::init() {
   std::weak_ptr<UpstreamTransactionInfos> this_weak_ptr = this->shared_from_this();
   tls_->set(
       [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        if (auto this_shared_ptr = this_weak_ptr.lock()) {
-          return std::make_shared<ThreadLocalUpstreamTransactionInfo>(
-              this_shared_ptr, dispatcher, this_shared_ptr->transaction_timeout_);
-        }
-        return nullptr;
+        auto this_shared_ptr = this_weak_ptr.lock();
+        return std::make_shared<ThreadLocalUpstreamTransactionInfo>(
+            this_shared_ptr, dispatcher, this_shared_ptr->transaction_timeout_);
       });
 }
 
@@ -854,12 +874,10 @@ void SipProxy::UpstreamTransactionInfos::insertTransaction(
     std::string transaction_id,
     std::shared_ptr<ConnectionManager::UpstreamActiveTrans> active_trans) {
   ENVOY_LOG(debug, "Inserting into cache upstream transaction with ID {} ... ", transaction_id);
-  if (hasTransaction(transaction_id)) {
-    return;
+  if (!hasTransaction(transaction_id)) {
+    tls_->getTyped<ThreadLocalUpstreamTransactionInfo>().upstream_transaction_infos_map_.emplace(
+        std::make_pair(transaction_id, active_trans));
   }
-
-  tls_->getTyped<ThreadLocalUpstreamTransactionInfo>().upstream_transaction_infos_map_.emplace(
-      std::make_pair(transaction_id, active_trans));
 }
 
 void SipProxy::UpstreamTransactionInfos::deleteTransaction(std::string&& transaction_id) {

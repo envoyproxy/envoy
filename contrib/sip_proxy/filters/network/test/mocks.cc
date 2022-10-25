@@ -44,6 +44,9 @@ MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, transportEnd()).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, messageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, messageEnd()).WillByDefault(Return(FilterStatus::Continue));
+  ON_CALL(*this, setDecoderFilterCallbacks(_)).WillByDefault(Invoke([this](DecoderFilterCallbacks& callbacks) -> void {
+        this->callbacks_ = &callbacks;
+      }));
 }
 MockDecoderFilter::~MockDecoderFilter() = default;
 
