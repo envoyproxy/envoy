@@ -363,6 +363,47 @@ private:
   mutable int count_ = 0;
 };
 
+TEST(TestConfig, AddNativeFilter) {
+  EngineBuilder engine_builder;
+
+  std::string filter_name = "envoy.filters.http.buffer";
+  std::string filter_config =
+      "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
+      "\"max_request_bytes\":5242880}";
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name)));
+  ASSERT_THAT(config_str, Not(HasSubstr("  typed_config: " + filter_config)));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.addNativeFilter(filter_name, filter_config);
+
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name));
+  ASSERT_THAT(config_str, HasSubstr("  typed_config: " + filter_config));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
+TEST(TestConfig, AddPlatformFilter) {
+  EngineBuilder engine_builder;
+
+  std::string filter_name = "test_platform_filter";
+
+  std::string config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, Not(HasSubstr("http.platform_bridge.PlatformBridge")));
+  ASSERT_THAT(config_str, Not(HasSubstr("platform_filter_name: " + filter_name)));
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+
+  engine_builder.addPlatformFilter(filter_name);
+
+  config_str = engine_builder.generateConfigStr();
+  ASSERT_THAT(config_str, HasSubstr("http.platform_bridge.PlatformBridge"));
+  ASSERT_THAT(config_str, HasSubstr("platform_filter_name: " + filter_name));
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+}
+
 TEST(TestConfig, StringAccessors) {
   std::string name("accessor_name");
   EngineBuilder engine_builder;
