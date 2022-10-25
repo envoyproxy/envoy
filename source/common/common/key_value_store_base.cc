@@ -79,14 +79,15 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
         ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(ttl_int)) -
             time_source_.systemTime()));
+        if (ttl <= std::chrono::seconds(0)) {
+          continue;
+        }
       } else {
         ENVOY_LOG(warn, "TTL was read from disk but failed to convert to integer");
         return false;
       }
     }
-    if (!ttl.has_value() || ttl > std::chrono::seconds(0)) {
-      addOrUpdate(key.value(), value.value(), ttl);
-    }
+    addOrUpdate(key.value(), value.value(), ttl);
   }
   return true;
 }
