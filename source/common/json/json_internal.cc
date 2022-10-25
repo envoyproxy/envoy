@@ -43,6 +43,9 @@ public:
 
   bool isArray() const override { return type_ == Type::Array; }
   bool isObject() const override { return type_ == Type::Object; }
+  bool isBoolean(const std::string& name) const override;
+  bool isString(const std::string& name) const override;
+  bool isInteger(const std::string& name) const override;
 
   // Value factory.
   template <typename T> static FieldSharedPtr createValue(T value) {
@@ -382,6 +385,24 @@ nlohmann::json Field::asJsonDocument() const {
 }
 
 uint64_t Field::hash() const { return HashUtil::xxHash64(asJsonString()); }
+
+bool Field::isBoolean(const std::string& name) const {
+  checkType(Type::Object);
+  auto value_itr = value_.object_value_.find(name);
+  return value_itr->second->isType(Type::Boolean);
+}
+
+bool Field::isInteger(const std::string& name) const {
+  checkType(Type::Object);
+  auto value_itr = value_.object_value_.find(name);
+  return value_itr->second->isType(Type::Integer);
+}
+
+bool Field::isString(const std::string& name) const {
+  checkType(Type::Object);
+  auto value_itr = value_.object_value_.find(name);
+  return value_itr->second->isType(Type::String);
+}
 
 bool Field::getBoolean(const std::string& name) const {
   checkType(Type::Object);

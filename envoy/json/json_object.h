@@ -92,6 +92,24 @@ public:
   virtual bool isArray() const PURE;
 
   /**
+   * Determine if an object has type bool.
+   * @return bool is the object an bool?
+   */
+  virtual bool isBoolean(const std::string& name) const PURE;
+
+    /**
+   * Determine if an object has type string.
+   * @return bool is the object an string?
+   */
+  virtual bool isString(const std::string& name) const PURE;
+
+    /**
+   * Determine if an object has type int.
+   * @return bool is the object an int?
+   */
+  virtual bool isInteger(const std::string& name) const PURE;
+
+  /**
    * Get an array by name.
    * @param name supplies the key name.
    * @param allow_empty specifies whether to return an empty array if the key does not exist.

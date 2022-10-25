@@ -68,10 +68,15 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
+      {"x-jwt-claim-sub", ""},
+      {"x-jwt-claim-nested", ""},
+
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
+  EXPECT_EQ("test@example.com", headers.get_("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));;
 }
 
 // Test to set the payload (hence dynamic metadata) with the header and payload extracted from the
@@ -144,6 +149,8 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // This test verifies that JWT must be issued by the provider specified in the requirement.
@@ -161,9 +168,15 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
+    claim_to_header:
+    - name: x-jwt-claim-sub
+      claim: sub
   other_provider:
     issuer: other_issuer
     forward_payload_header: other-auth-userinfo
+    claim_to_header:
+    - name: x-jwt-claim-issuer
+      claim: iss
 rules:
 - match:
     path: "/"
@@ -179,10 +192,15 @@ rules:
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
+      {"x-jwt-claim-sub", ""},
+      {"x-jwt-claim-issuer", ""},
+      
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_TRUE(headers.has("example-auth-userinfo"));
+  EXPECT_TRUE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-issuer"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 

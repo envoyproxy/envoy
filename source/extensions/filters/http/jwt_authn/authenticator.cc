@@ -12,7 +12,8 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
+#include "jwt_verify_lib/verify.h" 
+#include "source/common/json/json_loader.h"
 
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
@@ -39,7 +40,6 @@ public:
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
         time_source_(time_source) {}
-
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
@@ -286,10 +286,49 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     }
   }
 
+ // Copy JWT Claim to Header
   if (provider.claim_to_header_size() != 0) {
+    Json::ObjectSharedPtr payload_json;
+    try {
+      payload_json = Json::Factory::loadFromString(jwt_->payload_str_);
+    } catch (EnvoyException& e) {
+      ENVOY_LOG(error, "Could not parse JWT Claim: {}", e.what());
+    }
     for (const auto& header : provider.claim_to_header()) {
       if (!header.claim().empty()) {
-        // TODO: Add a logic to fetch custom claim from jwt payload
+        auto temp_payload_json = payload_json;
+        std::vector<absl::string_view> claims;
+        bool validClaim = true;
+        claims = absl::StrSplit(header.claim(), '.');
+        std::string lastKey = std::string(claims[claims.size() - 1]);
+        claims = std::vector<absl::string_view>(claims.begin(), claims.end()-1);
+        for (const absl::string_view& val : claims) {
+          try {
+            if (temp_payload_json->isObject() && temp_payload_json->hasObject(std::string(val))) {
+            temp_payload_json = temp_payload_json->getObject(std::string(val), true);
+            } else {
+              validClaim = false;
+              break;
+            }
+          } catch (EnvoyException& e) {
+            ENVOY_LOG(debug, "JWT Claim is not correct", e.what());
+            validClaim = false;
+            break;
+          }
+        }
+        if (validClaim && temp_payload_json->isObject() && temp_payload_json->hasObject(lastKey)) {
+          if (temp_payload_json->isBoolean(lastKey)) {
+            headers_->addCopy(Http::LowerCaseString(header.name()), std::to_string(temp_payload_json->getBoolean(lastKey)));
+          } else if (temp_payload_json->isInteger(lastKey)) {
+            headers_->addCopy(Http::LowerCaseString(header.name()), std::to_string(temp_payload_json->getInteger(lastKey)));
+          } else if (temp_payload_json->isString(lastKey)) {
+            headers_->addCopy(Http::LowerCaseString(header.name()), temp_payload_json->getString(lastKey));
+          } else {
+            ENVOY_LOG(debug, "--------claim : {} is of unsupported type-----------", lastKey);
+          }
+        } else {
+              ENVOY_LOG(debug, "--------claim : {} not present in the payload-----------", lastKey);
+        }
       }
     }
   }

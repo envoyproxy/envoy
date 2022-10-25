@@ -60,6 +60,7 @@ public:
   MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::RequestHeaderMap& headers),
               (const));
   MOCK_METHOD(void, sanitizePayloadHeaders, (Http::HeaderMap & headers), (const));
+  MOCK_METHOD(void, sanitizeClaimHeaders, (Http::HeaderMap & headers), (const));
 };
 
 class MockJwtCache : public JwtCache {
