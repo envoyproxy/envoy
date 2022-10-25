@@ -35,7 +35,7 @@ RedirectPolicy::RedirectPolicy(
       path_(config.path()) {
 
   Http::Utility::Url absolute_url;
-  auto uri = absl::StrCat(host_, path_);
+  std::string uri(absl::StrCat(host_, path_));
   if (!absolute_url.initialize(uri, false)) {
     throw EnvoyException(
         absl::StrCat("Invalid uri specified for redirection for custom response: ", uri));
@@ -44,7 +44,9 @@ RedirectPolicy::RedirectPolicy(
   if (config.has_status_code()) {
     status_code_ = static_cast<Http::Code>(config.status_code().value());
   }
-  header_parser_ = Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
+  response_header_parser_ =
+      Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
+  request_header_parser_ = Envoy::Router::HeaderParser::configure(config.request_headers_to_add());
 }
 
 Http::FilterHeadersStatus
@@ -65,7 +67,7 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
       return Http::FilterHeadersStatus::Continue;
     }
     // Apply header mutations.
-    header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
+    response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
     // Modify response status code.
     if (status_code_.has_value()) {
       auto const code = *status_code_;
@@ -84,7 +86,8 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
   Http::Utility::Url absolute_url;
-  if (!absolute_url.initialize(absl::StrCat(host_, path_), false)) {
+  std::string uri(absl::StrCat(host_, path_));
+  if (!absolute_url.initialize(uri, false)) {
     IS_ENVOY_BUG(absl::StrCat("Redirect for custom response failed: invalid location {}",
                               absl::StrCat(host_, path_)));
     return Http::FilterHeadersStatus::Continue;
@@ -124,6 +127,8 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   if (decoder_callbacks->downstreamCallbacks()) {
     decoder_callbacks->downstreamCallbacks()->clearRouteCache();
   }
+  // Apply header mutations before recalculating the route.
+  request_header_parser_->evaluateHeaders(*downstream_headers, decoder_callbacks->streamInfo());
   const auto route = decoder_callbacks->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {

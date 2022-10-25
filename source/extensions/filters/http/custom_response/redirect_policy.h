@@ -53,7 +53,8 @@ private:
   const std::string path_;
 
   absl::optional<Http::Code> status_code_;
-  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
+  std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;
 };
 } // namespace CustomResponse
 } // namespace HttpFilters

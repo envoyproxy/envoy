@@ -65,6 +65,10 @@ message CustomResponse {
     // response.
     repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
         [(validate.rules).repeated = {max_items: 1000}];
+
+    // HTTP headers to add to the request before it is redirected.
+    repeated config.core.v3.HeaderValueOption request_headers_to_add = 5
+        [(validate.rules).repeated = {max_items: 1000}];
   }
 
   // Custom response policy to serve a locally stored response to the

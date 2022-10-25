@@ -116,6 +116,8 @@ protected:
   Http::TestResponseHeaderMapImpl gateway_error_response_{{":status", "502"},
                                                           {"content-length", "0"}};
   Http::TestResponseHeaderMapImpl okay_response_{{":status", "201"}, {"content-length", "0"}};
+  Http::TestResponseHeaderMapImpl internal_server_error_{{":status", "500"},
+                                                         {"content-length", "0"}};
 
   Envoy::Http::LowerCaseString test_header_key_{kTestHeaderKey};
   std::string custom_response_filter_config_;
@@ -381,6 +383,41 @@ name: local-reply-during-decode-if-not-cer
   EXPECT_TRUE(response->complete());
   //     Verify we do not get a modified status value. (500 instead of 292)
   EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that the route meant for custom response redirection can be routed to with the required
+// header.
+TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
+
+  // Add route with header matcher
+  auto some_other_host = config_helper_.createVirtualHost("some.other.host");
+  some_other_host.mutable_routes(0)->mutable_match()->set_prefix("/");
+  // "cer-only" header needs to be present for route matching.
+  auto header = some_other_host.mutable_routes(0)->mutable_match()->mutable_headers()->Add();
+  header->set_name("cer-only");
+  some_other_host.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_bytes(
+      "cer-only-response");
+  some_other_host.mutable_routes(0)->mutable_direct_response()->set_status(202);
+  config_helper_.addVirtualHost(some_other_host);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Verify some.other.host is reachable via the redirect policy with the
+  // "cer-only" header added.
+  default_request_headers_.setHost("some.route");
+  auto response2 = sendRequestAndWaitForResponse(
+      default_request_headers_, 0, internal_server_error_, 0, 0, std::chrono::minutes(20));
+  EXPECT_EQ("292", response2->headers().getStatusValue());
+  EXPECT_EQ("cer-only-response", response2->body());
+  default_request_headers_.setHost("some.other.host");
+
+  // Verify some.other.host is not directly reachable.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // Verify that the route was not found.
+  EXPECT_EQ("499", response->headers().getStatusValue());
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,

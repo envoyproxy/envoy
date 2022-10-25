@@ -100,16 +100,20 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             name: action
             typed_config:
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_response
+              name: redirect_response2
               typed_config:
                 "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
                 status_code: 292
-                host: "https://foo.example"
+                host: "https://some.other.host"
                 path: "/internal_server_error"
                 response_headers_to_add:
                 - header:
                     key: "foo3"
                     value: "x-bar3"
+                request_headers_to_add:
+                - header:
+                    key: "cer-only"
+                  keep_empty_value: true
   )EOF";
 
 // Simulate filters that send local reply during either encode or decode based
