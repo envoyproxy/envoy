@@ -376,8 +376,7 @@ EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
 
-# As part of build minimization for Envoy Mobile, Envoy libraries were changed to not always link.
-# This allows folks importing Envoy to easily revert that change by settting LIBRARY_DEFAULT_ALWAYSLINK to 1
+# Set this variable to true to disable alwayslink for envoy_cc_library.
 LIBRARY_DEFAULT_ALWAYSLINK = 0
 
 # For any users who want to further disable alwayslink, this can be set to 0.

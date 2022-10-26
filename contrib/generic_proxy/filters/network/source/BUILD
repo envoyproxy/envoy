@@ -48,7 +48,7 @@ envoy_cc_contrib_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_contrib_extension(
     name = "route_lib",
     srcs = [
         "route.cc",
@@ -72,7 +72,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_contrib_extension(
     name = "match_lib",
     srcs = [
         "match.cc",
