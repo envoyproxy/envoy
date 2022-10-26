@@ -35,6 +35,7 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
   - area: http
     change: |
+      removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
       removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
 
 new_features:
