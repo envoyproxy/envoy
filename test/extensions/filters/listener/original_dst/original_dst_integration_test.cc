@@ -44,6 +44,8 @@ INSTANTIATE_TEST_SUITE_P(Protocols, OriginalDstIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
+  // Windows apparently have this loopback property.
+  DISABLE_UNDER_WINDOWS;
   // Only do this for IPv4 as we can have many 127.0.0.x addresses listening on 0.0.0.0
   if (version_ != Network::Address::IpVersion::v4) {
     return;
@@ -93,6 +95,8 @@ public:
 };
 
 TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
+  // Windows apparently have this loopback property.
+  DISABLE_UNDER_WINDOWS;
   if (version_ != Network::Address::IpVersion::v4) {
     return;
   }
