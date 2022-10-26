@@ -358,7 +358,7 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
-   * @return tracing configuration.
+   * @return tracing configuration if present.
    */
   virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
