@@ -43,6 +43,7 @@ paths:
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
   - generated/
+  - source/extensions/clusters/original_dst/
   - source/extensions/common/wasm/ext
   - source/extensions/extensions_build_config.bzl
   - third_party/
