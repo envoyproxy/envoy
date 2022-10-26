@@ -718,8 +718,7 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
-  loadBalancingPolicy() const override {
+  const ProtobufTypes::MessagePtr& loadBalancingPolicy() const override {
     return load_balancing_policy_;
   }
   TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
@@ -751,7 +750,8 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
-  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config);
+  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
+                           Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -925,7 +925,7 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
-  envoy::config::cluster::v3::LoadBalancingPolicy_Policy load_balancing_policy_;
+  ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
   const bool drain_connections_on_host_removal_;
