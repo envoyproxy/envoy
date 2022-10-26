@@ -334,9 +334,9 @@ public:
 
   void updateConcurrentStreams(uint32_t max_streams) {
     absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
-    settings.insert(settings.end(), {{http2::adapter::MAX_CONCURRENT_STREAMS, max_streams}});
+    settings.push_back({http2::adapter::MAX_CONCURRENT_STREAMS, max_streams});
     adapter_->SubmitSettings(settings);
-    int rc = adapter_->Send();
+    const int rc = adapter_->Send();
     ASSERT(rc == 0);
   }
 };

@@ -579,7 +579,7 @@ protected:
   void scheduleProtocolConstraintViolationCallback();
   void onProtocolConstraintViolation();
 
-  // Whether to use the new HTTP/2 library. Only has an effect if `use_new_codec_wrapper` is true.
+  // Whether to use the new HTTP/2 library.
   const bool use_oghttp2_library_;
   static Http2Callbacks http2_callbacks_;
 

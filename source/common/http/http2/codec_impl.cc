@@ -1488,7 +1488,7 @@ Status ConnectionImpl::sendPendingFrames() {
     return okStatus();
   }
 
-  int rc = adapter_->Send();
+  const int rc = adapter_->Send();
   if (rc != 0) {
     ASSERT(rc == NGHTTP2_ERR_CALLBACK_FAILURE);
     return codecProtocolError(nghttp2_strerror(rc));
