@@ -41,6 +41,7 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeDefaultConfig) {
   makeDlbConnectionBalanceConfig(typed_config, dlb);
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(0, dlb.id());
+  EXPECT_EQ(0, dlb.retry_times());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
@@ -48,10 +49,12 @@ TEST_F(DlbConnectionBalanceFactoryTest, MakeCustomConfig) {
 
   envoy::extensions::network::connection_balance::dlb::v3alpha::Dlb dlb;
   dlb.set_id(10);
+  dlb.set_retry_times(12);
 
   makeDlbConnectionBalanceConfig(typed_config, dlb);
   verifyDlbConnectionBalanceConfigAndUnpack(typed_config, dlb);
   EXPECT_EQ(10, dlb.id());
+  EXPECT_EQ(12, dlb.retry_times());
 }
 
 TEST_F(DlbConnectionBalanceFactoryTest, EmptyProto) {
