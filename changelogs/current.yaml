@@ -18,6 +18,12 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+  - area: listener
+    change: |
+      removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
   - area: http
     change: |
       removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
@@ -27,6 +33,10 @@ removed_config_or_runtime:
   - area: http
     change: |
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
+      removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
 
 new_features:
 - area: generic_proxy
