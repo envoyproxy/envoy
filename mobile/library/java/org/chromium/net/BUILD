@@ -23,6 +23,7 @@ android_binary(
     name = "cronet",
     srcs = [],
     manifest = "ChromiumNetManifest.xml",
+    proguard_specs = ["//library:proguard_rules"],
     visibility = ["//visibility:public"],
     deps = [
         ":net",
