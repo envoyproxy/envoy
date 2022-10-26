@@ -978,12 +978,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   // This lambda should be erased when
   // `envoy.reloadable_features.http_100_continue_case_insensitive` is removed.
   auto is100Continue = [](absl::string_view request_expect) {
-    return request_expect == Headers::get().ExpectValues._100Continue ||
-           (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http_100_continue_case_insensitive") &&
-            // The Expect field-value is case-insensitive.
-            // https://tools.ietf.org/html/rfc7231#section-5.1.1
-            absl::EqualsIgnoreCase(request_expect, Headers::get().ExpectValues._100Continue));
+    // The Expect field-value is case-insensitive.
+    // https://tools.ietf.org/html/rfc7231#section-5.1.1
+    return absl::EqualsIgnoreCase(request_expect, Headers::get().ExpectValues._100Continue);
   };
 
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&

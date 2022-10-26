@@ -36,6 +36,9 @@ removed_config_or_runtime:
   - area: http
     change: |
       removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.http_100_continue_case_insensitive`` and legacy code paths.
 
 new_features:
 - area: generic_proxy
