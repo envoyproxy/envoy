@@ -42,6 +42,8 @@ public:
   EngineBuilder& addKeyValueStore(const std::string& name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(const std::string& name, StringAccessorSharedPtr accessor);
   EngineBuilder& addNativeFilter(const std::string& name, const std::string& typed_config);
+  // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
+  // envoy_http_filter must be registered as a platform API with the same name.
   EngineBuilder& addPlatformFilter(const std::string& name);
   EngineBuilder& setAppVersion(const std::string& app_version);
   EngineBuilder& setAppId(const std::string& app_id);
