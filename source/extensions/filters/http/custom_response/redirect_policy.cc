@@ -47,6 +47,14 @@ RedirectPolicy::RedirectPolicy(
   response_header_parser_ =
       Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
   request_header_parser_ = Envoy::Router::HeaderParser::configure(config.request_headers_to_add());
+  if (config.has_modify_request_headers_action()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<ModifyRequestHeadersActionFactory>(
+        config.modify_request_headers_action());
+    auto action_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        config.modify_request_headers_action().typed_config(), context.messageValidationVisitor(),
+        factory);
+    modify_request_headers_action_ = factory.createAction(*action_config, context);
+  }
 }
 
 Http::FilterHeadersStatus
@@ -129,6 +137,10 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   }
   // Apply header mutations before recalculating the route.
   request_header_parser_->evaluateHeaders(*downstream_headers, decoder_callbacks->streamInfo());
+  if (modify_request_headers_action_) {
+    modify_request_headers_action_->modifyRequestHeaders(*downstream_headers,
+                                                         decoder_callbacks->streamInfo(), *this);
+  }
   const auto route = decoder_callbacks->route();
   // Don't allow a redirect to a non existing route.
   if (!route) {

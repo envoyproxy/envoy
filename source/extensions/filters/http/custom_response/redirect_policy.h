@@ -2,11 +2,13 @@
 
 #include <memory>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
 
@@ -16,6 +18,7 @@ namespace HttpFilters {
 namespace CustomResponse {
 
 class CustomResponseFilter;
+class ModifyRequestHeadersAction;
 
 /**
  * All stats for the custom response filter. @see stats_macros.h
@@ -55,7 +58,31 @@ private:
   absl::optional<Http::Code> status_code_;
   std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
   std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;
+  std::unique_ptr<ModifyRequestHeadersAction> modify_request_headers_action_;
 };
+
+class ModifyRequestHeadersAction {
+public:
+  virtual ~ModifyRequestHeadersAction() = default;
+  virtual void modifyRequestHeaders(Envoy::Http::RequestHeaderMap& request_headers,
+                                    Envoy::StreamInfo::StreamInfo& stream_info,
+                                    const RedirectPolicy&) PURE;
+};
+
+class ModifyRequestHeadersActionFactory : public Config::TypedFactory {
+public:
+  ~ModifyRequestHeadersActionFactory() override = default;
+
+  virtual std::unique_ptr<ModifyRequestHeadersAction>
+  createAction(const Protobuf::Message& config,
+               Envoy::Server::Configuration::ServerFactoryContext& context) PURE;
+
+  std::string category() const override {
+    return "envoy.extensions.http.filters.custom_response.redirect_policy."
+           "modify_request_headers_action";
+  }
+};
+
 } // namespace CustomResponse
 } // namespace HttpFilters
 } // namespace Extensions

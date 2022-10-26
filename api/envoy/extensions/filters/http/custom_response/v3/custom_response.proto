@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.custom_response.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/substitution_format_string.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -69,6 +70,10 @@ message CustomResponse {
     // HTTP headers to add to the request before it is redirected.
     repeated config.core.v3.HeaderValueOption request_headers_to_add = 5
         [(validate.rules).repeated = {max_items: 1000}];
+
+    // Custom action to modify request headers before selection of the
+    // redirected route.
+    config.core.v3.TypedExtensionConfig modify_request_headers_action = 6;
   }
 
   // Custom response policy to serve a locally stored response to the

@@ -420,6 +420,44 @@ TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
   EXPECT_EQ("499", response->headers().getStatusValue());
 }
 
+// Test ModifyRequestHeadersAction
+TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
+  // Uncomment the config related to modify_request_headers_action
+  auto pos = custom_response_filter_config_.find("##");
+  while (pos != std::string::npos) {
+    custom_response_filter_config_.replace(pos, 2, "  ");
+    pos = custom_response_filter_config_.find("##");
+  }
+
+  TestModifyRequestHeadersActionFactory factory;
+  Envoy::Registry::InjectFactory<ModifyRequestHeadersActionFactory> registration(factory);
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        route->mutable_match()->set_prefix("/internal_server_error");
+        auto header = route->mutable_match()->mutable_headers()->Add();
+        header->set_name("x-envoy-cer-backend");
+        header->mutable_string_match()->set_exact("global/storage");
+        route->mutable_direct_response()->set_status(static_cast<uint32_t>(220));
+        // Use inline bytes rather than a filename to avoid using a path that may look illegal
+        // to Envoy.
+        route->mutable_direct_response()->mutable_body()->set_inline_bytes(
+            "Modify action response body");
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("some.route");
+  auto response = sendRequestAndWaitForResponse(
+      default_request_headers_, 0,
+      Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
+      std::chrono::minutes(20));
+  EXPECT_EQ("220", response->headers().getStatusValue());
+  EXPECT_EQ("Modify action response body", response->body());
+}
+
 INSTANTIATE_TEST_SUITE_P(Protocols, CustomResponseIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);

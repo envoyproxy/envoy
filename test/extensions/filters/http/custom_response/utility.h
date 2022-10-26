@@ -5,6 +5,7 @@
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
+#include "source/extensions/filters/http/custom_response/redirect_policy.h"
 
 #include "test/integration/filters/common.h"
 
@@ -87,6 +88,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "foo2"
                     value: "x-bar2"
+                  append: false
       - predicate:
           single_predicate:
             input:
@@ -114,6 +116,32 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "cer-only"
                   keep_empty_value: true
+      - predicate:
+          single_predicate:
+            input:
+              name: "520_response"
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseStatusCodeMatchInput
+            value_match:
+              exact: "520"
+        on_match:
+          action:
+            name: action
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+              name: redirect_response2
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
+                host: "https://global/storage"
+                path: "/internal_server_error"
+                response_headers_to_add:
+                - header:
+                    key: "foo3"
+                    value: "x-bar3"
+##              modify_request_headers_action:
+##                name: modify-request-headers-action
+##                typed_config:
+##                  "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
 // Simulate filters that send local reply during either encode or decode based
@@ -154,6 +182,34 @@ public:
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
+  }
+};
+
+class TestModifyRequestHeadersAction : public ModifyRequestHeadersAction {
+public:
+  ~TestModifyRequestHeadersAction() override = default;
+
+  void modifyRequestHeaders(Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
+                            const RedirectPolicy& redirect_policy) override {
+    headers.setCopy(Http::LowerCaseString("x-envoy-cer-backend"), redirect_policy.host().substr(8));
+  };
+};
+
+class TestModifyRequestHeadersActionFactory : public ModifyRequestHeadersActionFactory {
+public:
+  ~TestModifyRequestHeadersActionFactory() override = default;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom filter config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return "modify-request-headers-action"; }
+
+  std::unique_ptr<ModifyRequestHeadersAction>
+  createAction(const Protobuf::Message&,
+               Envoy::Server::Configuration::ServerFactoryContext&) override {
+    return std::make_unique<TestModifyRequestHeadersAction>();
   }
 };
 
