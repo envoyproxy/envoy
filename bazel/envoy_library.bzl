@@ -12,8 +12,6 @@ load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
-    "EXTENSION_DEFAULT_ALWAYSLINK",
-    "LIBRARY_DEFAULT_ALWAYSLINK",
 )
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -59,7 +57,7 @@ def envoy_cc_extension(
         tags = [],
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,
-        alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
+        alwayslink = 1,
         **kwargs):
     if "//visibility:public" not in visibility:
         visibility = visibility + extra_visibility
@@ -87,7 +85,7 @@ def envoy_cc_contrib_extension(
         tags = [],
         extra_visibility = [],
         visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY,
-        alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
+        alwayslink = 1,
         **kwargs):
     envoy_cc_extension(name, tags, extra_visibility, visibility, **kwargs)
 
@@ -106,10 +104,17 @@ def envoy_cc_library(
         strip_include_prefix = None,
         include_prefix = None,
         textual_hdrs = None,
-        alwayslink = LIBRARY_DEFAULT_ALWAYSLINK,
+        alwayslink = None,
         defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
+    # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
+    if not(alwayslink):
+        alwayslink = select({
+          repository + "//bazel:disable_library_autolink": 0,
+          "//conditions:default": 1,
+        })
 
     native.cc_library(
         name = name,

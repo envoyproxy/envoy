@@ -292,6 +292,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_library_autolink",
+    values = {"define": "library_autolink=disabled"},
+)
+
+config_setting(
     name = "disable_object_dump_on_signal_trace",
     values = {"define": "object_dump_on_signal_trace=disabled"},
 )

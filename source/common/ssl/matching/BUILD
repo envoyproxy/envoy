@@ -5,7 +5,7 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "EXTENSION_DEFAULT_ALWAYSLINK",
+    "LEGACY_AUTOLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -22,5 +22,5 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "@envoy_api//envoy/extensions/matching/common_inputs/ssl/v3:pkg_cc_proto",
     ],
-    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
+    alwayslink = LEGACY_AUTOLINK,
 )

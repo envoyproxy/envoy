@@ -18,9 +18,6 @@ EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
 
-# Set this variable to true to disable alwayslink for envoy_cc_library.
-LIBRARY_DEFAULT_ALWAYSLINK = 1
-
-# For any users who want to further disable alwayslink, this can be set to 0.
-# TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.
-EXTENSION_DEFAULT_ALWAYSLINK = 1
+# As part of (https://github.com/envoyproxy/envoy-mobile/issues/175) we turned down alwayslink for envoy libraries
+# This tracks libraries that should be registered as extensions.
+LEGACY_ALWAYSLINK = 1

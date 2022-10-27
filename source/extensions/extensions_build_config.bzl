@@ -377,8 +377,5 @@ EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "/
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
 
 # Set this variable to true to disable alwayslink for envoy_cc_library.
-LIBRARY_DEFAULT_ALWAYSLINK = 1
-
-# For any users who want to further disable alwayslink, this can be set to 0.
 # TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.
-EXTENSION_DEFAULT_ALWAYSLINK = 1
+LEGACY_AUTOLINK = 1
