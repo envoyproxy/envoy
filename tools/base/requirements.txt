@@ -339,9 +339,9 @@ envoy-base-utils==0.3.7 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.3.0 \
-    --hash=sha256:9383b4fcfcb22d6733813b3a75c9e40b1ba62f5a13c11b7e3366c31a27e4057a \
-    --hash=sha256:f23069e123770e5b3a4e4e050c01d03f6c87144e09f9a20f488ce6768eda5f4c
+envoy-code-check==0.3.1 \
+    --hash=sha256:809e13870f4e9697421ca87e8455a461b754425ba58f85cd4cbc972d70fd776f \
+    --hash=sha256:bf5a3aa50787a82a40bd9504d675e53001e53ab901d00eed4d9ad82e227e14a0
     # via -r requirements.in
 envoy-dependency-check==0.1.5 \
     --hash=sha256:2394626236e7b43c0273d4a0a43e1e13d3990ebde9ebdacea253464000927961 \
@@ -716,6 +716,10 @@ packaging==21.0 \
     #   envoy-github-abstract
     #   envoy-github-release
     #   sphinx
+pathspec==0.10.1 \
+    --hash=sha256:46846318467efc4556ccfd27816e004270a9eeeeb4d062ce5e6fc7a87c573f93 \
+    --hash=sha256:7ace6161b621d31e7902eb6b5ae148d12cfd23f4a249b9ffb6b9fee12084323d
+    # via yamllint
 pep8-naming==0.13.2 \
     --hash=sha256:59e29e55c478db69cffbe14ab24b5bd2cd615c0413edf790d47d3fb7ba9a4e23 \
     --hash=sha256:93eef62f525fd12a6f8c98f4dcc17fa70baae2f37fa1f73bec00e3e44392fa48
@@ -846,6 +850,7 @@ pyyaml==6.0 \
     #   -r requirements.in
     #   envoy-base-utils
     #   envoy-code-check
+    #   yamllint
 requests==2.26.0 \
     --hash=sha256:6c1246513ecd5ecd4528a0906f910e8f0f9c6b8ec72030dc9fd154dc1a6efd24 \
     --hash=sha256:b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7
@@ -987,6 +992,10 @@ verboselogs==1.7 \
 wrapt==1.12.1 \
     --hash=sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7
     # via deprecated
+yamllint==1.28.0 \
+    --hash=sha256:89bb5b5ac33b1ade059743cf227de73daa34d5e5a474b06a5e17fc16583b0cf2 \
+    --hash=sha256:9e3d8ddd16d0583214c5fdffe806c9344086721f107435f68bad990e5a88826b
+    # via envoy-code-check
 yapf==0.32.0 \
     --hash=sha256:8fea849025584e486fd06d6ba2bed717f396080fd3cc236ba10cb97c4c51cf32 \
     --hash=sha256:a3f5085d37ef7e3e004c4ba9f9b3e40c54ff1901cd111f05145ae313a7c67d1b
@@ -1061,4 +1070,6 @@ yarl==1.8.1 \
 setuptools==65.5.0 \
     --hash=sha256:512e5536220e38146176efb833d4a62aa726b7bbff82cfbc8ba9eaa3996e0b17 \
     --hash=sha256:f62ea9da9ed6289bfe868cd6845968a2c854d1427f8548d52cae02a42b4f0356
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   yamllint
