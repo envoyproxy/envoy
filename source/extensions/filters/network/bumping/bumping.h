@@ -166,6 +166,14 @@ public:
     return &read_callbacks_->connection();
   }
 
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
+    return transport_socket_options_;
+  }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return upstream_options_;
+  }
+
   // CertificateProvider::OnDemandUpdateCallbacks
   void onCacheHit(const std::string host) const override;
   void onCacheMiss(const std::string host) const override;

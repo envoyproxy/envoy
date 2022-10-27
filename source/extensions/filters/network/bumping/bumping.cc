@@ -145,8 +145,11 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
+  // Set transport socket SNI of upstream with downstream SNI
   transport_socket_options_ =
-      Network::TransportSocketOptionsUtility::fromFilterState(*filter_state);
+      Network::TransportSocketOptionsUtility::fromFilterState(
+        *filter_state,
+        downstream_connection.requestedServerName());
 
   if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key());

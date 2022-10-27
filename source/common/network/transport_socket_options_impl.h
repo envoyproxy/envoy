@@ -107,7 +107,7 @@ public:
    * nullptr if nothing is in the filter state.
    */
   static TransportSocketOptionsConstSharedPtr
-  fromFilterState(const StreamInfo::FilterState& stream_info);
+  fromFilterState(const StreamInfo::FilterState& stream_info, absl::string_view sni = absl::string_view(""));
 };
 
 class CommonUpstreamTransportSocketFactory : public UpstreamTransportSocketFactory {

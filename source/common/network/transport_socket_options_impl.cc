@@ -54,7 +54,8 @@ void CommonUpstreamTransportSocketFactory::hashKey(
 }
 
 TransportSocketOptionsConstSharedPtr
-TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
+TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state,
+                                               absl::string_view sni) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
@@ -63,8 +64,14 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   std::unique_ptr<const TransportSocketOptions::Http11ProxyInfo> proxy_info;
 
   bool needs_transport_socket_options = false;
-  if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
-      typed_data != nullptr) {
+
+  // sni parameter prevails over value from filterstate
+  if (sni.size()) {
+    server_name = sni;
+    needs_transport_socket_options = true;
+  }
+  else if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+           typed_data != nullptr) {
     server_name = typed_data->value();
     needs_transport_socket_options = true;
   }
