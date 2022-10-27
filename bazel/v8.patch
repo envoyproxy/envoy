@@ -1,7 +1,7 @@
 # 1. Use already imported python dependencies
 # 2. Disable pointer compression (limits the maximum number of WasmVMs).
 # 3. Add support for --define=no_debug_info=1. 
-# 4. Allow compiling v8 on macOS 10.15 to 13.0.
+# 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
 # 5. Don't expose Wasm C API (only Wasm C++ API).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
