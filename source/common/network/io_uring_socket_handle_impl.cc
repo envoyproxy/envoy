@@ -138,7 +138,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; ++i) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      buffer.add(slices[i].mem_, slices[i].len_);
+      iov[num_slices_to_write].iov_base = slices[i].mem_;
+      iov[num_slices_to_write].iov_len = slices[i].len_;
+      num_slices_to_write++;
     }
   }
 
@@ -458,11 +460,11 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     }
     break;
   case RequestType::Read: {
-    ASSERT(req.iohandle_.has_value());
     // Read is cancellable.
     if (result == -ECANCELED) {
       return;
     }
+    ASSERT(req.iohandle_.has_value());
     auto& iohandle = req.iohandle_->get();
     // This is hacky fix, we should check the req is valid or not.
     if (iohandle.fd_ == -1) {
