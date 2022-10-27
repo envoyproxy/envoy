@@ -150,6 +150,7 @@ public:
 
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create() override;
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
 private:
   class RedisShard {

@@ -79,7 +79,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # project_url = "https://pkg.go.dev/golang.org/x/net",
         # last_update = "2020-02-26"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
     )
     go_repository(
         name = "org_golang_x_text",
@@ -90,7 +90,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # project_url = "https://pkg.go.dev/golang.org/x/text",
         # last_update = "2021-06-16"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
     )
     go_repository(
         name = "com_github_spf13_afero",
@@ -101,7 +101,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # project_url = "https://pkg.go.dev/github.com/spf13/afero",
         # last_update = "2021-03-20"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L60-L65"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L60-L65"
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
@@ -112,7 +112,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
         # last_update = "2022-03-04"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
@@ -123,5 +123,5 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # project_url = "https://pkg.go.dev/github.com/iancoleman/strcase",
         # last_update = "2020-11-22"
         # use_category = ["api"],
-        # source = "https://github.com/envoyproxy/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
     )
