@@ -40,10 +40,18 @@ the request will be forwarded to the ``service2-mirror`` cluster.
    :emphasize-lines: 12-17
    :caption: Envoy configuration with header based route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
 
-The pattern to allow a request header to determine the cluster it is mirrored to
-is most useful in a trusted environment. For example, a higher level Envoy instance (or
-another application acting as a proxy) might automatically add this header to requests for upstream
-processing by another Envoy instance configured with request mirror policies.
+
+.. warning::
+
+   Allowing a request header to determine the cluster that the request is mirrored to is most useful in
+   a trusted environment.
+
+   For example, a downstream Envoy instance (or other application acting as a proxy) might 
+   automatically add this header to requests for processing by an upstream Envoy instance 
+   configured with request mirror policies.
+
+   If you allow dynamic mirroring according to request header, you may wish to restrict which requests
+   can set or proxy the header.
 
 .. note::
 
@@ -67,9 +75,6 @@ Change to the ``examples/route-mirror`` directory.
     envoy/examples/route-mirror
     $ docker-compose build
     $ docker-compose up -d
-
-.. code-block:: console
-
     $ docker-compose ps
     NAME                               COMMAND                  SERVICE             STATUS              PORTS
     route-mirror-envoy-front-proxy-1   "/docker-entrypoint.…"   envoy-front-proxy   running             0.0.0.0:10000->10000/tcp, :::10000->10000/tcp
@@ -92,9 +97,13 @@ Let's send a request to the ``envoy-front-proxy`` service which forwards the req
 Step 3: View logs for the statically mirrored request
 *****************************************************
 
-The logs from the ``service1`` and ``service1-mirror`` services shows that
-both the ``service1`` and ``service1-mirror`` services got the request made
+The logs from the ``service1`` and ``service1-mirror`` services show that
+both the ``service1`` and ``service1-mirror`` services received the request made
 in Step 2.
+
+You can also see that for the request to the ``service1-mirror``
+service, the ``Host`` header was modified by Envoy to have a ``-shadow`` suffix
+in the hostname.
 
 .. code-block:: console
 
@@ -108,9 +117,6 @@ in Step 2.
    Host: localhost-shadow:10000
    192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/1 HTTP/1.1" 200 -
 
-You can also see that for the request to the ``service1-mirror`` service, the
-``Host`` header was modified by Envoy to have a ``-shadow`` suffix in the
-hostname.
 
 Step 4: Make a request to the route mirrored by request header
 **************************************************************
@@ -153,35 +159,18 @@ Step 6: Missing or invalid cluster name in request header
 *********************************************************
 
 If you do not specify the ``x-mirror-cluster`` in the request to ``service2``,
-a request to ``service1`` will not automatically be mirrored to ``service2-mirror``.
+or specify an unknown cluster, the request will not be mirrored but will be
+handled in the normal way.
 
 .. code-block:: console
 
   $ curl localhost:10000/service/2
   Hello from behind Envoy (service 2)!
 
-View the logs for the ``service2`` and ``service2-mirror`` services.
-
-.. code-block:: console
-
-   $ docker-compose logs service2
-   ...
-   Host: localhost:10000
-   192.168.80.6 - - [06/Oct/2022 03:56:22] "GET /service/2 HTTP/1.1" 200 -
-
-   $ docker-compose logs service2-mirror
-   # No new logs
-
-Similarly, if we specify a value for the ``x-mirror-cluster`` header such that there
-is no such cluster defined with that name, ``service2-mirror`` will not receive
-the request:
-
-.. code-block:: console
-
   $ curl --header "x-mirror-cluster: service2-mirror-non-existent" localhost:10000/service/2
   Hello from behind Envoy (service 2)!
 
-View the logs for the ``service2`` and ``service2-mirror`` services.
+View the logs for ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
 
