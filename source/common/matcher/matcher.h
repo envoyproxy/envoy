@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Matcher {
 
-template <class ProtoType> class ActionBase : public Action {
+template <class ProtoType> class ActionBase : public virtual Action {
 public:
   absl::string_view typeUrl() const override { return staticTypeUrl(); }
 

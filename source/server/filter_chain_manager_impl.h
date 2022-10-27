@@ -100,6 +100,15 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
+using FilterChainActionFactoryContext =
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainBaseAction : public virtual Matcher::Action {
+public:
+  virtual ~FilterChainBaseAction() = default;
+  virtual const Network::FilterChain* get() const PURE;
+};
+
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,

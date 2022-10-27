@@ -31,13 +31,13 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
                          Network::Utility::parseInternetAddress("255.255.255.255"));
 }
 
-struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
+struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue>,  public FilterChainBaseAction {
   explicit FilterChainNameAction(Network::DrainableFilterChainSharedPtr chain) : chain_(chain) {}
+  const Network::FilterChain* get() const override {
+    return chain_.get();
+  }
   const Network::DrainableFilterChainSharedPtr chain_;
 };
-
-using FilterChainActionFactoryContext =
-    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
 
 class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext>,
                                      Logger::Loggable<Logger::Id::config> {
@@ -588,7 +588,7 @@ FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSoc
          "Matching must complete for network streams.");
   if (match_result.result_) {
     const auto result = match_result.result_();
-    return result->getTyped<FilterChainNameAction>().chain_.get();
+    return result->getTyped<FilterChainBaseAction>().get();
   }
   return default_filter_chain_.get();
 }
