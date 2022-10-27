@@ -297,7 +297,7 @@ use_original_src_ip: true
 
     if (!session_access_log_format.empty()) {
       envoy::config::accesslog::v3::AccessLog* session_access_log =
-          config.mutable_session_access_log()->Add();
+          config.mutable_access_log()->Add();
       session_access_log->set_name("envoy.access_loggers.file");
       envoy::extensions::access_loggers::file::v3::FileAccessLog session_file_access_log;
       session_file_access_log.set_path("unused");
