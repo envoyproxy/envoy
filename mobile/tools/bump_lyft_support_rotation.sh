@@ -48,7 +48,7 @@ previous=${first_line#"current: "}
 next="$(next_maintainer "$previous" "$maintainers_file")"
 set_maintainer "$next" "$maintainers_file"
 
-echo "::set-output name=PREVIOUS_MAINTAINER::$previous"
-echo "::set-output name=NEXT_MAINTAINER::$next"
+echo "PREVIOUS_MAINTAINER=$previous" >> $GITHUB_OUTPUT
+echo "NEXT_MAINTAINER=$next" >> $GITHUB_OUTPUT
 
 echo "Lyft support maintainer changing from $previous to $next"

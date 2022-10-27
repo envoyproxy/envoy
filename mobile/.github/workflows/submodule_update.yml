@@ -22,7 +22,7 @@ jobs:
       run: |
         if ! git diff-index --quiet HEAD --; then
           echo "Detected changes..."
-          echo "::set-output name=dirty::true"
+          echo "dirty=true" >> $GITHUB_OUTPUT
         fi
     - name: Get current support maintainer
       if: steps.state.outputs.dirty == 'true'
@@ -31,7 +31,7 @@ jobs:
         maintainers_file=".github/lyft_maintainers.yml"
         first_line="$(head -n 1 "$maintainers_file")"
         current=${first_line#"current: "}
-        echo "::set-output name=maintainer::$current"
+        echo "maintainer=$current" >> $GITHUB_OUTPUT
     - name: Create PR
       if: steps.state.outputs.dirty == 'true'
       uses: peter-evans/create-pull-request@923ad837f191474af6b1721408744feb989a4c27

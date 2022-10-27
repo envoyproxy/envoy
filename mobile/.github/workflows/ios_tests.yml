@@ -20,10 +20,10 @@ jobs:
         run: |
           if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
             echo "Tests will run."
-            echo "::set-output name=run_tests::true"
+            echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
-            echo "::set-output name=run_tests::false"
+            echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
@@ -53,10 +53,10 @@ jobs:
         run: |
           if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
             echo "Tests will run."
-            echo "::set-output name=run_tests::true"
+            echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
-            echo "::set-output name=run_tests::false"
+            echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
