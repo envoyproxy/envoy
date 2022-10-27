@@ -38,15 +38,28 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
+  auto& uring = io_uring_factory_.get().ref();
+  if (read_req_) {
+    auto req = new Request{*this, RequestType::Cancel};
+    auto res = uring.prepareCancel(read_req_, req);
+    if (res == Io::IoUringResult::Failed) {
+      // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+      uring.submit();
+      res = uring.prepareCancel(read_req_, req);
+      RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
+    }
+  }
+
   auto req = new Request{absl::nullopt, RequestType::Close};
-  Io::IoUringResult res = io_uring_factory_.get().ref().prepareClose(fd_, req);
+  auto res = uring.prepareClose(fd_, req);
   if (res == Io::IoUringResult::Failed) {
     // Fall back to posix system call.
     ::close(fd_);
   }
+  uring.submit();
   if (isLeader()) {
-    if (io_uring_factory_.get().ref().isEventfdRegistered()) {
-      io_uring_factory_.get().ref().unregisterEventfd();
+    if (uring.isEventfdRegistered()) {
+      uring.unregisterEventfd();
     }
     file_event_adapter_.reset();
   }
@@ -73,7 +86,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::readv(uint64_t /* max_length */
     num_bytes_to_read += slice_length;
   }
   ASSERT(num_bytes_to_read <= static_cast<uint64_t>(bytes_to_read_));
-  is_read_added_ = false;
+  read_req_ = nullptr;
 
   uint64_t len = bytes_to_read_;
   bytes_to_read_ = 0;
@@ -107,7 +120,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
         delete this_fragment;
       });
   buffer.addBufferFragment(*fragment);
-  is_read_added_ = false;
+  read_req_ = nullptr;
 
   uint64_t len = bytes_to_read_;
   bytes_to_read_ = 0;
@@ -316,22 +329,21 @@ void IoUringSocketHandleImpl::resetFileEvents() { file_event_adapter_.reset(); }
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) { return Api::OsSysCallsSingleton::get().shutdown(fd_, how); }
 
 void IoUringSocketHandleImpl::addReadRequest() {
-  if (!is_read_enabled_ || !SOCKET_VALID(fd_) || is_read_added_) {
+  if (!is_read_enabled_ || !SOCKET_VALID(fd_) || read_req_) {
     return;
   }
 
   ASSERT(read_buf_ == nullptr);
-  is_read_added_ = true; // don't add READ if it's been already added.
   read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
   iov_.iov_base = read_buf_.get();
   iov_.iov_len = read_buffer_size_;
   auto& uring = io_uring_factory_.get().ref();
-  auto req = new Request{*this, RequestType::Read};
-  auto res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
+  read_req_ = new Request{*this, RequestType::Read};
+  auto res = uring.prepareReadv(fd_, &iov_, 1, 0, read_req_);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     uring.submit();
-    res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
+    res = uring.prepareReadv(fd_, &iov_, 1, 0, read_req_);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
   }
 }
@@ -496,6 +508,10 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     break;
   case RequestType::Read: {
     ASSERT(req.iohandle_.has_value());
+    // Read is cancellable.
+    if (result == -ECANCELED) {
+      return;
+    }
     auto& iohandle = req.iohandle_->get();
     iohandle.bytes_to_read_ = result;
     // This is hacky fix, we should check the req is valid or not.
@@ -538,6 +554,8 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     break;
   }
   case RequestType::Close:
+    break;
+  case RequestType::Cancel:
     break;
   default:
     PANIC("not implemented");

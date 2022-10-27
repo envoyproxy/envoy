@@ -12,7 +12,7 @@ namespace Network {
 
 class IoUringSocketHandleImpl;
 
-enum class RequestType { Accept, Connect, Read, Write, Close, Unknown };
+enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
 
 using IoUringSocketHandleImplOptRef =
     absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
@@ -126,7 +126,7 @@ private:
   struct iovec iov_;
   std::unique_ptr<uint8_t[]> read_buf_{nullptr};
   int32_t bytes_to_read_{0};
-  bool is_read_added_{false};
+  Request* read_req_{nullptr};
   bool is_read_enabled_{true};
   std::list<Buffer::SliceDataPtr> write_buf_{};
   uint32_t vecs_to_write_{0};
