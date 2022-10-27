@@ -33,6 +33,7 @@ envoy_cc_extension(
         "//source/server:listener_manager_lib",
         "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_extension(

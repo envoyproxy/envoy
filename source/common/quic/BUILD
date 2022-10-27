@@ -1,8 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -415,7 +418,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "quic_transport_socket_factory_lib",
     srcs = ["quic_transport_socket_factory.cc"],
     hdrs = ["quic_transport_socket_factory.h"],
@@ -432,6 +435,7 @@ envoy_cc_core_extension(
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 # Create a single target that contains all the libraries that register factories.

@@ -190,7 +190,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "auto_protocol_lib",
     srcs = [
         "auto_protocol_impl.cc",
@@ -206,9 +206,10 @@ envoy_cc_extension(
         ":twitter_protocol_lib",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "binary_protocol_lib",
     srcs = [
         "binary_protocol_impl.cc",
@@ -221,9 +222,10 @@ envoy_cc_extension(
         ":protocol_interface",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "compact_protocol_lib",
     srcs = [
         "compact_protocol_impl.cc",
@@ -237,9 +239,10 @@ envoy_cc_extension(
         ":protocol_interface",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "twitter_protocol_lib",
     srcs = [
         "twitter_protocol_impl.cc",
@@ -254,6 +257,7 @@ envoy_cc_extension(
         ":thrift_object_lib",
         "//source/common/common:macros",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -332,7 +336,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "auto_transport_lib",
     srcs = [
         "auto_transport_impl.cc",
@@ -351,9 +355,10 @@ envoy_cc_extension(
         ":unframed_transport_lib",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "framed_transport_lib",
     srcs = [
         "framed_transport_impl.cc",
@@ -366,9 +371,10 @@ envoy_cc_extension(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "header_transport_lib",
     srcs = [
         "header_transport_impl.cc",
@@ -382,9 +388,10 @@ envoy_cc_extension(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "unframed_transport_lib",
     srcs = [
         "unframed_transport_impl.cc",
@@ -397,4 +404,5 @@ envoy_cc_extension(
         ":transport_interface",
         "//source/common/common:assert_lib",
     ],
+    alwayslink = 1,
 )

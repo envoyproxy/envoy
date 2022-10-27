@@ -7,7 +7,6 @@ load(
     ":envoy_library.bzl",
     _envoy_basic_cc_library = "envoy_basic_cc_library",
     _envoy_cc_contrib_extension = "envoy_cc_contrib_extension",
-    _envoy_cc_core_extension = "envoy_cc_core_extension",
     _envoy_cc_extension = "envoy_cc_extension",
     _envoy_cc_library = "envoy_cc_library",
     _envoy_cc_linux_library = "envoy_cc_linux_library",
@@ -228,7 +227,6 @@ envoy_cc_binary = _envoy_cc_binary
 # Library wrappers (from envoy_library.bzl)
 envoy_basic_cc_library = _envoy_basic_cc_library
 envoy_cc_extension = _envoy_cc_extension
-envoy_cc_core_extension = _envoy_cc_core_extension
 envoy_cc_contrib_extension = _envoy_cc_contrib_extension
 envoy_cc_library = _envoy_cc_library
 envoy_cc_linux_library = _envoy_cc_linux_library

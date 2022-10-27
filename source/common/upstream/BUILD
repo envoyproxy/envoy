@@ -1,9 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
     "envoy_select_enable_http3",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -338,7 +341,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
@@ -358,9 +361,10 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "original_dst_cluster_lib",
     srcs = ["original_dst_cluster.cc"],
     hdrs = ["original_dst_cluster.h"],
@@ -378,6 +382,7 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -451,7 +456,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "eds_lib",
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
@@ -481,6 +486,7 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -585,7 +591,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "static_cluster_lib",
     srcs = ["static_cluster.cc"],
     hdrs = ["static_cluster.h"],
@@ -595,9 +601,10 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "strict_dns_cluster_lib",
     srcs = ["strict_dns_cluster.cc"],
     hdrs = ["strict_dns_cluster.h"],
@@ -607,6 +614,7 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(

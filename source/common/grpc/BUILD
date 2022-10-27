@@ -1,10 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_google_grpc_external_deps",
     "envoy_package",
     "envoy_select_google_grpc",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -194,7 +197,7 @@ envoy_cc_library(
     ] + envoy_google_grpc_external_deps(),
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "google_grpc_creds_lib",
     srcs = ["google_grpc_creds_impl.cc"],
     hdrs = ["google_grpc_creds_impl.h"],
@@ -206,6 +209,7 @@ envoy_cc_core_extension(
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(

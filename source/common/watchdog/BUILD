@@ -1,8 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,7 +27,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "abort_action_config",
     srcs = ["abort_action_config.cc"],
     hdrs = ["abort_action_config.h"],
@@ -36,4 +39,5 @@ envoy_cc_core_extension(
         "//source/common/protobuf:message_validator_lib",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )

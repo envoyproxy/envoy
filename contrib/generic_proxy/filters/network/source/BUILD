@@ -48,7 +48,7 @@ envoy_cc_contrib_extension(
     ],
 )
 
-envoy_cc_contrib_extension(
+envoy_cc_library(
     name = "route_lib",
     srcs = [
         "route.cc",
@@ -72,7 +72,7 @@ envoy_cc_contrib_extension(
     ],
 )
 
-envoy_cc_contrib_extension(
+envoy_cc_library(
     name = "match_lib",
     srcs = [
         "match.cc",
@@ -85,4 +85,5 @@ envoy_cc_contrib_extension(
         "//source/common/matcher:matcher_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )

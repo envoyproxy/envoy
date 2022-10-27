@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
@@ -28,4 +28,5 @@ envoy_cc_extension(
         "//source/common/grpc:google_grpc_creds_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )

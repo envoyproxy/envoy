@@ -54,19 +54,6 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
         **kargs
     )
 
-# Extensions that Envoy will currently not work without. These have public visibility.
-def envoy_cc_core_extension(
-        name,
-        tags = [],
-        visibility = ["//visibility:public"],
-        **kwargs):
-    envoy_cc_extension(
-        name = name,
-        tags = tags,
-        visibility = visibility,
-        **kwargs
-    )
-
 def envoy_cc_extension(
         name,
         tags = [],

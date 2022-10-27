@@ -1,13 +1,16 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
     "envoy_pch_library",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -327,7 +330,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "regex_lib",
     srcs = ["regex.cc"],
     hdrs = ["regex.h"],
@@ -342,6 +345,7 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/extensions/regex_engines/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(

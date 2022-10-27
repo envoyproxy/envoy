@@ -1,7 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -10,7 +15,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "envoy_quic_crypto_server_stream_lib",
     srcs = ["envoy_quic_crypto_server_stream.cc"],
     hdrs = ["envoy_quic_crypto_server_stream.h"],
@@ -24,6 +29,7 @@ envoy_cc_extension(
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_extension(
@@ -44,7 +50,7 @@ envoy_cc_extension(
     ),
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "envoy_quic_crypto_client_stream_lib",
     srcs = ["envoy_quic_crypto_client_stream.cc"],
     hdrs = ["envoy_quic_crypto_client_stream.h"],
@@ -56,4 +62,5 @@ envoy_cc_extension(
     deps = [
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )

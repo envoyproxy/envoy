@@ -1,14 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
+    "envoy_cc_library",
     "envoy_package",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "inputs_lib",
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
@@ -18,4 +22,5 @@ envoy_cc_core_extension(
         "//envoy/network:filter_interface",
         "@envoy_api//envoy/extensions/matching/common_inputs/ssl/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )

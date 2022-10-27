@@ -1,8 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
     "envoy_cc_library",
     "envoy_package",
+)
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "EXTENSION_DEFAULT_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -141,7 +144,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "default_client_connection_factory",
     srcs = [
         "default_client_connection_factory.cc",
@@ -158,6 +161,7 @@ envoy_cc_core_extension(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -220,7 +224,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "socket_interface_lib",
     hdrs = ["socket_interface.h"],
     deps = [
@@ -229,9 +233,10 @@ envoy_cc_core_extension(
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "default_socket_interface_lib",
     srcs = [
         "io_socket_handle_impl.cc",
@@ -255,6 +260,7 @@ envoy_cc_core_extension(
         "//source/common/event:dispatcher_includes",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
+    alwayslink = EXTENSION_DEFAULT_ALWAYSLINK,
 )
 
 envoy_cc_library(

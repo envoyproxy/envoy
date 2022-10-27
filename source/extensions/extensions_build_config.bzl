@@ -380,4 +380,5 @@ CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
 LIBRARY_DEFAULT_ALWAYSLINK = 0
 
 # For any users who want to further disable alwayslink, this can be set to 0.
+# TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.
 EXTENSION_DEFAULT_ALWAYSLINK = 1

@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_core_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -8,7 +8,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_core_extension(
+envoy_cc_library(
     name = "cert_validator_lib",
     srcs = [
         "default_validator.cc",
@@ -47,4 +47,5 @@ envoy_cc_core_extension(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )

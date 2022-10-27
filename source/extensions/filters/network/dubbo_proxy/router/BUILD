@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
 )
@@ -38,7 +37,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
@@ -50,6 +49,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(

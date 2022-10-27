@@ -5,6 +5,11 @@ load(
     "envoy_extension_package",
 )
 
+load(
+  "@envoy_build_config//:extensions_build_config.bzl",
+  "EXTENSION_DEFAULT_ALWAYSLINK",
+)
+
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
