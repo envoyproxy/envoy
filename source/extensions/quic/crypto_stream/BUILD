@@ -6,7 +6,7 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_AUTOLINK",
+    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -29,7 +29,7 @@ envoy_cc_library(
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
     ],
-    alwayslink = LEGACY_AUTOLINK,
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_extension(
@@ -62,5 +62,5 @@ envoy_cc_library(
     deps = [
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
     ],
-    alwayslink = LEGACY_AUTOLINK,
+    alwayslink = LEGACY_ALWAYSLINK,
 )

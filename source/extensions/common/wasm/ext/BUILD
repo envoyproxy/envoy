@@ -7,7 +7,7 @@ load(
 
 load(
   "@envoy_build_config//:extensions_build_config.bzl",
-  "LEGACY_AUTOLINK",
+  "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2

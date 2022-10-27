@@ -5,7 +5,7 @@ load(
 )
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_AUTOLINK",
+    "LEGACY_ALWAYSLINK",
 )
 
 licenses(["notice"])  # Apache 2
@@ -435,7 +435,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
-    alwayslink = LEGACY_AUTOLINK,
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 # Create a single target that contains all the libraries that register factories.

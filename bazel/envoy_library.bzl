@@ -108,12 +108,13 @@ def envoy_cc_library(
         defines = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
-    if not(alwayslink):
+    if not (alwayslink):
         alwayslink = select({
-          repository + "//bazel:disable_library_autolink": 0,
-          "//conditions:default": 1,
+            repository + "//bazel:disable_library_autolink": 0,
+            "//conditions:default": 1,
         })
 
     native.cc_library(
