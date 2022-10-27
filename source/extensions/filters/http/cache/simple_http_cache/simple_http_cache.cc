@@ -143,19 +143,22 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
-                                    const ResponseMetadata& metadata) {
+                                    const ResponseMetadata& metadata,
+                                    std::function<void(bool)> on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
 
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
+    on_complete(false);
     return;
   }
   auto& entry = iter->second;
 
   // TODO(tangsaidi) handle Vary header updates properly
   if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
+    on_complete(false);
     return;
   }
 
@@ -188,6 +191,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;
+  on_complete(true);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
