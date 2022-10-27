@@ -21,6 +21,7 @@ EXTENSIONS = {
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
     "envoy.clusters.original_dst":                      "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+    "envoy.clusters.logical_dns":                       "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
 
     #
     # Compression
