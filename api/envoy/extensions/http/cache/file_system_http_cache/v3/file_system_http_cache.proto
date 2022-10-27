@@ -44,21 +44,21 @@ message FileSystemHttpCacheConfig {
   //
   // If unset there is no limit except file system failure.
   //
-  // This limit is not yet implemented.
+  // [#not-implemented-hide:]
   google.protobuf.UInt64Value max_cache_size_bytes = 3;
 
   // The maximum size of a cache entry in bytes - larger responses will not be cached.
   //
   // If unset there is no limit.
   //
-  // This limit is not yet implemented.
+  // [#not-implemented-hide:]
   google.protobuf.UInt64Value max_cache_entry_size_bytes = 4;
 
   // The maximum number of cache entries - when reached, another entry is removed.
   //
   // If unset there is no limit.
   //
-  // This limit is not yet implemented.
+  // [#not-implemented-hide:]
   google.protobuf.UInt64Value max_cache_entry_count = 5;
 
   // A number of folders into which to subdivide the cache.
@@ -69,6 +69,6 @@ message FileSystemHttpCacheConfig {
   //
   // On file systems that perform well with many inodes, the default value of 1 should be used.
   //
-  // This feature is not yet implemented.
+  // [#not-implemented-hide:]
   uint32 cache_subdivisions = 6;
 }
