@@ -100,16 +100,11 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
     return Api::ioCallUint64ResultNoError();
   }
 
-  if (bytes_to_read_ == 0) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
-  }
-
   if (bytes_to_read_ < 0) {
     return {0, Api::IoErrorPtr(new IoSocketError(bytes_to_read_), IoSocketError::deleteIoError)};
   }
 
-  if (read_buf_ == nullptr) {
+  if (bytes_to_read_ == 0 || read_buf_ == nullptr) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
@@ -129,32 +124,59 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                         uint64_t num_slice) {
-  Buffer::OwnedImpl buffer;
-  for (uint64_t i = 0; i < num_slice; i++) {
+  if (is_write_added_) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  if (bytes_to_write_ < 0) {
+    return {0, Api::IoErrorPtr(new IoSocketError(bytes_to_read_), IoSocketError::deleteIoError)};
+  }
+
+  struct iovec* iovecs = new struct iovec[num_slice];
+  struct iovec* iov = iovecs;
+  uint64_t num_slices_to_write = 0;
+  for (uint64_t i = 0; i < num_slice; ++i) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
       buffer.add(slices[i].mem_, slices[i].len_);
     }
   }
-  return write(buffer);
+
+  if (num_slices_to_write > 0) {
+    is_write_added_ = true; // don't add WRITE if it's been already added.
+    auto req = new Request{*this, RequestType::Write, iovecs};
+    auto& uring = io_uring_factory_.get().ref();
+    auto res = uring.prepareWritev(fd_, iovecs, num_slice, 0, req);
+    if (res == Io::IoUringResult::Failed) {
+      // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+      uring.submit();
+      res = uring.prepareWritev(fd_, iovecs, num_slice, 0, req);
+      RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+    }
+    // Need to ensure the write request submitted.
+    uring.submit();
+    // Make the IO handle start reading to avoid read timeout in procedures out of Envoy's scope
+    // including handshaking of TLS.
+    addReadRequest();
+  }
+
+  if (bytes_to_write_ == 0) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  uint64_t len = bytes_to_write_;
+  bytes_to_write_ = 0;
+  return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
-  auto length = buffer.length();
-  ASSERT(length > 0);
-
-  while (buffer.length() > 0) {
-    // The buffer must not own the data after it has been extracted and put into
-    // the `io-uring` submission queue to avoid freeing it before the writev
-    // operation is completed.
-    Buffer::SliceDataPtr data = buffer.extractMutableFrontSlice();
-    write_buf_.push_back(std::move(data));
+  if (bytes_to_write_ > 0) {
+    buffer.drain(static_cast<uint64_t>(bytes_to_write_));
   }
 
-  addWriteRequest();
-  // Need to ensure the write request submitted.
-  auto& uring = io_uring_factory_.get().ref();
-  uring.submit();
-  return {length, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  Buffer::RawSliceVector slices = buffer.getRawSlices();
+  return writev(slices.begin(), slices.size());
 }
 
 Api::IoCallUint64Result
@@ -326,7 +348,9 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::resetFileEvents() { file_event_adapter_.reset(); }
 
-Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) { return Api::OsSysCallsSingleton::get().shutdown(fd_, how); }
+Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
+  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
+}
 
 void IoUringSocketHandleImpl::addReadRequest() {
   if (!is_read_enabled_ || !SOCKET_VALID(fd_) || read_req_) {
@@ -345,79 +369,6 @@ void IoUringSocketHandleImpl::addReadRequest() {
     uring.submit();
     res = uring.prepareReadv(fd_, &iov_, 1, 0, read_req_);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
-  }
-}
-
-void IoUringSocketHandleImpl::addWriteRequest() {
-  if (is_write_added_ || write_buf_.empty()) {
-    return;
-  }
-
-  is_write_added_ = true; // don't add WRITE if it's been already added.
-  uint32_t nr_vecs = write_buf_.size();
-  struct iovec* iovecs = new struct iovec[write_buf_.size()];
-  struct iovec* iov = iovecs;
-  for (auto& slice : write_buf_) {
-    absl::Span<uint8_t> mdata = slice->getMutableData();
-    iov->iov_base = mdata.data();
-    iov->iov_len = mdata.size();
-    iov++;
-  }
-
-  auto req = new Request{*this, RequestType::Write, iovecs, std::move(write_buf_)};
-  write_buf_ = std::list<Buffer::SliceDataPtr>{};
-  auto& uring = io_uring_factory_.get().ref();
-  auto res = uring.prepareWritev(fd_, iovecs, nr_vecs, 0, req);
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-    res = uring.prepareWritev(fd_, iovecs, nr_vecs, 0, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
-  }
-  vecs_to_write_ = nr_vecs;
-  // Make the IO handle start reading to avoid read timeout in procedures out of Envoy's scope
-  // including handshaking of TLS.
-  addReadRequest();
-}
-
-void IoUringSocketHandleImpl::continueWriting(Request& req, uint32_t offset) {
-  auto iovecs = req.iov_;
-  while (offset > 0 && vecs_to_write_ > 0) {
-    size_t length = iovecs->iov_len;
-    // The iovec has been written completly.
-    if (offset >= length) {
-      iovecs++;
-      vecs_to_write_--;
-      offset -= length;
-      continue;
-    }
-
-    // The iovec has been written partially.
-    uint8_t* iov_base = reinterpret_cast<uint8_t*>(iovecs->iov_base);
-    iovecs->iov_base = iov_base + offset;
-    iovecs->iov_len -= offset;
-    break;
-  }
-
-  // The WRITE has been completed.
-  if (!vecs_to_write_) {
-    iovecs -= req.slices_.size();
-    delete[] iovecs;
-
-    is_write_added_ = false;
-    addWriteRequest();
-    return;
-  }
-
-  // The WRITE is not completed. Resubmit the trimmed request.
-  auto new_req = new Request{*this, RequestType::Write, iovecs, std::move(req.slices_)};
-  auto& uring = io_uring_factory_.get().ref();
-  auto res = uring.prepareWritev(fd_, iovecs, vecs_to_write_, 0, new_req);
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-    res = uring.prepareWritev(fd_, iovecs, vecs_to_write_, 0, new_req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
 }
 
@@ -513,13 +464,13 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
       return;
     }
     auto& iohandle = req.iohandle_->get();
-    iohandle.bytes_to_read_ = result;
     // This is hacky fix, we should check the req is valid or not.
     if (iohandle.fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       break;
     }
 
+    iohandle.bytes_to_read_ = result;
     if (result == 0) {
       iohandle.remote_closed_ = true;
     }
@@ -535,22 +486,17 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
                                         : Event::FileReadyType::Write);
     break;
   case RequestType::Write: {
-    ASSERT(req.iov_ != nullptr);
     ASSERT(req.iohandle_.has_value());
     auto& iohandle = req.iohandle_->get();
-
     // This is hacky fix, we should check the req is valid or not.
     if (iohandle.fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       break;
     }
 
-    if (result < 0) {
-      delete[] req.iov_;
-      iohandle.cb_(Event::FileReadyType::Closed);
-    } else {
-      iohandle.continueWriting(const_cast<Request&>(req), result);
-    }
+    iohandle.bytes_to_write_ = result;
+    iohandle.is_write_added_ = false;
+    iohandle.cb_(Event::FileReadyType::Write);
     break;
   }
   case RequestType::Close:
