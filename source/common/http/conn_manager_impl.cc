@@ -305,12 +305,17 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
 
-  // Create account, wiring the stream to use it for tracking bytes.
-  // If tracking is disabled, the wiring becomes a NOP.
-  auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
   Buffer::BufferMemoryAccountSharedPtr downstream_stream_account =
-      buffer_factory.createAccount(response_encoder.getStream());
-  response_encoder.getStream().setAccount(downstream_stream_account);
+      response_encoder.getStream().account();
+
+  if (downstream_stream_account == nullptr) {
+    // Create account, wiring the stream to use it for tracking bytes.
+    // If tracking is disabled, the wiring becomes a NOP.
+    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
+    response_encoder.getStream().setAccount(downstream_stream_account);
+  }
+
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_stream_account)));
 
@@ -1631,6 +1636,9 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::OperationName::Egress;
+  }
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
@@ -1639,10 +1647,14 @@ const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() c
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig()->verbose_;
+  return connection_manager_.config_.tracingConfig() &&
+         connection_manager_.config_.tracingConfig()->verbose_;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::DefaultMaxPathTagLength;
+  }
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 

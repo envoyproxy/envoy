@@ -794,9 +794,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->coarseHealth());
 
   // This is the first time we received an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -1456,31 +1456,55 @@ TEST_F(HostImplTest, HealthFlags) {
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
 
   // To begin with, no flags are set so we're healthy.
-  EXPECT_EQ(Host::Health::Healthy, host->health());
+  EXPECT_EQ(Host::Health::Healthy, host->coarseHealth());
 
   // Setting an unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
   // Setting a degraded flag on an unhealthy host has no effect.
   host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
   // If the degraded flag is the only thing set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If the EDS and active degraded flag is set, host is degraded.
   host->healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If only the EDS degraded is set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If EDS and failed active hc is set, host is unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
+}
+
+TEST_F(HostImplTest, HealthStatus) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1, 0,
+                                    Host::HealthStatus::DRAINING);
+
+  // To begin with, no flags are set so EDS status is used.
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->healthStatus());
+
+  // Setting an active unhealthy flag make the host unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // Setting a degraded flag on an unhealthy host has no effect.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // If the degraded flag is the only thing set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
 }
 
 // Test that it's not possible to do a HostDescriptionImpl with a unix
@@ -1804,7 +1828,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
 }
 
 TEST_F(StaticClusterImplTest, AltStatName) {
@@ -2451,7 +2475,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
   }
 
   {
@@ -2469,10 +2496,16 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("[2001::1]:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("[2001::1]:0", cluster.info()
+                                 ->getUpstreamLocalAddressSelector()
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 .address_->asString());
   }
 
   {
@@ -2488,7 +2521,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   {
@@ -2551,7 +2587,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::PipeInstance>("/test");
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -2567,8 +2606,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
   }
 
   {
@@ -2608,8 +2650,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
   }
 }
 
@@ -2655,10 +2700,16 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("[2001::1]:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("[2001::1]:0", cluster.info()
+                                 ->getUpstreamLocalAddressSelector()
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 .address_->asString());
   }
 
   {
@@ -2674,7 +2725,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   {
@@ -2733,7 +2787,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::PipeInstance>("/test");
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -2771,8 +2828,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
   }
 }
 

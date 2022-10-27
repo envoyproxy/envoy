@@ -95,7 +95,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
-        parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
+        parent_.callbacks()->tracingConfig(),
+        absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
         parent.timeSource().systemTime());
     if (parent.attemptCount() != 1) {
       // This is a retry request, add this metadata to span.

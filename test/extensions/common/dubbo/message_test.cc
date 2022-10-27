@@ -28,11 +28,9 @@ TEST(RpcRequestImplTest, RpcRequestAttachmentTest) {
   RpcRequestImpl::Attachment attachment(std::move(map), 23333);
 
   EXPECT_EQ(4, attachment.attachment().toUntypedMap().value().get().size());
-  // Only string type key/value pairs will be inserted to header map.
-  EXPECT_EQ(2, attachment.headers().size());
 
   // Test lookup.
-  EXPECT_EQ(nullptr, attachment.lookup("map_key"));
+  EXPECT_EQ(absl::nullopt, attachment.lookup("map_key"));
   EXPECT_EQ("fake_group", *attachment.lookup("group"));
 
   EXPECT_FALSE(attachment.attachmentUpdated());
@@ -40,20 +38,17 @@ TEST(RpcRequestImplTest, RpcRequestAttachmentTest) {
   // Test remove. Remove a normal string type key/value pair.
   EXPECT_EQ("fake_value", *attachment.lookup("fake_key"));
   attachment.remove("fake_key");
-  EXPECT_EQ(nullptr, attachment.lookup("fake_key"));
+  EXPECT_EQ(absl::nullopt, attachment.lookup("fake_key"));
 
   EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
-  EXPECT_EQ(1, attachment.headers().size());
 
   // Test remove. Delete a key/value pair whose value type is map.
   attachment.remove("map_key");
   EXPECT_EQ(2, attachment.attachment().toUntypedMap().value().get().size());
-  EXPECT_EQ(1, attachment.headers().size());
 
   // Test insert.
   attachment.insert("test", "test_value");
   EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
-  EXPECT_EQ(2, attachment.headers().size());
 
   EXPECT_EQ("test_value", *attachment.lookup("test"));
 

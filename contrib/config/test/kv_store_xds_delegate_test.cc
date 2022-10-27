@@ -70,7 +70,7 @@ protected:
 
   template <typename Resource>
   void checkSavedResources(const XdsSourceId& source_id,
-                           const std::vector<std::string>& resource_names,
+                           const absl::flat_hash_set<std::string>& resource_names,
                            const std::vector<DecodedResourceRef>& expected_resources) {
     // Retrieve the xDS resources.
     const auto retrieved_resources = xds_delegate_->getResources(source_id, resource_names);
