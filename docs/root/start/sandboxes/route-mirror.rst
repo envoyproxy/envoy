@@ -46,8 +46,8 @@ the request will be forwarded to the ``service2-mirror`` cluster.
    Allowing a request header to determine the cluster that the request is mirrored to is most useful in
    a trusted environment.
 
-   For example, a downstream Envoy instance (or other application acting as a proxy) might 
-   automatically add this header to requests for processing by an upstream Envoy instance 
+   For example, a downstream Envoy instance (or other application acting as a proxy) might
+   automatically add this header to requests for processing by an upstream Envoy instance
    configured with request mirror policies.
 
    If you allow dynamic mirroring according to request header, you may wish to restrict which requests
