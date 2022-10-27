@@ -173,10 +173,10 @@ private:
           header_proto_ = headerProtoFromBuffer(*read_result.value());
           if (header_proto_.headers_size() == 1 && header_proto_.headers(0).key() == "vary") {
             // TODO(ravenblack): do we need to handle vary entries here? How
-            // did we get to updateHeaders on a vary entry? Just abort for now.
+            // did we get to updateHeaders on a vary entry rather than the
+            // variant? Just abort for now.
             // (The entry was deleted at this point, so we should eventually get
-            // back into a useable state even if this is a valid event. The
-            // example cache implementation punts on this.)
+            // back into a usable state even if this is a valid event.)
             fail("not implemented updating vary header", absl::OkStatus());
             return;
           }

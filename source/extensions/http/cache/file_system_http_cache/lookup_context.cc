@@ -1,9 +1,10 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
-#include "cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
+
+#include "cache_file_fixed_block.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -80,7 +81,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                       key_ = maybe_vary_key.value();
                       auto fh = std::move(file_handle_);
                       file_handle_ = nullptr;
-                      // close should be cancelable to make this safe.
+                      // It should be possible to cancel close, to make this safe.
                       // (it should still close the file, but cancel the callback.)
                       auto queued = fh->close([this, cb](absl::Status) {
                         absl::MutexLock lock(&mu_);

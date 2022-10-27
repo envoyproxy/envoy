@@ -44,7 +44,7 @@ public:
   // read the headers expecting them to have one length, then read them with a different
   // length (or in a partially overwritten state).
   //
-  // If we opened the file, unlinked it, modified it, and relinked it, a reader might still
+  // If we opened the file, unlinked it, modified it, and linked it, a reader might still
   // have already had the original version open and still get the same race as above.
   //
   // Therefore the only way to reliably ensure that there are no readers of the file while
