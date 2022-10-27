@@ -25,6 +25,12 @@ private:
     Http::ResponseTrailerMapPtr trailers_;
   };
 
+  // Returns a Key with the vary header added to custom_fields.
+  // It is an error to call this with headers that don't include vary.
+  // Returns nullopt if the vary headers are no longer valid.
+  absl::optional<Key> variedRequestKey(const LookupRequest& request,
+                                       const Http::ResponseHeaderMap& response_headers) const;
+
   // Looks for a response that has been varied. Only called from lookup.
   Entry varyLookup(const LookupRequest& request,
                    const Http::ResponseHeaderMapPtr& response_headers);
