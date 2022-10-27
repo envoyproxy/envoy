@@ -148,19 +148,25 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
-
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
     on_complete(false);
     return;
   }
-  auto& entry = iter->second;
-
-  // TODO(tangsaidi) handle Vary header updates properly
-  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
-    on_complete(false);
-    return;
+  if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
+    auto varied_key =
+        variedRequestKey(simple_lookup_context.request(), *iter->second.response_headers_);
+    if (!varied_key.has_value()) {
+      on_complete(false);
+      return;
+    }
+    iter = map_.find(varied_key.value());
+    if (iter == map_.end() || !iter->second.response_headers_) {
+      on_complete(false);
+      return;
+    }
   }
+  auto& entry = iter->second;
 
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
@@ -224,25 +230,35 @@ bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& respon
   return true;
 }
 
+absl::optional<Key>
+SimpleHttpCache::variedRequestKey(const LookupRequest& request,
+                                  const Http::ResponseHeaderMap& response_headers) const {
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeaderUtils::getVaryValues(response_headers);
+  ASSERT(!vary_header_values.empty());
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+      request.varyAllowList(), vary_header_values, request.requestHeaders());
+  if (!vary_identifier.has_value()) {
+    // The vary allow list has changed and has made the vary header of this
+    // cached value not cacheable.
+    return absl::nullopt;
+  }
+  Key varied_request_key = request.key();
+  varied_request_key.add_custom_fields(vary_identifier.value());
+  return varied_request_key;
+}
+
 SimpleHttpCache::Entry
 SimpleHttpCache::varyLookup(const LookupRequest& request,
                             const Http::ResponseHeaderMapPtr& response_headers) {
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeaderUtils::getVaryValues(*response_headers);
-  ASSERT(!vary_header_values.empty());
-
-  Key varied_request_key = request.key();
-  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
-      request.varyAllowList(), vary_header_values, request.requestHeaders());
-  if (!vary_identifier.has_value()) {
-    // The vary allow list has changed and has made the vary header of this
-    // cached value not cacheable.
+  auto maybe_key = variedRequestKey(request, *response_headers);
+  if (!maybe_key.has_value()) {
     return SimpleHttpCache::Entry{};
   }
-  varied_request_key.add_custom_fields(vary_identifier.value());
+  Key& varied_request_key = maybe_key.value();
 
   auto iter = map_.find(varied_request_key);
   if (iter == map_.end()) {
