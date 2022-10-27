@@ -70,8 +70,6 @@ Change to the ``examples/route-mirror`` directory.
 
 .. code-block:: console
 
-    $ pwd
-    envoy/examples/route-mirror
     $ docker-compose ps
     NAME                               COMMAND                  SERVICE             STATUS              PORTS
     route-mirror-envoy-front-proxy-1   "/docker-entrypoint.…"   envoy-front-proxy   running             0.0.0.0:10000->10000/tcp, :::10000->10000/tcp
@@ -99,9 +97,6 @@ both the ``service1`` and ``service1-mirror`` services got the request made
 in Step 2.
 
 .. code-block:: console
-
-   $ pwd
-   envoy/examples/route-mirror
 
    $ docker-compose logs service1
    ...
@@ -140,9 +135,6 @@ got the request.
 
 .. code-block:: console
 
-   $ pwd
-   envoy/examples/route-mirror
-
    $ docker-compose logs service2
    ...
    Host: localhost:10000
@@ -172,9 +164,6 @@ View the logs for the ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
 
-   $ pwd
-   envoy/examples/route-mirror
-
    $ docker-compose logs service2
    ...
    Host: localhost:10000
@@ -195,9 +184,6 @@ the request:
 View the logs for the ``service2`` and ``service2-mirror`` services.
 
 .. code-block:: console
-
-   $ pwd
-   envoy/examples/route-mirror
 
    $ docker-compose logs service2
    ...
