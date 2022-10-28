@@ -1680,13 +1680,6 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_fuzz_test(
-    name = "h2_wrapped_capture_fuzz_test",
-    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
-    corpus = "h2_corpus",
-    deps = [":h2_fuzz_lib"],
-)
-
-envoy_cc_fuzz_test(
     name = "h2_capture_persistent_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
