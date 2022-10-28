@@ -324,9 +324,9 @@ docutils==0.16 \
     #   sphinx
     #   sphinx-rtd-theme
     #   sphinx-tabs
-envoy-base-utils==0.3.7 \
-    --hash=sha256:5c79aa70de6b7014a5b955822eb83324fd222b7cf7bb656e12a018c747b4f2df \
-    --hash=sha256:ac7850ec1c90253964a5d7f7847a3c3317f9d77607e6f90d1fb5aeb975ac2842
+envoy-base-utils==0.3.8 \
+    --hash=sha256:9c4190bae708a75a955a7c09f9a674121c92dd7e33a359de3715332651ffe2bb \
+    --hash=sha256:ae44642f2f43ac778f854f41c931d1969fe96dc323e9112876bc02b94fda05b2
     # via
     #   -r requirements.in
     #   envoy-code-check
