@@ -61,8 +61,8 @@ the request will be forwarded to the ``service2-mirror`` cluster.
    to the client. A response returned by the ``service1-mirror`` or the ``service2-mirror``
    cluster is not sent back to the client.
 
-   This also means that any problems in request processing in the mirror cluster doesn't affect the
-   response received by the client.
+   This also means that any problems or latency in request processing in the mirror cluster
+   don't affect the response received by the client.
 
 Step 1: Build the sandbox
 *************************
