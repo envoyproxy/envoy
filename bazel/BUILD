@@ -304,7 +304,8 @@ config_setting(
 bool_flag(
     name = "http3",
     build_setting_default = True,
-    visibility = ["//visibility:private"],
+    # TODO(keith): make private again https://github.com/bazelbuild/bazel-skylib/issues/404
+    # visibility = ["//visibility:private"],
 )
 
 config_setting(
@@ -312,7 +313,8 @@ config_setting(
     flag_values = {
         ":http3": "False",
     },
-    visibility = ["//visibility:private"],
+    # TODO(keith): make private again https://github.com/bazelbuild/bazel-skylib/issues/404
+    # visibility = ["//visibility:private"],
 )
 
 selects.config_setting_group(
@@ -331,7 +333,8 @@ config_setting(
 config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
-    visibility = ["//visibility:private"],
+    # TODO(keith): make private again https://github.com/bazelbuild/bazel-skylib/issues/404
+    # visibility = ["//visibility:private"],
 )
 
 selects.config_setting_group(
