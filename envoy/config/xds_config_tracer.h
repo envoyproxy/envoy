@@ -50,9 +50,9 @@ public:
   /**
    * Log the decoded SotW xDS resources ingestion status.
    *
-   * This is called twice. One is at the time when the resouce is successfully parsed and
+   * This is called twice. One is at the time when the resource is successfully parsed and
    * before the ingestion. The other one is when the resource is successfully applied to Envoy
-   * and are about to be ACK'ed. The TraceDetails imply the status of ingestion process, e.g.,
+   * and are about to be ACK'ed. The TraceDetails implies the status of ingestion process, e.g.,
    * TraceState::INGESTED.
    *
    * @param type_url The type url of xDS message.
