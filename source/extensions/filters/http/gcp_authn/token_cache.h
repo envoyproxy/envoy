@@ -32,6 +32,8 @@ public:
   void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
   TokenType* validateTokenAndReturn(const std::string& key, TokenType* const found_token);
 
+  uint64_t capacity() { return lru_cache_.maxSize(); }
+
   ~TokenCacheImpl() {
     // Remove all entries from the cache.
     lru_cache_.clear();
