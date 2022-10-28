@@ -1871,9 +1871,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     const bool health_check_address_changed =
         (health_checker_ != nullptr && existing_host_found &&
          *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
-    bool locality_changed = false;
-    locality_changed = (existing_host_found &&
-                        (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+    const bool locality_changed =
+        (existing_host_found &&
+         (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
     if (locality_changed) {
       hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
     }
