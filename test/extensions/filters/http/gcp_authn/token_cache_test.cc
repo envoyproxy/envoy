@@ -96,8 +96,7 @@ TEST_F(TokenCacheTest, ExpiredToken) {
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
   // Set the time to `Sun May 29 2033 13:35:42 GMT-0400` while the expiration time in the token
-  // is `Sun May 29 2033 13:36:41 GMT-0400`. i.e., set to the time to 1 second later than exp
-  // time.
+  // is `Sun May 29 2033 13:36:41 GMT-0400`. i.e., set the time to exp_time + 1s.
   const time_t exp_time = 2001000942;
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time));
   std::string token = std::string(GoodTokenStr);
@@ -108,7 +107,7 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   EXPECT_TRUE(found_jwt == nullptr);
 
   std::unique_ptr<::google::jwt_verify::Jwt> jwt = std::make_unique<::google::jwt_verify::Jwt>();
-  // Set the time to `exp_time - 1s`.
+  // Set the time to exp_time - 1s.
   time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time - 1));
   auto* old_jwt = jwt.get();
   token_cache_->insert(token, std::move(jwt));
