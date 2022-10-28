@@ -33,4 +33,4 @@ responds_with \
     "Hello from behind Envoy (service 2)!" \
     "http://localhost:${PORT_PROXY}/service/2" \
     --header 'x-mirror-cluster: service2-mirror-non-existent'
-docker-compose logs service2-mirror | grep GET | wc -l | grep --quiet 1
+docker-compose logs service2-mirror | grep -c GET | grep --quiet 1
