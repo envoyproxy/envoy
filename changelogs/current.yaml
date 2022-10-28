@@ -21,6 +21,9 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+  - area: eds
+    change: |
+      removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
   - area: listener
     change: |
       removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
