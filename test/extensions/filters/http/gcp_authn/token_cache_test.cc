@@ -31,6 +31,8 @@ constexpr absl::string_view GoodTokenStr =
     "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
     "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
     "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+// The value of exp time field in the token above.
+const time_t ExpTime = 2001001001;
 
 // Expired token
 // {"iss":"https://example.com","sub":"test@example.com","aud":"example_service",
@@ -95,11 +97,11 @@ TEST_F(TokenCacheTest, ExpiredToken) {
 
 // Test the token with the clock skew.
 TEST_F(TokenCacheTest, TokenWithClockSkew) {
-  // Set the time to `Sun May 29 2033 13:35:42 GMT-0400` while the expiration time in the token
-  // is `Sun May 29 2033 13:36:41 GMT-0400`. i.e., set to the time to 1 second later than exp
-  // time.
-  const time_t exp_time = 2001000942;
-  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time));
+  // Set the time to exp_time + 1s.
+  // i.e., The expiration time in the token is `Sun May 29 2033 13:36:41 GMT-0400` and the time we
+  // set to is `Sun May 29 2033 13:35:42 GMT-0400`.
+  const time_t exp_time_with_skew = ExpTime - ::google::jwt_verify::kClockSkewInSecond;
+  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew + 1));
   std::string token = std::string(GoodTokenStr);
   ::google::jwt_verify::Status status = jwt_->parseFromString(token);
   EXPECT_TRUE(status == ::google::jwt_verify::Status::Ok);
@@ -108,8 +110,8 @@ TEST_F(TokenCacheTest, TokenWithClockSkew) {
   EXPECT_TRUE(found_jwt == nullptr);
 
   std::unique_ptr<::google::jwt_verify::Jwt> jwt = std::make_unique<::google::jwt_verify::Jwt>();
-  // Set the time to `exp_time - 1s`.
-  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time - 1));
+  // Set the time to exp_time - 1s.
+  time_system_.setSystemTime(std::chrono::system_clock::from_time_t(exp_time_with_skew));
   auto* old_jwt = jwt.get();
   token_cache_->insert(token, std::move(jwt));
   found_jwt = token_cache_->lookUp(token);
