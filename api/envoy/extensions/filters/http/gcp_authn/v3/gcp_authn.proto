@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.gcp_authn.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.gcp_authn.v3";
+option java_outer_classname = "GcpAuthnProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/gcp_authn/v3;gcp_authnv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: GCP authentication]
+// GCP authentication :ref:`configuration overview <config_http_filters_gcp_authn>`.
+// [#extension: envoy.filters.http.gcp_authn]
+
+// Filter configuration.
+message GcpAuthnFilterConfig {
+  // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
+  // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
+  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+
+  // Retry policy for fetching tokens.
+  // This field is optional. If it is not configured, the filter will be fail-closed (i.e., reject the requests).
+  config.core.v3.RetryPolicy retry_policy = 2;
+
+  // Token cache configuration. This field is optional.
+  TokenCacheConfig cache_config = 3;
+}
+
+// Audience is the URL of the receiving service that performs token authentication.
+// It will be provided to the filter through cluster's typed_filter_metadata.
+message Audience {
+  string url = 1 [(validate.rules).string = {min_len: 1}];
+}
+
+// Token Cache configuration.
+message TokenCacheConfig {
+  // The number of cache entries. The maximum number of entries is INT64_MAX as it is constrained by underlying cache implementation.
+  // Default value 0 (i.e., proto3 defaults) disables the cache by default. Other default values will enable the cache.
+  google.protobuf.UInt64Value cache_size = 1 [(validate.rules).uint64 = {lte: 9223372036854775807}];
+}

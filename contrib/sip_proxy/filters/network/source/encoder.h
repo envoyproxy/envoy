@@ -9,6 +9,7 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
+#include "contrib/sip_proxy/filters/network/source/sip.h"
 
 namespace Envoy {
 namespace Extensions {

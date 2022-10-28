@@ -10,7 +10,7 @@ AdminInstanceTest::AdminInstanceTest()
     : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
       cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
       admin_(cpu_profile_path_, server_, false), request_headers_{{":path", "/"}},
-      admin_filter_(admin_.createCallbackFunction()) {
+      admin_filter_(admin_.createRequestFunction()) {
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -35,9 +35,10 @@ Http::Code AdminInstanceTest::runCallback(absl::string_view path_and_query,
   }
 
   request_headers_.setMethod(method);
+  request_headers_.setPath(path_and_query);
   admin_filter_.decodeHeaders(request_headers_, false);
 
-  return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
+  return admin_.runCallback(response_headers, response, admin_filter_);
 }
 
 Http::Code AdminInstanceTest::getCallback(absl::string_view path_and_query,

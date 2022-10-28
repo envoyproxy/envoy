@@ -13,7 +13,7 @@ class V8RuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createV8Vm(); }
 
-  absl::string_view name() override { return "envoy.wasm.runtime.v8"; }
+  std::string name() const override { return "envoy.wasm.runtime.v8"; }
 };
 
 #if defined(PROXY_WASM_HAS_RUNTIME_V8)

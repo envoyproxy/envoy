@@ -14,6 +14,16 @@ public:
   virtual ~SubscriptionFactory() = default;
 
   /**
+   * @return true if a config source comes from the local filesystem.
+   */
+  static bool
+  isPathBasedConfigSource(envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase type) {
+    return type == envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath ||
+           type ==
+               envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPathConfigSource;
+  }
+
+  /**
    * Subscription factory interface.
    *
    * @param config envoy::config::core::v3::ConfigSource to construct from.
@@ -29,7 +39,7 @@ public:
   virtual SubscriptionPtr subscriptionFromConfigSource(
       const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
       Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-      OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options) PURE;
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
 
   /**
    * Collection subscription factory interface for xDS-TP URLs.
@@ -50,7 +60,7 @@ public:
                                 const envoy::config::core::v3::ConfigSource& config,
                                 absl::string_view type_url, Stats::Scope& scope,
                                 SubscriptionCallbacks& callbacks,
-                                OpaqueResourceDecoder& resource_decoder) PURE;
+                                OpaqueResourceDecoderSharedPtr resource_decoder) PURE;
 };
 
 } // namespace Config

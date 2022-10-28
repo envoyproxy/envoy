@@ -70,7 +70,8 @@ if [[ "$OSTYPE" == "msys" ]]; then
         port=$(shuf -n 1 -i 49152-65535)
         netstat -atn | grep -q "$port" >> /dev/null
     do
-    continue
+        echo "Port is used. retrying..."
+        continue
     done
     SOCKET="127.0.0.1:${port}"
 else

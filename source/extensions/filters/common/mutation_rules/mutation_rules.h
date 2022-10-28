@@ -13,7 +13,16 @@ namespace Filters {
 namespace Common {
 namespace MutationRules {
 
-enum class CheckOperation { SET, APPEND, REMOVE };
+// The operation to check for. Note that the value of APPEND is to only be
+// used when a second value will be added to a header that already exists.
+enum class CheckOperation {
+  // An attempt to replace all current header values
+  SET,
+  // An attempt to add a second value to a header that already exists.
+  APPEND,
+  // An attempt to remove a header
+  REMOVE
+};
 enum class CheckResult { OK, IGNORE, FAIL };
 
 class ExtraRoutingHeaders;

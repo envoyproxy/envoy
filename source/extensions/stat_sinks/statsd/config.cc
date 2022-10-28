@@ -34,10 +34,10 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
         server.clusterManager(), server.scope(), statsd_sink.prefix());
-  default:
-    // Verified by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::STATSD_SPECIFIER_NOT_SET:
+    break; // Fall through to PANIC
   }
+  throw EnvoyException("unexpected statsd specifier case num");
 }
 
 ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {

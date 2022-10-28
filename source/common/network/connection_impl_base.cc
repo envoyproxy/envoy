@@ -50,8 +50,14 @@ void ConnectionImplBase::initializeDelayedCloseTimer() {
 
 void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO(mattklein123): If we close while raising a connected event we should not raise further
-    // connected events.
+    // If a previous connected callback closed the connection, don't raise any further connected
+    // events. There was already recursion raising closed events. We still raise closed events
+    // to further callbacks because such events are typically used for cleanup.
+    if (event != ConnectionEvent::LocalClose && event != ConnectionEvent::RemoteClose &&
+        state() != State::Open) {
+      return;
+    }
+
     if (callback != nullptr) {
       callback->onEvent(event);
     }

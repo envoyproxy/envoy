@@ -31,7 +31,13 @@ public:
       }
     }
 
+    if (!tls_slot_) {
+      return;
+    }
     auto handle = tls_slot_->get()->handle();
+    if (!handle) {
+      return;
+    }
     if (handle->wasmHandle()) {
       handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
                                         response_trailers, stream_info);

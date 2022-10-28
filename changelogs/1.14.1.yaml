@@ -1,0 +1,6 @@
+date: April 8, 2020
+
+changes:
+- area: request_id_extension
+  change: |
+    fixed static initialization for noop request id extension.

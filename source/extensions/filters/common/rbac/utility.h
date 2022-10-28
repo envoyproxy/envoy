@@ -38,21 +38,43 @@ RoleBasedAccessControlFilterStats
 generateStats(const std::string& prefix, const std::string& shadow_prefix, Stats::Scope& scope);
 
 template <class ConfigType>
-std::unique_ptr<RoleBasedAccessControlEngineImpl>
-createEngine(const ConfigType& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                                  config.rules(), validation_visitor, EnforcementMode::Enforced)
-                            : nullptr;
+std::unique_ptr<RoleBasedAccessControlEngine>
+createEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
+             ProtobufMessage::ValidationVisitor& validation_visitor,
+             ActionValidationVisitor& action_validation_visitor) {
+  if (config.has_matcher()) {
+    if (config.has_rules()) {
+      ENVOY_LOG_MISC(warn, "RBAC rules are ignored when matcher is configured");
+    }
+    return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
+        config.matcher(), context, action_validation_visitor, EnforcementMode::Enforced);
+  }
+  if (config.has_rules()) {
+    return std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules(), validation_visitor,
+                                                              EnforcementMode::Enforced);
+  }
+
+  return nullptr;
 }
 
 template <class ConfigType>
-std::unique_ptr<RoleBasedAccessControlEngineImpl>
-createShadowEngine(const ConfigType& config,
-                   ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return config.has_shadow_rules()
-             ? std::make_unique<RoleBasedAccessControlEngineImpl>(
-                   config.shadow_rules(), validation_visitor, EnforcementMode::Shadow)
-             : nullptr;
+std::unique_ptr<RoleBasedAccessControlEngine>
+createShadowEngine(const ConfigType& config, Server::Configuration::ServerFactoryContext& context,
+                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                   ActionValidationVisitor& action_validation_visitor) {
+  if (config.has_shadow_matcher()) {
+    if (config.has_shadow_rules()) {
+      ENVOY_LOG_MISC(warn, "RBAC shadow rules are ignored when shadow matcher is configured");
+    }
+    return std::make_unique<RoleBasedAccessControlMatcherEngineImpl>(
+        config.shadow_matcher(), context, action_validation_visitor, EnforcementMode::Shadow);
+  }
+  if (config.has_shadow_rules()) {
+    return std::make_unique<RoleBasedAccessControlEngineImpl>(
+        config.shadow_rules(), validation_visitor, EnforcementMode::Shadow);
+  }
+
+  return nullptr;
 }
 
 std::string responseDetail(const std::string& policy_id);

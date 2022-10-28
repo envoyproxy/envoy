@@ -79,8 +79,7 @@ void handleLegacyDnsResolverData(
 Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   ENVOY_LOG_MISC(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
-      typed_dns_resolver_config);
+  return DnsResolverFactory::createFactory(typed_dns_resolver_config);
 }
 
 // Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
@@ -90,6 +89,20 @@ Network::DnsResolverFactory& createDefaultDnsResolverFactory(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   Network::makeDefaultDnsResolverConfig(typed_dns_resolver_config);
   return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+}
+
+Network::DnsResolverFactory& DnsResolverFactory::createFactory(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
+  factory.initialize();
+  return factory;
+}
+
+void DnsResolverFactory::terminateFactories() {
+  auto& factories = Registry::FactoryRegistry<Network::DnsResolverFactory>::factories();
+  std::for_each(factories.begin(), factories.end(),
+                [](auto& factory_it) { factory_it.second->terminate(); });
 }
 
 } // namespace Network

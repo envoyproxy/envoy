@@ -128,9 +128,8 @@ class StatefulProcessor:
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
-                    if api_key <= 51 or api_key in [56, 57, 60, 61]:
-                        message = self.parse_top_level_element(message_spec)
-                        messages.append(message)
+                    message = self.parse_top_level_element(message_spec)
+                    messages.append(message)
             except Exception as e:
                 print('could not process %s' % input_file)
                 raise
@@ -201,7 +200,8 @@ class StatefulProcessor:
                 if child is not None:
                     fields.append(child)
             # Some structures share the same name, use request/response as prefix.
-            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'TopicData']:
+            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
+                             'SnapshotId', 'TopicData', 'TopicSnapshot']:
                 type_name = self.type.capitalize() + type_name
             # Some of the types repeat multiple times (e.g. AlterableConfig).
             # In such a case, every second or later occurrence of the same name is going to be prefixed
@@ -238,8 +238,8 @@ class StatefulProcessor:
 
     def parse_type(self, type_name, field_spec, highest_possible_version):
         """
-    Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one.
-    """
+        Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one.
+        """
         if (type_name.startswith('[]')):
             # In spec files, array types are defined as `[]underlying_type` instead of having its own
             # element with type inside.
@@ -474,8 +474,8 @@ class Array(TypeSpecification):
 
 class Primitive(TypeSpecification):
     """
-  Represents a Kafka primitive value.
-  """
+    Represents a Kafka primitive value.
+    """
 
     USABLE_PRIMITIVE_TYPE_NAMES = [
         'bool', 'int8', 'int16', 'int32', 'int64', 'uint16', 'float64', 'string', 'bytes',
@@ -534,13 +534,15 @@ class Primitive(TypeSpecification):
     # Custom values that make test code more readable.
     KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
         'string':
-            '"string"',
+            'static_cast<std::string>("string")',
         'bool':
             'false',
         'int8':
             'static_cast<int8_t>(8)',
         'int16':
             'static_cast<int16_t>(16)',
+        'uint16':
+            'static_cast<uint16_t>(17)',
         'int32':
             'static_cast<int32_t>(32)',
         'int64':
@@ -560,7 +562,7 @@ class Primitive(TypeSpecification):
     def __init__(self, name, custom_default_value):
         self.original_name = name
         self.name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_ENVOY_TYPE)
-        self.custom_default_value = custom_default_value
+        self.custom_default_value = Primitive.sanitize_value(self.name, custom_default_value)
 
     @staticmethod
     def compute(name, map):
@@ -568,6 +570,18 @@ class Primitive(TypeSpecification):
             return map[name]
         else:
             raise ValueError(name)
+
+    @staticmethod
+    def sanitize_value(type, arg):
+        """
+        Unfortunately we cannot print Python True/False straight into C++ code, so we lowercase.
+        """
+        if arg is None:
+            return None
+        if 'bool' == type:
+            return str(arg).lower()
+        else:
+            return arg
 
     def compute_declaration_chain(self):
         # Primitives need no declarations.

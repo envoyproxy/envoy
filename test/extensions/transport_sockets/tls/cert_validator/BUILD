@@ -37,16 +37,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "utility_test",
-    srcs = [
-        "utility_test.cc",
-    ],
-    deps = [
-        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "test_common",
     hdrs = ["test_common.h"],
@@ -68,5 +58,31 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cert_validator_integration_test",
+    srcs = [
+        "default_validator_integration_test.cc",
+        "default_validator_integration_test.h",
+    ],
+    data = [
+        "//test/config/integration/certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    deps = [
+        "//test/integration:http_integration_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "timed_cert_validator",
+    srcs = ["timed_cert_validator.cc"],
+    hdrs = [
+        "timed_cert_validator.h",
+    ],
+    deps = [
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )

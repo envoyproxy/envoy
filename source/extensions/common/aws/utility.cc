@@ -223,9 +223,7 @@ static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
   return nmemb;
 }
 
-absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
-                                                     const std::string& path,
-                                                     const std::string& auth_token) {
+absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message) {
   static const size_t MAX_RETRIES = 4;
   static const std::chrono::milliseconds RETRY_DELAY{1000};
   static const std::chrono::seconds TIMEOUT{5};
@@ -235,7 +233,10 @@ absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
     return absl::nullopt;
   };
 
-  const std::string url = fmt::format("http://{}/{}", host, path);
+  const auto host = message.headers().getHostValue();
+  const auto path = message.headers().getPathValue();
+
+  const std::string url = fmt::format("http://{}{}", host, path);
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
   curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
@@ -246,9 +247,17 @@ absl::optional<std::string> Utility::metadataFetcher(const std::string& host,
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlCallback);
 
   struct curl_slist* headers = nullptr;
-  if (!auth_token.empty()) {
-    const std::string auth = fmt::format("Authorization: {}", auth_token);
-    headers = curl_slist_append(headers, auth.c_str());
+  message.headers().iterate([&headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    // Skip pseudo-headers
+    if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    const std::string header =
+        fmt::format("{}: {}", entry.key().getStringView(), entry.value().getStringView());
+    headers = curl_slist_append(headers, header.c_str());
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  if (headers != nullptr) {
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   }
 

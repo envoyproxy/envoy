@@ -102,41 +102,18 @@ public:
 
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
   bool isTerminalFilterByProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 };
 
 } // namespace
 
-struct TcpConnPoolIntegrationTestParams {
-  Network::Address::IpVersion version;
-  bool test_original_version;
-};
-
-std::vector<TcpConnPoolIntegrationTestParams> getProtocolTestParams() {
-  std::vector<TcpConnPoolIntegrationTestParams> ret;
-
-  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(TcpConnPoolIntegrationTestParams{ip_version, true});
-    ret.push_back(TcpConnPoolIntegrationTestParams{ip_version, false});
-  }
-  return ret;
-}
-
-std::string protocolTestParamsToString(
-    const ::testing::TestParamInfo<TcpConnPoolIntegrationTestParams>& params) {
-  return absl::StrCat(
-      (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
-      (params.param.test_original_version == true ? "OriginalConnPool" : "NewConnPool"));
-}
-
-class TcpConnPoolIntegrationTest : public testing::TestWithParam<TcpConnPoolIntegrationTestParams>,
+class TcpConnPoolIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public BaseIntegrationTest {
 public:
   TcpConnPoolIntegrationTest()
-      : BaseIntegrationTest(GetParam().version, tcp_conn_pool_config),
-        filter_resolver_(config_factory_) {}
+      : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
@@ -148,24 +125,14 @@ public:
       )EOF");
   }
 
-  // Initializer for individual tests.
-  void SetUp() override {
-    if (GetParam().test_original_version) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool",
-                                        "false");
-    } else {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.new_tcp_connection_pool",
-                                        "true");
-    }
-  }
-
 private:
   TestFilterConfigFactory config_factory_;
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
-                         testing::ValuesIn(getProtocolTestParams()), protocolTestParamsToString);
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   initialize();
@@ -227,8 +194,6 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
   // second pool, which is why the log message is expected 2 times. If the initial pool was not
   // cleaned up, only 1 pool would be created.
   EXPECT_LOG_CONTAINS_N_TIMES("debug", "Allocating TCP conn pool", 2, {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
-                                      "true");
     initialize();
 
     std::string request1("request1");

@@ -39,7 +39,7 @@ config:
     hmac_secret:
       name: hmac
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback
@@ -54,6 +54,7 @@ config:
   - oauth2-resource
   - http://example.com
   - https://example.com
+  auth_type: "BASIC_AUTH"
     )EOF";
 
   OAuth2Config factory;
@@ -91,7 +92,7 @@ config:
       oauth_hmac: OauthHMAC
       oauth_expires: OauthExpires
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback
@@ -125,6 +126,7 @@ config:
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context, timeSource());
   EXPECT_CALL(context, api());
+  EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -167,7 +169,7 @@ config:
     cookie_names:
       bearer_token: "?"
   authorization_endpoint: https://oauth.com/oauth/authorize/
-  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
   redirect_path_matcher:
     path:
       exact: /callback

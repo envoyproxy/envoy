@@ -115,6 +115,11 @@ void UberFilterFuzzer::fuzz(
       ASSERT(read_filter_ != nullptr);
       Buffer::OwnedImpl buffer(action.on_data().data());
       read_filter_->onData(buffer, action.on_data().end_stream());
+      if (read_filter_callbacks_->connection_.state_ != Envoy::Network::Connection::State::Open) {
+        ENVOY_LOG_MISC(trace, "Connection closed after data processing.");
+        reset();
+        return;
+      }
 
       break;
     }

@@ -20,11 +20,20 @@ namespace Envoy {
 
 // Simple filter for test purposes. This filter will be injected into the filter chain during
 // tests.
-// The filter reacts only to "switch" keyword to switch upstream startTls transport socket to secure
-// mode. All other payloads are forwarded either downstream or upstream respectively.
-// Filter will be instantiated as terminal filter in order to have access to upstream connection.
+// The filter reacts only to SwitchViaMessageAtTerminal keyword to switch upstream startTls
+// transport socket to secure mode. All other payloads are forwarded either downstream or upstream
+// respectively. Filter will be instantiated as terminal filter in order to have access to upstream
+// connection.
 class StartTlsSwitchFilter : public Network::Filter {
 public:
+  // Messages sent by a test client to which filters should react by converting
+  // upstream startTLS socket from non-secure mode to secure mode.
+  // SwitchViaMessageAtTerminal is processed by a terminal filter.
+  static constexpr absl::string_view SwitchViaMessageAtTerminal = "switchViaMessage";
+  // SwitchViaFilterManager message is processed by a downstream Read filter and signals
+  // to the filter manager to convey the signal to the terminal filter.
+  static constexpr absl::string_view SwitchViaFilterManager = "switchViaFM";
+
   ~StartTlsSwitchFilter() override {
     if (upstream_connection_) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -39,6 +48,10 @@ public:
     read_callbacks_ = &callbacks;
   }
 
+  bool startUpstreamSecureTransport() override {
+    return upstream_connection_->startSecureTransport();
+  }
+
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
   void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks& callbacks) override {
@@ -48,8 +61,10 @@ public:
   Network::FilterStatus onNewConnection() override;
 
   static std::shared_ptr<StartTlsSwitchFilter>
-  newInstance(Upstream::ClusterManager& cluster_manager) {
-    auto p = std::shared_ptr<StartTlsSwitchFilter>(new StartTlsSwitchFilter(cluster_manager));
+  newInstance(Upstream::ClusterManager& cluster_manager,
+              Network::ConnectionCallbacks* upstream_callbacks) {
+    auto p = std::shared_ptr<StartTlsSwitchFilter>(
+        new StartTlsSwitchFilter(cluster_manager, upstream_callbacks));
     p->self_ = p;
     return p;
   }
@@ -78,14 +93,36 @@ public:
     Network::ReadFilterCallbacks* read_callbacks_{};
   };
 
+  // Helper read filter inserted into downstream filter chain. The filter reacts to
+  // SwitchViaFilterManager string and signals to the filter manager to signal to the terminal
+  // filter to switch upstream connection to secure mode.
+  struct DownstreamReadFilter : public Network::ReadFilter {
+    DownstreamReadFilter() = default;
+    Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
+    Network::FilterStatus onData(Buffer::Instance& data, bool /*end_stream*/) override {
+      const std::string message = data.toString();
+      if (data.toString() == StartTlsSwitchFilter::SwitchViaFilterManager) {
+        read_callbacks_->startUpstreamSecureTransport();
+      }
+      return Network::FilterStatus::Continue;
+    }
+
+    void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+      read_callbacks_ = &callbacks;
+    }
+    Network::ReadFilterCallbacks* read_callbacks_{};
+  };
+
 private:
-  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager)
-      : cluster_manager_(cluster_manager) {}
+  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager,
+                       Network::ConnectionCallbacks* upstream_callbacks)
+      : upstream_connection_cb_(upstream_callbacks), cluster_manager_(cluster_manager) {}
 
   std::weak_ptr<StartTlsSwitchFilter> self_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_{};
+  Network::ConnectionCallbacks* upstream_connection_cb_;
   Upstream::ClusterManager& cluster_manager_;
 };
 
@@ -94,6 +131,7 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto h = c->loadBalancer().chooseHost(nullptr);
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
+  upstream_connection_->addConnectionCallbacks(*upstream_connection_cb_);
   upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
@@ -117,7 +155,7 @@ Network::FilterStatus StartTlsSwitchFilter::onWrite(Buffer::Instance& buf, bool 
 
 void StartTlsSwitchFilter::onCommand(Buffer::Instance& buf) {
   const std::string message = buf.toString();
-  if (message == "switch") {
+  if (message == SwitchViaMessageAtTerminal) {
     // Start the upstream secure transport immediately since we clearly have all the bytes
     ASSERT_TRUE(upstream_connection_->startSecureTransport());
   }
@@ -127,9 +165,11 @@ void StartTlsSwitchFilter::onCommand(Buffer::Instance& buf) {
 class StartTlsSwitchFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
                                               test::integration::starttls::StartTlsFilterConfig> {
 public:
-  explicit StartTlsSwitchFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
+  explicit StartTlsSwitchFilterConfigFactory(const std::string& name,
+                                             Network::ConnectionCallbacks& upstream_callbacks)
+      : FactoryBase(name), upstream_callbacks_(&upstream_callbacks) {}
   bool isTerminalFilterByProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 
@@ -137,7 +177,11 @@ public:
   createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(context.clusterManager()));
+      // Inject two filters into downstream connection: first is helper read filter and then
+      // terminal filter.
+      filter_manager.addReadFilter(std::make_shared<StartTlsSwitchFilter::DownstreamReadFilter>());
+      filter_manager.addReadFilter(
+          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
     };
   }
 
@@ -145,24 +189,28 @@ public:
 
 private:
   const std::string name_;
+  Network::ConnectionCallbacks* upstream_callbacks_;
 };
 
+using StartTlsTestParamsType = std::pair<Network::Address::IpVersion, absl::string_view>;
 // Fixture class for integration tests.
-class StartTlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class StartTlsIntegrationTest : public testing::TestWithParam<StartTlsTestParamsType>,
                                 public BaseIntegrationTest {
 public:
   StartTlsIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig()),
+      : BaseIntegrationTest(GetParam().first, ConfigHelper::baseConfig()),
         stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
 
+  NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+
   // Config factory for StartTlsSwitchFilter.
-  StartTlsSwitchFilterConfigFactory config_factory_{"startTls"};
+  StartTlsSwitchFilterConfigFactory config_factory_{"startTls", upstream_callbacks_};
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
       registered_config_factory_{config_factory_};
 
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
-  Network::TransportSocketFactoryPtr tls_context_;
+  Network::DownstreamTransportSocketFactoryPtr tls_context_;
 
   // Technically unused.
   StreamInfo::StreamInfoImpl stream_info_;
@@ -225,7 +273,7 @@ void StartTlsIntegrationTest::initialize() {
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       downstream_tls_context, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
-  tls_context_ = Network::TransportSocketFactoryPtr{
+  tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
           std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
 
@@ -243,6 +291,10 @@ void StartTlsIntegrationTest::initialize() {
 TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   initialize();
 
+  // The upstream connection should only report a single connected event
+  EXPECT_CALL(upstream_callbacks_, onEvent(_));
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+
   // Open clear-text connection.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("starttls_test"));
 
@@ -255,10 +307,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
   // Create TLS transport socket and install it in fake_upstream.
-  Network::TransportSocketPtr ts =
-      tls_context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-          absl::string_view(""), std::vector<std::string>(),
-          std::vector<std::string>{"envoyalpn"}));
+  Network::TransportSocketPtr ts = tls_context_->createDownstreamTransportSocket();
 
   // Synchronization object used to suspend execution
   // until dispatcher completes transport socket conversion.
@@ -277,10 +326,12 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   // Wait until the transport socket conversion completes.
   notification.WaitForNotification();
 
-  // Send message which will trigger upstream starttls to use secure mode.
-  ASSERT_TRUE(tcp_client->write("switch"));
+  // Send a message which will trigger upstream starttls to use secure mode.
+  // The message is a test parameter and upstream starttls will be switched to secure
+  // mode either directly by the terminal test filter or via filter manager.
+  ASSERT_TRUE(tcp_client->write(GetParam().second.data()));
   // Make sure the data makes it upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(11));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5 + GetParam().second.length()));
 
   // Send a message from upstream down through Envoy to tcp_client.
   ASSERT_TRUE(fake_upstream_connection->write("upstream"));
@@ -292,7 +343,23 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   test_server_.reset();
 }
 
+// Create matrix of parameters for parameterized test.
+std::vector<StartTlsTestParamsType> generateTestParams() {
+  std::vector<absl::string_view> switch_messages = {
+      StartTlsSwitchFilter::SwitchViaMessageAtTerminal,
+      StartTlsSwitchFilter::SwitchViaFilterManager};
+  std::vector<StartTlsTestParamsType> testParams;
+
+  for (const Network::Address::IpVersion ip_version : TestEnvironment::getIpVersionsForTest()) {
+    for (const absl::string_view& message_from_client : switch_messages) {
+      testParams.emplace_back(ip_version, message_from_client);
+    }
+  }
+
+  return testParams;
+}
+
 INSTANTIATE_TEST_SUITE_P(StartTlsIntegrationTestSuite, StartTlsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                         testing::ValuesIn(generateTestParams()));
 
 } // namespace Envoy

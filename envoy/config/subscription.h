@@ -83,6 +83,8 @@ public:
   virtual std::string resourceName(const Protobuf::Message& resource) PURE;
 };
 
+using OpaqueResourceDecoderSharedPtr = std::shared_ptr<OpaqueResourceDecoder>;
+
 /**
  * Subscription to DecodedResources.
  */

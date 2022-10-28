@@ -103,7 +103,7 @@ message BuildVersion {
 }
 
 // Version and identification for an Envoy extension.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Extension {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Extension";
 
@@ -121,7 +121,8 @@ message Extension {
   // [#not-implemented-hide:] Type descriptor of extension configuration proto.
   // [#comment:TODO(yanavlasov): Link to the doc with existing configuration protos.]
   // [#comment:TODO(yanavlasov): Add tests when PR #9391 lands.]
-  string type_descriptor = 3;
+  string type_descriptor = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The version is a property of the extension and maintained independently
   // of other extensions and the Envoy API.
@@ -130,6 +131,9 @@ message Extension {
 
   // Indicates that the extension is present but was disabled via dynamic configuration.
   bool disabled = 5;
+
+  // Type URLs of extension configuration protos.
+  repeated string type_urls = 6;
 }
 
 // Identifies a specific Envoy instance. The node identifier is presented to the
@@ -197,7 +201,7 @@ message Node {
 
   // Client feature support list. These are well known features described
   // in the Envoy API repository for a given major version of an API. Client features
-  // use reverse DNS naming scheme, for example `com.acme.feature`.
+  // use reverse DNS naming scheme, for example ``com.acme.feature``.
   // See :ref:`the list of features <client_features>` that xDS client may
   // support.
   repeated string client_features = 10;
@@ -205,7 +209,7 @@ message Node {
   // Known listening ports on the node as a generic hint to the management server
   // for filtering :ref:`listeners <config_listeners>` to be returned. For example,
   // if there is a listener bound to port 80, the list can optionally contain the
-  // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
+  // SocketAddress ``(0.0.0.0,80)``. The field is optional and just a hint.
   repeated Address listening_addresses = 11
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
@@ -235,20 +239,20 @@ message Node {
 message Metadata {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Metadata";
 
-  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The ``envoy.*``
   // namespace is reserved for Envoy's built-in filters.
-  // If both *filter_metadata* and
+  // If both ``filter_metadata`` and
   // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
   // fields are present in the metadata with same keys,
-  // only *typed_filter_metadata* field will be parsed.
+  // only ``typed_filter_metadata`` field will be parsed.
   map<string, google.protobuf.Struct> filter_metadata = 1;
 
-  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The ``envoy.*``
   // namespace is reserved for Envoy's built-in filters.
   // The value is encoded as google.protobuf.Any.
   // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
-  // and *typed_filter_metadata* fields are present in the metadata with same keys,
-  // only *typed_filter_metadata* field will be parsed.
+  // and ``typed_filter_metadata`` fields are present in the metadata with same keys,
+  // only ``typed_filter_metadata`` field will be parsed.
   map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 
@@ -319,7 +323,7 @@ message HeaderValue {
   //
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
-  // unknown header values are replaced with the empty string instead of `-`.
+  // unknown header values are replaced with the empty string instead of ``-``.
   string value = 2 [
     (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
   ];
@@ -352,11 +356,25 @@ message HeaderValueOption {
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
-  google.protobuf.BoolValue append = 2;
+  // This field is deprecated and please use
+  // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
+  //
+  // .. note::
+  //   The :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>` and
+  //   :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` have
+  //   default value (``false``) for this field.
+  google.protobuf.BoolValue append = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
-  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  // Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent.
+  // Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD
+  // <envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
+  // otherwise they are added.
+  bool keep_empty_value = 4;
 }
 
 // Wrapper for a set of headers.
@@ -469,7 +487,7 @@ message TransportSocket {
 //   :ref:`FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
 //   and may also be represented as an integer with the assumption that the value is an integral
 //   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
-//   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
+//   as a ``FractionalPercent`` whose numerator is 42 and denominator is HUNDRED.
 message RuntimeFractionalPercent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.RuntimeFractionalPercent";

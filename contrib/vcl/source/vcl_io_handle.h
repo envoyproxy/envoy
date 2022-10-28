@@ -45,6 +45,7 @@ public:
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
                                    RecvMsgOutput& output) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override { return false; }

@@ -3,12 +3,6 @@
 Lua
 ===
 
-.. attention::
-
-  By default Envoy is built without exporting symbols that you may need when interacting with Lua
-  modules installed as shared objects. Envoy may need to be built with support for exported symbols.
-  Please see the :repo:`Bazel docs <bazel/README.md>` for more information.
-
 Overview
 --------
 
@@ -56,29 +50,30 @@ API.
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.lua.v3.Lua>`
-* This filter should be configured with the name *envoy.filters.http.lua*.
 
-A simple example of configuring Lua HTTP filter that contains only :ref:`inline_code
-<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` is as follow:
+A simple example of configuring Lua HTTP filter that contains only :ref:`default source code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>` is as follow:
 
 .. code-block:: yaml
 
   name: envoy.filters.http.lua
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    inline_code: |
-      -- Called on the request path.
-      function envoy_on_request(request_handle)
-        -- Do something.
-      end
-      -- Called on the response path.
-      function envoy_on_response(response_handle)
-        -- Do something.
-      end
+    default_source_code:
+      inline_string: |
+        -- Called on the request path.
+        function envoy_on_request(request_handle)
+          -- Do something.
+        end
+        -- Called on the response path.
+        function envoy_on_response(response_handle)
+          -- Do something.
+        end
 
-By default, Lua script defined in ``inline_code`` will be treated as a ``GLOBAL`` script. Envoy will
-execute it for every HTTP request.
+By default, Lua script defined in ``default_source_code`` will be treated as a ``default`` script. Envoy will
+execute it for every HTTP request. This ``default`` script is optional.
 
 Per-Route Configuration
 -----------------------
@@ -87,7 +82,7 @@ The Lua HTTP filter also can be disabled or overridden on a per-route basis by p
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration
 on the virtual host, route, or weighted cluster.
 
-LuaPerRoute provides two ways of overriding the ``GLOBAL`` Lua script:
+LuaPerRoute provides two ways of overriding the ``default`` Lua script:
 
 * By providing a name reference to the defined :ref:`named Lua source codes map
   <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
@@ -102,10 +97,11 @@ As a concrete example, given the following Lua filter configuration:
   name: envoy.filters.http.lua
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    inline_code: |
-      function envoy_on_request(request_handle)
-        -- do something
-      end
+    default_source_code:
+      inline_string:
+        function envoy_on_request(request_handle)
+          -- do something
+        end
     source_codes:
       hello.lua:
         inline_string: |
@@ -130,7 +126,7 @@ follow:
       disabled: true
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
-The ``GLOBAL`` Lua script will be overridden by the referenced script:
+The ``default`` Lua script will be overridden by the referenced script:
 
 .. code-block:: yaml
 
@@ -139,13 +135,7 @@ The ``GLOBAL`` Lua script will be overridden by the referenced script:
       "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
       name: hello.lua
 
-.. attention::
-
-  The name ``GLOBAL`` is reserved for :ref:`Lua.inline_code
-  <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`. Therefore, do not use
-  ``GLOBAL`` as name for other Lua scripts.
-
-Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``GLOBAL``
+Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``default``
 Lua script as follows:
 
 .. code-block:: yaml
@@ -159,6 +149,21 @@ Lua script as follows:
             response_handle:logInfo("Goodbye.")
           end
 
+Statistics
+----------
+.. _config_http_filters_lua_stats:
+
+The lua filter outputs statistics in the *.lua.* namespace by default. When
+there are multiple lua filters configured in a filter chain, stats from
+individual filter instance/script can be tracked by providing a per filter
+:ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.stat_prefix>`.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  error, Counter, Total script execution errors.
 
 Script examples
 ---------------
@@ -388,19 +393,89 @@ httpCall()
 
 .. code-block:: lua
 
-  local headers, body = handle:httpCall(cluster, headers, body, timeout, asynchronous)
+  local headers, body = handle:httpCall(cluster, headers, body, timeout_ms, asynchronous)
+
+  -- Alternative function signature.
+  local headers, body = handle:httpCall(cluster, headers, body, options)
 
 Makes an HTTP call to an upstream host. *cluster* is a string which maps to a configured cluster manager cluster. *headers*
 is a table of key/value pairs to send (the value can be a string or table of strings). Note that
 the *:method*, *:path*, and *:authority* headers must be set. *body* is an optional string of body
-data to send. *timeout* is an integer that specifies the call timeout in milliseconds.
+data to send. *timeout_ms* is an integer that specifies the call timeout in milliseconds.
 
-*asynchronous* is a boolean flag. If asynchronous is set to true, Envoy will make the HTTP request and continue,
+*asynchronous* is a boolean flag. If async is set to true, Envoy will make the HTTP request and continue,
 regardless of the response success or failure. If this is set to false, or not set, Envoy will suspend executing the script
 until the call completes or has an error.
 
 Returns *headers* which is a table of response headers. Returns *body* which is the string response
 body. May be nil if there is no body.
+
+
+The alternative function signature allows caller to specify *options* as a table. Currently,
+the supported keys are:
+
+- *asynchronous* is a boolean flag that controls the asynchronicity of the HTTP call.
+  It refers to the same *asynchronous* flag as the first function signature.
+- *timeout_ms* is an integer that specifies the call timeout in milliseconds.
+  It refers to the same *timeout_ms* argument as the first function signature.
+- *trace_sampled* is a boolean flag that decides whether the produced trace span will be sampled or not.
+- *return_duplicate_headers* is boolean flag that decides whether the repeated headers are allowed in response headers.
+  If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
+  If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
+  of table.
+
+  For example, the following upstream response headers have repeated headers.
+
+  .. code-block:: none
+
+    {
+      { ":status", "200" },
+      { "foo", "bar" },
+      { "key", "value_0" },
+      { "key", "value_1" },
+      { "key", "value_2" },
+    }
+
+  Then if *return_duplicate_headers* is set to false, the returned headers will be:
+
+  .. code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = "value_2",
+    }
+
+  If *return_duplicate_headers* is set to true, the returned *headers* will be:
+
+  .. code-block:: lua
+
+    {
+      [":status"] = "200",
+      ["foo"] = "bar",
+      ["key"] = { "value_0", "value_1", "value_2" },
+    }
+
+
+Some examples of specifying *options* are shown below:
+
+.. code-block:: lua
+
+  -- Create a fire-and-forget HTTP call.
+  local request_options = {["asynchronous"] = true}
+
+  -- Create a synchronous HTTP call with 1000 ms timeout.
+  local request_options = {["timeout_ms"] = 1000}
+
+  -- Create a synchronous HTTP call, but do not sample the trace span.
+  local request_options = {["trace_sampled"] = false}
+
+  -- The same as above, but explicitly set the "asynchronous" flag to false.
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false }
+
+  -- The same as above, but with 1000 ms timeout.
+  local request_options = {["asynchronous"] = false, ["trace_sampled"] = false, ["timeout_ms"] = 1000 }
+
 
 respond()
 ^^^^^^^^^^
@@ -519,6 +594,20 @@ High resolution timestamp function. *format* is an optional enum parameter to in
 *EnvoyTimestampResolution.MILLISECOND* is supported
 The function returns timestamp in milliseconds since epoch by default if format is not set.
 
+.. _config_http_filters_lua_stream_handle_api_timestamp_string:
+
+timestampString()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  timestamp = handle:timestampString(resolution)
+
+Timestamp function. Timestamp is returned as a string. It represents the integer value of the selected resolution
+since epoch. *resolution* is an optional enum parameter to indicate the resolution of the timestamp.
+Supported resolutions are *EnvoyTimestampResolution.MILLISECOND* and *EnvoyTimestampResolution.MICROSECOND*.
+Default resolution is millisecond if *resolution* is not set.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -602,6 +691,17 @@ replace()
 
 Replaces a header. *key* is a string that supplies the header key. *value* is a string that supplies
 the header value. If the header does not exist, it is added as per the *add()* function.
+
+setHttp1ReasonPhrase()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  headers:setHttp1ReasonPhrase(reasonPhrase)
+
+Sets a custom HTTP/1 response reason phrase. This call is *only valid in the response flow*.
+*reasonPhrase* is a string that supplies the reason phrase value. Additionally this call only
+effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HTTP/3.
 
 .. _config_http_filters_lua_buffer_wrapper:
 

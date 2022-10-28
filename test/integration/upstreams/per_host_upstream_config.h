@@ -77,13 +77,13 @@ public:
       : HttpConnPool(thread_local_cluster, is_connect, route_entry, downstream_protocol, ctx) {}
 
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol> protocol) override {
     conn_pool_stream_handle_ = nullptr;
     auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
                                                           &callbacks_encoder, host);
     callbacks_->onPoolReady(std::move(upstream), host,
-                            callbacks_encoder.getStream().connectionLocalAddress(), info, protocol);
+                            callbacks_encoder.getStream().connectionInfoProvider(), info, protocol);
   }
 };
 

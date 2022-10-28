@@ -17,6 +17,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -57,8 +58,6 @@ public:
    */
   // This is a legacy alias.
   using Type = Envoy::Http::CodecType;
-
-  ~CodecClient() override;
 
   /**
    * Add a connection callback to the underlying network connection.
@@ -129,7 +128,13 @@ public:
   CodecType type() const { return type_; }
 
   // Note this is the L4 stream info, not L7.
-  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+
+  /**
+   * Connect to the host.
+   * Needs to be called after codec_ is instantiated.
+   */
+  void connect();
 
 protected:
   /**
@@ -140,12 +145,6 @@ protected:
    */
   CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
-
-  /**
-   * Connect to the host.
-   * Needs to be called after codec_ is instantiated.
-   */
-  void connect();
 
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
@@ -221,9 +220,23 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public ResponseDecoderWrapper {
+                         public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), parent_(parent) {}
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {
+      switch (parent.protocol()) {
+      case Protocol::Http10:
+      case Protocol::Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+        break;
+      case Protocol::Http2:
+      case Protocol::Http3:
+        wait_encode_complete_ =
+            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_response_half_close");
+        break;
+      }
+    }
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -236,8 +249,20 @@ private:
     void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    RequestEncoder* encoder_{};
+    // RequestEncoderWrapper
+    void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
+
+    void setEncoder(RequestEncoder& encoder) {
+      inner_encoder_ = &encoder;
+      inner_encoder_->getStream().addCallbacks(*this);
+    }
+
+    void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
+
     CodecClient& parent_;
+    bool wait_encode_complete_{true};
+    bool encode_complete_{false};
+    bool decode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
@@ -247,6 +272,8 @@ private:
    * wrapped decoder.
    */
   void responsePreDecodeComplete(ActiveRequest& request);
+  void requestEncodeComplete(ActiveRequest& request);
+  void completeRequest(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
@@ -275,13 +302,27 @@ private:
 using CodecClientPtr = std::unique_ptr<CodecClient>;
 
 /**
+ * Production implementation that installs a real codec without automatically connecting.
+ * TODO(danzh) deprecate this class and make CodecClientProd to have the option to defer connect
+ * once "envoy.reloadable_features.postpone_h3_client_connect_to_next_loop" is deprecated.
+ */
+class NoConnectCodecClientProd : public CodecClient {
+public:
+  NoConnectCodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
+                           Upstream::HostDescriptionConstSharedPtr host,
+                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
+                           const Network::TransportSocketOptionsConstSharedPtr& options);
+};
+
+/**
  * Production implementation that installs a real codec.
  */
-class CodecClientProd : public CodecClient {
+class CodecClientProd : public NoConnectCodecClientProd {
 public:
   CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  Random::RandomGenerator& random_generator);
+                  Random::RandomGenerator& random_generator,
+                  const Network::TransportSocketOptionsConstSharedPtr& options);
 };
 
 } // namespace Http

@@ -434,8 +434,8 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   const tsi_handshaker_vtable* vtable = raw_handshaker->vtable;
   tsi_handshaker_vtable mock_vtable = *vtable;
   mock_vtable.next = [](tsi_handshaker*, const unsigned char*, size_t, const unsigned char**,
-                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb,
-                        void*) { return TSI_INTERNAL_ERROR; };
+                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb, void*,
+                        std::string*) { return TSI_INTERNAL_ERROR; };
   raw_handshaker->vtable = &mock_vtable;
 
   client_.handshaker_factory_ = [&](Event::Dispatcher& dispatcher,
@@ -906,19 +906,21 @@ protected:
 
     socket_factory_ = std::make_unique<TsiSocketFactory>(handshaker_factory, nullptr);
   }
-  Network::TransportSocketFactoryPtr socket_factory_;
+  Network::UpstreamTransportSocketFactoryPtr socket_factory_;
 };
 
 TEST_F(TsiSocketFactoryTest, CreateTransportSocket) {
-  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(nullptr));
+  EXPECT_NE(nullptr, socket_factory_->createTransportSocket(nullptr, nullptr));
 }
 
 TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
 
-TEST_F(TsiSocketFactoryTest, UsesProxyProtocolOptions) {
-  EXPECT_FALSE(socket_factory_->usesProxyProtocolOptions());
+TEST_F(TsiSocketFactoryTest, HashKey) {
+  std::vector<uint8_t> key;
+  socket_factory_->hashKey(key, nullptr);
+  EXPECT_EQ(0, key.size());
 }
 
 } // namespace

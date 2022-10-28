@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 
 #include <array>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <string>
@@ -22,7 +23,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
@@ -113,7 +114,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       // the hood. Therefore, to ignore cert expiration, we need to set the callback
       // for X509_verify_cert to ignore that error.
       if (config_->allowExpiredCertificate()) {
-        X509_STORE_set_verify_cb(store, CertValidatorUtil::ignoreCertificateExpirationCallback);
+        CertValidatorUtil::setIgnoreCertificateExpiration(store);
       }
     }
   }
@@ -150,7 +151,12 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
+        auto san_matcher = createStringSanMatcher(matcher);
+        if (san_matcher == nullptr) {
+          throw EnvoyException(
+              absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
+        }
+        subject_alt_name_matchers_.push_back(std::move(san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -186,7 +192,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   return verify_mode;
 }
 
-int DefaultCertValidator::doVerifyCertChain(
+int DefaultCertValidator::doSynchronousVerifyCertChain(
     X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options) {
   if (verify_trusted_ca_) {
@@ -203,13 +209,24 @@ int DefaultCertValidator::doVerifyCertChain(
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
+  if (!verifyCertAndUpdateStatus(ssl_extended_info, &leaf_cert, transport_socket_options, nullptr,
+                                 nullptr)) {
+    X509_STORE_CTX_set_error(store_ctx, X509_V_ERR_APPLICATION_VERIFICATION);
+    return 0;
+  }
+  return 1;
+}
 
+bool DefaultCertValidator::verifyCertAndUpdateStatus(
+    Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
+    const Network::TransportSocketOptions* transport_socket_options, std::string* error_details,
+    uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated =
-      verifyCertificate(&leaf_cert,
+      verifyCertificate(leaf_cert,
                         transport_socket_options != nullptr
                             ? transport_socket_options->verifySubjectAltNameListOverride()
                             : std::vector<std::string>{},
-                        subject_alt_name_matchers_);
+                        subject_alt_name_matchers_, error_details, out_alert);
 
   if (ssl_extended_info) {
     if (ssl_extended_info->certificateValidationStatus() ==
@@ -224,20 +241,25 @@ int DefaultCertValidator::doVerifyCertChain(
   // sure the verification for other validation context configurations doesn't fail (i.e. either
   // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure
   // other configurations are verified and the verification succeed.
-  int validation_status = verify_trusted_ca_
-                              ? validated != Envoy::Ssl::ClientValidationStatus::Failed
-                              : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+  const bool success = verify_trusted_ca_
+                           ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                           : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 
-  return allow_untrusted_certificate_ ? 1 : validation_status;
+  return (allow_untrusted_certificate_ || success);
 }
 
-Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
-    X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
+Envoy::Ssl::ClientValidationStatus
+DefaultCertValidator::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
+                                        const std::vector<SanMatcherPtr>& subject_alt_name_matchers,
+                                        std::string* error_details, uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
-
   if (!verify_san_list.empty()) {
     if (!verifySubjectAltName(cert, verify_san_list)) {
+      const char* error = "verify cert failed: verify SAN list";
+      if (error_details != nullptr) {
+        *error_details = error;
+      }
+      ENVOY_LOG(debug, error);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
@@ -246,6 +268,11 @@ Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
 
   if (!subject_alt_name_matchers.empty()) {
     if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
+      const char* error = "verify cert failed: SAN matcher";
+      if (error_details != nullptr) {
+        *error_details = error;
+      }
+      ENVOY_LOG(debug, error);
       stats_.fail_verify_san_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
@@ -261,6 +288,14 @@ Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
         verifyCertificateSpkiList(cert, verify_certificate_spki_list_);
 
     if (!valid_certificate_hash && !valid_certificate_spki) {
+      if (out_alert != nullptr) {
+        *out_alert = SSL_AD_BAD_CERTIFICATE_HASH_VALUE;
+      }
+      const char* error = "verify cert failed: cert hash and spki";
+      if (error_details != nullptr) {
+        *error_details = error;
+      }
+      ENVOY_LOG(debug, error);
       stats_.fail_verify_cert_hash_.inc();
       return Envoy::Ssl::ClientValidationStatus::Failed;
     }
@@ -269,6 +304,78 @@ Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
   }
 
   return validated;
+}
+
+ValidationResults DefaultCertValidator::doVerifyCertChain(
+    STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
+    Ssl::SslExtendedSocketInfo* ssl_extended_info,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL_CTX& ssl_ctx,
+    const CertValidator::ExtraValidationContext& /*validation_context*/, bool is_server,
+    absl::string_view /*host_name*/) {
+  if (sk_X509_num(&cert_chain) == 0) {
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(
+          Envoy::Ssl::ClientValidationStatus::NotValidated);
+    }
+    stats_.fail_verify_error_.inc();
+    const char* error = "verify cert failed: empty cert chain";
+    ENVOY_LOG(debug, error);
+    return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
+  }
+  X509* leaf_cert = sk_X509_value(&cert_chain, 0);
+  ASSERT(leaf_cert);
+  if (verify_trusted_ca_) {
+    X509_STORE* verify_store = SSL_CTX_get_cert_store(&ssl_ctx);
+    ASSERT(verify_store);
+    bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+    if (!ctx || !X509_STORE_CTX_init(ctx.get(), verify_store, leaf_cert, &cert_chain) ||
+        // We need to inherit the verify parameters. These can be determined by
+        // the context: if it's a server it will verify SSL client certificates or
+        // vice versa.
+        !X509_STORE_CTX_set_default(ctx.get(), is_server ? "ssl_client" : "ssl_server") ||
+        // Anything non-default in "param" should overwrite anything in the ctx.
+        !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
+                                SSL_CTX_get0_param(&ssl_ctx))) {
+      OPENSSL_PUT_ERROR(SSL, ERR_R_X509_LIB);
+      const char* error = "verify cert failed: init and setup X509_STORE_CTX";
+      onVerifyError(ssl_extended_info, error);
+      return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
+    }
+    const bool verify_succeeded = (X509_verify_cert(ctx.get()) == 1);
+
+    if (!verify_succeeded) {
+      const std::string error =
+          absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
+      onVerifyError(ssl_extended_info, error);
+      if (allow_untrusted_certificate_) {
+        return ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
+                                 absl::nullopt};
+      }
+      return {ValidationResults::ValidationStatus::Failed,
+              SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
+    }
+    if (ssl_extended_info) {
+      ssl_extended_info->setCertificateValidationStatus(
+          Envoy::Ssl::ClientValidationStatus::Validated);
+    }
+  }
+  std::string error_details;
+  uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
+  const bool succeeded = verifyCertAndUpdateStatus(
+      ssl_extended_info, leaf_cert, transport_socket_options.get(), &error_details, &tls_alert);
+  return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
+                                       absl::nullopt, absl::nullopt}
+                   : ValidationResults{ValidationResults::ValidationStatus::Failed, tls_alert,
+                                       error_details};
+}
+
+void DefaultCertValidator::onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info,
+                                         absl::string_view error) {
+  if (ssl_extended_info) {
+    ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+  stats_.fail_verify_error_.inc();
+  ENVOY_LOG(debug, error);
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
@@ -378,6 +485,35 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
+
+  rc = EVP_DigestUpdate(md.get(), &verify_trusted_ca_, sizeof(verify_trusted_ca_));
+  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+  if (config_ != nullptr) {
+    for (const auto& matcher : config_->subjectAltNameMatchers()) {
+      size_t hash = MessageUtil::hash(matcher);
+      rc = EVP_DigestUpdate(md.get(), &hash, sizeof(hash));
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    const std::string& crl = config_->certificateRevocationList();
+    if (!crl.empty()) {
+      rc = EVP_DigestUpdate(md.get(), crl.data(), crl.length());
+      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    }
+
+    bool allow_expired = config_->allowExpiredCertificate();
+    rc = EVP_DigestUpdate(md.get(), &allow_expired, sizeof(allow_expired));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto trust_chain_verification = config_->trustChainVerification();
+    rc = EVP_DigestUpdate(md.get(), &trust_chain_verification, sizeof(trust_chain_verification));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+
+    auto only_leaf_crl = config_->onlyVerifyLeafCertificateCrl();
+    rc = EVP_DigestUpdate(md.get(), &only_leaf_crl, sizeof(only_leaf_crl));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
 }
 
 void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
@@ -426,6 +562,10 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
   if (require_client_cert) {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
+  // Set the verify_depth
+  if (config_->maxVerifyDepth().has_value()) {
+    SSL_CTX_set_verify_depth(ctx, config_->maxVerifyDepth().value());
+  }
 }
 
 Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() const {
@@ -435,7 +575,7 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), time_source_);
 }
 
-size_t DefaultCertValidator::daysUntilFirstCertExpires() const {
+absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), time_source_);
 }
 
@@ -446,7 +586,7 @@ public:
     return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return "envoy.tls.cert_validator.default"; }
+  std::string name() const override { return "envoy.tls.cert_validator.default"; }
 };
 
 REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);

@@ -48,7 +48,7 @@ function exclude_check_format_testdata() {
 
 # Exclude files in third_party which are temporary forks from other OSS projects.
 function exclude_third_party() {
-  grep -v third_party/
+  grep -v third_party/ | grep -v bazel/external/http_parser
 }
 
 # Exclude files which are part of the Wasm emscripten environment

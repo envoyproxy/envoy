@@ -1,6 +1,7 @@
 dynamic_resources {
   ads_config {
     api_type: GRPC
+    transport_api_version: V3
     grpc_services {
       google_grpc {
         target_uri: "\177\177"
@@ -17,7 +18,6 @@ dynamic_resources {
 }
 flags_path: "\'"
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "^"

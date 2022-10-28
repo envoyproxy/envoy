@@ -75,6 +75,19 @@ sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/s
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
+# Test reuse_port listener with multiple addresses.
+HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES="${TEST_TMPDIR}"/hot_restart_v4_multiple_addresses.yaml
+echo "building ${HOT_RESTART_JSON_V4} ..."
+sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server_multiple_addresses.yaml | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
+  sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ enable_reuse_port }}#true#" | \
+  sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
+  cat > "${HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES}")
+
 # Shared memory size varies by architecture
 SHARED_MEMORY_SIZE="104"
 [[ "$(uname -m)" == "aarch64" ]] && SHARED_MEMORY_SIZE="120"

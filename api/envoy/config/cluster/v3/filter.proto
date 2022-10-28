@@ -20,12 +20,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.cluster.Filter";
 
-  // The name of the filter to instantiate. The name must match a
-  // supported upstream filter. Note that Envoy's :ref:`downstream network
-  // filters <config_network_filters>` are not valid upstream filters.
+  // The name of the filter configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
+  // Note that Envoy's :ref:`downstream network
+  // filters <config_network_filters>` are not valid upstream filters.
   google.protobuf.Any typed_config = 2;
 }

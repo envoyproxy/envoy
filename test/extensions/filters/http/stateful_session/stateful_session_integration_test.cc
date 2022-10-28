@@ -95,8 +95,20 @@ typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
       cookie:
         name: global-session-cookie
-        path: /path
+        path: /test
         ttl: 120s
+)EOF";
+
+static const std::string STATEFUL_SESSION_HEADER_FILTER =
+    R"EOF(
+name: envoy.filters.http.stateful_session
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
+  session_state:
+    name: envoy.http.stateful_session.header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
+      name: session-header
 )EOF";
 
 static const std::string DISABLE_STATEFUL_SESSION =
@@ -115,8 +127,19 @@ stateful_session:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
       cookie:
         name: route-session-cookie
-        path: /path
+        path: /test
         ttl: 120s
+)EOF";
+
+static const std::string OVERRIDE_STATEFUL_SESSION_HEADER =
+    R"EOF(
+"@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
+stateful_session:
+  session_state:
+    name: envoy.http.stateful_session.header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
+      name: route-session-header
 )EOF";
 
 TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
@@ -150,9 +173,46 @@ TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {
 
   // The selected upstream server address would be selected to the response headers.
   EXPECT_EQ(
-      Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/path",
+      Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/test",
                                                std::chrono::seconds(120), true),
       response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_F(StatefulSessionIntegrationTest, NormalStatefulSessionHeader) {
+  initializeFilterAndRoute(STATEFUL_SESSION_HEADER_FILTER, "");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "stateful.session.com"}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+  auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+  ASSERT(upstream_index.has_value());
+
+  envoy::config::endpoint::v3::LbEndpoint endpoint;
+  setUpstreamAddress(upstream_index.value(), endpoint);
+  const std::string address_string =
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+  const std::string encoded_address =
+      Envoy::Base64::encode(address_string.data(), address_string.size());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // The selected upstream server address would be selected to the response headers.
+  EXPECT_EQ(
+      encoded_address,
+      response->headers().get(Http::LowerCaseString("session-header"))[0]->value().getStringView());
 
   cleanupUpstreamAndDownstream();
 }
@@ -263,9 +323,120 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
 
     // The selected upstream server address would be selected to the response headers.
     EXPECT_EQ(
-        Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/path",
+        Envoy::Http::Utility::makeSetCookieValue("global-session-cookie", encoded_address, "/test",
                                                  std::chrono::seconds(120), true),
         response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeader) {
+  initializeFilterAndRoute(STATEFUL_SESSION_HEADER_FILTER, "");
+
+  {
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"session-header", encoded_address}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    // The upstream with index 1 should be selected.
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    EXPECT_EQ(upstream_index.value(), 1);
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"session-header", encoded_address}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    // The upstream with index 2 should be selected.
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    EXPECT_EQ(upstream_index.value(), 2);
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  // Test the case that stateful session header with unknown server address.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},
+        {":path", "/test"},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"},
+        {"session-header", Envoy::Base64::encode("127.0.0.7:50000", 15)}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT(upstream_index.has_value());
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(upstream_index.value(), endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // The selected upstream server address would be selected to the response headers.
+    EXPECT_EQ(encoded_address, response->headers()
+                                   .get(Http::LowerCaseString("session-header"))[0]
+                                   ->value()
+                                   .getStringView());
 
     cleanupUpstreamAndDownstream();
   }
@@ -274,18 +445,17 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionCooki
 TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, DISABLE_STATEFUL_SESSION);
 
-  uint64_t first_index = 0;
-  uint64_t second_index = 0;
-
-  envoy::config::endpoint::v3::LbEndpoint endpoint;
-  setUpstreamAddress(1, endpoint);
-  const std::string address_string =
-      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
-  const std::string encoded_address =
-      Envoy::Base64::encode(address_string.data(), address_string.size());
-
   {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
+    uint64_t first_index = 0;
+    uint64_t second_index = 0;
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "GET"},
         {":path", "/test"},
@@ -293,58 +463,121 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
         {":authority", "stateful.session.com"},
         {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
 
-    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
-    ASSERT(upstream_index.has_value());
-    first_index = upstream_index.value();
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    upstream_request_->encodeHeaders(default_response_headers_, true);
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      first_index = upstream_index.value();
 
-    ASSERT_TRUE(response->waitForEndStream());
+      upstream_request_->encodeHeaders(default_response_headers_, true);
 
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->waitForEndStream());
 
-    // No response header to be added.
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
 
-    cleanupUpstreamAndDownstream();
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      second_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    // Choose different upstream servers by default.
+    EXPECT_NE(first_index, second_index);
   }
 
   {
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    Http::TestRequestHeaderMapImpl request_headers{
-        {":method", "GET"},
-        {":path", "/test"},
-        {":scheme", "http"},
-        {":authority", "stateful.session.com"},
-        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
+    uint64_t first_index = 0;
+    uint64_t second_index = 0;
 
-    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
 
-    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
-    ASSERT(upstream_index.has_value());
-    second_index = upstream_index.value();
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"session-header", encoded_address}};
 
-    upstream_request_->encodeHeaders(default_response_headers_, true);
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    ASSERT_TRUE(response->waitForEndStream());
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
 
-    EXPECT_TRUE(upstream_request_->complete());
-    EXPECT_TRUE(response->complete());
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      first_index = upstream_index.value();
 
-    // No response header to be added.
-    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+      upstream_request_->encodeHeaders(default_response_headers_, true);
 
-    cleanupUpstreamAndDownstream();
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      second_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    // Choose different upstream servers by default.
+    EXPECT_NE(first_index, second_index);
   }
-
-  // Choose different upstream servers by default.
-  EXPECT_NE(first_index, second_index);
 }
 
-TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
+TEST_F(StatefulSessionIntegrationTest, CookieStatefulSessionOverriddenByRoute) {
   initializeFilterAndRoute(STATEFUL_SESSION_FILTER, OVERRIDE_STATEFUL_SESSION);
 
   {
@@ -384,12 +617,11 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
 
     EXPECT_EQ(
         Envoy::Http::Utility::makeSetCookieValue("route-session-cookie", route_encoded_address,
-                                                 "/path", std::chrono::seconds(120), true),
+                                                 "/test", std::chrono::seconds(120), true),
         response->headers().get(Http::LowerCaseString("set-cookie"))[0]->value().getStringView());
 
     cleanupUpstreamAndDownstream();
   }
-
   {
     envoy::config::endpoint::v3::LbEndpoint endpoint;
     setUpstreamAddress(2, endpoint);
@@ -423,6 +655,228 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverriddenByRoute) {
     EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
 
     cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_F(StatefulSessionIntegrationTest, HeaderStatefulSessionOverriddenByRoute) {
+  initializeFilterAndRoute(STATEFUL_SESSION_HEADER_FILTER, OVERRIDE_STATEFUL_SESSION_HEADER);
+
+  {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"session-header", encoded_address}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT(upstream_index.has_value());
+
+    envoy::config::endpoint::v3::LbEndpoint route_endpoint;
+    setUpstreamAddress(upstream_index.value(), route_endpoint);
+    const std::string route_address_string = fmt::format(
+        "127.0.0.1:{}", route_endpoint.endpoint().address().socket_address().port_value());
+    const std::string route_encoded_address =
+        Envoy::Base64::encode(route_address_string.data(), route_address_string.size());
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_FALSE(response->headers().get(Http::LowerCaseString("route-session-header")).empty());
+    EXPECT_EQ(route_encoded_address, response->headers()
+                                         .get(Http::LowerCaseString("route-session-header"))[0]
+                                         ->value()
+                                         .getStringView());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"route-session-header", encoded_address}};
+
+    auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+    // Stateful session is overridden and the upstream with index 2 should be selected..
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    EXPECT_EQ(upstream_index.value(), 2);
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+
+    // No response header to be added.
+    EXPECT_TRUE(response->headers().get(Http::LowerCaseString("route-session-header")).empty());
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+TEST_F(StatefulSessionIntegrationTest, CookieBasedStatefulSessionDisabledByRequestPath) {
+  initializeFilterAndRoute(STATEFUL_SESSION_FILTER, "");
+
+  {
+    uint64_t first_index = 0;
+    uint64_t second_index = 0;
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    // Request path is not start with cookie path which means that the stateful session cookie in
+    // the request my not generated by current filter. The stateful session will skip processing
+    // this request.
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},
+        {":path", "/path_not_match"},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"},
+        {"cookie", fmt::format("global-session-cookie=\"{}\"", encoded_address)}};
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      first_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      second_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("set-cookie")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    // Choose different upstream servers by default.
+    EXPECT_NE(first_index, second_index);
+  }
+
+  {
+    uint64_t first_index = 0;
+    uint64_t second_index = 0;
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_address =
+        Envoy::Base64::encode(address_string.data(), address_string.size());
+
+    // Request path is not start with cookie path which means that the stateful session cookie in
+    // the request my not generated by current filter. The stateful session will skip processing
+    // this request.
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/path_not_match"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "stateful.session.com"},
+                                                   {"session-header", encoded_address}};
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      first_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    {
+      codec_client_ = makeHttpConnection(lookupPort("http"));
+
+      auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+      auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+      ASSERT(upstream_index.has_value());
+      second_index = upstream_index.value();
+
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+
+      ASSERT_TRUE(response->waitForEndStream());
+
+      EXPECT_TRUE(upstream_request_->complete());
+      EXPECT_TRUE(response->complete());
+
+      // No response header to be added.
+      EXPECT_TRUE(response->headers().get(Http::LowerCaseString("session-header")).empty());
+
+      cleanupUpstreamAndDownstream();
+    }
+
+    // Choose different upstream servers by default.
+    EXPECT_NE(first_index, second_index);
   }
 }
 

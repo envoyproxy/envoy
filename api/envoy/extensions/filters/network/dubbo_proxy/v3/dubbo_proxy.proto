@@ -2,10 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.dubbo_proxy.v3;
 
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/extensions/filters/network/dubbo_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
 
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -32,7 +35,18 @@ enum SerializationType {
   Hessian2 = 0;
 }
 
-// [#next-free-field: 6]
+message Drds {
+  // Configuration source specifier.
+  // In case of ``api_config_source`` only aggregated ``api_type`` is supported.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the multiple route configuration. This allows to use different multiple route
+  // configurations. Tells which multiple route configuration should be fetched from the configuration
+  // source. Leave unspecified is also valid and means the unnamed multiple route configuration.
+  string route_config_name = 2;
+}
+
+// [#next-free-field: 8]
 message DubboProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
@@ -47,12 +61,24 @@ message DubboProxy {
   SerializationType serialization_type = 3 [(validate.rules).enum = {defined_only: true}];
 
   // The route table for the connection manager is static and is specified in this property.
-  repeated RouteConfiguration route_config = 4;
+  //
+  // .. note::
+  //
+  //   This field is deprecated. Please use ``drds`` or ``multiple_route_config`` first.
+  repeated RouteConfiguration route_config = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  oneof route_specifier {
+    // Use xDS to fetch the route configuration. It is invalid to define both ``route_config`` and ``drds``.
+    Drds drds = 6 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
+
+    MultipleRouteConfiguration multiple_route_config = 7;
+  }
 
   // A list of individual Dubbo filters that make up the filter chain for requests made to the
   // Dubbo proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no dubbo_filters are specified, a default Dubbo router filter
-  // (`envoy.filters.dubbo.router`) is used.
+  // (``envoy.filters.dubbo.router``) is used.
   repeated DubboFilter dubbo_filters = 5;
 }
 

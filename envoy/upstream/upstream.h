@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
@@ -28,9 +29,52 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "fmt/format.h"
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
+
+/**
+ * A bundle struct for address and socket options.
+ */
+struct UpstreamLocalAddress {
+public:
+  Network::Address::InstanceConstSharedPtr address_;
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+};
+
+/**
+ * Used to select upstream local address based on the endpoint address.
+ */
+class UpstreamLocalAddressSelector {
+public:
+  virtual ~UpstreamLocalAddressSelector() = default;
+
+  /**
+   * Return UpstreamLocalAddress based on the endpoint address.
+   * @param endpoint_address is the address used to select upstream local address.
+   * @param socket_options applied to the selected address.
+   * @return UpstreamLocalAddress which includes the selected upstream local address and socket
+   * options.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const PURE;
+};
+
+/**
+ * RAII handle for tracking the host usage by the connection pools.
+ **/
+class HostHandle {
+public:
+  virtual ~HostHandle() = default;
+};
+
+using HostHandlePtr = std::unique_ptr<HostHandle>;
 
 /**
  * An upstream host.
@@ -148,9 +192,18 @@ public:
   };
 
   /**
-   * @return the health of the host.
+   * @return the coarse health status of the host.
    */
-  virtual Health health() const PURE;
+  virtual Health coarseHealth() const PURE;
+
+  using HealthStatus = envoy::config::core::v3::HealthStatus;
+
+  /**
+   * @return more specific health status of host. This status is hybrid of EDS status and runtime
+   * active status (from active health checker or outlier detection). Active status will be taken as
+   * a priority.
+   */
+  virtual HealthStatus healthStatus() const PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
@@ -180,14 +233,15 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @return the current boolean value of host being in use.
+   * @return the current boolean value of host being in use by any connection pool.
    */
   virtual bool used() const PURE;
 
   /**
-   * @param new_used supplies the new value of host being in use to be stored.
+   * Creates a handle for a host. Deletion of the handle signals that the
+   * connection pools no longer need this host.
    */
-  virtual void used(bool new_used) PURE;
+  virtual HostHandlePtr acquireHandle() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -543,6 +597,7 @@ public:
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
+  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
   COUNTER(upstream_cx_destroy)                                                                     \
   COUNTER(upstream_cx_destroy_local)                                                               \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
@@ -575,6 +630,7 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
   COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
   COUNTER(upstream_rq_retry)                                                                       \
@@ -587,6 +643,7 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
+  COUNTER(upstream_http3_broken)                                                                   \
   GAUGE(lb_subsets_active, Accumulate)                                                             \
   GAUGE(max_host_weight, NeverImport)                                                              \
   GAUGE(membership_degraded, NeverImport)                                                          \
@@ -708,9 +765,18 @@ class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {
 class TypedLoadBalancerFactory;
 
 /**
- * Information about a given upstream cluster.
+ * This is a function used by upstream binding config to select the source address based on the
+ * target address. Given the target address through the parameter expect the source address
+ * returned.
  */
-class ClusterInfo {
+using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
+    const Network::Address::InstanceConstSharedPtr&)>;
+
+/**
+ * Information about a given upstream cluster.
+ * This includes the information and interfaces for building an upstream filter chain.
+ */
+class ClusterInfo : public Http::FilterChainFactory {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
@@ -807,11 +873,10 @@ public:
   }
 
   /**
-   * @return const envoy::config::cluster::v3::LoadBalancingPolicy_Policy& the load balancing policy
-   * to use for this cluster.
+   * @return const ProtobufWkt::Message& the validated load balancing policy configuration to use
+   * for this cluster.
    */
-  virtual const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
-  loadBalancingPolicy() const PURE;
+  virtual const ProtobufTypes::MessagePtr& loadBalancingPolicy() const PURE;
 
   /**
    * @return the load balancer factory for this cluster if the load balancing type is
@@ -955,11 +1020,10 @@ public:
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
-   * Returns an optional source address for upstream connections to bind to.
-   *
-   * @return a source address to bind to or nullptr if no bind need occur.
+   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+  virtual std::shared_ptr<UpstreamLocalAddressSelector>
+  getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.
@@ -975,13 +1039,6 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
-
-  /**
-   *
-   * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
-   *         connections for this cluster.
-   */
-  virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
@@ -1000,6 +1057,11 @@ public:
    * computations until they have been health checked for the first time.
    */
   virtual bool warmHosts() const PURE;
+
+  /**
+   * @return true if this cluster is configured to set local interface name on upstream connections.
+   */
+  virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.
@@ -1120,3 +1182,19 @@ using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>
 
 } // namespace Upstream
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace fmt

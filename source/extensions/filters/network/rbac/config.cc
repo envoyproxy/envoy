@@ -9,6 +9,8 @@
 #include "source/extensions/filters/network/rbac/rbac_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
+#include "xds/type/matcher/v3/matcher.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -76,10 +78,15 @@ Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
     Server::Configuration::FactoryContext& context) {
-  validateRbacRules(proto_config.rules());
-  validateRbacRules(proto_config.shadow_rules());
+  if (proto_config.has_rules()) {
+    validateRbacRules(proto_config.rules());
+  }
+  if (proto_config.has_shadow_rules()) {
+    validateRbacRules(proto_config.shadow_rules());
+  }
   RoleBasedAccessControlFilterConfigSharedPtr config(
       std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),
+                                                           context.getServerFactoryContext(),
                                                            context.messageValidationVisitor()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

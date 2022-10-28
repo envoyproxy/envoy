@@ -34,8 +34,6 @@ void HistogramCompletableTimespanImpl::ensureTimeHistogram(const Histogram& hist
                     "histogram measuring time or fix the unit of the passed histogram.",
                     histogram.name()));
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 uint64_t HistogramCompletableTimespanImpl::tickCount() const {
@@ -49,10 +47,9 @@ uint64_t HistogramCompletableTimespanImpl::tickCount() const {
   case Histogram::Unit::Unspecified:
   case Histogram::Unit::Bytes:
   case Histogram::Unit::Percent:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Stats

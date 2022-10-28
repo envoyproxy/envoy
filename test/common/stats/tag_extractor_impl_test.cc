@@ -202,6 +202,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("listener.127.0.0.1_0.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
                          {listener_address, cipher_name});
 
+  // Stat prefix listener
+  listener_address.value_ = "my_prefix";
+  regex_tester.testRegex("listener.my_prefix.ssl.cipher.AES256-SHA", "listener.ssl.cipher",
+                         {listener_address, cipher_name});
+
+  // Stat prefix with invalid period.
+  listener_address.value_ = "prefix";
+  regex_tester.testRegex("listener.prefix.notmatching.ssl.cipher.AES256-SHA",
+                         "listener.notmatching.ssl.cipher", {listener_address, cipher_name});
+
+  // Stat prefix with negative match for `admin`.
+  regex_tester.testRegex("listener.admin.ssl.cipher.AES256-SHA", "listener.admin.ssl.cipher",
+                         {cipher_name});
+
   // Mongo
   Tag mongo_prefix;
   mongo_prefix.name_ = tag_names.MONGO_PREFIX;
@@ -235,6 +249,18 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   ratelimit_prefix.value_ = "foo_ratelimiter";
   regex_tester.testRegex("ratelimit.foo_ratelimiter.over_limit", "ratelimit.over_limit",
                          {ratelimit_prefix});
+
+  // Local Http Ratelimit
+  Tag local_ratelimit_prefix;
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_HTTP_RATELIMIT_PREFIX;
+  local_ratelimit_prefix.value_ = "foo_ratelimiter";
+  regex_tester.testRegex("foo_ratelimiter.http_local_rate_limit.ok", "http_local_rate_limit.ok",
+                         {local_ratelimit_prefix});
+
+  // Local network Ratelimit
+  local_ratelimit_prefix.name_ = tag_names.LOCAL_NETWORK_RATELIMIT_PREFIX;
+  regex_tester.testRegex("local_rate_limit.foo_ratelimiter.rate_limited",
+                         "local_rate_limit.rate_limited", {local_ratelimit_prefix});
 
   // Dynamo
   Tag dynamo_http_prefix;
@@ -375,10 +401,35 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   // Listener manager worker id
   Tag worker_id;
   worker_id.name_ = tag_names.WORKER_ID;
-  worker_id.value_ = "worker_123";
+  worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
+
+  // Listener worker id
+  listener_address.value_ = "127.0.0.1_3012";
+  regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+
+  listener_address.value_ = "myprefix";
+  regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
+                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+
+  // Server worker id
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+                         {worker_id});
+
+  // Thrift Proxy Prefix
+  Tag thrift_prefix;
+  thrift_prefix.name_ = tag_names.THRIFT_PREFIX;
+  thrift_prefix.value_ = "thrift_prefix";
+  regex_tester.testRegex("thrift.thrift_prefix.response", "thrift.response", {thrift_prefix});
+
+  // Redis Proxy Prefix
+  Tag redis_prefix;
+  redis_prefix.name_ = tag_names.REDIS_PREFIX;
+  redis_prefix.value_ = "my_redis_prefix";
+  regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

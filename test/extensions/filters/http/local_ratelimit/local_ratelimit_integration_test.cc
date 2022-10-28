@@ -34,7 +34,7 @@ typed_config:
       numerator: 100
       denominator: HUNDRED
   response_headers_to_add:
-    - append: false
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
       header:
         key: x-local-rate-limit
         value: 'true'

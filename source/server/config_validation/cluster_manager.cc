@@ -13,7 +13,7 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
   return std::make_unique<ValidationClusterManager>(
       bootstrap, *this, stats_, tls_, context_.runtime(), local_info_, log_manager_,
       context_.mainThreadDispatcher(), admin_, validation_context_, context_.api(), http_context_,
-      grpc_context_, router_context_);
+      grpc_context_, router_context_, server_);
 }
 
 CdsApiPtr ValidationClusterManagerFactory::createCds(

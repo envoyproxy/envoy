@@ -6,7 +6,6 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
@@ -83,18 +82,19 @@ public:
 
   const Verifier* findVerifier(const Http::RequestHeaderMap& headers,
                                const StreamInfo::FilterState& filter_state) const override {
-    for (const auto& pair : rule_pairs_) {
-      if (pair.matcher_->matches(headers)) {
-        return pair.verifier_.get();
+    for (const auto& [matcher, verifier] : rule_pairs_) {
+      if (matcher->matches(headers)) {
+        return verifier.get();
       }
     }
-    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty() &&
-        filter_state.hasData<Router::StringAccessor>(filter_state_name_)) {
-      const auto& state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
-      ENVOY_LOG(debug, "use filter state value {} to find verifier.", state.asString());
-      const auto& it = filter_state_verifiers_.find(state.asString());
-      if (it != filter_state_verifiers_.end()) {
-        return it->second.get();
+    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty()) {
+      if (auto state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
+          state != nullptr) {
+        ENVOY_LOG(debug, "use filter state value {} to find verifier.", state->asString());
+        const auto& it = filter_state_verifiers_.find(state->asString());
+        if (it != filter_state_verifiers_.end()) {
+          return it->second.get();
+        }
       }
     }
     return nullptr;

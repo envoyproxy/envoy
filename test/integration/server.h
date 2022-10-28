@@ -46,7 +46,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
                       FieldValidationConfig validation_config = FieldValidationConfig(),
                       uint32_t concurrency = 1,
                       std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+                      bool use_bootstrap_node_metadata = false);
 
 class TestComponentFactory : public ComponentFactory {
 public:
@@ -70,17 +71,17 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopePtr wrapped_scope)
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
-  ScopePtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
   }
 
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
@@ -167,7 +168,7 @@ public:
 
 private:
   Thread::MutexBasicLockable& lock_;
-  ScopePtr wrapped_scope_;
+  ScopeSharedPtr wrapped_scope_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -330,13 +331,13 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
   }
-  ScopePtr createScope(const std::string& name) override {
+  ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
-  ScopePtr scopeFromStatName(StatName name) override {
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopePtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
+    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
@@ -443,16 +444,18 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr create(
-      const std::string& config_path, const Network::Address::IpVersion version,
-      std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
-      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
-      ProcessObjectOptRef process_object = absl::nullopt,
-      Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-      uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
-      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
+  static IntegrationTestServerPtr
+  create(const std::string& config_path, const Network::Address::IpVersion version,
+         std::function<void(IntegrationTestServer&)> on_server_ready_function,
+         std::function<void()> on_server_init_function,
+         absl::optional<uint64_t> deterministic_value, Event::TestTimeSystem& time_system,
+         Api::Api& api, bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = absl::nullopt,
+         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
+         bool use_bootstrap_node_metadata = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -481,7 +484,7 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -599,7 +602,8 @@ private:
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory,
+                     bool use_bootstrap_node_metadata);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

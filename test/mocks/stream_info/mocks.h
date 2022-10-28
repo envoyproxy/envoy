@@ -16,6 +16,51 @@
 namespace Envoy {
 namespace StreamInfo {
 
+class MockUpstreamInfo : public UpstreamInfo {
+public:
+  MockUpstreamInfo();
+  ~MockUpstreamInfo() override;
+
+  MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(void, setUpstreamConnectionId, (uint64_t id));
+  MOCK_METHOD(absl::optional<uint64_t>, upstreamConnectionId, (), (const));
+  MOCK_METHOD(void, setUpstreamInterfaceName, (absl::string_view interface_name));
+  MOCK_METHOD(absl::optional<absl::string_view>, upstreamInterfaceName, (), (const));
+  MOCK_METHOD(void, setUpstreamSslConnection,
+              (const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info));
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
+  MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
+  MOCK_METHOD(const UpstreamTiming&, upstreamTiming, (), (const));
+  MOCK_METHOD(void, setUpstreamLocalAddress,
+              (const Network::Address::InstanceConstSharedPtr& upstream_local_address));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
+  MOCK_METHOD(void, setUpstreamRemoteAddress,
+              (const Network::Address::InstanceConstSharedPtr& upstream_remote_address));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
+  MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
+  MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
+  MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
+  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
+  MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr& filter_state));
+  MOCK_METHOD(void, setUpstreamNumStreams, (uint64_t num_streams));
+  MOCK_METHOD(uint64_t, upstreamNumStreams, (), (const));
+  MOCK_METHOD(void, setUpstreamProtocol, (Http::Protocol protocol));
+  MOCK_METHOD(absl::optional<Http::Protocol>, upstreamProtocol, (), (const));
+
+  absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<absl::string_view> interface_name_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_connection_info_;
+  UpstreamTiming upstream_timing_;
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
+  std::string failure_reason_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+  FilterStateSharedPtr filter_state_;
+  uint64_t num_streams_ = 0;
+  absl::optional<Http::Protocol> upstream_protocol_;
+};
+
 class MockStreamInfo : public StreamInfo {
 public:
   MockStreamInfo();
@@ -89,6 +134,8 @@ public:
   MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(bool, isShadow, (), (const, override));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

@@ -139,24 +139,28 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
 
     EXPECT_EQ(4, result_params->size());
 
-    EXPECT_EQ("test_string", *result_params->at(0)->toString().value());
-    EXPECT_EQ(4, result_params->at(1)->toBinary().value()->at(4));
+    EXPECT_EQ("test_string", result_params->at(0)->toString().value().get());
+    EXPECT_EQ(4, result_params->at(1)->toBinary().value().get().at(4));
     EXPECT_EQ(233333, *result_params->at(2)->toLong());
-    EXPECT_EQ(3, result_params->at(3)->toUntypedMap().value()->size());
-    EXPECT_EQ("test_value2", *(result_params->at(3)
-                                   ->toUntypedMap()
-                                   .value()
-                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
-                                   ->second->toString()
-                                   .value()));
+    EXPECT_EQ(3, result_params->at(3)->toUntypedMap().value().get().size());
+    EXPECT_EQ("test_value2", result_params->at(3)
+                                 ->toUntypedMap()
+                                 .value()
+                                 .get()
+                                 .find("test2")
+                                 ->second->toString()
+                                 .value()
+                                 .get());
 
     auto& result_attach = invo->mutableAttachment();
-    EXPECT_EQ("test_value2", *(result_attach->attachment()
-                                   .toUntypedMap()
-                                   .value()
-                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
-                                   ->second->toString()
-                                   .value()));
+    EXPECT_EQ("test_value2", result_attach->attachment()
+                                 .toUntypedMap()
+                                 .value()
+                                 .get()
+                                 .find("test2")
+                                 ->second->toString()
+                                 .value()
+                                 .get());
 
     EXPECT_EQ(expected_attachment_offset, result_attach->attachmentOffset());
   }
@@ -203,20 +207,24 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
     EXPECT_EQ(true, invo->hasAttachment());
     EXPECT_EQ(true, invo->hasParameters());
 
-    EXPECT_EQ("test_value2", *(result_attach->attachment()
-                                   .toUntypedMap()
-                                   .value()
-                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
-                                   ->second->toString()
-                                   .value()));
+    EXPECT_EQ("test_value2", result_attach->attachment()
+                                 .toUntypedMap()
+                                 .value()
+                                 .get()
+                                 .find("test2")
+                                 ->second->toString()
+                                 .value()
+                                 .get());
 
     auto& result_params = invo->parameters();
-    EXPECT_EQ("test_value2", *(result_params.at(3)
-                                   ->toUntypedMap()
-                                   .value()
-                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
-                                   ->second->toString()
-                                   .value()));
+    EXPECT_EQ("test_value2", result_params.at(3)
+                                 ->toUntypedMap()
+                                 .value()
+                                 .get()
+                                 .find("test2")
+                                 ->second->toString()
+                                 .value()
+                                 .get());
   }
   // Test case that request only have parameters.
   {
@@ -260,14 +268,16 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
     EXPECT_EQ(true, invo->hasParameters());
 
     auto& result_params = invo->parameters();
-    EXPECT_EQ("test_value2", *(result_params.at(3)
-                                   ->toUntypedMap()
-                                   .value()
-                                   ->find(std::make_unique<Hessian2::StringObject>("test2"))
-                                   ->second->toString()
-                                   .value()));
+    EXPECT_EQ("test_value2", result_params.at(3)
+                                 ->toUntypedMap()
+                                 .value()
+                                 .get()
+                                 .find("test2")
+                                 ->second->toString()
+                                 .value()
+                                 .get());
 
-    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value()->empty());
+    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value().get().empty());
   }
   // Test the case where there are not enough parameters in the request buffer.
   {
@@ -340,7 +350,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocationWithParametersOrAttachment) {
     context->originMessage().move(buffer, buffer.length());
 
     auto& result_attach = invo->mutableAttachment();
-    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value()->empty());
+    EXPECT_EQ(true, result_attach->attachment().toUntypedMap().value().get().empty());
   }
 }
 
@@ -358,7 +368,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         't',
     }));
 
-    context->setBodySize(4);
+    context->setBodySize(buffer.length());
 
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
                               "Cannot parse RpcResult type from buffer");
@@ -370,7 +380,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x94',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->setBodySize(4);
+    context->setBodySize(buffer.length());
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_FALSE(result.first->hasException());
@@ -382,7 +392,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
         '\x93',                   // return type
         0x04, 't', 'e', 's', 't', // return body
     }));
-    context->setBodySize(4);
+    context->setBodySize(buffer.length());
     auto result = serializer.deserializeRpcResult(buffer, context);
     EXPECT_TRUE(result.second);
     EXPECT_TRUE(result.first->hasException());
@@ -412,12 +422,36 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     EXPECT_FALSE(result.first->hasException());
   }
 
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        '\x95', // return type
+        'H',    // return attachment
+        0x03,
+        'k',
+        'e',
+        'y',
+        0x05,
+        'v',
+        'a',
+        'l',
+        'u',
+        'e',
+        'Z',
+    }));
+
+    context->setBodySize(buffer.length());
+    auto result = serializer.deserializeRpcResult(buffer, context);
+    EXPECT_TRUE(result.second);
+    EXPECT_FALSE(result.first->hasException());
+  }
+
   // incorrect body size
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
         '\x94',                   // return type
-        0x05, 't', 'e', 's', 't', // return body
+        0x04, 't', 'e', 's', 't', // return body
     }));
     context->setBodySize(0);
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
@@ -429,7 +463,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
         '\x96',                   // incorrect return type
-        0x05, 't', 'e', 's', 't', // return body
+        0x04, 't', 'e', 's', 't', // return body
     }));
     context->setBodySize(buffer.length());
     EXPECT_THROW_WITH_MESSAGE(serializer.deserializeRpcResult(buffer, context), EnvoyException,
@@ -441,7 +475,7 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
         '\x92',                   // without the value of the return type
-        0x05, 't', 'e', 's', 't', // return body
+        0x04, 't', 'e', 's', 't', // return body
     }));
     std::string exception_string =
         fmt::format("RpcResult is no value, but the rest of the body size({}) not equal 0",

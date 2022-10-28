@@ -37,6 +37,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :linenos:
     :lines: 1-5
     :emphasize-lines: 1-3
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`
 
 .. _start_quick_start_dynamic_dynamic_resources:
 
@@ -55,6 +56,7 @@ In this example, the configuration is provided by the ``xds_cluster`` configured
     :lines: 3-19
     :lineno-start: 3
     :emphasize-lines: 3-15
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`
 
 .. _start_quick_start_dynamic_static_resources:
 
@@ -72,3 +74,4 @@ The ``xds_cluster`` is configured to query a control plane at http://my-control-
     :lines: 17-38
     :lineno-start: 17
     :emphasize-lines: 3-20
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`

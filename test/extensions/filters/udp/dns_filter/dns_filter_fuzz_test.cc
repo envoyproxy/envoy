@@ -27,8 +27,11 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   static NiceMock<Stats::MockCounter> mock_query_buffer_underflow;
   static NiceMock<Stats::MockCounter> mock_record_name_overflow;
   static NiceMock<Stats::MockCounter> query_parsing_failure;
+  static NiceMock<Stats::MockCounter> queries_with_additional_rrs;
+  static NiceMock<Stats::MockCounter> queries_with_ans_or_authority_rrs;
   static DnsParserCounters counters(mock_query_buffer_underflow, mock_record_name_overflow,
-                                    query_parsing_failure);
+                                    query_parsing_failure, queries_with_additional_rrs,
+                                    queries_with_ans_or_authority_rrs);
 
   FuzzedDataProvider data_provider(buf, len);
   Buffer::InstancePtr query_buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -39,27 +42,12 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
     const uint16_t retry_count = data_provider.ConsumeIntegralInRange<uint16_t>(0, 3);
     DnsMessageParser message_parser(true, api->timeSource(), retry_count, random, histogram);
-    uint64_t offset = data_provider.ConsumeIntegralInRange<uint64_t>(0, query.size());
 
-    const uint8_t fuzz_function = data_provider.ConsumeIntegralInRange<uint8_t>(0, 2);
-    switch (fuzz_function) {
-    case 0: {
-      DnsQueryContextPtr query_context =
-          std::make_unique<DnsQueryContext>(local, peer, counters, retry_count);
-      bool result = message_parser.parseDnsObject(query_context, query_buffer);
-      UNREFERENCED_PARAMETER(result);
-    } break;
+    DnsQueryContextPtr query_context =
+        std::make_unique<DnsQueryContext>(local, peer, counters, retry_count);
+    bool result = message_parser.parseDnsObject(query_context, query_buffer);
+    UNREFERENCED_PARAMETER(result);
 
-    case 1: {
-      DnsQueryRecordPtr ptr = message_parser.parseDnsQueryRecord(query_buffer, offset);
-      UNREFERENCED_PARAMETER(ptr);
-    } break;
-
-    case 2: {
-      DnsAnswerRecordPtr ptr = message_parser.parseDnsAnswerRecord(query_buffer, offset);
-      UNREFERENCED_PARAMETER(ptr);
-    } break;
-    } // end case
     query_buffer->drain(query_buffer->length());
   }
 }

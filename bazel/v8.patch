@@ -1,0 +1,74 @@
+# 1. Use already imported python dependencies
+# 2. Disable pointer compression (limits the maximum number of WasmVMs).
+# 3. Add support for --define=no_debug_info=1.
+# 4. Don't expose Wasm C API (only Wasm C++ API).
+
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90e7e..ced403d5aa 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4,7 +4,7 @@
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
+ load("@rules_python//python:defs.bzl", "py_binary")
+-load("@v8_python_deps//:requirements.bzl", "requirement")
++load("@base_pip3//:requirements.bzl", "requirement")
+ load(
+     "@v8//:bazel/defs.bzl",
+     "v8_binary",
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90e7e..3fcb38b3f3 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -157,7 +157,7 @@ v8_int(
+ # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
+ v8_string(
+     name = "v8_enable_pointer_compression",
+-    default = "none",
++    default = "False",
+ )
+ 
+ # Default setting for v8_enable_pointer_compression.
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index e957c0fad3..eee285ab60 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -116,6 +116,7 @@ def _default_args():
+         }) + select({
+             "@v8//bazel/config:is_clang": [
+                 "-Wno-invalid-offsetof",
++                "-Wno-unneeded-internal-declaration",
+                 "-std=c++17",
+             ],
+             "@v8//bazel/config:is_gcc": [
+@@ -151,6 +152,11 @@ def _default_args():
+                 "-fno-integrated-as",
+             ],
+             "//conditions:default": [],
++        }) + select({
++            "@envoy//bazel:no_debug_info": [
++                "-g0",
++            ],
++            "//conditions:default": [],
+         }),
+         includes = ["include"],
+         linkopts = select({
+diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
+index ce3f569fd5..dc8a4c4f6a 100644
+--- a/src/wasm/c-api.cc
++++ b/src/wasm/c-api.cc
+@@ -2238,6 +2238,8 @@ auto Instance::exports() const -> ownvec<Extern> {
+ 
+ }  // namespace wasm
+ 
++#if 0
++
+ // BEGIN FILE wasm-c.cc
+ 
+ extern "C" {
+@@ -3257,3 +3259,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
+ #undef WASM_DEFINE_SHARABLE_REF
+ 
+ }  // extern "C"
++
++#endif

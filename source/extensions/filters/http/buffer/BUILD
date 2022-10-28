@@ -36,8 +36,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    visibility = ["//visibility:public"],
+    # Many tests need to buffer to test streaming vs buffering.
+    extra_visibility = [
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",

@@ -1,9 +1,39 @@
+#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace {
+
+struct FormatterOnEnvoyHeadersTestParams {
+  Network::Address::IpVersion ip_version;
+  envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers;
+};
+
+std::string formatterOnEnvoyHeadersTestParamsToString(
+    const ::testing::TestParamInfo<FormatterOnEnvoyHeadersTestParams>& p) {
+  return fmt::format("{}_{}",
+                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                     p.param.formatter_type_on_envoy_headers);
+}
+
+std::vector<FormatterOnEnvoyHeadersTestParams> getFormatterOnEnvoyHeadersTestParams() {
+  std::vector<FormatterOnEnvoyHeadersTestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(FormatterOnEnvoyHeadersTestParams{
+        ip_version, envoy::extensions::http::header_formatters::preserve_case::v3::
+                        PreserveCaseFormatterConfig::DEFAULT});
+    ret.push_back(FormatterOnEnvoyHeadersTestParams{
+        ip_version, envoy::extensions::http::header_formatters::preserve_case::v3::
+                        PreserveCaseFormatterConfig::PROPER_CASE});
+  }
+
+  return ret;
+}
 
 // Demonstrate using a filter to affect the case.
 class PreserveCaseFilter : public Http::PassThroughFilter {
@@ -13,35 +43,45 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     headers.addCopy(Http::LowerCaseString("request-header"), "request-header-value");
     headers.formatter()->processKey("Request-Header");
+
+    headers.addCopy(Http::LowerCaseString("x-forwarded-for"), "x-forwarded-for-value");
+
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
     headers.addCopy(Http::LowerCaseString("response-header"), "response-header-value");
     headers.formatter()->processKey("Response-Header");
+
+    headers.addCopy(Http::LowerCaseString("hello-header"), "hello-header-value");
+
     return Http::FilterHeadersStatus::Continue;
   }
 };
 
 constexpr char PreserveCaseFilter::name[];
 
-class PreserveCaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                    public HttpIntegrationTest {
+class PreserveCaseIntegrationTest
+    : public testing::TestWithParam<FormatterOnEnvoyHeadersTestParams>,
+      public HttpIntegrationTest {
 public:
   PreserveCaseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version),
+        registration_(factory_) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::extensions::filters::network::
-                                            http_connection_manager::v3::HttpConnectionManager&
-                                                hcm) {
-      auto typed_extension_config = hcm.mutable_http_protocol_options()
-                                        ->mutable_header_key_format()
-                                        ->mutable_stateful_formatter();
-      typed_extension_config->set_name("preserve_case");
-      typed_extension_config->mutable_typed_config()->set_type_url(
-          "type.googleapis.com/"
-          "envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig");
-    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto typed_extension_config = hcm.mutable_http_protocol_options()
+                                            ->mutable_header_key_format()
+                                            ->mutable_stateful_formatter();
+          typed_extension_config->set_name("preserve_case");
+          auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
+                                                   preserve_case::v3::PreserveCaseFormatterConfig>(
+              fmt::format("formatter_type_on_envoy_headers: {}",
+                          GetParam().formatter_type_on_envoy_headers));
+          typed_extension_config->mutable_typed_config()->PackFrom(config);
+        });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       ConfigHelper::HttpProtocolOptions protocol_options;
@@ -50,9 +90,11 @@ public:
                                         ->mutable_header_key_format()
                                         ->mutable_stateful_formatter();
       typed_extension_config->set_name("preserve_case");
-      typed_extension_config->mutable_typed_config()->set_type_url(
-          "type.googleapis.com/"
-          "envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig");
+      auto config =
+          TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
+                                     PreserveCaseFormatterConfig>(fmt::format(
+              "formatter_type_on_envoy_headers: {}", GetParam().formatter_type_on_envoy_headers));
+      typed_extension_config->mutable_typed_config()->PackFrom(config);
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);
     });
@@ -65,8 +107,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+                         testing::ValuesIn(getFormatterOnEnvoyHeadersTestParams()),
+                         formatterOnEnvoyHeadersTestParamsToString);
 
 // Verify that we preserve case in both directions.
 TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
@@ -90,6 +132,19 @@ TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
   EXPECT_TRUE(absl::StrContains(upstream_request, "My-Request-Header: foo"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "HOst: host"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "Request-Header: request-header-value"));
+  switch (GetParam().formatter_type_on_envoy_headers) {
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      DEFAULT:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "x-forwarded-for: x-forwarded-for-value"));
+    break;
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      PROPER_CASE:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "X-Forwarded-For: x-forwarded-for-value"));
+    break;
+  default:
+    EXPECT_TRUE(absl::StrContains(upstream_request, "x-forwarded-for: x-forwarded-for-value"));
+    break;
+  }
 
   // Verify that the downstream response has preserved cased headers.
   auto response =
@@ -100,6 +155,20 @@ TEST_P(PreserveCaseIntegrationTest, EndToEnd) {
   tcp_client->waitForData("Content-Length: 0", false);
   tcp_client->waitForData("My-Response-Header: foo", false);
   tcp_client->waitForData("Response-Header: response-header-value", false);
+  switch (GetParam().formatter_type_on_envoy_headers) {
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      DEFAULT:
+    tcp_client->waitForData("hello-header: hello-header-value", false);
+    break;
+  case envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig::
+      PROPER_CASE:
+    tcp_client->waitForData("Hello-Header: hello-header-value", false);
+    break;
+  default:
+    tcp_client->waitForData("hello-header: hello-header-value", false);
+    break;
+  }
+
   tcp_client->close();
 }
 

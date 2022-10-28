@@ -3,12 +3,11 @@ use proxy_wasm::traits::{Context, HttpContext, RootContext};
 use proxy_wasm::types::*;
 use std::convert::TryFrom;
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> { Box::new(TestRoot) });
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
-}
+}}
 
 struct TestRoot;
 

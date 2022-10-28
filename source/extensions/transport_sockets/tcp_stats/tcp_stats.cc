@@ -9,7 +9,7 @@
 
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 
-#include </usr/include/linux/tcp.h>
+#include <linux/tcp.h>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
@@ -79,7 +79,7 @@ absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
   const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
-  if ((result.return_value_ != 0) || (optlen < sizeof(info))) {
+  if (result.return_value_ != 0) {
     ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
               result.return_value_, result.errno_, optlen);
     return absl::nullopt;

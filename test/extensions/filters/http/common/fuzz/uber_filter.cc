@@ -1,6 +1,8 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
+#include "source/common/common/thread_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -13,7 +15,11 @@ namespace Extensions {
 namespace HttpFilters {
 
 UberFilterFuzzer::UberFilterFuzzer()
-    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_} {
+    : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
+      thread_factory_(Thread::threadFactoryForTest()) {
+  ON_CALL(api_, threadFactory()).WillByDefault(testing::ReturnRef(thread_factory_));
+  worker_thread_dispatcher_ =
+      std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
       .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
@@ -77,12 +83,36 @@ void UberFilterFuzzer::fuzz(
   // Data path should not throw exceptions.
   if (decoder_filter_ != nullptr) {
     HttpFilterFuzzer::runData(decoder_filter_.get(), downstream_data);
+  } else {
+    decoding_finished_ = true;
   }
   if (encoder_filter_ != nullptr) {
     HttpFilterFuzzer::runData(encoder_filter_.get(), upstream_data);
+  } else {
+    encoding_finished_ = true;
   }
   if (access_logger_ != nullptr) {
     HttpFilterFuzzer::accessLog(access_logger_.get(), stream_info_);
+  }
+
+  // Most filters should have finished processing during runData, but filters that
+  // rely on an additional thread (e.g. for file system interaction) may need to wait
+  // for the worker thread to complete the filter's task.
+  // We can't use a time-based timeout for this, as lint forbids use of clock time,
+  // and fake time isn't useful for allowing other threads to complete work.
+  int loop_cycles = 5000;
+  while (!isFilterFinished() && --loop_cycles > 0) {
+    worker_thread_dispatcher_->run(Event::DispatcherImpl::RunType::NonBlock);
+    // Apparently RunType::Block doesn't actually block if there's only a timer
+    // event not ready to fire, so we use NonBlock for clarity, and this loop
+    // spins. We yield to keep it from spinning too wildly. For almost all cases
+    // this shouldn't matter as even entering the loop at all is rare, and for
+    // the cases where the loop is useful, a few cycles should be enough to
+    // complete unless the test is genuinely failing.
+    std::this_thread::yield();
+  }
+  if (!isFilterFinished()) {
+    throw EnvoyException("filter did not finish processing");
   }
 
   reset();
@@ -100,6 +130,8 @@ void UberFilterFuzzer::reset() {
   encoder_filter_.reset();
 
   access_logger_.reset();
+  custom_stat_namespaces_ = Stats::CustomStatNamespacesImpl();
+  decoding_buffer_ = nullptr;
   HttpFilterFuzzer::reset();
 }
 

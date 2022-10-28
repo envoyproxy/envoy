@@ -29,7 +29,7 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     san_matcher.set_san_type(san_type);
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
-      continue;
+      EXPECT_DEATH(createStringSanMatcher(san_matcher), "unhandled value");
     } else {
       const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
       EXPECT_NE(matcher.get(), nullptr);
@@ -49,6 +49,12 @@ TEST(SanMatcherConfigTest, UnspecifiedSanType) {
       envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SAN_TYPE_UNSPECIFIED);
   EXPECT_THROW_WITH_REGEX(TestUtility::validate(san_matcher), EnvoyException,
                           "Proto constraint validation failed");
+
+  auto san_type =
+      static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>(
+          static_cast<int>(123));
+  san_matcher.set_san_type(san_type);
+  EXPECT_EQ(createStringSanMatcher(san_matcher), nullptr);
 }
 
 } // namespace Tls

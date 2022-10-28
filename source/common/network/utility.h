@@ -9,6 +9,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/common/statusor.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -101,6 +103,14 @@ public:
   static Address::InstanceConstSharedPtr resolveUrl(const std::string& url);
 
   /**
+   * Determine the socket type for a URL.
+   *
+   * @param url supplies the url to resolve.
+   * @return StatusOr<Socket::Type> of the socket type, or an error status if url is invalid.
+   */
+  static StatusOr<Socket::Type> socketTypeFromUrl(const std::string& url);
+
+  /**
    * Match a URL to the TCP scheme
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the TCP scheme, false otherwise.
@@ -120,34 +130,6 @@ public:
    * @return bool true if the URL matches the Unix scheme, false otherwise.
    */
   static bool urlIsUnixScheme(absl::string_view url);
-
-  /**
-   * Parses the host from a TCP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a TCP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromTcpUrl(const std::string& url);
-
-  /**
-   * Parses the host from a UDP URL
-   * @param the URL to parse host from
-   * @return std::string the parsed host
-   */
-  static std::string hostFromUdpUrl(const std::string& url);
-
-  /**
-   * Parses the port from a UDP URL
-   * @param the URL to parse port from
-   * @return uint32_t the parsed port
-   */
-  static uint32_t portFromUdpUrl(const std::string& url);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) and create an Instance from it. The address must
@@ -217,7 +199,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isSameIpOrLoopback(const ConnectionSocket& socket);
+  static bool isSameIpOrLoopback(const ConnectionInfoProvider& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -406,6 +388,15 @@ private:
    * @return the absl::uint128 of the input having the bytes flipped.
    */
   static absl::uint128 flipOrder(const absl::uint128& input);
+};
+
+/**
+ * Log formatter for an address.
+ */
+struct AddressStrFormatter {
+  void operator()(std::string* out, const Network::Address::InstanceConstSharedPtr& instance) {
+    out->append(instance->asString());
+  }
 };
 
 } // namespace Network

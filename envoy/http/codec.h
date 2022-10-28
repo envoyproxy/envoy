@@ -329,7 +329,7 @@ public:
    * configured.
    * @return uint32_t the stream's configured buffer limits.
    */
-  virtual uint32_t bufferLimit() PURE;
+  virtual uint32_t bufferLimit() const PURE;
 
   /**
    * @return string_view optionally return the reason behind codec level errors.
@@ -341,10 +341,10 @@ public:
   virtual absl::string_view responseDetails() { return ""; }
 
   /**
-   * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
-   * with the stream.
+   * @return const Network::ConnectionInfoProvider& the adderess provider  of the connection
+   * associated with the stream.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() PURE;
 
   /**
    * Set the flush timeout for the stream. At the codec level this is used to bound the amount of
@@ -352,6 +352,11 @@ public:
    * small window updates as satisfying the idle timeout as this is a potential DoS vector.
    */
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
 
   /**
    * Sets the account for this stream, propagating it to all of its buffers.
@@ -453,6 +458,9 @@ struct Http1Settings {
   // True if this is an edge Envoy (using downstream address, no trusted hops)
   // and https:// URLs should be rejected over unencrypted connections.
   bool validate_scheme_{false};
+
+  // If true, Envoy will send a fully qualified URL in the firstline of the request.
+  bool send_fully_qualified_url_{false};
 };
 
 /**

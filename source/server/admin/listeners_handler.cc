@@ -12,9 +12,10 @@ namespace Server {
 
 ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                                   Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
+                                                   Buffer::Instance& response,
+                                                   AdminStream& admin_query) {
+  const Http::Utility::QueryParams params = admin_query.queryParams();
 
   ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
@@ -37,10 +38,10 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
   return Http::Code::OK;
 }
 
-Http::Code ListenersHandler::handlerListenerInfo(absl::string_view url,
-                                                 Http::ResponseHeaderMap& response_headers,
-                                                 Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+Http::Code ListenersHandler::handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
+                                                 Buffer::Instance& response,
+                                                 AdminStream& admin_query) {
+  const Http::Utility::QueryParams query_params = admin_query.queryParams();
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {
@@ -57,16 +58,25 @@ void ListenersHandler::writeListenersAsJson(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
     envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
-                                               *listener_status.mutable_local_address());
+    Network::Utility::addressToProtobufAddress(
+        *listener.get().listenSocketFactories()[0]->localAddress(),
+        *listener_status.mutable_local_address());
+    for (std::vector<Network::ListenSocketFactoryPtr>::size_type i = 1;
+         i < listener.get().listenSocketFactories().size(); i++) {
+      auto address = listener_status.add_additional_local_addresses();
+      Network::Utility::addressToProtobufAddress(
+          *listener.get().listenSocketFactories()[i]->localAddress(), *address);
+    }
   }
   response.add(MessageUtil::getJsonStringFromMessageOrError(listeners, true)); // pretty-print
 }
 
 void ListenersHandler::writeListenersAsText(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
-    response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().listenSocketFactory().localAddress()->asString()));
+    for (auto& socket_factory : listener.get().listenSocketFactories()) {
+      response.add(fmt::format("{}::{}\n", listener.get().name(),
+                               socket_factory->localAddress()->asString()));
+    }
   }
 }
 

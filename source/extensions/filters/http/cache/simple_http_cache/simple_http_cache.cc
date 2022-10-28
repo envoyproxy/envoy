@@ -59,12 +59,15 @@ public:
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata, bool end_stream) override {
+                     const ResponseMetadata& metadata, InsertCallback insert_success,
+                     bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
     metadata_ = metadata;
     if (end_stream) {
-      commit();
+      insert_success(commit());
+    } else {
+      insert_success(true);
     }
   }
 
@@ -75,29 +78,31 @@ public:
 
     body_.add(chunk);
     if (end_stream) {
-      commit();
+      ready_for_next_chunk(commit());
     } else {
       ready_for_next_chunk(true);
     }
   }
 
-  void insertTrailers(const Http::ResponseTrailerMap& trailers) override {
+  void insertTrailers(const Http::ResponseTrailerMap& trailers,
+                      InsertCallback insert_complete) override {
     ASSERT(!committed_);
     trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers);
-    commit();
+    insert_complete(commit());
   }
 
   void onDestroy() override {}
 
 private:
-  void commit() {
+  bool commit() {
     committed_ = true;
     if (VaryHeaderUtils::hasVary(*response_headers_)) {
-      cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                        request_headers_, vary_allow_list_, std::move(trailers_));
+      return cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_),
+                               body_.toString(), request_headers_, vary_allow_list_,
+                               std::move(trailers_));
     } else {
-      cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                    std::move(trailers_));
+      return cache_.insert(key_, std::move(response_headers_), std::move(metadata_),
+                           body_.toString(), std::move(trailers_));
     }
   }
 
@@ -138,19 +143,22 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
-                                    const ResponseMetadata& metadata) {
+                                    const ResponseMetadata& metadata,
+                                    std::function<void(bool)> on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
 
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
+    on_complete(false);
     return;
   }
   auto& entry = iter->second;
 
   // TODO(tangsaidi) handle Vary header updates properly
   if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
+    on_complete(false);
     return;
   }
 
@@ -183,6 +191,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;
+  on_complete(true);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -206,12 +215,13 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   }
 }
 
-void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
+bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              ResponseMetadata&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
   absl::WriterMutexLock lock(&mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
                                      std::move(body), std::move(trailers)};
+  return true;
 }
 
 SimpleHttpCache::Entry
@@ -249,7 +259,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
       iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
 }
 
-void SimpleHttpCache::varyInsert(const Key& request_key,
+bool SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
                                  ResponseMetadata&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_headers,
@@ -267,7 +277,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
   if (!vary_identifier.has_value()) {
     // Skip the insert if we are unable to create a vary key.
-    return;
+    return false;
   }
 
   varied_request_key.add_custom_fields(vary_identifier.value());
@@ -289,6 +299,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     map_[request_key] =
         SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list), {}};
   }
+  return true;
 }
 
 InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
@@ -305,6 +316,8 @@ CacheInfo SimpleHttpCache::cacheInfo() const {
   return cache_info;
 }
 
+SINGLETON_MANAGER_REGISTRATION(simple_http_cache_singleton);
+
 class SimpleHttpCacheFactory : public HttpCacheFactory {
 public:
   // From UntypedFactory
@@ -315,13 +328,17 @@ public:
         envoy::extensions::cache::simple_http_cache::v3::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
-  HttpCache& getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-                      Server::Configuration::FactoryContext&) override {
-    return cache_;
+  std::shared_ptr<HttpCache>
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
+           Server::Configuration::FactoryContext& context) override {
+    return context.singletonManager().getTyped<SimpleHttpCache>(
+        SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), &createCache);
   }
 
 private:
-  SimpleHttpCache cache_;
+  static std::shared_ptr<Singleton::Instance> createCache() {
+    return std::make_shared<SimpleHttpCache>();
+  }
 };
 
 static Registry::RegisterFactory<SimpleHttpCacheFactory, HttpCacheFactory> register_;

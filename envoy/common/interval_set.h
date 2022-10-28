@@ -37,6 +37,14 @@ public:
    * Clears the contents of the interval set.
    */
   virtual void clear() PURE;
+
+  /**
+   * Determines whether the specified Value is in any of the intervals.
+   *
+   * @param value the value
+   * @return true if value is covered in the inteval set.
+   */
+  virtual bool test(Value value) const PURE;
 };
 
 } // namespace Envoy

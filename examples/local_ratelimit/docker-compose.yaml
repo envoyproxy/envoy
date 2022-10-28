@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  envoy-stat:
+    build:
+      context: .
+      dockerfile: Dockerfile-ratelimit
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_STATS0:-9901}:9901"
+    - "${PORT_STATS1:-9902}:9902"
+  service:
+    build:
+      context: .
+      dockerfile: Dockerfile-nginx

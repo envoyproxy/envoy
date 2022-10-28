@@ -144,7 +144,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
     stats_.local_response_business_exception_.inc();
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected status");
   }
 }
 

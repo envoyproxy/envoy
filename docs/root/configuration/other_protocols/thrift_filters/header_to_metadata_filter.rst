@@ -2,8 +2,8 @@
 
 Envoy Header-To-Metadata Filter
 ===============================
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
-* This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata>`
 
 This filter is configured with rules that will be matched against requests.
 Each rule has either a header and can be triggered either when the header is present or missing.
@@ -25,40 +25,21 @@ Example
 A sample filter configuration to route traffic to endpoints based on the presence or
 absence of a version header could be:
 
-.. code-block:: yaml
-
-  thrift_filters:
-    - name: envoy.filters.thrift.header_to_metadata
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.thrift.header_to_metadata.v3.HeaderToMetadata
-        request_rules:
-          - header: x-version
-            on_header_present:
-              metadata_namespace: envoy.lb
-              key: version
-              type: STRING
-            on_header_missing:
-              metadata_namespace: envoy.lb
-              key: default
-              value: 'true'
-              type: STRING
-            remove: false
+.. literalinclude:: _include/header-to-metadata-filter.yaml
+    :language: yaml
+    :lines: 20-35
+    :lineno-start: 20
+    :linenos:
+    :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
 A corresponding upstream cluster configuration could be:
 
-.. code-block:: yaml
-
-  clusters:
-    - name: versioned-cluster
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      lb_subset_config:
-        fallback_policy: ANY_ENDPOINT
-        subset_selectors:
-          - keys:
-              - default
-          - keys:
-              - version
+.. literalinclude:: _include/header-to-metadata-filter.yaml
+    :language: yaml
+    :lines: 37-47
+    :lineno-start: 37
+    :linenos:
+    :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
 This would then allow requests with the ``x-version`` header set to be matched against
 endpoints with the corresponding version. Whereas requests with that header missing
@@ -67,22 +48,12 @@ would be matched with the default endpoints.
 If the header's value needs to be transformed before it's added to the request as
 dynamic metadata, this filter supports regex matching and substitution:
 
-.. code-block:: yaml
-
-  thrift_filters:
-    - name: envoy.filters.thrift.header_to_metadata
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.thrift.header_to_metadata.v3.HeaderToMetadata
-        request_rules:
-          - header: ":path"
-            on_header_present:
-              metadata_namespace: envoy.lb
-              key: cluster
-              regex_value_rewrite:
-                pattern:
-                  google_re2: {}
-                  regex: "^/(cluster[\\d\\w-]+)/?.*$"
-                substitution: "\\1"
+.. literalinclude:: _include/header-to-metadata-filter-regex-substitution.yaml
+    :language: yaml
+    :lines: 20-32
+    :lineno-start: 20
+    :linenos:
+    :caption: :download:`header-to-metadata-filter-regex-substitution.yaml <_include/header-to-metadata-filter-regex-substitution.yaml>`
 
 Statistics
 ----------

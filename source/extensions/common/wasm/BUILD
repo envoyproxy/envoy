@@ -14,6 +14,7 @@ envoy_cc_library(
         "wasm_runtime_factory.h",
     ],
     deps = [
+        "//envoy/config:typed_config_interface",
         "@proxy_wasm_cpp_host//:wasm_vm_headers",
     ],
 )
@@ -28,7 +29,6 @@ envoy_cc_library(
         "wasm.h",
         "wasm_vm.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -67,7 +67,11 @@ envoy_cc_library(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//source/extensions:__subpackages__",
+        "//test/extensions:__subpackages__",
+        "//test/test_common:__subpackages__",
+    ],
     deps = [
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",

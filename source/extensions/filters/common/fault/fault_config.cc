@@ -52,7 +52,7 @@ FaultAbortConfig::FaultAbortConfig(
     provider_ = std::make_unique<HeaderAbortProvider>(abort_config.percentage());
     break;
   case envoy::extensions::filters::http::fault::v3::FaultAbort::ErrorTypeCase::ERROR_TYPE_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not set");
   }
 }
 
@@ -110,7 +110,7 @@ FaultDelayConfig::FaultDelayConfig(
     break;
   case envoy::extensions::filters::common::fault::v3::FaultDelay::FaultDelaySecifierCase::
       FAULT_DELAY_SECIFIER_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not set");
   }
 }
 
@@ -143,7 +143,7 @@ FaultRateLimitConfig::FaultRateLimitConfig(
     break;
   case envoy::extensions::filters::common::fault::v3::FaultRateLimit::LimitTypeCase::
       LIMIT_TYPE_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not set");
   }
 }
 

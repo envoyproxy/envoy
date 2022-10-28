@@ -66,9 +66,10 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = parent_.client_factory_.create(
-        host_, parent_.dispatcher_, *this, redis_command_stats_,
-        parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_);
+    client_ =
+        parent_.client_factory_.create(host_, parent_.dispatcher_, *this, redis_command_stats_,
+                                       parent_.cluster_.info()->statsScope(),
+                                       parent_.auth_username_, parent_.auth_password_, false);
     client_->addConnectionCallbacks(*this);
   }
 
@@ -81,8 +82,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   case Type::Ping:
     current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -107,8 +106,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!parent_.reuse_connection_) {

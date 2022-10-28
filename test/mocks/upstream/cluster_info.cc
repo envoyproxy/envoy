@@ -36,6 +36,20 @@ MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
 
 MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 
+MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
+    Network::Address::InstanceConstSharedPtr& address)
+    : address_(address) {
+  ON_CALL(*this, getUpstreamLocalAddress(_, _))
+      .WillByDefault(
+          Invoke([&](const Network::Address::InstanceConstSharedPtr&,
+                     const Network::ConnectionSocket::OptionsSharedPtr&) -> UpstreamLocalAddress {
+            UpstreamLocalAddress ret;
+            ret.address_ = address_;
+            ret.socket_options_ = nullptr;
+            return ret;
+          }));
+}
+
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
@@ -59,9 +73,12 @@ MockClusterInfo::MockClusterInfo()
           cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
-          circuit_breakers_stats_, absl::nullopt, absl::nullopt)),
+          std::numeric_limits<uint64_t>::max(), circuit_breakers_stats_, absl::nullopt,
+          absl::nullopt)),
+      upstream_local_address_selector_(
+          std::make_shared<NiceMock<MockUpstreamLocalAddressSelector>>(source_address_)),
       stats_scope_(stats_store_.createScope("test_scope")) {
-  ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
+  ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(5001)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
@@ -92,12 +109,12 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, timeoutBudgetStats())
       .WillByDefault(
           Return(std::reference_wrapper<ClusterTimeoutBudgetStats>(*timeout_budget_stats_)));
-  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
+  ON_CALL(*this, getUpstreamLocalAddressSelector())
+      .WillByDefault(Return(upstream_local_address_selector_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
-  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRoundRobinConfig()).WillByDefault(ReturnRef(lb_round_robin_config_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
@@ -105,7 +122,6 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
-  ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));

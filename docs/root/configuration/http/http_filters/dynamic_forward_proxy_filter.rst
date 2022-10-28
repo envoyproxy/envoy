@@ -4,8 +4,8 @@ Dynamic forward proxy
 =====================
 
 * HTTP dynamic forward proxy :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig>`
-* This filter should be configured with the name *envoy.filters.http.dynamic_forward_proxy*
 
 The following is a complete configuration that configures both the
 :ref:`dynamic forward proxy HTTP filter
@@ -20,6 +20,19 @@ via the :ref:`virtual host's typed_per_filter_config <envoy_v3_api_field_config.
 :ref:`route's typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`. This can be used to rewrite
 the host header with the provided value before DNS lookup, thus allowing to route traffic to the rewritten
 host when forwarding. See the example below within the configured routes.
+
+.. warning::
+
+  Servers operating dynamic forward proxy in environments where either client or destination are
+  untrusted are subject to confused deputy attacks. For example, a client may attempt to use the
+  dynamic forward capability to access a port on the server's localhost, link-local addresses,
+  Cloud-provider metadata server or the private network in which the proxy is operating. Similarly,
+  an untrusted network endpoint might establish DNS records that point to any of the forementioned
+  locations. Dynamic forward proxy servers should be protected by network firewalls, default-deny RBAC and
+  other restrictions on container or kernel networking; the details are setup specific. Please
+  consider carefully auditing the dynamic forward proxy server's networking configuration with the
+  understanding that any address reachable from the proxy is potentially accessible by untrusted
+  clients.
 
 .. note::
 

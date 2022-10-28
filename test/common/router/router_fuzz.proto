@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package test.common.router;
 
-import "validate/validate.proto";
-
 import "google/protobuf/empty.proto";
 
 import "test/fuzz/common.proto";

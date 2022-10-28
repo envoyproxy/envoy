@@ -9,8 +9,8 @@ at the expense of higher CPU load or offloading it to a compression accelerator.
 
 Configuration
 -------------
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
-* This filter should be configured with the name *envoy.filters.http.compressor*.
 
 How it works
 ------------
@@ -19,8 +19,9 @@ determine whether or not the content should be compressed. The content is
 compressed and then sent to the client with the appropriate headers, if
 response and request allow.
 
-Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
-and :ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
+Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`,
+:ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
+and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>`
 compression only. Other compression libraries can be supported as extensions.
 
 An example configuration of the filter may look like the following:
@@ -196,7 +197,7 @@ specific to responses only:
 .. attention:
 
    In case the compressor is not configured to compress responses with the field
-   `response_direction_config` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
+   ``response_direction_config`` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
    message the stats are rooted in the legacy tree
-   <stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*, that is without
+   ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``, that is without
    the direction prefix.

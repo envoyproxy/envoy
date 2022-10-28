@@ -11,7 +11,6 @@ py_binary(
     srcs = ["process_xml.py"],
     deps = [
         "@envoy_repo",
-        requirement("pygithub"),
         requirement("slackclient"),
     ],
 )

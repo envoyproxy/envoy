@@ -50,7 +50,7 @@ void RealThreadsTestHelper::shutdownThreading() {
   });
 }
 
-void RealThreadsTestHelper::exitThreads() {
+void RealThreadsTestHelper::exitThreads(std::function<void()> cleanup) {
   for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
     dispatcher->post([&dispatcher]() { dispatcher->exit(); });
   }
@@ -59,7 +59,10 @@ void RealThreadsTestHelper::exitThreads() {
     thread->join();
   }
 
-  main_dispatcher_->post([this]() {
+  main_dispatcher_->post([this, cleanup]() {
+    if (cleanup != nullptr) {
+      cleanup();
+    }
     tls_.reset();
     main_dispatcher_->exit();
   });
@@ -67,19 +70,33 @@ void RealThreadsTestHelper::exitThreads() {
 }
 
 void RealThreadsTestHelper::runOnAllWorkersBlocking(std::function<void()> work) {
-  absl::Barrier start_barrier(num_threads_);
-  BlockingBarrier blocking_barrier(num_threads_);
+  runOnAllWorkers(work)();
+}
+
+std::function<void()> RealThreadsTestHelper::runOnAllWorkers(std::function<void()> work) {
+  auto start_barrier = std::make_shared<absl::Barrier>(num_threads_);
+  auto blocking_barrier = std::make_shared<BlockingBarrier>(num_threads_);
   for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-    thread_dispatcher->post(blocking_barrier.run([work, &start_barrier]() {
-      start_barrier.Block();
+    thread_dispatcher->post(blocking_barrier->run([work, start_barrier]() {
+      start_barrier->Block();
       work();
     }));
   }
+
+  // When run, this closure will block on the destruction of the blocking barrier.
+  auto waiter = [blocking_barrier]() {};
+  blocking_barrier.reset();
+  return waiter;
 }
 
-void RealThreadsTestHelper::runOnMainBlocking(std::function<void()> work) {
-  BlockingBarrier blocking_barrier(1);
-  main_dispatcher_->post(blocking_barrier.run([work]() { work(); }));
+void RealThreadsTestHelper::runOnMainBlocking(std::function<void()> work) { runOnMain(work)(); }
+
+std::function<void()> RealThreadsTestHelper::runOnMain(std::function<void()> work) {
+  auto blocking_barrier = std::make_shared<BlockingBarrier>(1);
+  main_dispatcher_->post(blocking_barrier->run([work]() { work(); }));
+  auto waiter = [blocking_barrier]() {};
+  blocking_barrier.reset();
+  return waiter;
 }
 
 void RealThreadsTestHelper::mainDispatchBlock() {

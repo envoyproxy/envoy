@@ -1,0 +1,46 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9090
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.thrift_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.ThriftProxy
+          stat_prefix: ingress_thrift
+          route_config:
+            name: local_route
+            routes:
+            - match:
+                method_name: ""
+              route:
+                cluster: versioned-cluster
+          thrift_filters:
+          - name: envoy.filters.thrift.header_to_metadata
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3.HeaderToMetadata
+              request_rules:
+              - header: x-version
+                on_present:
+                  metadata_namespace: envoy.lb
+                  key: cluster
+                  regex_value_rewrite:
+                    pattern:
+                      regex: "^/(cluster[\\d\\w-]+)/?.*$"
+                    substitution: "\\1"
+
+  clusters:
+  - name: versioned-cluster
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: versioned-cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080

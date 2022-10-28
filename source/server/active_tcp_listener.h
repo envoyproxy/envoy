@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
@@ -26,9 +27,13 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
-                    uint32_t worker_index);
+                    Runtime::Loader& runtime, Network::SocketSharedPtr&& socket,
+                    Network::Address::InstanceConstSharedPtr& listen_address,
+                    Network::ConnectionBalancer& connection_balancer);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+                    Network::Address::InstanceConstSharedPtr& listen_address,
+                    Network::ListenerConfig& config,
+                    Network::ConnectionBalancer& connection_balancer, Runtime::Loader& runtime);
   ~ActiveTcpListener() override;
 
   bool listenerConnectionLimitReached() const {
@@ -80,6 +85,12 @@ public:
   // The number of connections currently active on this listener. This is typically used for
   // connection balancing across per-handler listeners.
   std::atomic<uint64_t> num_listener_connections_{};
+
+  Network::ConnectionBalancer& connection_balancer_;
+  // This is the address this listener is listening on. It's used to get the correct listener
+  // when rebalancing. The accepted socket can't be used to get the listening address, since
+  // the accepted socket's remote address can be another address than the listening address.
+  Network::Address::InstanceConstSharedPtr listen_address_;
 };
 
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;

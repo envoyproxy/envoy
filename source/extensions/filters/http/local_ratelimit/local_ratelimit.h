@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,11 @@ struct LocalRateLimitStats {
   ALL_LOCAL_RATE_LIMIT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * Type of virtual host rate limit options
+ */
+enum class VhRateLimitOptions { Override, Include, Ignore };
+
 class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
   PerConnectionRateLimiter(
@@ -70,6 +76,10 @@ public:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  int64_t
+  remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
   LocalRateLimitStats& stats() const { return stats_; }
@@ -87,6 +97,10 @@ public:
     return descriptors_;
   }
   bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
+  bool enableXRateLimitHeaders() const { return enable_x_rate_limit_headers_; }
+  envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
+    return vh_rate_limits_;
+  }
 
 private:
   friend class FilterTest;
@@ -119,6 +133,8 @@ private:
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
+  const bool enable_x_rate_limit_headers_;
+  const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -127,7 +143,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  * HTTP local rate limit filter. Depending on the route configuration, this filter calls consults
  * with local token bucket before allowing further filter iteration.
  */
-class Filter : public Http::PassThroughFilter {
+class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterConfigSharedPtr config) : config_(config) {}
 
@@ -135,16 +151,30 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
+                                          bool end_stream) override;
+
 private:
   friend class FilterTest;
 
   void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
+  void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+                           std::vector<RateLimit::LocalDescriptor>& descriptors,
+                           Http::RequestHeaderMap& headers);
+  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  uint32_t maxTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  uint32_t remainingTokens(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  int64_t remainingFillInterval(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
   const FilterConfig* getConfig() const;
   FilterConfigSharedPtr config_;
+
+  absl::optional<std::vector<RateLimit::LocalDescriptor>> stored_descriptors_;
+  VhRateLimitOptions vh_rate_limits_;
 };
 
 } // namespace LocalRateLimitFilter

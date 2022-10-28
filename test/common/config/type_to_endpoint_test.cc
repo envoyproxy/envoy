@@ -16,13 +16,9 @@ namespace {
 // Verify type-to-endpoint methods with RDS as an exemplar.
 TEST(TypeToEndpoint, All) {
   // The dummy messages are included for link purposes only.
-  envoy::api::v2::RdsDummy _v2_rds_dummy;
   envoy::service::route::v3::RdsDummy _v3_rds_dummy;
 
   // Delta gRPC endpoints.
-  EXPECT_EQ(
-      "envoy.service.route.v3.RouteDiscoveryService.DeltaRoutes",
-      deltaGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
   EXPECT_EQ(
       "envoy.service.route.v3.RouteDiscoveryService.DeltaRoutes",
       deltaGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
@@ -31,13 +27,8 @@ TEST(TypeToEndpoint, All) {
   EXPECT_EQ(
       "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes",
       sotwGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
-  EXPECT_EQ(
-      "envoy.service.route.v3.RouteDiscoveryService.StreamRoutes",
-      sotwGrpcMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
 
   // REST endpoints.
-  EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.FetchRoutes",
-            restMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
   EXPECT_EQ("envoy.service.route.v3.RouteDiscoveryService.FetchRoutes",
             restMethod("type.googleapis.com/envoy.config.route.v3.RouteConfiguration").full_name());
 }

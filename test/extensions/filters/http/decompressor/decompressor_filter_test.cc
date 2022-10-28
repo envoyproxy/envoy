@@ -205,6 +205,24 @@ decompressor_library:
     expectDecompression(decompressor_ptr, end_with_data);
   }
 
+  void testAcceptEncodingFilter(const std::string& original_accept_encoding,
+                                const std::string& final_accept_encoding) {
+    setUpFilter(R"EOF(
+decompressor_library:
+  typed_config:
+    "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+request_direction_config:
+  advertise_accept_encoding: true
+)EOF");
+    Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
+                                                         {"content-length", "256"}};
+    if (isRequestDirection()) {
+      headers_before_filter.addCopy("accept-encoding", original_accept_encoding);
+    }
+    decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
+                        final_accept_encoding);
+  }
+
   Compression::Decompressor::MockDecompressorFactory* decompressor_factory_{};
   DecompressorFilterConfigSharedPtr config_;
   std::unique_ptr<DecompressorFilter> filter_;
@@ -297,6 +315,18 @@ request_direction_config:
   decompressionActive(headers_before_filter, true /* end_with_data */,
                       absl::nullopt /* expected_content_encoding*/,
                       "br,mock" /* expected_accept_encoding */);
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) {
+  // Do not duplicate accept-encoding values. Remove extra accept-encoding values for the
+  // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
+  // to 1.0). Test also whitespace in accept-encoding value string.
+  testAcceptEncodingFilter("br,mock, mock\t,mock ;q=0.3", "br,mock");
+}
+
+TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValue) {
+  // If the accept-encoding header had a q-value, it needs to be removed.
+  testAcceptEncodingFilter("mock;q=0.6", "mock");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
@@ -564,18 +594,12 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
 }
 
 TEST_P(DecompressorFilterTest, DecompressionLibraryNotRegistered) {
-  EXPECT_THROW_WITH_MESSAGE(
-      setUpFilter(R"EOF(
+  EXPECT_THROW(setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
     "@type": "type.googleapis.com/envoy.extensions.compression.does_not_exist"
 )EOF"),
-      EnvoyException,
-      "Unable to parse JSON as proto (INVALID_ARGUMENT:(decompressor_library.typed_config): "
-      "invalid value Invalid type URL, unknown type: envoy.extensions.compression.does_not_exist "
-      "for type Any): "
-      "{\"decompressor_library\":{\"typed_config\":{\"@type\":\"type.googleapis.com/"
-      "envoy.extensions.compression.does_not_exist\"}}}");
+               EnvoyException);
 }
 
 } // namespace

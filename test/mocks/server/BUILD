@@ -242,6 +242,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:tracer_config_interface",
         "//source/common/secret:secret_manager_impl_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/server:config_tracker_mocks",
         "//test/mocks/server:options_mocks",

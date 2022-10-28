@@ -24,9 +24,9 @@ namespace Http {
 namespace Http1 {
 
 ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
-    : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
+    : RequestEncoderWrapper(&parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
-  RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
 }
 
 ActiveClient::StreamWrapper::~StreamWrapper() {
@@ -71,19 +71,11 @@ void ActiveClient::StreamWrapper::onResetStream(StreamResetReason, absl::string_
   parent_.codec_client_->close();
 }
 
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
-    : Envoy::Http::ActiveClient(
-          parent, parent.host()->cluster().maxRequestsPerConnection(),
-          1 // HTTP1 always has a concurrent-request-limit of 1 per connection.
-      ) {
-  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
-}
-
-ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data)
-    : Envoy::Http::ActiveClient(
-          parent, parent.host()->cluster().maxRequestsPerConnection(),
-          1, // HTTP1 always has a concurrent-request-limit of 1 per connection.
-          data) {
+ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
+                           OptRef<Upstream::Host::CreateConnectionData> data)
+    : Envoy::Http::ActiveClient(parent, parent.host()->cluster().maxRequestsPerConnection(),
+                                /* effective_concurrent_stream_limit */ 1,
+                                /* configured_concurrent_stream_limit */ 1, data) {
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
@@ -108,14 +100,16 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
   return std::make_unique<FixedHttpConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
       random_generator, state,
-      [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
+      [](HttpConnPoolImplBase* pool) {
+        return std::make_unique<ActiveClient>(*pool, absl::nullopt);
+      },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP1, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(
+            CodecType::HTTP1, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http11});
+      std::vector<Protocol>{Protocol::Http11}, absl::nullopt, nullptr);
 }
 
 } // namespace Http1

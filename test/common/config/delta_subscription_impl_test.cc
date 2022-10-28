@@ -140,7 +140,8 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   NiceMock<Random::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
-  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>());
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =
@@ -150,11 +151,13 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   if (GetParam() == LegacyOrUnified::Unified) {
     xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        random, stats_store, rate_limit_settings, local_info, false);
+        random, stats_store, rate_limit_settings, local_info, false,
+        std::make_unique<NiceMock<MockCustomConfigValidators>>());
   } else {
     xds_context = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
-        random, stats_store, rate_limit_settings, local_info);
+        random, stats_store, rate_limit_settings, local_info,
+        std::make_unique<NiceMock<MockCustomConfigValidators>>());
   }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(

@@ -39,7 +39,8 @@ void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
 void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
 std::string ZipkinSpan::getBaggage(absl::string_view) { return EMPTY_STRING; }
 
-void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context) {
+void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
+                               const Upstream::HostDescriptionConstSharedPtr&) {
   // Set the trace-id and span-id headers properly, based on the newly-created span structure.
   trace_context.setByReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
                                   span_.traceIdAsHexString());
@@ -95,11 +96,14 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
-  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
+  const bool split_spans_for_request = zipkin_config.split_spans_for_request();
+
+  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context,
+             split_spans_for_request](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer =
-        std::make_unique<Tracer>(local_info_.clusterName(), local_info_.address(), random_generator,
-                                 trace_id_128bit, shared_span_context, time_source_);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
+        shared_span_context, time_source_, split_spans_for_request);
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);

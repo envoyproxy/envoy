@@ -37,12 +37,13 @@ static_resources:
                   value: |
                     {}
                 vm_config:
-                  runtime: "envoy.wasm.runtime.v8"
                   vm_id: "my_vm_id"
                   code:
                     local:
                       filename: "lib/envoy_filter_http_wasm_example.wasm"
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
   - name: web_service

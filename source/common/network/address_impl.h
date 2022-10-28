@@ -18,6 +18,13 @@ namespace Network {
 namespace Address {
 
 /**
+ * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
+ * use v6 sockets.
+ * This appears to be what Android OS does for all platform sockets.
+ */
+bool forceV6();
+
+/**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
  * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
@@ -123,6 +130,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+  absl::string_view addressType() const override { return "default"; }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -196,7 +204,7 @@ public:
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr, bool v6only = true);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
@@ -213,6 +221,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+  absl::string_view addressType() const override { return "default"; }
 
   // Validate that IPv6 is supported on this platform
   static absl::Status validateProtocolSupported();
@@ -232,6 +241,7 @@ private:
     absl::uint128 address() const override;
     bool v6only() const override;
     uint32_t port() const;
+    InstanceConstSharedPtr v4CompatibleAddress() const override;
 
     std::string makeFriendlyAddress() const;
 
@@ -299,6 +309,7 @@ public:
     }
     return sizeof(pipe_.address_);
   }
+  absl::string_view addressType() const override { return "default"; }
 
 private:
   /**
@@ -333,7 +344,7 @@ public:
   /**
    * Construct from a string name.
    */
-  explicit EnvoyInternalInstance(const std::string& address_id,
+  explicit EnvoyInternalInstance(const std::string& address_id, const std::string& endpoint_id = "",
                                  const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
@@ -344,13 +355,17 @@ public:
   // TODO(lambdai): Verify all callers accepts nullptr.
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
+  absl::string_view addressType() const override { return "envoy_internal"; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
-    explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
+    explicit EnvoyInternalAddressImpl(const std::string& address_id, const std::string& endpoint_id)
+        : address_id_(address_id), endpoint_id_(endpoint_id) {}
     ~EnvoyInternalAddressImpl() override = default;
     const std::string& addressId() const override { return address_id_; }
+    const std::string& endpointId() const override { return endpoint_id_; }
     const std::string address_id_;
+    const std::string endpoint_id_;
   };
   EnvoyInternalAddressImpl internal_address_;
 };

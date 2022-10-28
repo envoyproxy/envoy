@@ -14,5 +14,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_lib",
     ],
 )

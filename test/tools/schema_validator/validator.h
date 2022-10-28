@@ -18,7 +18,7 @@ public:
   /**
    * List of supported schemas to validate.
    */
-  enum Type { DiscoveryResponse, Route };
+  enum Type { Bootstrap, DiscoveryResponse, Route };
 
   /**
    * Get a string representation of the schema type.
@@ -28,6 +28,7 @@ public:
   static const std::string& toString(Type type);
 
 private:
+  static const std::string BOOTSTRAP;
   static const std::string DISCOVERY_RESPONSE;
   static const std::string ROUTE;
 };
@@ -37,7 +38,7 @@ private:
  */
 class Options {
 public:
-  Options(int argc, char** argv);
+  Options(int argc, const char* const* argv);
 
   /**
    * @return the schema type.
@@ -49,9 +50,21 @@ public:
    */
   const std::string& configPath() const { return config_path_; }
 
+  /**
+   * @return whether to fail on deprecated fields.
+   */
+  bool failOnDeprecated() const { return fail_on_deprecated_; }
+
+  /**
+   * @return whether to fail on WiP fields.
+   */
+  bool failOnWip() const { return fail_on_wip_; }
+
 private:
   Schema::Type schema_type_;
   std::string config_path_;
+  bool fail_on_deprecated_;
+  bool fail_on_wip_;
 };
 
 /**
@@ -60,15 +73,21 @@ private:
 class Validator {
 public:
   Validator() : api_(Api::createApiForTest(stats_)) {}
+
   /**
    * Validates the configuration at config_path against schema_type.
    * An EnvoyException is thrown in several cases:
    *  - Cannot load the configuration from config_path(invalid path or malformed data).
    *  - A schema error from validating the configuration.
-   * @param config_path specifies the path to the configuration file.
-   * @param schema_type specifies the schema to validate the configuration against.
+   *  - Use of deprecated/WiP fields if configured to fail in those cases.
+   * @param options supplies the validation options.
    */
-  void validate(const std::string& config_path, Schema::Type schema_type);
+  void validate(const Options& options);
+
+  /**
+   * Run the validator from command line arguments.
+   */
+  static void run(int argc, const char* const* argv);
 
 private:
   Stats::IsolatedStoreImpl stats_;

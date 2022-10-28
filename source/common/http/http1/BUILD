@@ -32,6 +32,7 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
+        ":balsa_parser_lib",
         ":codec_stats_lib",
         ":header_formatter_lib",
         ":legacy_parser_lib",
@@ -114,5 +115,20 @@ envoy_cc_library(
     deps = [
         ":parser_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "balsa_parser_lib",
+    srcs = ["balsa_parser.cc"],
+    hdrs = ["balsa_parser.h"],
+    deps = [
+        ":parser_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/http:headers_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_enums_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_frame_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_headers_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_visitor_interface_lib",
     ],
 )

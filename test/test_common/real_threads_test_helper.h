@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Thread {
 
 class RealThreadsTestHelper {
-protected:
+public:
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingBarrier {
   public:
@@ -40,7 +40,7 @@ protected:
   // Shutdown thread local instance.
   void shutdownThreading();
   // Post exit signal and wait for main thread and worker threads to join.
-  void exitThreads();
+  void exitThreads(std::function<void()> cleanup = nullptr);
   // Run the callback in all the workers, block until the callback has finished in all threads.
   void runOnAllWorkersBlocking(std::function<void()> work);
   // Run the callback in main thread, block until the callback has been executed in main thread.
@@ -52,12 +52,21 @@ protected:
   // executed.
   void tlsBlock();
 
-  ThreadLocal::Instance& tls() { return *tls_; }
+  // Runs a function on all workers, and returns a lambda which blocks waiting
+  // for all the workers to finish.
+  std::function<void()> runOnAllWorkers(std::function<void()> work);
 
+  // Runs a function on the main thread, and returns a lambda which blocks
+  // waiting for the main thread to finish.
+  std::function<void()> runOnMain(std::function<void()> work);
+
+  ThreadLocal::Instance& tls() { return *tls_; }
   Api::Api& api() { return *api_; }
+  Event::Dispatcher& mainDispatcher() { return *main_dispatcher_; }
 
   // TODO(chaoqin-li1123): make these variables private when we figure out how to clean up the
   // threading resources inside the helper class.
+protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;

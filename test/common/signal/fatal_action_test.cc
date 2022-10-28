@@ -72,13 +72,6 @@ TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
   EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::ActionManagerUnset);
 }
 
-TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
-  // Register empty list of actions
-  FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest());
-  EXPECT_DEBUG_DEATH(
-      { FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest()); }, "");
-}
-
 TEST_F(FatalActionTest, CanCallRegisteredActions) {
   // Set up Fatal Actions
   safe_actions_.emplace_back(std::make_unique<TestFatalAction>(true, &counter_));

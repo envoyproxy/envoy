@@ -43,7 +43,9 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConf
         auto* config = virtual_host->mutable_typed_per_filter_config();
         (*config)["filter.unknown"].PackFrom(Envoy::ProtobufWkt::Struct());
       });
-  EXPECT_DEATH(initialize(), "Didn't find a registered implementation for name: 'filter.unknown'");
+  EXPECT_DEATH(initialize(),
+               "Didn't find a registered implementation for 'filter.unknown' with type URL: "
+               "'google.protobuf.Struct'");
 }
 
 TEST_F(HTTPTypedPerFilterConfigTest, IgnoreUnknownOptionalHttpFilterInTypedPerFilterConfig) {

@@ -22,7 +22,7 @@ public:
       const quic::QuicCryptoServerConfig* crypto_config,
       quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
       quic::QuicCryptoServerStreamBase::Helper* helper,
-      OptRef<const Network::TransportSocketFactory> transport_socket_factory,
+      OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
       Event::Dispatcher& dispatcher) PURE;
 };
 

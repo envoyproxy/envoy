@@ -18,7 +18,7 @@ std::vector<bool> RouteCoverage::coverageFields() {
     return std::vector<bool>{cluster_covered_, virtual_cluster_covered_, virtual_host_covered_,
                              path_rewrite_covered_, host_rewrite_covered_};
   } else if (direct_response_entry_ != nullptr) {
-    return std::vector<bool>{redirect_path_covered_};
+    return std::vector<bool>{redirect_path_covered_, redirect_code_covered_};
   } else {
     return std::vector<bool>{};
   }
@@ -46,6 +46,10 @@ void Coverage::markHostRewriteCovered(const Envoy::Router::Route& route) {
 
 void Coverage::markRedirectPathCovered(const Envoy::Router::Route& route) {
   coveredRoute(route).setRedirectPathCovered();
+}
+
+void Coverage::markRedirectCodeCovered(const Envoy::Router::Route& route) {
+  coveredRoute(route).setRedirectCodeCovered();
 }
 
 double Coverage::report() {
@@ -95,8 +99,10 @@ void Coverage::printMissingTests(const std::set<std::string>& all_route_names,
   for (const auto& host : route_config_.virtual_hosts()) {
     for (const auto& route : host.routes()) {
       if (missing_route_names.find(route.name()) != missing_route_names.end()) {
-        std::cout << "Missing test for host: " << host.name()
-                  << ", route: " << route.match().DebugString() << std::endl;
+        std::string route_text;
+        Protobuf::TextFormat::PrintToString(route.match(), &route_text);
+        std::cout << "Missing test for host: " << host.name() << ", route: " << route_text
+                  << std::endl;
       }
     }
   }

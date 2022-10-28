@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "envoy/common/exception.h"
+#include "envoy/http/header_formatter.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
@@ -131,6 +132,10 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     return true;
   }
 
+  const bool is_request = metadata.isRequest();
+  auto formatter =
+      is_request ? metadata.requestHeaders().formatter() : metadata.responseHeaders().formatter();
+
   while (header_size > 0) {
     // Attempt to read info blocks
     int32_t info_id = drainVarIntI32(buffer, header_size, "info id");
@@ -148,12 +153,21 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
     while (num_headers-- > 0) {
       std::string key_string = drainVarString(buffer, header_size, "header key");
+      if (formatter) {
+        formatter->processKey(key_string);
+      }
       // LowerCaseString doesn't allow '\0', '\n', and '\r'.
       key_string =
           absl::StrReplaceAll(key_string, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
+
       const Http::LowerCaseString key = Http::LowerCaseString(key_string);
       const std::string value = drainVarString(buffer, header_size, "header value");
-      metadata.headers().addCopy(key, value);
+
+      if (is_request) {
+        metadata.requestHeaders().addCopy(key, value);
+      } else {
+        metadata.responseHeaders().addCopy(key, value);
+      }
     }
   }
 
@@ -179,11 +193,12 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     throw EnvoyException(absl::StrCat("invalid thrift header transport message size ", msg_size));
   }
 
-  const Http::HeaderMap& headers = metadata.headers();
-  if (headers.size() > MaxHeadersSize / 2) {
+  const uint32_t headers_size =
+      metadata.isRequest() ? metadata.requestHeaders().size() : metadata.responseHeaders().size();
+  if (headers_size > MaxHeadersSize / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
-        absl::StrCat("invalid thrift header transport too many headers ", headers.size()));
+        absl::StrCat("invalid thrift header transport too many headers ", headers_size));
   }
 
   Buffer::OwnedImpl header_buffer;
@@ -205,18 +220,31 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   BufferHelper::writeVarIntI32(header_buffer, 0); // num transforms
-  if (!headers.empty()) {
+
+  if (headers_size > 0) {
     // Info ID 1
     header_buffer.writeByte(1);
 
     // Num headers
-    BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
+    BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers_size));
 
-    headers.iterate([&header_buffer](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      writeVarString(header_buffer, header.key().getStringView());
+    auto formatter = metadata.isRequest() ? metadata.requestHeaders().formatter()
+                                          : metadata.responseHeaders().formatter();
+
+    auto header_writer = [&header_buffer,
+                          formatter](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      const auto header_key = header.key().getStringView();
+
+      writeVarString(header_buffer, formatter ? formatter->format(header_key) : header_key);
       writeVarString(header_buffer, header.value().getStringView());
       return Http::HeaderMap::Iterate::Continue;
-    });
+    };
+
+    if (metadata.isRequest()) {
+      metadata.requestHeaders().iterate(header_writer);
+    } else {
+      metadata.responseHeaders().iterate(header_writer);
+    }
   }
 
   uint64_t header_size = header_buffer.length();

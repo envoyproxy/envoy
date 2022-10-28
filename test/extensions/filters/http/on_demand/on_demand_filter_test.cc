@@ -4,13 +4,16 @@
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,35 +23,84 @@ namespace OnDemand {
 class OnDemandFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    filter_ = std::make_unique<OnDemandRouteUpdate>();
+    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
+    odcds_ = nullptr;
+    setupWithConfig(std::move(config));
+  }
+
+  void setupWithCds() {
+    auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
+    odcds_ = mock_odcds.get();
+    auto config = std::make_shared<OnDemandFilterConfig>(
+        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+    setupWithConfig(std::move(config));
+  }
+
+  void setupWithConfig(OnDemandFilterConfigSharedPtr config) {
+    filter_ = std::make_unique<OnDemandRouteUpdate>(std::move(config));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  Upstream::MockOdCdsApiHandle* odcds_;
   std::unique_ptr<OnDemandRouteUpdate> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
-// tests decodeHeaders() when no cached route is available and vhds is configured
-TEST_F(OnDemandFilterTest, TestDecodeHeaders) {
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButHasNoEntry) {
+  setupWithCds();
   Http::TestRequestHeaderMapImpl headers;
-  std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, requestRouteConfigUpdate(_));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*decoder_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
-// tests decodeHeaders() when no cached route is available
-TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailable) {
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableAndConfigIsNull) {
+  setupWithConfig(nullptr);
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
-// tests decodeHeaders() when no route configuration is available
-TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteConfigIsNotAvailable) {
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButOdCdsIsDisabled) {
   Http::TestRequestHeaderMapImpl headers;
-  std::shared_ptr<Router::MockConfig> route_config_ptr{new NiceMock<Router::MockConfig>()};
-  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableAndClusterIsAvailable) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterIsNotAvailable) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteAvailableButClusterNameIsEmpty) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  std::string empty_cluster_name;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(ReturnRef(empty_cluster_name));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailableAndOdCdsIsEnabled) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(OnDemandFilterTest, TestDecodeHeadersWhenRouteIsNotAvailable) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
@@ -99,6 +151,47 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStream) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
   filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// tests onClusterDiscoveryCompletion when a cluster is missing
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterNotFound) {
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Missing);
+}
+
+// tests onClusterDiscoveryCompletion when discovering a cluster timed out
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterTimedOut) {
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Timeout);
+}
+
+// tests onClusterDiscoveryCompletion when a cluster is available
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFound) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
+// tests onClusterDiscoveryCompletion when a cluster is available, but recreating a stream failed
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStreamFailed) {
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(false));
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
+// tests onClusterDiscoveryCompletion when a cluster is available, but redirect contains a body
+TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithBody) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillOnce(Return(&buffer));
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 } // namespace OnDemand

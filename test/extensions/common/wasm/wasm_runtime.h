@@ -7,24 +7,17 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-// All Wasm runtimes.
-std::vector<std::string> runtimes();
+// Testable runtime and language combinations.
+std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nullvm,
+                                                                 bool cpp_only);
 
-// All sandboxed Wasm runtimes.
-std::vector<std::string> sandboxRuntimes();
+inline auto runtime_and_cpp_values = testing::ValuesIn(wasmTestMatrix(true, true));
+inline auto sandbox_runtime_and_cpp_values = testing::ValuesIn(wasmTestMatrix(false, true));
+inline auto runtime_and_language_values = testing::ValuesIn(wasmTestMatrix(true, false));
+inline auto sandbox_runtime_and_language_values = testing::ValuesIn(wasmTestMatrix(false, false));
 
-// All programming languages used in Wasm tests.
-std::vector<std::string> languages();
-
-// Testable runtime and language combinations
-std::vector<std::tuple<std::string, std::string>> runtimesAndLanguages();
-
-inline auto runtime_values = testing::ValuesIn(runtimes());
-inline auto sandbox_runtime_values = testing::ValuesIn(sandboxRuntimes());
-inline auto language_values = testing::ValuesIn(languages());
-inline auto runtime_and_language_values = testing::ValuesIn(runtimesAndLanguages());
-
-std::string wasmTestParamsToString(const ::testing::TestParamInfo<std::string>& p);
+std::string
+wasmTestParamsToString(const ::testing::TestParamInfo<std::tuple<std::string, std::string>>& p);
 
 } // namespace Wasm
 } // namespace Common

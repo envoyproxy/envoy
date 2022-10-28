@@ -18,25 +18,19 @@ enum class ParserType { Legacy };
 
 enum class MessageType { Request, Response };
 
-// The following define special return values for parser callbacks.
-// These codes do not overlap with standard HTTP Status codes. They are only used for user
-// callbacks.
-enum class ParserStatus {
-  // Callbacks other than on_headers_complete should return a non-zero int to indicate an error
-  // and
-  // halt execution.
+// CallbackResult is used to send signals to the parser. See
+// https://github.com/nodejs/http-parser/blob/5c5b3ac62662736de9e71640a8dc16da45b32503/http_parser.h#L72.
+enum class CallbackResult {
+  // An error has happened. Further data must not be fed to the parser.
   Error = -1,
+  // Operation successful.
   Success = 0,
-  // Returning '1' from on_headers_complete will tell http_parser that it should not expect a
-  // body.
+  // Returned by onHeadersComplete() to indicate that the parser should not
+  // expect a body.
   NoBody = 1,
-  // Returning '2' from on_headers_complete will tell http_parser that it should not expect a body
-  // nor any further data on the connection.
+  // Returned by onHeadersComplete() to indicate that the parser should not
+  // expect either a body or any further data on the connection.
   NoBodyData = 2,
-  // Pause parser.
-  Paused,
-  // Other. This could be returning from a parser code that does not map to the above.
-  Unknown,
 };
 
 class ParserCallbacks {
@@ -44,49 +38,50 @@ public:
   virtual ~ParserCallbacks() = default;
   /**
    * Called when a request/response is beginning.
-   * @return integer return code from the parser indicating status.
+   * @return CallbackResult representing success or failure.
    */
-  virtual Status onMessageBegin() PURE;
+  virtual CallbackResult onMessageBegin() PURE;
 
   /**
    * Called when URL data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return CallbackResult representing success or failure.
    */
-  virtual Status onUrl(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header field data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return Status representing success or failure.
-   */
-  virtual Status onHeaderField(const char* data, size_t length) PURE;
-
-  /**
-   * Called when header value data is received.
-   * @param data supplies the start address.
-   * @param length supplies the length.
-   * @return Status representing success or failure.
-   */
-  virtual Status onHeaderValue(const char* data, size_t length) PURE;
+  virtual CallbackResult onUrl(const char* data, size_t length) PURE;
 
   /**
    * Called when response status data is received.
    * @param data supplies the start address.
    * @param length supplies the length.
-   * @return Status representing success or failure.
+   * @return CallbackResult representing success or failure.
    */
-  virtual Status onStatus(const char* data, size_t length) PURE;
+  virtual CallbackResult onStatus(const char* data, size_t length) PURE;
 
   /**
-   * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked. Note that this only applies to headers and NOT trailers. End of
-   * trailers are signaled via onMessageCompleteBase().
-   * @return An error status or a ParserStatus.
+   * Called when header field data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   * @return CallbackResult representing success or failure.
    */
-  virtual Envoy::StatusOr<ParserStatus> onHeadersComplete() PURE;
+  virtual CallbackResult onHeaderField(const char* data, size_t length) PURE;
+
+  /**
+   * Called when header value data is received.
+   * @param data supplies the start address.
+   * @param length supplies the length.
+   * @return CallbackResult representing success or failure.
+   */
+  virtual CallbackResult onHeaderValue(const char* data, size_t length) PURE;
+
+  /**
+   * Called when headers are complete. A base routine happens first then a
+   * virtual dispatch is invoked. Note that this only applies to headers and NOT
+   * trailers. End of trailers are signaled via onMessageCompleteBase().
+   * @return CallbackResult::Error, CallbackResult::Success,
+   * CallbackResult::NoBody, or CallbackResult::NoBodyData.
+   */
+  virtual CallbackResult onHeadersComplete() PURE;
 
   /**
    * Called when body data is received.
@@ -97,53 +92,51 @@ public:
 
   /**
    * Called when the HTTP message has completed parsing.
-   * @return An error status or a ParserStatus.
+   * @return CallbackResult representing success or failure.
    */
-  virtual StatusOr<ParserStatus> onMessageComplete() PURE;
+  virtual CallbackResult onMessageComplete() PURE;
 
   /**
    * Called when accepting a chunk header.
    */
   virtual void onChunkHeader(bool) PURE;
+};
 
-  virtual int setAndCheckCallbackStatus(Status&& status) PURE;
-  virtual int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;
+// ParserStatus represents the internal state of the parser.
+enum class ParserStatus {
+  // An error has occurred.
+  Error = -1,
+  // No error.
+  Ok = 0,
+  // The parser is paused.
+  Paused,
 };
 
 class Parser {
 public:
-  // Struct containing the return value from parser execution.
-  struct RcVal {
-    // Number of parsed bytes.
-    size_t nread;
-    // Integer error from parser indicating return code.
-    int rc;
-  };
   virtual ~Parser() = default;
 
   // Executes the parser.
-  // @return an RcVal containing the number of parsed bytes and return code.
-  virtual RcVal execute(const char* slice, int len) PURE;
+  // @return the number of parsed bytes.
+  virtual size_t execute(const char* slice, int len) PURE;
 
   // Unpauses the parser.
   virtual void resume() PURE;
 
-  // Pauses the parser and returns a status indicating pause.
-  virtual ParserStatus pause() PURE;
+  // Pauses the parser. Returns CallbackResult::Success, which can be returned
+  // directly in ParserCallback implementations for brevity.
+  virtual CallbackResult pause() PURE;
 
-  // Returns a parser status representing the errno value from the parser.
-  virtual ParserStatus getStatus() PURE;
+  // Returns a ParserStatus representing the internal state of the parser.
+  virtual ParserStatus getStatus() const PURE;
 
   // Returns an integer representing the status code stored in the parser structure. For responses
   // only.
   // TODO(asraa): Return Envoy::Http::Code.
   virtual uint16_t statusCode() const PURE;
 
-  // Returns an integer representing the HTTP major version.
-  virtual int httpMajor() const PURE;
-
-  // Returns an integer representing the HTTP minor version.
-  virtual int httpMinor() const PURE;
+  // Returns whether HTTP version is 1.1.
+  virtual bool isHttp11() const PURE;
 
   // Returns the number of bytes in the body. absl::nullopt if no Content-Length header
   virtual absl::optional<uint64_t> contentLength() const PURE;
@@ -154,14 +147,11 @@ public:
   // Returns a textual representation of the method. For requests only.
   virtual absl::string_view methodName() const PURE;
 
-  // Returns a textual representation of the given return code.
-  virtual absl::string_view errnoName(int rc) const PURE;
+  // Returns a textual representation of the internal error state of the parser.
+  virtual absl::string_view errorMessage() const PURE;
 
   // Returns whether the Transfer-Encoding header is present.
   virtual int hasTransferEncoding() const PURE;
-
-  // Converts a ParserStatus code to the parsers' integer return code value.
-  virtual int statusToInt(const ParserStatus code) const PURE;
 };
 
 using ParserPtr = std::unique_ptr<Parser>;

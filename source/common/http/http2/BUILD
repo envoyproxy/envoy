@@ -28,6 +28,7 @@ envoy_cc_library(
         "abseil_optional",
         "abseil_inlined_vector",
         "abseil_algorithm",
+        "abseil_cleanup",
     ],
     deps = [
         ":codec_stats_lib",

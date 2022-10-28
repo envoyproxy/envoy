@@ -66,8 +66,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   const Verifier* verifier = nullptr;
   const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
-          "envoy.filters.http.jwt_authn", decoder_callbacks_->route());
+      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(decoder_callbacks_);
   if (per_route_config != nullptr) {
     std::string error_msg;
     std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);

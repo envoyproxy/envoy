@@ -9,6 +9,7 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -17,6 +18,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
+#include "source/common/config/custom_config_validators.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
 #include "source/common/config/watch_map.h"
@@ -60,7 +62,10 @@ public:
               const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings);
+              const RateLimitSettings& rate_limit_settings,
+              CustomConfigValidatorsPtr&& config_validators,
+              XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+              const std::string& target_xds_authority = "");
 
   ~GrpcMuxImpl() override;
 
@@ -79,7 +84,7 @@ public:
   Config::GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const absl::flat_hash_set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder& resource_decoder,
+                                   OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) override;
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
@@ -200,6 +205,9 @@ private:
   // this one is up to GrpcMux.
   const LocalInfo::LocalInfo& local_info_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+  CustomConfigValidatorsPtr config_validators_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
+  const std::string target_xds_authority_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
@@ -213,7 +221,8 @@ public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+               CustomConfigValidatorsPtr&& config_validators);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -227,7 +236,10 @@ public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node);
+              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+              CustomConfigValidatorsPtr&& config_validators,
+              XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+              const std::string& target_xds_authority = "");
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -247,7 +259,7 @@ public:
   }
 
   Config::GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                                   SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                   SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {

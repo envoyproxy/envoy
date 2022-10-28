@@ -18,7 +18,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "i"

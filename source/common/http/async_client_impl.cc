@@ -20,6 +20,8 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
+const Router::PathMatcherSharedPtr AsyncStreamImpl::RouteEntryImpl::path_matcher_;
+const Router::PathRewriterSharedPtr AsyncStreamImpl::RouteEntryImpl::path_rewriter_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rate_limit_policy_;
@@ -78,7 +80,8 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_),
+      router_(options.filter_config_ ? options.filter_config_.value().get() : parent.config_,
+              parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_, options.timeout, options.hash_policy,
@@ -86,6 +89,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       send_xff_(options.send_xff) {
 
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
+  stream_info_.setIsShadow(options.is_shadow);
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
@@ -158,11 +162,17 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // TODO(mattklein123): We trust callers currently to not do anything insane here if they set up
-  // buffering on an async client call. We should potentially think about limiting the size of
-  // buffering that we allow here.
   if (buffered_body_ != nullptr) {
-    buffered_body_->add(data);
+    // TODO(shikugawa): Currently, data is dropped when the retry buffer overflows and there is no
+    // ability implement any error handling. We need to implement buffer overflow handling in the
+    // future. Options include configuring the max buffer size, or for use cases like gRPC
+    // streaming, deleting old data in the retry buffer.
+    if (buffered_body_->length() + data.length() > kBufferLimitForRetry) {
+      ENVOY_LOG_EVERY_POW_2(
+          warn, "the buffer size limit (64KB) for async client retries has been exceeded.");
+    } else {
+      buffered_body_->add(data);
+    }
   }
 
   router_.decodeData(data, end_stream);
@@ -237,7 +247,7 @@ void AsyncStreamImpl::cleanup() {
   }
 }
 
-void AsyncStreamImpl::resetStream() {
+void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
   stream_callbacks_.onReset();
   cleanup();
 }
@@ -264,7 +274,7 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
 }
 
 void AsyncRequestImpl::initialize() {
-  child_span_->injectContext(request_->headers());
+  child_span_->injectContext(request_->headers(), nullptr);
   sendHeaders(request_->headers(), request_->body().length() == 0);
   if (request_->body().length() != 0) {
     // It's possible this will be a no-op due to a local response synchronously generated in
@@ -277,8 +287,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() {
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, &response_->headers(),
-                                                   response_->trailers(), streamInfo(),
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
                                                    Tracing::EgressConfig::get());
 
   callbacks_.onSuccess(*this, std::move(response_));
@@ -310,9 +319,8 @@ void AsyncRequestImpl::onReset() {
                                           remoteClosed() ? &response_->headers() : nullptr);
 
   // Finalize the span based on whether we received a response or not.
-  Tracing::HttpTracerUtility::finalizeUpstreamSpan(
-      *child_span_, remoteClosed() ? &response_->headers() : nullptr,
-      remoteClosed() ? response_->trailers() : nullptr, streamInfo(), Tracing::EgressConfig::get());
+  Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
+                                                   Tracing::EgressConfig::get());
 
   if (!cancelled_) {
     // In this case we don't have a valid response so we do need to raise a failure.

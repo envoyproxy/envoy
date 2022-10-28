@@ -39,6 +39,15 @@ public:
         ->set_value(3);
     config_helper_.addVirtualHost(handle_max_3_hop);
 
+    auto handle_by_direct_response = config_helper_.createVirtualHost("handle.direct.response");
+    handle_by_direct_response.mutable_routes(0)->set_name("direct_response");
+    handle_by_direct_response.mutable_routes(0)->mutable_direct_response()->set_status(204);
+    handle_by_direct_response.mutable_routes(0)
+        ->mutable_direct_response()
+        ->mutable_body()
+        ->set_inline_string(EMPTY_STRING);
+    config_helper_.addVirtualHost(handle_by_direct_response);
+
     HttpProtocolIntegrationTest::initialize();
   }
 
@@ -102,8 +111,7 @@ TEST_P(RedirectIntegrationTest, RedirectNotConfigured) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("302 via_upstream test-header-value\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
@@ -139,8 +147,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
       0,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("302 via_upstream test-header-value\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
@@ -148,9 +155,12 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   // Validate that header sanitization is only called once.
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.set_via("via_value"); });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) {
+    hcm.mutable_delayed_close_timeout()->set_seconds(0);
+    hcm.set_via("via_value");
+    hcm.mutable_common_http_protocol_options()->mutable_max_requests_per_connection()->set_value(1);
+  });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -162,6 +172,8 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
@@ -181,10 +193,8 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
@@ -207,15 +217,17 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(redirect_response_, true);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 31),
+                                       BytesCountExpectation(0, 42, 0, 42),
+                                       BytesCountExpectation(0, 42, 0, 42), 0);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 31),
-                                       BytesCountExpectation(0, 42, 0, 42), 0);
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(140, 63, 121, 31),
+                                       BytesCountExpectation(77, 42, 77, 42),
                                        BytesCountExpectation(77, 42, 77, 42), 1);
 }
 
@@ -245,9 +257,13 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85),
+  BytesCountExpectation http2_expected = (GetParam().http2_implementation == Http2Impl::Oghttp2)
+                                             ? BytesCountExpectation(137, 59, 137, 59)
+                                             : BytesCountExpectation(137, 64, 137, 64);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85), http2_expected,
                                      BytesCountExpectation(137, 64, 137, 64), 0);
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(244, 38, 219, 18),
+                                     BytesCountExpectation(85, 10, 85, 10),
                                      BytesCountExpectation(85, 10, 85, 10), 1);
 }
 
@@ -314,6 +330,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
 
   // Respond with a redirect.
   upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
@@ -336,10 +354,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
@@ -373,6 +389,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   // Respond with a redirect.
   redirect_response_.setStatus(303);
   upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("303 internal_redirect test-header-value"));
 
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
@@ -397,10 +415,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("303 internal_redirect test-header-value\n"));
   // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
@@ -431,6 +447,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
   // Respond with a redirect.
   redirect_response_.setStatus(303);
   upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("303 internal_redirect test-header-value"));
 
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
@@ -454,10 +472,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("303 internal_redirect test-header-value\n"));
   // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
 TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
@@ -566,6 +582,13 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
     auto next_location = fmt::format(HandleThreeHopLocationFormat, i + 1);
     redirect_response_.setLocation(next_location);
     upstream_requests.back()->encodeHeaders(redirect_response_, true);
+    if (i != 3) {
+      EXPECT_THAT(waitForAccessLog(access_log_name_, i),
+                  HasSubstr("302 internal_redirect test-header-value"));
+    } else {
+      EXPECT_THAT(waitForAccessLog(access_log_name_, i),
+                  HasSubstr("302 via_upstream test-header-value"));
+    }
   }
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -578,14 +601,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
       1, test_server_->counter("http.config_test.passthrough_internal_redirect_too_many_redirects")
              ->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 3),
-              HasSubstr("302 via_upstream test-header-value\n"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
@@ -598,8 +613,6 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
              hcm) { hcm.set_via("via_value"); });
   config_helper_.prependFilter(R"EOF(
   name: pause-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
   )EOF");
   initialize();
 
@@ -611,6 +624,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
@@ -633,10 +648,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   // 302 was never returned downstream
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
   // No test header
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -"));
 }
 
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {
@@ -655,10 +668,42 @@ TEST_P(RedirectIntegrationTest, InvalidRedirect) {
       1,
       test_server_->counter("cluster.cluster_0.upstream_internal_redirect_failed_total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("302 via_upstream test-header-value\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
+}
+
+TEST_P(RedirectIntegrationTest, InternalRedirectHandledByDirectResponse) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  redirect_response_.setLocation("http://handle.direct.response/");
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("204", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  // 302 was never returned downstream
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("302 internal_redirect test-header-value"));
+  // No test header
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("204 direct_response -"));
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,

@@ -117,7 +117,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/rides$
     - name: :method
       string_match:
@@ -127,7 +126,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/rides/\d+$
     - name: :method
       string_match:
@@ -137,7 +135,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users/\d+/chargeaccounts$
     - name: :method
       string_match:
@@ -147,7 +144,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users/\d+/chargeaccounts/[^validate]\w+$
     - name: :method
       string_match:
@@ -157,7 +153,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users$
     - name: :method
       string_match:
@@ -167,7 +162,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users/\d+$
     - name: :method
       string_match:
@@ -177,7 +171,6 @@ virtual_hosts:
     - name: :path
       string_match:
         safe_regex:
-          google_re2: {}
           regex: ^/users/\d+/location$
     - name: :method
       string_match:

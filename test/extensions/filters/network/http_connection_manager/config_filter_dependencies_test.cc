@@ -61,6 +61,7 @@ public:
     *d.add_decode_provided() = potato();
     return std::make_unique<FilterDependencies>(d);
   }
+  std::set<std::string> configTypes() override { return {}; };
 };
 
 // Test filter that requires a potato.
@@ -73,6 +74,7 @@ public:
     *d.add_decode_required() = potato();
     return std::make_unique<FilterDependencies>(d);
   }
+  std::set<std::string> configTypes() override { return {}; };
 };
 
 TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {

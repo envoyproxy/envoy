@@ -38,11 +38,15 @@ bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager
   return filter_manager.initializeReadFilters();
 }
 
-bool FilterChainUtility::buildFilterChain(
-    Network::ListenerFilterManager& filter_manager,
-    const std::vector<Network::ListenerFilterFactoryCb>& factories) {
-  for (const Network::ListenerFilterFactoryCb& factory : factories) {
-    factory(filter_manager);
+bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
+                                          const Filter::ListenerFilterFactoriesList& factories) {
+  for (const auto& filter_config_provider : factories) {
+    auto config = filter_config_provider->config();
+    if (!config.has_value()) {
+      return false;
+    }
+    auto config_value = config.value();
+    config_value(filter_manager);
   }
 
   return true;

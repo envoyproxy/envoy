@@ -1,22 +1,11 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/test_tools/quic_test_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -55,7 +44,7 @@ public:
 };
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
-  spdy::SpdyHeaderBlock headers_block;
+  spdy::Http2HeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -69,7 +58,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   NiceMock<MockHeaderValidator> validator;
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
-  auto envoy_headers = spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+  auto envoy_headers = http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
       headers_block, 100, validator, details, rst);
   // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
   EXPECT_EQ(headers_block.size() + 3u, envoy_headers->size());
@@ -130,7 +119,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
-  spdy::SpdyHeaderBlock headers_block;
+  spdy::Http2HeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -139,19 +128,19 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
   // 6 headers are allowed.
   NiceMock<MockHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
-  EXPECT_NE(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+  EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 6, validator, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
-  EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 5, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
-  EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 4, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
-  spdy::SpdyHeaderBlock headers_block;
+  spdy::Http2HeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -160,7 +149,7 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly(Return(Http::HeaderUtility::HeaderValidationResult::REJECT));
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
-  EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 5, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }

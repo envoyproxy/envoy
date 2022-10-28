@@ -22,6 +22,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -52,6 +53,18 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   }
 }
 
+StatusOr<Socket::Type> Utility::socketTypeFromUrl(const std::string& url) {
+  if (urlIsTcpScheme(url)) {
+    return Socket::Type::Stream;
+  } else if (urlIsUdpScheme(url)) {
+    return Socket::Type::Datagram;
+  } else if (urlIsUnixScheme(url)) {
+    return Socket::Type::Stream;
+  } else {
+    return absl::InvalidArgumentError(absl::StrCat("unknown protocol scheme: ", url));
+  }
+}
+
 bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
 bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
@@ -59,47 +72,6 @@ bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(ur
 bool Utility::urlIsUnixScheme(absl::string_view url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
-
-std::string hostFromUrl(const std::string& url, absl::string_view scheme,
-                        absl::string_view scheme_name) {
-  if (!absl::StartsWith(url, scheme)) {
-    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
-  }
-
-  const size_t colon_index = url.find(':', scheme.size());
-
-  if (colon_index == std::string::npos) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  return url.substr(scheme.size(), colon_index - scheme.size());
-}
-
-uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
-                     absl::string_view scheme_name) {
-  if (!absl::StartsWith(url, scheme)) {
-    throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
-  }
-
-  const size_t colon_index = url.find(':', scheme.size());
-
-  if (colon_index == std::string::npos) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  const size_t rcolon_index = url.rfind(':');
-  if (colon_index != rcolon_index) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
-  }
-
-  try {
-    return std::stoi(url.substr(colon_index + 1));
-  } catch (const std::invalid_argument& e) {
-    throw EnvoyException(e.what());
-  } catch (const std::out_of_range& e) {
-    throw EnvoyException(e.what());
-  }
-}
 
 Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::InstancePtr& buffer,
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
@@ -118,25 +90,10 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 } // namespace
 
-std::string Utility::hostFromTcpUrl(const std::string& url) {
-  return hostFromUrl(url, TCP_SCHEME, "TCP");
-}
-
-uint32_t Utility::portFromTcpUrl(const std::string& url) {
-  return portFromUrl(url, TCP_SCHEME, "TCP");
-}
-
-std::string Utility::hostFromUdpUrl(const std::string& url) {
-  return hostFromUrl(url, UDP_SCHEME, "UDP");
-}
-
-uint32_t Utility::portFromUdpUrl(const std::string& url) {
-  return portFromUrl(url, UDP_SCHEME, "UDP");
-}
-
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
                                                                      uint16_t port, bool v6only) {
   sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
@@ -244,7 +201,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     const Api::SysCallIntResult rc =
         Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
-    RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+    RELEASE_ASSERT(!rc.return_value_, fmt::format("getifaddrs error: {}", rc.errno_));
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
@@ -267,16 +224,16 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
+bool Utility::isSameIpOrLoopback(const ConnectionInfoProvider& connection_info_provider) {
   // These are local:
   // - Pipes
   // - Sockets to a loopback address
   // - Sockets where the local and remote address (ignoring port) are the same
-  const auto& remote_address = socket.connectionInfoProvider().remoteAddress();
+  const auto& remote_address = connection_info_provider.remoteAddress();
   if (remote_address->type() == Address::Type::Pipe || isLoopbackAddress(*remote_address)) {
     return true;
   }
-  const auto local_ip = socket.connectionInfoProvider().localAddress()->ip();
+  const auto local_ip = connection_info_provider.localAddress()->ip();
   const auto remote_ip = remote_address->ip();
   if (remote_ip != nullptr && local_ip != nullptr &&
       remote_ip->addressAsString() == local_ip->addressAsString()) {
@@ -372,7 +329,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   case Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not handled");
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
@@ -387,19 +344,32 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
+  SocketOptionName opt_dst;
+  SocketOptionName opt_tp;
+  if (*ipVersion == Address::IpVersion::v4) {
+    opt_dst = ENVOY_SOCKET_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IP_TRANSPARENT;
+  } else {
+    opt_dst = ENVOY_SOCKET_IP6T_SO_ORIGINAL_DST;
+    opt_tp = ENVOY_SOCKET_IPV6_TRANSPARENT;
+  }
+
   sockaddr_storage orig_addr;
   memset(&orig_addr, 0, sizeof(orig_addr));
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status;
-
-  if (*ipVersion == Address::IpVersion::v4) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  } else {
-    status =
-        sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
-  }
+  int status =
+      sock.getSocketOption(opt_dst.level(), opt_dst.option(), &orig_addr, &addr_len).return_value_;
 
   if (status != 0) {
+    if (Api::OsSysCallsSingleton::get().supportsIpTransparent()) {
+      socklen_t flag_len = sizeof(int);
+      int is_tp;
+      status =
+          sock.getSocketOption(opt_tp.level(), opt_tp.option(), &is_tp, &flag_len).return_value_;
+      if (status == 0 && is_tp) {
+        return sock.ioHandle().localAddress();
+      }
+    }
     return nullptr;
   }
 
@@ -421,7 +391,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find('-') != std::string::npos) {
+    if (absl::StrContains(s, '-')) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -501,11 +471,15 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
-  } else {
-    ASSERT(address.type() == Address::Type::Ip);
+  } else if (address.type() == Address::Type::Ip) {
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  } else {
+    ASSERT(address.type() == Address::Type::EnvoyInternal);
+    auto* internal_address = proto_address.mutable_envoy_internal_address();
+    internal_address->set_server_listener_name(address.envoyInternalAddress()->addressId());
+    internal_address->set_endpoint_id(address.envoyInternalAddress()->endpointId());
   }
 }
 
@@ -715,8 +689,6 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                        : num_packets_to_read);
   // Make sure to read at least once.
   num_reads = std::max<size_t>(1, num_reads);
-  bool honor_read_limit =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
@@ -744,9 +716,7 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
     }
-    if (honor_read_limit) {
-      --num_reads;
-    }
+    --num_reads;
     if (num_reads == 0) {
       return std::move(result.err_);
     }

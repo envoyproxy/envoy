@@ -40,7 +40,7 @@ bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Desc
     return true;
   }
 
-  const auto header_value = metadata.headers().get(header_name_);
+  const auto header_value = metadata.requestHeaders().get(header_name_);
   if (header_value.empty()) {
     return false;
   }
@@ -79,7 +79,8 @@ bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,
                                                 const std::string&, const MessageMetadata& metadata,
                                                 const Network::Address::Instance&) const {
-  if (expect_match_ == Http::HeaderUtility::matchHeaders(metadata.headers(), action_headers_)) {
+  if (expect_match_ ==
+      Http::HeaderUtility::matchHeaders(metadata.requestHeaders(), action_headers_)) {
     descriptor.entries_.push_back({"header_match", descriptor_value_});
     return true;
   } else {

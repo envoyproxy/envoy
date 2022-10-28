@@ -148,10 +148,9 @@ TEST(OpenCensusTracerTest, Span) {
     EXPECT_EQ(zeros, sd.parent_span_id());
     parent_span_id = sd.context().span_id();
 
-    ASSERT_EQ(3, sd.annotations().events().size());
+    ASSERT_EQ(2, sd.annotations().events().size());
     EXPECT_EQ("my annotation", sd.annotations().events()[0].event().description());
-    EXPECT_EQ("spawnChild", sd.annotations().events()[1].event().description());
-    EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
+    EXPECT_EQ("setSampled", sd.annotations().events()[1].event().description());
     EXPECT_TRUE(sd.has_ended());
   }
 
@@ -217,7 +216,7 @@ void testIncomingHeaders(
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, false});
-    span->injectContext(injected_headers);
+    span->injectContext(injected_headers, nullptr);
     span->finishSpan();
 
     // Check contents via public API.

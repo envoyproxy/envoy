@@ -45,6 +45,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
         "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/init:init_mocks",
@@ -200,6 +201,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

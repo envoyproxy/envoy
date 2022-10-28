@@ -16,6 +16,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -63,6 +64,8 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Append)) {
     out |= O_APPEND;
+  } else if (in.test(File::Operation::Write)) {
+    out |= O_TRUNC;
   }
 
   if (in.test(File::Operation::Read) && in.test(File::Operation::Write)) {

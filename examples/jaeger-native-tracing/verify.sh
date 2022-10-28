@@ -2,6 +2,8 @@
 
 export NAME=jaeger-native
 export DELAY=10
+export PORT_PROXY="${JAEGER_NATIVE_PORT_PROXY:-11000}"
+export PORT_UI="${JAEGER_NATIVE_PORT_UI:-11001}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -10,9 +12,9 @@ export DELAY=10
 run_log "Test services"
 responds_with \
     Hello \
-    http://localhost:8000/trace/1
+    "http://localhost:${PORT_PROXY}/trace/1"
 
 run_log "Test Jaeger UI"
 responds_with \
     "<!doctype html>" \
-    http://localhost:16686
+    "http://localhost:${PORT_UI}"

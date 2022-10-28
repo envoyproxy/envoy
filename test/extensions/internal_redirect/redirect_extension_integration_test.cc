@@ -122,11 +122,15 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByPreviousRout
   // Redirect to another route
   redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
   first_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto second_request = waitForNextStream();
   // Redirect back to the original route.
   redirect_response_.setLocation("http://handle.internal.redirect.no.repeated.target/another/path");
   second_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto third_request = waitForNextStream();
   // Redirect to the same route as the first redirect. This should fail.
@@ -135,6 +139,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByPreviousRout
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
+              HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("302", response->headers().getStatusValue());
   EXPECT_EQ("http://handle.internal.redirect.max.three.hop/yet/another/path",
             response->headers().getLocationValue());
@@ -144,12 +150,6 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByPreviousRout
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
-              HasSubstr("302 via_upstream test-header-value\n"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
@@ -189,12 +189,16 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByAllowListedR
   // Redirect to another route
   redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
   first_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto second_request = waitForNextStream();
   // Redirect back to the original route.
   redirect_response_.setLocation(
       "http://handle.internal.redirect.only.allow.listed.target/another/path");
   second_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto third_request = waitForNextStream();
   // Redirect to the non-allow-listed route. This should fail.
@@ -212,12 +216,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByAllowListedR
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-              HasSubstr("302 internal_redirect test-header-value\n"));
   EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
-              HasSubstr("302 via_upstream test-header-value\n"));
+              HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
@@ -259,12 +259,16 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
   // Redirect to another route
   redirect_response_.setLocation("http://handle.internal.redirect.max.three.hop/random/path");
   first_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto second_request = waitForNextStream();
   // Redirect back to the original route.
   redirect_response_.setLocation(
       "http://handle.internal.redirect.only.allow.safe.cross.scheme.redirect/another/path");
   second_request->encodeHeaders(redirect_response_, true);
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              HasSubstr("302 internal_redirect test-header-value"));
 
   auto third_request = waitForNextStream();
   // Redirect to https target. This should fail.
@@ -282,12 +286,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
       1,
       test_server_->counter("http.config_test.passthrough_internal_redirect_predicate")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 0),
-              HasSubstr("302 internal_redirect test-header-value\n"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-              HasSubstr("302 internal_redirect test-header-value\n"));
   EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
-              HasSubstr("302 via_upstream test-header-value\n"));
+              HasSubstr("302 via_upstream test-header-value"));
   EXPECT_EQ("test-header-value",
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }

@@ -39,7 +39,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -146,6 +146,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
     common_access_log.mutable_response_flags()->set_overload_manager(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed)) {
+    common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
@@ -168,13 +172,18 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
+  if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+    common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
+        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
+  }
+  if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+    common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
+        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+  }
   if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
         stream_info.downstreamAddressProvider().sslConnection();
-
-    tls_properties->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
@@ -203,8 +212,14 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
+  absl::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
+  if (dur) {
+    common_access_log.mutable_duration()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
   StreamInfo::TimingUtility timing(stream_info);
-  absl::optional<std::chrono::nanoseconds> dur = timing.lastDownstreamRxByteReceived();
+  dur = timing.lastDownstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
@@ -267,6 +282,13 @@ void Utility::extractCommonAccessLogProperties(
   if (!stream_info.getRouteName().empty()) {
     common_access_log.set_route_name(stream_info.getRouteName());
   }
+  if (stream_info.attemptCount().has_value()) {
+    common_access_log.set_upstream_request_attempt_count(stream_info.attemptCount().value());
+  }
+  if (stream_info.connectionTerminationDetails().has_value()) {
+    common_access_log.set_connection_termination_details(
+        stream_info.connectionTerminationDetails().value());
+  }
 
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
@@ -274,10 +296,8 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (stream_info.filterState().hasDataWithName(key)) {
-      const auto& obj =
-          stream_info.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(key);
-      ProtobufTypes::MessagePtr serialized_proto = obj.serializeAsProto();
+    if (auto state = stream_info.filterState().getDataReadOnlyGeneric(key); state != nullptr) {
+      ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
       if (serialized_proto != nullptr) {
         auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
         ProtobufWkt::Any& any = filter_state_objects[key];

@@ -1,36 +1,33 @@
-name: Check for latest_release of deps
+name: Check dependencies
 
-on :
-  schedule :
-    - cron : '0 8 * * *'
+on:
+  schedule:
+    - cron: '0 8 * * *'
 
-  workflow_dispatch :
+  workflow_dispatch:
 
-jobs :
-  build :
-    runs-on : ubuntu-latest
-    if: github.repository_owner == 'envoyproxy'
+permissions:
+  contents: read # to fetch code (actions/checkout)
+  issues: write # required to open/close dependency issues
 
-    steps :
-      - name : checkout
-        uses : actions/checkout/@v2
-        with :
-          ref : ${{ github.head_ref }}
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.repository == 'envoyproxy/envoy'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
-          python-version: ${{ matrix.python-version }}
+          ref: ${{ github.head_ref }}
+      - name: Set up Python (3.10)
+        uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
+        with:
+          python-version: "3.10"
 
-      - name: Install dependencies
+      - name: Run dependency checker
         run: |
-          python -m pip install --upgrade pip
-          pip install virtualenv
-
-      - name: setting up virtualenv
-        run : |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          # --create_issues flag to create issue only in github action
-          # and not interfere with the CI
-          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --create_issues
-          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --create_issues
+          TODAY_DATE=$(date -u -I"date")
+          export TODAY_DATE
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
+          bazel run //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error

@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package envoy.type.v3;
+
+import "envoy/type/v3/ratelimit_unit.proto";
+import "envoy/type/v3/token_bucket.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.v3";
+option java_outer_classname = "RatelimitStrategyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: Rate Limit Strategies]
+
+message RateLimitStrategy {
+  // Choose between allow all and deny all.
+  enum BlanketRule {
+    ALLOW_ALL = 0;
+    DENY_ALL = 1;
+  }
+
+  // Best-effort limit of the number of requests per time unit.
+  //
+  // Allows to specify the desired requests per second (RPS, QPS), requests per minute (QPM, RPM),
+  // etc., without specifying a rate limiting algorithm implementation.
+  //
+  // ``RequestsPerTimeUnit`` strategy does not demand any specific rate limiting algorithm to be
+  // used (in contrast to the :ref:`TokenBucket <envoy_v3_api_msg_type.v3.TokenBucket>`,
+  // for example). It implies that the implementation details of rate limiting algorithm are
+  // irrelevant as long as the configured number of "requests per time unit" is achieved.
+  //
+  // Note that the ``TokenBucket`` is still a valid implementation of the ``RequestsPerTimeUnit``
+  // strategy, and may be chosen to enforce the rate limit. However, there's no guarantee it will be
+  // the ``TokenBucket`` in particular, and not the Leaky Bucket, the Sliding Window, or any other
+  // rate limiting algorithm that fulfills the requirements.
+  message RequestsPerTimeUnit {
+    // The desired number of requests per :ref:`time_unit
+    // <envoy_v3_api_field_type.v3.RateLimitStrategy.RequestsPerTimeUnit.time_unit>` to allow.
+    // If set to ``0``, deny all (equivalent to ``BlanketRule.DENY_ALL``).
+    //
+    // .. note::
+    //   Note that the algorithm implementation determines the course of action for the requests
+    //   over the limit. As long as the ``requests_per_time_unit`` converges on the desired value,
+    //   it's allowed to treat this field as a soft-limit: allow bursts, redistribute the allowance
+    //   over time, etc.
+    //
+    uint64 requests_per_time_unit = 1;
+
+    // The unit of time. Ignored when :ref:`requests_per_time_unit
+    // <envoy_v3_api_field_type.v3.RateLimitStrategy.RequestsPerTimeUnit.requests_per_time_unit>`
+    // is ``0`` (deny all).
+    RateLimitUnit time_unit = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  oneof strategy {
+    option (validate.required) = true;
+
+    // Allow or Deny the requests.
+    // If unset, allow all.
+    BlanketRule blanket_rule = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // Best-effort limit of the number of requests per time unit, f.e. requests per second.
+    // Does not prescribe any specific rate limiting algorithm, see :ref:`RequestsPerTimeUnit
+    // <envoy_v3_api_msg_type.v3.RateLimitStrategy.RequestsPerTimeUnit>` for details.
+    RequestsPerTimeUnit requests_per_time_unit = 2;
+
+    // Limit the requests by consuming tokens from the Token Bucket.
+    // Allow the same number of requests as the number of tokens available in
+    // the token bucket.
+    TokenBucket token_bucket = 3;
+  }
+}

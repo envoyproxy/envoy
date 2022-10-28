@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 34]
+// [#next-free-field: 36]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -169,7 +169,7 @@ message Bootstrap {
   // Optional duration between flushes to configured stats sinks. For
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5
-  // seconds). Only one of `stats_flush_interval` or `stats_flush_on_admin`
+  // seconds). Only one of ``stats_flush_interval`` or ``stats_flush_on_admin``
   // can be set.
   // Duration must be at least 1ms and at most 5 min.
   google.protobuf.Duration stats_flush_interval = 7 [
@@ -182,14 +182,14 @@ message Bootstrap {
 
   oneof stats_flush {
     // Flush stats to sinks only when queried for on the admin interface. If set,
-    // a flush timer is not created. Only one of `stats_flush_on_admin` or
-    // `stats_flush_interval` can be set.
+    // a flush timer is not created. Only one of ``stats_flush_on_admin`` or
+    // ``stats_flush_interval`` can be set.
     bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
   }
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
-  // Deprecated in favor of *watchdogs* which has finer granularity.
+  // Deprecated in favor of ``watchdogs`` which has finer granularity.
   Watchdog watchdog = 8
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -249,7 +249,7 @@ message Bootstrap {
   // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
-  // This field is deprecated in favor of *dns_resolution_config*
+  // This field is deprecated in favor of ``dns_resolution_config``
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 20
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -267,12 +267,12 @@ message Bootstrap {
   // or any other DNS resolver types and the related parameters.
   // For example, an object of
   // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
   // :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>`
   // configuration.
-  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
-  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
+  // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+  // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
   // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
@@ -289,18 +289,18 @@ message Bootstrap {
   // xdstp:// URL authority resolution. The algorithm is as
   // follows:
   // 1. The authority field is taken from the xdstp:// URL, call
-  //    this *resource_authority*.
-  // 2. *resource_authority* is compared against the authorities in any peer
-  //    *ConfigSource*. The peer *ConfigSource* is the configuration source
+  //    this ``resource_authority``.
+  // 2. ``resource_authority`` is compared against the authorities in any peer
+  //    ``ConfigSource``. The peer ``ConfigSource`` is the configuration source
   //    message which would have been used unconditionally for resolution
   //    with opaque resource names. If there is a match with an authority, the
-  //    peer *ConfigSource* message is used.
-  // 3. *resource_authority* is compared sequentially with the authorities in
-  //    each configuration source in *config_sources*. The first *ConfigSource*
+  //    peer ``ConfigSource`` message is used.
+  // 3. ``resource_authority`` is compared sequentially with the authorities in
+  //    each configuration source in ``config_sources``. The first ``ConfigSource``
   //    to match wins.
   // 4. As a fallback, if no configuration source matches, then
-  //    *default_config_source* is used.
-  // 5. If *default_config_source* is not specified, resolution fails.
+  //    ``default_config_source`` is used.
+  // 5. If ``default_config_source`` is not specified, resolution fails.
   // [#not-implemented-hide:]
   repeated core.v3.ConfigSource config_sources = 22;
 
@@ -330,6 +330,18 @@ message Bootstrap {
   // Optional path to a file with performance tracing data created by "Perfetto" SDK in binary
   // ProtoBuf format. The default value is "envoy.pftrace".
   string perf_tracing_file_path = 33;
+
+  // Optional overriding of default regex engine.
+  // If the value is not specified, Google RE2 will be used by default.
+  // [#extension-category: envoy.regex_engines]
+  core.v3.TypedExtensionConfig default_regex_engine = 34;
+
+  // Optional XdsResourcesDelegate configuration, which allows plugging custom logic into both
+  // fetch and load events during xDS processing.
+  // If a value is not specified, no XdsResourcesDelegate will be used.
+  // TODO(abeyad): Add public-facing documentation.
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig xds_delegate_extension = 35;
 }
 
 // Administration interface :ref:`operations documentation
@@ -345,7 +357,7 @@ message Admin {
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_v3_api_field_config.bootstrap.v3.Admin.address>` is set.
-  // Deprecated in favor of *access_log* which offers more options.
+  // Deprecated in favor of ``access_log`` which offers more options.
   string access_log_path = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -387,7 +399,7 @@ message ClusterManager {
   // Name of the local cluster (i.e., the cluster that owns the Envoy running
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
-  // If *local_cluster_name* is defined then :ref:`clusters
+  // If ``local_cluster_name`` is defined then :ref:`clusters
   // <envoy_v3_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
@@ -403,7 +415,7 @@ message ClusterManager {
   core.v3.BindConfig upstream_bind_config = 3;
 
   // A management server endpoint to stream load stats to via
-  // *StreamLoadStats*. This must have :ref:`api_type
+  // ``StreamLoadStats``. This must have :ref:`api_type
   // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
@@ -449,15 +461,15 @@ message Watchdog {
   }
 
   // Register actions that will fire on given WatchDog events.
-  // See *WatchDogAction* for priority of events.
+  // See ``WatchDogAction`` for priority of events.
   repeated WatchdogAction actions = 7;
 
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *watchdog_miss* statistic. If not specified the default is 200ms.
+  // ``watchdog_miss`` statistic. If not specified the default is 200ms.
   google.protobuf.Duration miss_timeout = 1;
 
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *watchdog_mega_miss* statistic. If not specified the default is
+  // ``watchdog_mega_miss`` statistic. If not specified the default is
   // 1000ms.
   google.protobuf.Duration megamiss_timeout = 2;
 
@@ -466,20 +478,20 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // Defines the maximum jitter used to adjust the *kill_timeout* if *kill_timeout* is
+  // Defines the maximum jitter used to adjust the ``kill_timeout`` if ``kill_timeout`` is
   // enabled. Enabling this feature would help to reduce risk of synchronized
   // watchdog kill events across proxies due to external triggers. Set to 0 to
   // disable. If not specified the default is 0 (disabled).
   google.protobuf.Duration max_kill_timeout_jitter = 6 [(validate.rules).duration = {gte {}}];
 
-  // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
+  // If ``max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))``
   // threads have been nonresponsive for at least this duration kill the entire
   // Envoy process. Set to 0 to disable this behavior. If not specified the
   // default is 0 (disabled).
   google.protobuf.Duration multikill_timeout = 4;
 
-  // Sets the threshold for *multikill_timeout* in terms of the percentage of
-  // nonresponsive threads required for the *multikill_timeout*.
+  // Sets the threshold for ``multikill_timeout`` in terms of the percentage of
+  // nonresponsive threads required for the ``multikill_timeout``.
   // If not specified the default is 0.
   type.v3.Percent multikill_threshold = 5;
 }
@@ -490,7 +502,7 @@ message Watchdog {
 // have an out of band system to terminate the process.
 //
 // The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
-// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// ``FatalAction`` extensions live in the ``envoy.extensions.fatal_actions`` API
 // namespace.
 message FatalAction {
   // Extension specific configuration for the action. It's expected to conform
@@ -570,7 +582,7 @@ message RuntimeLayer {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.RuntimeLayer.RtdsLayer";
 
-    // Resource to subscribe to at *rtds_config* for the RTDS layer.
+    // Resource to subscribe to at ``rtds_config`` for the RTDS layer.
     string name = 1;
 
     // RTDS configuration source.

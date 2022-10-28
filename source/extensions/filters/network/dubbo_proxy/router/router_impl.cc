@@ -35,7 +35,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
                                             fmt::format("dubbo router: no route for interface '{}'",
                                                         invocation.serviceName())),
                                false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   route_entry_ = route_->routeEntry();
@@ -49,7 +49,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
         AppException(ResponseStatus::ServerError, fmt::format("dubbo router: unknown cluster '{}'",
                                                               route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   cluster_ = cluster->info();
@@ -62,7 +62,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
                      fmt::format("dubbo router: maintenance mode for cluster '{}'",
                                  route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
@@ -72,7 +72,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
             ResponseStatus::ServerError,
             fmt::format("dubbo router: no healthy upstream for '{}'", route_entry_->clusterName())),
         false);
-    return FilterStatus::StopIteration;
+    return FilterStatus::AbortIteration;
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
@@ -127,7 +127,7 @@ FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
-                   metadata->responseStatus());
+                   static_cast<int>(metadata->responseStatus()));
 
   switch (metadata->responseStatus()) {
   case ResponseStatus::Ok:
@@ -196,6 +196,9 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
 void Router::onEvent(Network::ConnectionEvent event) {
   if (!upstream_request_ || upstream_request_->response_complete_) {
+    ENVOY_BUG(event == Network::ConnectionEvent::RemoteClose ||
+                  event == Network::ConnectionEvent::LocalClose,
+              "Unexpected event");
     // Client closed connection after completing response.
     ENVOY_LOG(debug, "dubbo upstream request: the upstream request had completed");
     return;
@@ -215,9 +218,10 @@ void Router::onEvent(Network::ConnectionEvent event) {
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
-  default:
+  case Network::ConnectionEvent::Connected:
+  case Network::ConnectionEvent::ConnectedZeroRtt:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("unexpected");
   }
 }
 
@@ -327,7 +331,7 @@ void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason re
       reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
     if (reason == ConnectionPool::PoolFailureReason::Timeout) {
       host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+    } else {
       host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
     parent_.callbacks_->continueDecoding();
@@ -415,8 +419,6 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
                                  upstream_host_->address()->asString())),
         false);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

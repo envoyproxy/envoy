@@ -17,7 +17,6 @@ envoy_cc_library(
         "response_evaluator.h",
         "success_criteria_evaluator.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/grpc:status",
         "//source/common/common:enum_to_int",

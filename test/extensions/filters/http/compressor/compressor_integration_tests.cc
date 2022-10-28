@@ -192,6 +192,13 @@ void WebsocketWithCompressorIntegrationTest::sendBidirectionalData() {
 // Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    // TODO(#23286) - add web socket support for H2 UHV
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -268,12 +275,7 @@ TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
-              "bytestream");
-  }
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);

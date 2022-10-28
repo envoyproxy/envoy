@@ -5,7 +5,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "test/mocks/upstream/cluster_info.h"
@@ -109,6 +109,29 @@ TEST(GrpcContextTest, ResolvedServiceAndMethodOutliveChangesInRequestNames) {
   auto new_request_names = context.resolveDynamicServiceAndMethod(path);
   EXPECT_EQ("service_name1", absl::get<Stats::DynamicSavedName>(new_request_names->service_));
   EXPECT_EQ("method1", absl::get<Stats::DynamicSavedName>(new_request_names->method_));
+}
+
+TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/foo.bar.zoo/method.name?a=b");
+  const Http::HeaderEntry* path = headers.Path();
+  Stats::TestUtil::TestSymbolTable symbol_table;
+  ContextImpl context(*symbol_table);
+  absl::optional<Context::RequestStatNames> request_names;
+  request_names = context.resolveDynamicServiceAndMethodWithDotReplaced(path);
+  EXPECT_TRUE(request_names);
+  EXPECT_EQ("foo_bar_zoo", absl::get<Stats::DynamicSavedName>(request_names->service_));
+  EXPECT_EQ("method.name", absl::get<Stats::DynamicSavedName>(request_names->method_));
+  headers.setPath("");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
+  headers.setPath("/");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
+  headers.setPath("//");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
+  headers.setPath("/service_name");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
+  headers.setPath("/service_name/");
+  EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
 }
 
 } // namespace Grpc

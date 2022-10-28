@@ -381,7 +381,12 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 
 Network::TransportSocketPtr
-TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
+TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
+                                        Upstream::HostDescriptionConstSharedPtr) const {
+  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
+}
+
+Network::TransportSocketPtr TsiSocketFactory::createDownstreamTransportSocket() const {
   return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
 }
 

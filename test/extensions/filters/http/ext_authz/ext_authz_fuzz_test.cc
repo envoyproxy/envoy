@@ -58,7 +58,8 @@ class FuzzerMocks {
 public:
   FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
 
-    ON_CALL(decoder_callbacks_, connection()).WillByDefault(Return(&connection_));
+    ON_CALL(decoder_callbacks_, connection())
+        .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
@@ -80,6 +81,7 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  static ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Http::ContextImpl http_context(stats_store.symbolTable());
 

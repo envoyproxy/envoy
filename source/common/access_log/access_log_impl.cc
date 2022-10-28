@@ -48,7 +48,8 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
   case envoy::config::accesslog::v3::ComparisonFilter::LE:
     return lhs <= value;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected comparison op enum");
+  return false;
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
@@ -89,7 +90,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  IS_ENVOY_BUG("unexpected filter specifier value");
+  return nullptr;
 }
 
 bool TraceableRequestFilter::evaluate(const StreamInfo::StreamInfo& info,
@@ -156,7 +158,10 @@ OperatorFilter::OperatorFilter(
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& config : configs) {
-    filters_.emplace_back(FilterFactory::fromProto(config, runtime, random, validation_visitor));
+    auto filter = FilterFactory::fromProto(config, runtime, random, validation_visitor);
+    if (filter != nullptr) {
+      filters_.emplace_back(std::move(filter));
+    }
   }
 }
 
@@ -303,9 +308,11 @@ bool MetadataFilter::evaluate(const StreamInfo::StreamInfo& info, const Http::Re
   return default_match_;
 }
 
-InstanceSharedPtr
-AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::CommonFactoryContext& context) {
+namespace {
+
+template <typename FactoryContext>
+InstanceSharedPtr makeAccessLogInstance(const envoy::config::accesslog::v3::AccessLog& config,
+                                        FactoryContext& context) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context.runtime(),
@@ -319,6 +326,20 @@ AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& confi
       config, context.messageValidationVisitor(), factory);
 
   return factory.createAccessLogInstance(*message, std::move(filter), context);
+}
+
+} // namespace
+
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return makeAccessLogInstance(config, context);
+}
+
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::CommonFactoryContext& context) {
+  return makeAccessLogInstance(config, context);
 }
 
 } // namespace AccessLog

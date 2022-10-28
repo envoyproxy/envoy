@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/utility.h"
 
+#include <cstdint>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/safe_memcpy.h"
@@ -45,8 +47,8 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
       std::make_unique<envoy::admin::v3::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details->set_days_until_expiration(
-      Utility::getDaysUntilExpiration(cert, time_source));
+  const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
+  certificate_details->set_days_until_expiration(days_until_expiry);
 
   ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
@@ -71,21 +73,46 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
+bool Utility::labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern) {
+  constexpr char glob = '*';
+  // Check the special case of a single * pattern, as it's common.
+  if (pattern.size() == 1 && pattern[0] == glob) {
+    return true;
+  }
+  // Only valid if wildcard character appear once.
+  if (std::count(pattern.begin(), pattern.end(), glob) == 1) {
+    std::vector<absl::string_view> split_pattern = absl::StrSplit(pattern, glob);
+    return (pattern.size() <= dns_label.size() + 1) &&
+           absl::StartsWith(dns_label, split_pattern[0]) &&
+           absl::EndsWith(dns_label, split_pattern[1]);
+  }
+  return false;
+}
+
 bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  // A-label ACE prefix https://www.rfc-editor.org/rfc/rfc5890#section-2.3.2.5.
+  constexpr absl::string_view ACE_prefix = "xn--";
   const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
   const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
   if (lower_case_dns_name == lower_case_pattern) {
     return true;
   }
 
-  size_t pattern_len = lower_case_pattern.length();
-  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
-    if (lower_case_dns_name.length() > pattern_len - 1) {
-      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
-      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
-             lower_case_dns_name.substr(off, pattern_len - 1) ==
-                 lower_case_pattern.substr(1, pattern_len - 1);
-    }
+  std::vector<absl::string_view> split_pattern =
+      absl::StrSplit(lower_case_pattern, absl::MaxSplits('.', 1));
+  std::vector<absl::string_view> split_dns_name =
+      absl::StrSplit(lower_case_dns_name, absl::MaxSplits('.', 1));
+
+  // dns name and pattern should contain more than 1 label to match.
+  if (split_pattern.size() < 2 || split_dns_name.size() < 2) {
+    return false;
+  }
+  // Only the left-most label in the pattern contains wildcard '*' and is not an A-label.
+  if ((split_pattern[0].find('*') != absl::string_view::npos) &&
+      (split_pattern[1].find('*') == absl::string_view::npos) &&
+      (!absl::StartsWith(split_pattern[0], ACE_prefix))) {
+    return (split_dns_name[1] == split_pattern[1]) &&
+           labelWildcardMatch(split_dns_name[0], split_pattern[0]);
   }
 
   return false;
@@ -199,6 +226,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;
+      memset(&sin, 0, sizeof(sin));
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
       safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
@@ -206,6 +234,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       san = addr.ip()->addressAsString();
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
+      memset(&sin6, 0, sizeof(sin6));
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
       safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
@@ -226,16 +255,19 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-int32_t Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
+absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
+                                                         TimeSource& time_source) {
   if (cert == nullptr) {
-    return std::numeric_limits<int>::max();
+    return absl::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1_Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
-    return days;
+    if (days >= 0 && seconds >= 0) {
+      return absl::make_optional(days);
+    }
   }
-  return 0;
+  return absl::nullopt;
 }
 
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,

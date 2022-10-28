@@ -26,7 +26,7 @@ message Decompressor {
     // filter will operate as a pass-through filter. If the message is unspecified, the filter will be enabled.
     config.core.v3.RuntimeFeatureFlag enabled = 1;
 
-    // If set to true, will decompress response even if a *no-transform* cache control header is set.
+    // If set to true, will decompress response even if a ``no-transform`` cache control header is set.
     bool ignore_no_transform_header = 2;
   }
 

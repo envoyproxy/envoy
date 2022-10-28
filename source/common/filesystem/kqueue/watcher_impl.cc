@@ -16,15 +16,16 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), queue_(kqueue()), kqueue_event_(dispatcher.createFileEvent(
-                                       queue_,
-                                       [this](uint32_t events) -> void {
-                                         if (events & Event::FileReadyType::Read) {
-                                           onKqueueEvent();
-                                         }
-                                       },
-                                       Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
+    : file_system_(file_system), queue_(kqueue()),
+      kqueue_event_(dispatcher.createFileEvent(
+          queue_,
+          [this](uint32_t events) -> void {
+            if (events & Event::FileReadyType::Read) {
+              onKqueueEvent();
+            }
+          },
+          Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() {
   close(queue_);
@@ -48,8 +49,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(absl::string_view path, uint32_t
       return nullptr;
     }
 
-    watch_fd =
-        open(std::string(api_.fileSystem().splitPathFromFilename(path).directory_).c_str(), 0);
+    watch_fd = open(std::string(file_system_.splitPathFromFilename(path).directory_).c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;
     }
@@ -106,7 +106,7 @@ void WatcherImpl::onKqueueEvent() {
     ASSERT(file != nullptr);
     ASSERT(watch_fd == file->fd_);
 
-    auto pathname = api_.fileSystem().splitPathFromFilename(file->file_);
+    auto pathname = file_system_.splitPathFromFilename(file->file_);
 
     if (file->watching_dir_) {
       if (event.fflags & NOTE_DELETE) {

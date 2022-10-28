@@ -6,11 +6,12 @@ licenses(["notice"])  # Apache 2
 py_binary(
     name = "validate_fragment",
     srcs = ["validate_fragment.py"],
-    data = ["//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text"],
+    args = ["$(location @envoy_api//:v3_proto_set)"],
+    data = ["@envoy_api//:v3_proto_set"],
     visibility = ["//visibility:public"],
     deps = [
+        requirement("envoy.base.utils"),
         requirement("PyYAML"),
-        "@bazel_tools//tools/python/runfiles",
         "@com_google_protobuf//:protobuf_python",
     ],
 )

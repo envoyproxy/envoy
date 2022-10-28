@@ -57,10 +57,12 @@ public:
 
     // Endpoint connections
     if (tls_hosts_) {
-      host_upstream_ = &addFakeUpstream(
-          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
-      host2_upstream_ = &addFakeUpstream(
-          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
+      host_upstream_ =
+          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()),
+                           http_conn_type_, /*autonomous_upstream=*/false);
+      host2_upstream_ =
+          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()),
+                           http_conn_type_, /*autonomous_upstream=*/false);
     } else {
       host_upstream_ = &addFakeUpstream(http_conn_type_);
       host2_upstream_ = &addFakeUpstream(http_conn_type_);

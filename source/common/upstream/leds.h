@@ -65,7 +65,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   // LEDS stats scope must outlive the subscription.
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   LedsStats stats_;
   // A map between a LEDS resource name to the LbEndpoint data.
   LbEndpointsMap endpoints_map_;

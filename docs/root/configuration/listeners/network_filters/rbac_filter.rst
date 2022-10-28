@@ -3,10 +3,10 @@
 Role Based Access Control (RBAC) Network Filter
 ===============================================
 
-The RBAC network filter is used to authorize actions (permissions) by identified downstream clients
-(principals). This is useful to explicitly manage callers to an application and protect it from
-unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
-block-list (DENY) set of policies based on properties of the connection (IPs, ports, SSL subject).
+The RBAC network filter is used to authorize actions by identified downstream clients. This is useful
+to explicitly manage callers to an application and protect it from unexpected or forbidden agents.
+The filter supports configuration with either a safe-list (ALLOW) or block-list (DENY) set of policies,
+or a matcher with different actions, based on properties of the connection (IPs, ports, SSL subject).
 This filter also supports policy in both enforcement and shadow modes. Shadow mode won't effect real
 users, it is used to test that a new set of policies work before rolling out to production.
 
@@ -15,8 +15,8 @@ will include the name of the matched policy that caused the deny in the format o
 (policy_name will be ``none`` if no policy matched), this helps to distinguish the deny from Envoy
 RBAC filter and the upstream backend.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.network.rbac*.
 
 Statistics
 ----------

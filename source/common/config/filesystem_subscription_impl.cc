@@ -12,18 +12,35 @@
 namespace Envoy {
 namespace Config {
 
+envoy::config::core::v3::PathConfigSource makePathConfigSource(const std::string& path) {
+  envoy::config::core::v3::PathConfigSource path_config_source;
+  path_config_source.set_path(path);
+  return path_config_source;
+}
+
 FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : path_(path), watcher_(dispatcher.createFilesystemWatcher()), callbacks_(callbacks),
-      resource_decoder_(resource_decoder), stats_(stats), api_(api),
-      validation_visitor_(validation_visitor) {
-  watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
-    if (started_) {
-      refresh();
-    }
-  });
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : path_(path_config_source.path()), callbacks_(callbacks), resource_decoder_(resource_decoder),
+      stats_(stats), api_(api), validation_visitor_(validation_visitor) {
+  if (!path_config_source.has_watched_directory()) {
+    file_watcher_ = dispatcher.createFilesystemWatcher();
+    file_watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+      if (started_) {
+        refresh();
+      }
+    });
+  } else {
+    directory_watcher_ =
+        std::make_unique<WatchedDirectory>(path_config_source.watched_directory(), dispatcher);
+    directory_watcher_->setCallback([this]() {
+      if (started_) {
+        refresh();
+      }
+    });
+  }
 }
 
 // Config::Subscription
@@ -52,7 +69,7 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
   *config_update = std::move(owned_message);
   const auto decoded_resources =
-      DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
+      DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
   callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
   return message.version_info();
 }
@@ -88,10 +105,11 @@ void FilesystemSubscriptionImpl::refresh() {
 }
 
 FilesystemCollectionSubscriptionImpl::FilesystemCollectionSubscriptionImpl(
-    Event::Dispatcher& dispatcher, absl::string_view path, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
-    : FilesystemSubscriptionImpl(dispatcher, path, callbacks, resource_decoder, stats,
+    Event::Dispatcher& dispatcher,
+    const envoy::config::core::v3::PathConfigSource& path_config_source,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
+    SubscriptionStats stats, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+    : FilesystemSubscriptionImpl(dispatcher, path_config_source, callbacks, resource_decoder, stats,
                                  validation_visitor, api) {}
 
 std::string
@@ -132,7 +150,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
     // TODO(htuch): implement indirect collection entries.
     if (collection_entry.has_inline_entry()) {
       decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(
-          resource_decoder_, collection_entry.inline_entry()));
+          *resource_decoder_, collection_entry.inline_entry()));
     }
   }
   *config_update = std::move(owned_resource_message);

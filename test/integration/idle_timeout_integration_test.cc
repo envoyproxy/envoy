@@ -12,6 +12,7 @@ namespace {
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    config_helper_.disableDelayClose();
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -249,6 +250,37 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_EQ("stream timeout", response->body());
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));
+}
+
+// Per-stream idle timeout after having sent downstream headers.
+TEST_P(IdleTimeoutIntegrationTest, IdleStreamTimeoutWithRouteReselect) {
+  enable_per_stream_idle_timeout_ = true;
+  config_helper_.prependFilter(R"EOF(
+    name: set-route-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetRouteFilterConfig
+      cluster_override: cluster_0
+      idle_timeout_override:
+        seconds: 5
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  // Sleep past the default timeout.
+  sleep();
+  sleep();
+  sleep();
+
+  EXPECT_FALSE(response->complete());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Per-stream idle timeout with reads disabled.

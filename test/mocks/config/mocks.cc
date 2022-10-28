@@ -13,15 +13,15 @@ namespace Config {
 
 MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillByDefault(
-          Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                        Stats::Scope&, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder&,
-                        const SubscriptionOptions&) -> SubscriptionPtr {
-            auto ret = std::make_unique<NiceMock<MockSubscription>>();
-            subscription_ = ret.get();
-            callbacks_ = &callbacks;
-            return ret;
-          }));
+      .WillByDefault(Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                   Stats::Scope&, SubscriptionCallbacks& callbacks,
+                                   OpaqueResourceDecoderSharedPtr,
+                                   const SubscriptionOptions&) -> SubscriptionPtr {
+        auto ret = std::make_unique<NiceMock<MockSubscription>>();
+        subscription_ = ret.get();
+        callbacks_ = &callbacks;
+        return ret;
+      }));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 }

@@ -29,17 +29,15 @@ public:
 
 protected:
   void SetUp() override {
-    envoy::config::core::v3::GrpcService service;
-    auto grpc = service.mutable_envoy_grpc();
-    grpc->set_cluster_name("test");
+    grpc_service_.mutable_envoy_grpc()->set_cluster_name("test");
 
-    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
-    client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, service, stats_store_);
+    client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, stats_store_);
   }
 
-  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused, Unused) {
+  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused) {
     auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client,
                 startRaw("envoy.service.ext_proc.v3.ExternalProcessor", "Process", _, _))
@@ -66,6 +64,7 @@ protected:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   bool grpc_closed_ = false;
 
+  envoy::config::core::v3::GrpcService grpc_service_;
   ExternalProcessorClientPtr client_;
   Grpc::MockAsyncClientManager client_manager_;
   Grpc::MockAsyncStream stream_;
@@ -76,14 +75,14 @@ protected:
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
@@ -94,14 +93,14 @@ TEST_F(ExtProcStreamTest, SendToStream) {
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -131,7 +130,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -144,7 +143,7 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto stream = client_->start(*this, stream_info_);
+  auto stream = client_->start(*this, grpc_service_, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);

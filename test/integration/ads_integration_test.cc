@@ -55,6 +55,46 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
+// Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
+// an xDS server without removing the resources not included in the DiscoveryResponse from the xDS
+// server.
+TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
+  initialize();
+  registerTestServerPorts({});
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+
+  auto cluster_0 = buildCluster("cluster_0");
+  auto cluster_1 = buildCluster("cluster_1");
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster_0, cluster_1},
+                                                             {cluster_0, cluster_1}, {}, "1");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {cluster_0.name(), cluster_1.name()},
+                                      {cluster_0.name(), cluster_1.name()}, {}));
+  auto cla_0 = buildClusterLoadAssignment(cluster_0.name());
+  auto cla_1 = buildClusterLoadAssignment(cluster_1.name());
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {cla_0, cla_1}, {cla_0, cla_1}, {}, "1");
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  // Send an update for one of the ClusterLoadAssignments only.
+  cla_0.mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_load_balancing_weight()->set_value(
+      2);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(eds_type_url, {cla_0},
+                                                                            {cla_0}, {}, "2");
+
+  // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
+  // delete the other. We use cluster membership health as a proxy for this.
+  test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
+  test_server_->waitForCounterEq("cluster.cluster_1.update_success", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+}
+
 // Update the only warming cluster. Verify that the new cluster is still warming and the cluster
 // manager as a whole is not initialized.
 TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
@@ -216,6 +256,133 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
 
   sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
       sds_type_url, {validation_context}, {validation_context}, {}, "1");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+}
+
+// Make sure two clusters with different secrets send only a single SDS request.
+// This is a regression test of #21518.
+TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.combine_sds_requests", "true");
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto sds_type_url =
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+
+  std::vector<envoy::config::cluster::v3::Cluster> clusters;
+  for (int i = 0; i < 2; ++i) {
+    envoy::config::core::v3::TransportSocket sds_transport_socket;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            validation_context_sds_secret_config:
+              name: validation_context_{}
+              sds_config:
+                resource_api_version: V3
+                ads: {{}}
+    )EOF",
+                                          i),
+                              sds_transport_socket);
+    auto cluster = ConfigHelper::buildStaticCluster("cluster", 8000, "127.0.0.1");
+    cluster.set_name(absl::StrCat("cluster_", i));
+    *cluster.mutable_transport_socket() = sds_transport_socket;
+    clusters.push_back(std::move(cluster));
+  }
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, clusters, clusters, {},
+                                                             "1");
+
+  // Expect a single request containing the 2 SDS resources.
+  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "",
+                                      {"validation_context_0", "validation_context_1"},
+                                      {"validation_context_0", "validation_context_1"}, {}));
+  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
+
+  std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;
+  for (int i = 0; i < 2; ++i) {
+    envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
+    TestUtility::loadFromYaml(
+        fmt::format(
+            R"EOF(
+      name: validation_context_{}
+      validation_context:
+        trusted_ca:
+          filename: {}
+    )EOF",
+            i, TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")),
+        validation_context);
+    validation_contexts.push_back(std::move(validation_context));
+  }
+
+  sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, validation_contexts, validation_contexts, {}, "1");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+}
+
+// Two clusters with different secrets send two SDS requests.
+// This is a test that validates the behavior prior to #21518.
+// The test will be removed one envoy.reloadable_features.combine_sds_requests
+// is removed.
+TEST_P(AdsIntegrationTest, SecretsNonPausedDuringCDS) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.combine_sds_requests", "false");
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto sds_type_url =
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
+
+  std::vector<envoy::config::cluster::v3::Cluster> clusters;
+  for (int i = 0; i < 2; ++i) {
+    envoy::config::core::v3::TransportSocket sds_transport_socket;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            validation_context_sds_secret_config:
+              name: validation_context_{}
+              sds_config:
+                resource_api_version: V3
+                ads: {{}}
+    )EOF",
+                                          i),
+                              sds_transport_socket);
+    auto cluster = ConfigHelper::buildStaticCluster("cluster", 8000, "127.0.0.1");
+    cluster.set_name(absl::StrCat("cluster_", i));
+    *cluster.mutable_transport_socket() = sds_transport_socket;
+    clusters.push_back(std::move(cluster));
+  }
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, clusters, clusters, {},
+                                                             "1");
+
+  // Expect two different SDS requests.
+  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_0"},
+                                      {"validation_context_0"}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_1"},
+                                      {"validation_context_1"}, {}));
+  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
+
+  std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;
+  for (int i = 0; i < 2; ++i) {
+    envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
+    TestUtility::loadFromYaml(
+        fmt::format(
+            R"EOF(
+      name: validation_context_{}
+      validation_context:
+        trusted_ca:
+          filename: {}
+    )EOF",
+            i, TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")),
+        validation_context);
+    validation_contexts.push_back(std::move(validation_context));
+  }
+
+  sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+      sds_type_url, validation_contexts, validation_contexts, {}, "1");
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
@@ -406,7 +573,6 @@ TEST_P(AdsIntegrationTest, DEPRECATED_FEATURE_TEST(RejectV2TransportConfigByDefa
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {cluster}, {cluster}, {}, "1");
   test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
-  EXPECT_GE(test_server_->gauge("runtime.deprecated_feature_seen_since_process_start")->value(), 1);
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
@@ -878,6 +1044,63 @@ TEST_P(AdsIntegrationTest, ClusterWarmingOnNamedResponse) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
+// This test validates two cases.
+// 1. Verify Listener warming is finished only on named RDS response for new routes.
+// 2. Verify Listener does not get in to warming state for existing routes.
+TEST_P(AdsIntegrationTest, ListenerWarmingOnNamedResponse) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {buildCluster("cluster_0")},
+                                                             {buildCluster("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "1");
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      {buildRouteConfig("route_config_0", "cluster_0")}, {}, "1");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing listener - update stat prefix, use the same route name.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildCluster("cluster_1")}, {buildCluster("cluster_1")},
+      {"cluster_0"}, "2");
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")},
+      {buildClusterLoadAssignment("cluster_1")}, {"cluster_0"}, "2");
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_test")},
+      {buildListener("listener_0", "route_config_0", "rds_test")}, {}, "2");
+
+  // Validate that listener is updated correctly and does not get in to warming state.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+
+  // Update listener with a new route.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1", "rds_test")},
+      {buildListener("listener_0", "route_config_1", "rds_test")}, {}, "2");
+
+  // Validate that the listener gets in to warming state waiting for RDS.
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 1);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Send the new route and validate that listener finishes warming.
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_1", "cluster_1")},
+      {buildRouteConfig("route_config_1", "cluster_1")}, {}, "2");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   initialize();
@@ -1017,6 +1240,11 @@ public:
                                                (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                            ? "GRPC"
                                            : "DELTA_GRPC")) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'grpc.ads_cluster.streams_closed_13' and
+    // stat_prefix 'ads_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+
     if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
@@ -1066,6 +1294,11 @@ public:
                                                (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                            ? "GRPC"
                                            : "DELTA_GRPC")) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'grpc.ads_cluster.streams_closed_2' and stat_prefix
+    // 'ads_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+
     if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
@@ -1261,6 +1494,11 @@ public:
                                                (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                            ? "GRPC"
                                            : "DELTA_GRPC")) {
+    // TODO(ggreenway): add tag extraction rules.
+    // Missing stat tag-extraction rule for stat 'grpc.ads_cluster.streams_closed_2' and stat_prefix
+    // 'ads_cluster'.
+    skip_tag_extraction_rule_check_ = true;
+
     if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
@@ -1292,7 +1530,7 @@ public:
       // Path to EDS for ads_cluster
       const std::string eds_path = TestEnvironment::temporaryFileSubstitute(
           "test/config/integration/server_xds.eds.ads_cluster.yaml", port_map_, version_);
-      ads_cluster_eds_config->set_path(eds_path);
+      ads_cluster_eds_config->mutable_path_config_source()->set_path(eds_path);
       ads_cluster_eds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add EDS static Cluster that uses ADS as config Source.
@@ -1989,7 +2227,7 @@ TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
 
   test_server_->waitForCounterEq(
-      "cluster.xdstp_//test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+      "cluster.xdstp_test/envoy.config.cluster.v3.Cluster/foo-cluster/"
       "baz?xds.node.cluster=cluster_name&xds.node.id=node_name.leds.init_fetch_timeout",
       1);
 

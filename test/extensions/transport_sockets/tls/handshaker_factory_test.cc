@@ -13,6 +13,7 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -93,6 +94,8 @@ protected:
       : context_manager_(
             std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
         registered_factory_(handshaker_factory_) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
     // UpstreamTlsContext proto expects to use the newly-registered handshaker.
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
@@ -113,6 +116,7 @@ protected:
   HandshakerFactoryImplForTest handshaker_factory_;
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory_;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context_;
+  TestScopedRuntime scoped_runtime_;
 };
 
 TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
@@ -133,7 +137,8 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
@@ -158,7 +163,8 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 
   SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
 
@@ -194,7 +200,8 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
           tls_context_, "", mock_factory_ctx),
       *context_manager_, stats_store_);
 
-  std::unique_ptr<Network::TransportSocket> socket = socket_factory.createTransportSocket(nullptr);
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory.createTransportSocket(nullptr, nullptr);
 }
 
 } // namespace

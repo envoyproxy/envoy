@@ -18,6 +18,8 @@ load(
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
+    _envoy_select_admin_html = "envoy_select_admin_html",
+    _envoy_select_admin_no_html = "envoy_select_admin_no_html",
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
@@ -206,6 +208,8 @@ def envoy_google_grpc_external_deps():
 # from the other bzl files (e.g. envoy_select.bzl, envoy_binary.bzl, etc.)
 
 # Select wrappers (from envoy_select.bzl)
+envoy_select_admin_html = _envoy_select_admin_html
+envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3

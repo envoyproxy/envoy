@@ -18,11 +18,12 @@ class MockRoleBasedAccessControlRouteSpecificFilterConfig
     : public RoleBasedAccessControlRouteSpecificFilterConfig {
 public:
   MockRoleBasedAccessControlRouteSpecificFilterConfig(
-      const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& r)
+      const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& r,
+      Server::Configuration::ServerFactoryContext& context)
       : RoleBasedAccessControlRouteSpecificFilterConfig(
-            r, ProtobufMessage::getStrictValidationVisitor()){};
+            r, context, ProtobufMessage::getStrictValidationVisitor()){};
 
-  MOCK_METHOD(Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&, engine, (), (const));
+  MOCK_METHOD(Filters::Common::RBAC::RoleBasedAccessControlEngine&, engine, (), (const));
 };
 
 } // namespace

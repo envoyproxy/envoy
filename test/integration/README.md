@@ -166,6 +166,17 @@ bazel test //test/integration:http2_upstream_integration_test \
 --jobs 60 --local_test_jobs=60 --runs_per_test=1000 --test_arg="-l trace"
 ```
 
+For hard to reproduce flakes, a sometimes useful tool is `stress`, available via
+`apt install stress`. Running stress alongsize `bazel test` (in another window,
+starting it after the build completes) can be a great help in reproducing issues,
+especially where tests are blocked on different things. For example, if a test
+spends some time blocked on network traffic and has a cpu race, running many
+instances of the test doesn't much help repro because the other instances aren't
+using cpu at the critical moment. For this case, `stress -c [number of cores]`
+can frequently make a 1/1000 flake into a 1/2 flake. Less commonly, for example,
+unusually slow disk access can flake a test, in which case `stress --hdd 8`
+helps boost the failure rate.
+
 ## Debugging test flakes
 
 Once you've managed to reproduce your test flake, you get to figure out what's

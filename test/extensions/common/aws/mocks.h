@@ -29,21 +29,16 @@ public:
   MOCK_METHOD(void, signUnsignedPayload, (Http::RequestHeaderMap&));
 };
 
-class MockMetadataFetcher {
+class MockFetchMetadata {
 public:
-  virtual ~MockMetadataFetcher() = default;
+  virtual ~MockFetchMetadata() = default;
 
-  MOCK_METHOD(absl::optional<std::string>, fetch,
-              (const std::string&, const std::string&, const absl::optional<std::string>&),
-              (const));
+  MOCK_METHOD(absl::optional<std::string>, fetch, (Http::RequestMessage&), (const));
 };
 
 class DummyMetadataFetcher {
 public:
-  absl::optional<std::string> operator()(const std::string&, const std::string&,
-                                         const absl::optional<std::string>&) {
-    return absl::nullopt;
-  }
+  absl::optional<std::string> operator()(Http::RequestMessage&) { return absl::nullopt; }
 };
 
 } // namespace Aws

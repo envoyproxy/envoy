@@ -18,6 +18,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -48,11 +49,12 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Quic::QuicStatNames quic_stat_names(stats_store.symbolTable());
   AccessLog::MockAccessLogManager log_manager;
   Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
+  NiceMock<Server::MockInstance> server;
 
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, dns_resolver, ssl_context_manager, dispatcher, local_info,
       secret_manager, validation_context, *api, http_context, grpc_context, router_context,
-      log_manager, singleton_manager, options, quic_stat_names);
+      log_manager, singleton_manager, options, quic_stat_names, server);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);

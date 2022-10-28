@@ -203,6 +203,7 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         ":stat_test_utility_lib",
+        "//source/common/common:hash_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:symbol_table_lib",

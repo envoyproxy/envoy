@@ -33,7 +33,9 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
   }
 
 public:
-  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()) {
+    skip_tag_extraction_rule_check_ = true;
+  };
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
 };

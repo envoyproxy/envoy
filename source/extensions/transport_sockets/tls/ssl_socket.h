@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -62,6 +63,7 @@ public:
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -69,6 +71,7 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
+  void onAsynchronousCertValidationComplete() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
@@ -86,6 +89,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   void shutdownBasic();
+  void resumeHandshake();
 
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
@@ -96,25 +100,30 @@ private:
   SslHandshakerImplSharedPtr info_;
 };
 
-class ClientSslSocketFactory : public Network::TransportSocketFactory,
+class ClientSslSocketFactory : public Network::CommonUpstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
   ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPtr config,
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope);
 
+  ~ClientSslSocketFactory() override;
+
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
+  absl::string_view defaultServerNameIndication() const override {
+    return clientContextConfig()->serverNameIndication();
+  }
   bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
-  const Ssl::ClientContextConfig& config() const { return *config_; }
+  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override { return {*config_}; }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx();
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
 
 private:
   Envoy::Ssl::ContextManager& manager_;
@@ -125,7 +134,7 @@ private:
   Envoy::Ssl::ClientContextSharedPtr ssl_ctx_ ABSL_GUARDED_BY(ssl_ctx_mu_);
 };
 
-class ServerSslSocketFactory : public Network::TransportSocketFactory,
+class ServerSslSocketFactory : public Network::DownstreamTransportSocketFactory,
                                public Secret::SecretCallbacks,
                                Logger::Loggable<Logger::Id::config> {
 public:
@@ -133,10 +142,10 @@ public:
                          Envoy::Ssl::ContextManager& manager, Stats::Scope& stats_scope,
                          const std::vector<std::string>& server_names);
 
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
+  ~ServerSslSocketFactory() override;
+
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;

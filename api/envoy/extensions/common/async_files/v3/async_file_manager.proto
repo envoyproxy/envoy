@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.common.async_files.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.common.async_files.v3";
+option java_outer_classname = "AsyncFileManagerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/common/async_files/v3;async_filesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: AsyncFileManager configuration]
+
+// Configuration to instantiate or select a singleton ``AsyncFileManager``.
+message AsyncFileManagerConfig {
+  message ThreadPool {
+    // The number of threads to use. If unset or zero, will default to the number
+    // of concurrent threads the hardware supports. This default is subject to
+    // change if performance analysis suggests it.
+    uint32 thread_count = 1;
+  }
+
+  // An optional identifier for the manager. An empty string is a valid identifier
+  // for a common, default ``AsyncFileManager``.
+  //
+  // Reusing the same id with different configurations in the same envoy instance
+  // is an error.
+  string id = 1;
+
+  oneof manager_type {
+    option (validate.required) = true;
+
+    // Configuration for a thread-pool based async file manager.
+    ThreadPool thread_pool = 2;
+  }
+}

@@ -1,0 +1,60 @@
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
+- area: cache_filter
+  change: |
+    add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
+
+bug_fixes:
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: grpc_json_transcoder
+  change: |
+    fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
+- area: router
+  change: |
+    fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+  - area: listener
+    change: |
+      removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
+      removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
+      removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+
+new_features:
+- area: generic_proxy
+  change: |
+    added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
+    :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: upstream
+  change: |
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
+- area: thrift
+  change: |
+    added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
+- area: http
+  change: |
+    allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+
+deprecated:

@@ -12,7 +12,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-Network::TransportSocketFactoryPtr
+Network::UpstreamTransportSocketFactoryPtr
 UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {

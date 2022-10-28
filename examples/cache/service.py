@@ -38,4 +38,4 @@ if __name__ == "__main__":
     if not os.path.isfile('/etc/responses.yaml'):
         print('Responses file not found at /etc/responses.yaml')
         exit(1)
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8000)

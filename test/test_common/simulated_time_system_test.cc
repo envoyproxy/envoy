@@ -6,7 +6,6 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "event2/event.h"
@@ -59,7 +58,6 @@ protected:
     base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
-  TestScopedRuntime scoped_runtime_;
   Event::MockDispatcher dispatcher_;
   LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;

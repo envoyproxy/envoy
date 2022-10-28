@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.validate.h"
 
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/filter.h"
 
 namespace Envoy {
@@ -15,7 +15,7 @@ Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryF
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocol_cache_manager_factory(
+  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocol_cache_manager_factory(
       context.singletonManager(), context.threadLocal(), {context});
   FilterConfigSharedPtr filter_config(
       std::make_shared<FilterConfig>(proto_config, alternate_protocol_cache_manager_factory,

@@ -38,7 +38,7 @@ IntegrationTcpClient::IntegrationTcpClient(
     Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
     Network::Address::IpVersion version, bool enable_half_close,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::Address::InstanceConstSharedPtr source_address)
+    Network::Address::InstanceConstSharedPtr source_address, absl::string_view destination_address)
     : payload_reader_(new WaitForPayloadReader(dispatcher)),
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, createBuffer_(_, _, _))
@@ -55,9 +55,12 @@ IntegrationTcpClient::IntegrationTcpClient(
       }));
 
   connection_ = dispatcher.createClientConnection(
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      source_address, Network::Test::createRawBufferSocket(), options);
+      Network::Utility::resolveUrl(fmt::format(
+          "tcp://{}:{}",
+          destination_address.empty() ? Network::Test::getLoopbackAddressUrlString(version)
+                                      : destination_address,
+          port)),
+      source_address, Network::Test::createRawBufferSocket(), options, nullptr);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));

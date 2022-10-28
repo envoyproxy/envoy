@@ -14,7 +14,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/mat
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: IP matcher]
-// [#extension: envoy.matching.input_matchers.ip]
+// [#extension: envoy.matching.matchers.ip]
 
 // This input matcher matches IPv4 or IPv6 addresses against a list of CIDR
 // ranges. It returns true if and only if the input IP belongs to at least one

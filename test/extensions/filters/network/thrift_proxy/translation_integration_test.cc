@@ -132,6 +132,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Tests that the proxy will translate between different downstream and upstream transports and
 // protocols.
 TEST_P(ThriftTranslationIntegrationTest, Translates) {
+  DISABLE_UNDER_WINDOWS; // https://github.com/envoyproxy/envoy/issues/21017
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));

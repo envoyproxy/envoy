@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.dubbo_proxy.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/range.proto";
@@ -90,6 +91,11 @@ message RouteAction {
     // Currently ClusterWeight only supports the name and weight fields.
     config.route.v3.WeightedCluster weighted_clusters = 2;
   }
+
+  // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  // the upstream cluster with metadata matching what is set in this field will be considered for
+  // load balancing. The filter name should be specified as ``envoy.lb``.
+  config.core.v3.Metadata metadata_match = 3;
 }
 
 message MethodMatch {
@@ -127,4 +133,12 @@ message MethodMatch {
   // The key is the parameter index, starting from 0.
   // The value is the parameter matching type.
   map<uint32, ParameterMatchSpecifier> params_match = 2;
+}
+
+message MultipleRouteConfiguration {
+  // The name of the named route configurations. This name is used in asynchronous route discovery.
+  string name = 1;
+
+  // The route table of the dubbo connection manager.
+  repeated RouteConfiguration route_config = 4;
 }

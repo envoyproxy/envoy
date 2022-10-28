@@ -112,18 +112,21 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
-                          this](FilterChainFactoryCallbacks& callbacks) -> void {
+                          this](FilterChainManager& manager) -> void {
           if (log_handler_.get()) {
-            callbacks.addAccessLogHandler(log_handler_);
+            auto factory = createLogHandlerFactoryCb(log_handler_);
+            manager.applyFilterFactoryCb({}, factory);
           }
           for (int i = 0; i < num_decoder_filters; i++) {
-            callbacks.addStreamDecoderFilter(
+            auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
+            manager.applyFilterFactoryCb({}, factory);
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
-            callbacks.addStreamEncoderFilter(
+            auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
+            manager.applyFilterFactoryCb({}, factory);
           }
         }));
 
@@ -220,8 +223,9 @@ void HttpConnectionManagerImplTest::sendRequestHeadersAndData() {
   conn_manager_->onData(fake_input, false);
 }
 
-ResponseHeaderMap*
-HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& response_headers) {
+ResponseHeaderMap* HttpConnectionManagerImplTest::sendResponseHeaders(
+    ResponseHeaderMapPtr&& response_headers, absl::optional<StreamInfo::ResponseFlag> response_flag,
+    std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
@@ -232,8 +236,12 @@ HttpConnectionManagerImplTest::sendResponseHeaders(ResponseHeaderMapPtr&& respon
   EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  if (response_flag.has_value()) {
+    decoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(response_flag.value());
+  }
   decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false,
+                                                 response_code_details);
   return altered_response_headers;
 }
 

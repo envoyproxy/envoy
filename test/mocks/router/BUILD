@@ -17,6 +17,7 @@ envoy_cc_mock(
         "//envoy/http:stateful_session_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
+        "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:router_interface",
         "//envoy/router:router_ratelimit_interface",
@@ -45,5 +46,6 @@ envoy_cc_mock(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_time_lib",
     ],
 )

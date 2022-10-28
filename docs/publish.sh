@@ -32,7 +32,7 @@ fi
 DOCS_MAIN_BRANCH="main"
 
 echo 'cloning'
-git clone git@github.com:envoyproxy/envoyproxy.github.io "${CHECKOUT_DIR}" -b "${DOCS_MAIN_BRANCH}" --depth 1
+git clone git@github.com:envoyproxy/envoy-website "${CHECKOUT_DIR}" -b "${DOCS_MAIN_BRANCH}" --depth 1
 
 rm -fr "$PUBLISH_DIR"
 mkdir -p "$PUBLISH_DIR"

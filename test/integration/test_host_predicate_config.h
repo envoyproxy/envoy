@@ -3,6 +3,8 @@
 #include "envoy/upstream/retry.h"
 
 #include "test/integration/test_host_predicate.h"
+#include "test/integration/test_host_predicate.pb.h"
+#include "test/integration/test_host_predicate.pb.validate.h"
 
 #include "gmock/gmock.h"
 
@@ -16,9 +18,7 @@ public:
     return std::make_shared<testing::NiceMock<TestHostPredicate>>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom per-filter empty config proto
-    // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new ::test::integration::TestHostPredicate()};
   }
 };
 } // namespace Envoy

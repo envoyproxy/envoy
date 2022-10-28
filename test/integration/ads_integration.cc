@@ -28,6 +28,11 @@ AdsIntegrationTest::AdsIntegrationTest()
                                              (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                          ? "GRPC"
                                          : "DELTA_GRPC")) {
+  // TODO(ggreenway): add tag extraction rules.
+  // Missing stat tag-extraction rule for stat 'grpc.ads_cluster.streams_closed_9' and stat_prefix
+  // 'ads_cluster'.
+  skip_tag_extraction_rule_check_ = true;
+
   if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");

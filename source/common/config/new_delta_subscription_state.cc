@@ -78,7 +78,7 @@ void NewDeltaSubscriptionState::updateSubscriptionInterest(
         // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
         // attached to it, so it will not be moved to ambiguous category.
         if (!it->second.isWaitingForServer()) {
-          ambiguous_resource_state_.insert({it->first, it->second.version()});
+          ambiguous_resource_state_.insert_or_assign(it->first, it->second.version());
         }
         requested_resource_state_.erase(it);
         actually_erased = true;
@@ -152,8 +152,7 @@ UpdateAck NewDeltaSubscriptionState::handleResponse(
 
 bool NewDeltaSubscriptionState::isHeartbeatResponse(
     const envoy::service::discovery::v3::Resource& resource) const {
-  if (!supports_heartbeats_ &&
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_heartbeats")) {
+  if (!supports_heartbeats_) {
     return false;
   }
   if (resource.has_resource()) {
@@ -212,7 +211,8 @@ void NewDeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {
@@ -231,6 +231,24 @@ void NewDeltaSubscriptionState::handleGoodResponse(
 
   watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
                             message.system_version_info());
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
+    const auto scoped_update = ttl_.scopedTtlUpdate();
+    if (requested_resource_state_.contains(Wildcard)) {
+      for (const auto& resource : message.resources()) {
+        addResourceStateFromServer(resource);
+      }
+    } else {
+      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
+      // and ignore the others.
+      for (const auto& resource : message.resources()) {
+        if (requested_resource_state_.contains(resource.name())) {
+          addResourceStateFromServer(resource);
+        }
+      }
+    }
+  }
 
   // If a resource is gone, there is no longer a meaningful version for it that makes sense to
   // provide to the server upon stream reconnect: either it will continue to not exist, in which
@@ -376,7 +394,7 @@ void NewDeltaSubscriptionState::addResourceStateFromServer(
     ASSERT(!ambiguous_resource_state_.contains(resource.name()));
   } else {
     // It is a resource that is a part of our wildcard request.
-    wildcard_resource_state_.insert({resource.name(), resource.version()});
+    wildcard_resource_state_.insert_or_assign(resource.name(), resource.version());
     // The resource could be ambiguous before, but now the ambiguity
     // is resolved.
     ambiguous_resource_state_.erase(resource.name());

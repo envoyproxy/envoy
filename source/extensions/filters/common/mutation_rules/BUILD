@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "mutation_rules_lib",
     srcs = ["mutation_rules.cc"],
     hdrs = ["mutation_rules.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/common:macros",

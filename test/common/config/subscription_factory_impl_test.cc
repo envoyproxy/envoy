@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/subscription_factory_impl.h"
@@ -17,6 +18,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
@@ -41,9 +43,11 @@ enum class LegacyOrUnified { Legacy, Unified };
 class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
-      : http_request_(&cm_.thread_local_cluster_.async_client_),
+      : resource_decoder_(std::make_shared<MockOpaqueResourceDecoder>()),
+        http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
-        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_) {}
+        subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
+                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef()) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
@@ -65,10 +69,11 @@ public:
   Event::MockDispatcher dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   MockSubscriptionCallbacks callbacks_;
-  MockOpaqueResourceDecoder resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockInstance> server_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   SubscriptionFactoryImpl subscription_factory_;
@@ -80,8 +85,7 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
 public:
   SubscriptionFactoryTestUnifiedOrLegacyMux() {
     if (GetParam() == LegacyOrUnified::Unified) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.unified_mux", "true"}});
+      scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "true"}});
     }
   }
 

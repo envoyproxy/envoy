@@ -13,7 +13,7 @@ option java_outer_classname = "QuicConfigProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
-option ruby_package = "Envoy.Api.V2.ListenerNS";
+option ruby_package = "Envoy::Api::V2::ListenerNS";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 

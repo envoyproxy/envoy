@@ -41,10 +41,10 @@ message Router {
   // requests may be made for each downstream (inbound) request.
   repeated config.accesslog.v3.AccessLog upstream_log = 3;
 
-  // Do not add any additional *x-envoy-* headers to requests or responses. This
-  // only affects the :ref:`router filter generated *x-envoy-* headers
+  // Do not add any additional ``x-envoy-`` headers to requests or responses. This
+  // only affects the :ref:`router filter generated x-envoy- headers
   // <config_http_filters_router_headers_set>`, other Envoy filters and the HTTP
-  // connection manager may continue to set *x-envoy-* headers.
+  // connection manager may continue to set ``x-envoy-`` headers.
   bool suppress_envoy_headers = 4;
 
   // Specifies a list of HTTP headers to strictly validate. Envoy will reject a

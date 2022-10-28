@@ -20,7 +20,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Authorization Service ]
+// [#protodoc-title: Authorization service]
 
 // The authorization service request messages used by external authorization :ref:`network filter
 // <config_network_filters_ext_authz>` and :ref:`HTTP filter <config_http_filters_ext_authz>`.
@@ -69,22 +69,22 @@ message OkHttpResponse {
   // HTTP entity headers in addition to the original request headers. This allows the authorization
   // service to append, to add or to override headers from the original request before
   // dispatching it to the upstream. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
-  // false when used in this message. By setting the `append` field to `true`,
+  // false when used in this message. By setting the ``append`` field to ``true``,
   // the filter will append the correspondent header value to the matched request header.
-  // By leaving `append` as false, the filter will either add a new header, or override an existing
+  // By leaving ``append`` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
   repeated config.core.v3.HeaderValueOption headers = 2;
 
   // HTTP entity headers to remove from the original request before dispatching
   // it to the upstream. This allows the authorization service to act on auth
-  // related headers (like `Authorization`), process them, and consume them.
+  // related headers (like ``Authorization``), process them, and consume them.
   // Under this model, the upstream will either receive the request (if it's
   // authorized) or not receive it (if it's not), but will not see headers
   // containing authorization credentials.
   //
-  // Pseudo headers (such as `:authority`, `:method`, `:path` etc), as well as
-  // the header `Host`, may not be removed as that would make the request
-  // malformed. If mentioned in `headers_to_remove` these special headers will
+  // Pseudo headers (such as ``:authority``, ``:method``, ``:path`` etc), as well as
+  // the header ``Host``, may not be removed as that would make the request
+  // malformed. If mentioned in ``headers_to_remove`` these special headers will
   // be ignored.
   //
   // When using the HTTP service this must instead be set by the HTTP
@@ -114,12 +114,12 @@ message OkHttpResponse {
   repeated string query_parameters_to_remove = 8;
 }
 
-// Intended for gRPC and Network Authorization servers `only`.
+// Intended for gRPC and Network Authorization servers ``only``.
 message CheckResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.CheckResponse";
 
-  // Status `OK` allows the request. Any other status indicates the request should be denied, and
+  // Status ``OK`` allows the request. Any other status indicates the request should be denied, and
   // for HTTP filter, if not overridden by :ref:`denied HTTP response status <envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status>`
   // Envoy sends ``403 Forbidden`` HTTP status code by default.
   google.rpc.Status status = 1;

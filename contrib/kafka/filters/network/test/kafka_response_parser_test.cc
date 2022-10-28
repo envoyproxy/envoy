@@ -1,9 +1,12 @@
+#include "test/test_common/utility.h"
+
 #include "contrib/kafka/filters/network/source/kafka_response_parser.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
 #include "contrib/kafka/filters/network/test/serialization_utilities.h"
 #include "gmock/gmock.h"
 
 using testing::_;
+using testing::ContainsRegex;
 using testing::Return;
 
 namespace Envoy {
@@ -76,9 +79,8 @@ TEST_F(KafkaResponseParserTest, ResponseHeaderParserShouldThrowIfThereIsUnexpect
   // given
   const int32_t payload_length = 100;
   const int32_t correlation_id = 1234;
-  uint32_t header_len = 0;
-  header_len += putIntoBuffer(payload_length);
-  header_len += putIntoBuffer(correlation_id); // Insert correlation id.
+  putIntoBuffer(payload_length);
+  putIntoBuffer(correlation_id); // Insert correlation id.
 
   absl::string_view data = putGarbageIntoBuffer();
 
@@ -91,7 +93,9 @@ TEST_F(KafkaResponseParserTest, ResponseHeaderParserShouldThrowIfThereIsUnexpect
 
   // when
   // then - exception gets thrown.
-  EXPECT_THROW(testee.parse(data), EnvoyException);
+  EXPECT_THAT_THROWS_MESSAGE(testee.parse(data), EnvoyException,
+                             AllOf(ContainsRegex("no response metadata registered"),
+                                   ContainsRegex(std::to_string(correlation_id))));
 }
 
 TEST_F(KafkaResponseParserTest, ResponseDataParserShoulRethrowDeserializerExceptionsDuringFeeding) {
@@ -102,7 +106,7 @@ TEST_F(KafkaResponseParserTest, ResponseDataParserShoulRethrowDeserializerExcept
   public:
     uint32_t feed(absl::string_view&) override {
       // Move some pointers to simulate data consumption.
-      throw EnvoyException("feed");
+      throw EnvoyException("deserializer-failure");
     };
 
     bool ready() const override { throw std::runtime_error("should not be invoked at all"); };
@@ -116,15 +120,8 @@ TEST_F(KafkaResponseParserTest, ResponseDataParserShoulRethrowDeserializerExcept
   absl::string_view data = putGarbageIntoBuffer();
 
   // when
-  bool caught = false;
-  try {
-    testee.parse(data);
-  } catch (EnvoyException& e) {
-    caught = true;
-  }
-
-  // then
-  ASSERT_EQ(caught, true);
+  // then - exception gets thrown.
+  EXPECT_THROW_WITH_MESSAGE(testee.parse(data), EnvoyException, "deserializer-failure");
 }
 
 // This deserializer consumes FAILED_DESERIALIZER_STEP bytes and returns 0

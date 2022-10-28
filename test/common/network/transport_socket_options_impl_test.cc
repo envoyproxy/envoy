@@ -1,3 +1,5 @@
+#include "envoy/common/hashable.h"
+
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/application_protocol.h"
@@ -27,6 +29,17 @@ TEST_F(TransportSocketOptionsImplTest, Nullptr) {
       "random_key_has_no_effect", std::make_unique<UpstreamServerName>("www.example.com"),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
+}
+
+TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
+  filter_state_.setData(
+      "random_key_has_effect", std::make_unique<UpstreamServerName>("www.example.com"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain,
+      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
+  EXPECT_EQ(1, objects.size());
+  EXPECT_EQ("random_key_has_effect", objects.at(0).name_);
 }
 
 TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
@@ -73,6 +86,46 @@ TEST_F(TransportSocketOptionsImplTest, Both) {
   EXPECT_EQ(absl::make_optional<std::string>("www.example.com"),
             transport_socket_options->serverNameOverride());
   EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
+}
+
+class TestTransportSocketFactory : public CommonUpstreamTransportSocketFactory {
+public:
+  TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                        std::shared_ptr<const Upstream::HostDescription>) const override {
+    return nullptr;
+  }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
+  bool implementsSecureTransport() const override { return false; }
+};
+
+class NonHashableObj : public StreamInfo::FilterState::Object {};
+class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
+  absl::optional<uint64_t> hash() const override { return 12345; };
+};
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
+  filter_state_.setData("hashable", std::make_shared<HashableObj>(),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_GT(keys.size(), 0);
+}
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
+  filter_state_.setData("non-hashable", std::make_shared<NonHashableObj>(),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_EQ(keys.size(), 0);
 }
 
 } // namespace

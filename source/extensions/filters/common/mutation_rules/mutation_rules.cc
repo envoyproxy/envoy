@@ -79,9 +79,12 @@ bool Checker::isAllowed(CheckOperation op, const LowerCaseString& header_name) c
     // and fail if the header is in that list.
     return false;
   }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_system, false) &&
-      absl::StartsWith(header_name, ":")) {
-    // If true, disallow changes to all internal headers.
+  if (absl::StartsWith(header_name, ":") &&
+      (op == CheckOperation::APPEND ||
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_system, false))) {
+    // Disallow changes to system headers if explicitly disallowed, or if
+    // if the operation is "append," since system headers don't allow multiple
+    // values.
     return false;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_envoy, false) &&

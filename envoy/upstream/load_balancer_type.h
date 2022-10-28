@@ -75,6 +75,13 @@ public:
   fallbackPolicy() const PURE;
 
   /**
+   * @return LbSubsetMetadataFallbackPolicy the fallback policy used to try different route metadata
+   * until a host is found
+   */
+  virtual envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy
+  metadataFallbackPolicy() const PURE;
+
+  /**
    * @return ProtobufWkt::Struct the struct describing the metadata for a
    *         host to be included in the default subset.
    */

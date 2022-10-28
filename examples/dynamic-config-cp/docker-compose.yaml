@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   proxy:
@@ -13,17 +13,19 @@ services:
     - 19000:19000
 
   service1:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service1
 
   service2:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service2
 
   go-control-plane:
     build:
       context: .
       dockerfile: Dockerfile-control-plane
-    command: bin/example -debug
+    command: bin/example
     healthcheck:
       test: nc -zv localhost 18000

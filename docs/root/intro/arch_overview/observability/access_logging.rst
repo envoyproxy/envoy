@@ -3,9 +3,10 @@
 Access logging
 ==============
 
-The :ref:`HTTP connection manager <arch_overview_http_conn_man>` and
-:ref:`tcp proxy <arch_overview_tcp_proxy>` support extensible access logging with the following
-features:
+The :ref:`HTTP connection manager <arch_overview_http_conn_man>`, the
+:ref:`tcp proxy <arch_overview_tcp_proxy>` and the
+:ref:`thrift proxy <config_network_filters_thrift_proxy>`
+support extensible access logging with the following features:
 
 * Any number of access logs per a connection stream.
 * Customizable access log filters that allow different types of requests and responses to be written

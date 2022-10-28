@@ -135,8 +135,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
   Config per_route_config(config_proto, true);
-  EXPECT_CALL(*decoder_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.header_to_metadata"))
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -161,8 +160,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
   Config per_route_config(config_proto, true);
-  EXPECT_CALL(*decoder_callbacks_.route_,
-              mostSpecificPerFilterConfig("envoy.filters.http.header_to_metadata"))
+  EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config));
 
   EXPECT_TRUE(getConfig()->doRequest());

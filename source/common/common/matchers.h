@@ -120,9 +120,10 @@ public:
                  : absl::StrContains(value, matcher_.contains());
     case StringMatcherType::MatchPatternCase::kSafeRegex:
       return regex_->match(value);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case StringMatcherType::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+      break;
     }
+    PANIC("unexpected");
   }
   bool match(const ProtobufWkt::Value& value) const override {
 
@@ -195,6 +196,7 @@ public:
 
   static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
   static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+  static PathMatcherConstSharedPtr createPattern(const std::string& pattern, bool ignore_case);
   static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 

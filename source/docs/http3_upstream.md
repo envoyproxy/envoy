@@ -24,8 +24,8 @@ broken for twice the previous period, up to a maximum of 1 day. If it is instead
 marked as confirmed, then the period is reset to the default and the next time
 HTTP/3 is marked as broken it will be for the initial 5 minutes.
 
-#### Alternate Protocols Cache
-The `AlternateProtocolsCache` is responsible for tracking servers which advertise HTTP/3.
+#### Http Server Protocols Cache
+The `HttpServerPropertiesCache` is responsible for tracking servers which advertise HTTP/3.
 These advertisements may arrive via HTTP Alternative Service (alt-svc) or soon via the HTTPS
 DNS RR. Currently only advertisements which specify the same hostname and port are stored.
 

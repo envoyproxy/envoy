@@ -43,7 +43,7 @@ Terminal 2 ::
     ------------------------------------------------------------------------------------------------------------
     load-reporting-service_http_service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:81->80/tcp
     load-reporting-service_http_service_2   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 0.0.0.0:80->80/tcp
-    load-reporting-service_lrs_server_1     go run main.go                 Up      0.0.0.0:18000->18000/tcp
+    load-reporting-service_lrs_server_1     go run main.go                 Up      18000/tcp
 
 Step 2: Start sending stream of HTTP requests
 *********************************************

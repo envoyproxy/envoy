@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load(":genrule_cmd.bzl", "genrule_cmd")
 
 licenses(["notice"])  # Apache 2

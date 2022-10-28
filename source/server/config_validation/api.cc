@@ -20,12 +20,12 @@ Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name)
 Event::DispatcherPtr
 ValidationImpl::allocateDispatcher(const std::string&,
                                    const Event::ScaledRangeTimerManagerFactory&) {
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string&,
                                                         Buffer::WatermarkFactoryPtr&&) {
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 } // namespace Api

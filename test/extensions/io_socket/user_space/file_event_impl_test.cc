@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(bool, isPeerWritable, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
+  MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
 };
 
 class FileEventImplTest : public testing::Test {

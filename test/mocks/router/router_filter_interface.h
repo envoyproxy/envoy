@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -45,13 +46,17 @@ public:
   MOCK_METHOD(bool, downstreamEndStream, (), (const));
   MOCK_METHOD(uint32_t, attemptCount, (), (const));
   MOCK_METHOD(const VirtualCluster*, requestVcluster, (), (const));
-  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(const Route*, route, (), (const));
   MOCK_METHOD(const std::list<UpstreamRequestPtr>&, upstreamRequests, (), (const));
   MOCK_METHOD(const UpstreamRequest*, finalUpstreamRequest, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
 
+  const RouteStatsContextOptRef routeStatsContext() const override {
+    return RouteStatsContextOptRef();
+  }
+
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<MockRouteEntry> route_entry_;
+  NiceMock<MockRoute> route_;
   NiceMock<Network::MockConnection> client_connection_;
 
   envoy::extensions::filters::http::router::v3::Router router_proto;
@@ -59,8 +64,9 @@ public:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
   FilterConfig config_;
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
   std::list<UpstreamRequestPtr> requests_;
+  Event::GlobalTimeSystem time_system_;
 };
 
 } // namespace Router

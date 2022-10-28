@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 export NAME=wasm-cc
+export UID
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -34,9 +35,10 @@ sed -i'.bak' s/\\.\\/lib\\/envoy_filter_http_wasm_example.wasm/.\\/lib\\/envoy_f
 
 run_log "Bring the proxy back up"
 docker-compose up --build -d proxy
-
-run_log "Snooze for 5 while proxy starts"
-sleep 5
+wait_for 10 bash -c "\
+         responds_with \
+         'Hello, Wasm world' \
+         http://localhost:8000"
 
 run_log "Test updated connection"
 responds_with \

@@ -4,7 +4,6 @@ package envoy.extensions.filters.http.ext_authz;
 import "envoy/extensions/filters/http/ext_authz/v3/ext_authz.proto";
 import "test/fuzz/common.proto";
 import "envoy/config/core/v3/base.proto";
-import "google/protobuf/empty.proto";
 import "validate/validate.proto";
 
 // We only fuzz a single request per iteration.
@@ -22,7 +21,7 @@ message ExtAuthzTestCase {
   // HTTP request data.
   test.fuzz.HttpData request_data = 2 [(validate.rules).message = {required: true}];
   // Set default auth check result.
-  AuthResult result = 3;
+  AuthResult result = 3 [(validate.rules).enum.defined_only = true];
   // Filter metadata.
   envoy.config.core.v3.Metadata filter_metadata = 4;
   // TODO: Add headers and data to ExtAuthz::Response and check that the request headers and data

@@ -18,7 +18,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifierBase::VerifyProof(
     std::string* /*error_details*/, std::unique_ptr<quic::ProofVerifyDetails>* /*details*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
   // Only reachable in Google QUIC which is not supported by Envoy.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 } // namespace Quic

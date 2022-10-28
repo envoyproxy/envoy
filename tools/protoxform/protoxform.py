@@ -4,7 +4,6 @@
 # version candidate FileDescriptorProtos. The resulting FileDescriptorProtos are
 # then later processed by proto_sync.py, which invokes protoprint.py to format.
 
-import copy
 import functools
 
 from tools.api_proto_plugin import plugin, visitor
@@ -41,11 +40,12 @@ class ProtoFormatVisitor(visitor.Visitor):
     def visit_file(self, file_proto, type_context, services, msgs, enums):
         # Freeze protos that have next major version candidates.
         typedb = utils.get_type_db()
-        output_proto = copy.deepcopy(file_proto)
-        existing_pkg_version_status = output_proto.options.Extensions[
+        existing_pkg_version_status = file_proto.options.Extensions[
             status_pb2.file_status].package_version_status
         empty_file = len(services) == 0 and len(enums) == 0 and len(msgs) == 0
-        pkg_version_status_exempt = file_proto.name.startswith('envoy/annotations') or empty_file
+        pkg_version_status_exempt = (
+            file_proto.name.startswith('envoy/annotations') or empty_file
+            or file_proto.name.startswith('xds'))
         # It's a format error not to set package_version_status.
         if existing_pkg_version_status == status_pb2.UNKNOWN and not pkg_version_status_exempt:
             raise ProtoXformError('package_version_status must be set in %s' % file_proto.name)
@@ -53,16 +53,16 @@ class ProtoFormatVisitor(visitor.Visitor):
         if self._active_or_frozen and not pkg_version_status_exempt:
             # Freeze if this is an active package with a next major version. Preserve
             # frozen status otherwise.
-            if self._freeze and typedb.next_version_protos.get(output_proto.name, None):
+            if self._freeze and typedb.next_version_protos.get(file_proto.name, None):
                 target_pkg_version_status = status_pb2.FROZEN
             elif existing_pkg_version_status == status_pb2.FROZEN:
                 target_pkg_version_status = status_pb2.FROZEN
             else:
                 assert (existing_pkg_version_status == status_pb2.ACTIVE)
                 target_pkg_version_status = status_pb2.ACTIVE
-            output_proto.options.Extensions[
+            file_proto.options.Extensions[
                 status_pb2.file_status].package_version_status = target_pkg_version_status
-        return str(output_proto)
+        return str(file_proto)
 
 
 def main():

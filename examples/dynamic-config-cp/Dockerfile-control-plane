@@ -1,8 +1,10 @@
-FROM golang
+FROM golang@sha256:a452d6273ad03a47c2f29b898d6bb57630e77baf839651ef77d03e4e049c5bf3
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y netcat \
-    && apt-get autoremove -y \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y netcat \
+    && apt-get -qq autoremove -y \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 

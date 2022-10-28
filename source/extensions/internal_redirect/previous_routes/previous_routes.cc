@@ -42,9 +42,9 @@ bool PreviousRoutesPredicate::acceptTargetRoute(StreamInfo::FilterState& filter_
                          StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::Request);
   }
-  auto& predicate_state =
+  auto predicate_state =
       filter_state.getDataMutable<PreviousRoutesPredicateState>(filter_state_name);
-  return predicate_state.insertRouteIfNotPresent(route_name);
+  return predicate_state->insertRouteIfNotPresent(route_name);
 }
 
 } // namespace InternalRedirect

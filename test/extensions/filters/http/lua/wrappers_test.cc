@@ -276,6 +276,26 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
                             "[string \"...\"]:5: object used outside of proper scope");
 }
 
+// Verify setting the HTTP1 reason phrase
+TEST_F(LuaHeaderMapWrapperTest, SetHttp1ReasonPhrase) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:setHttp1ReasonPhrase("Slow Down")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  HeaderMapWrapper::create(coroutine_->luaState(), *headers, []() { return true; });
+  start("callMe");
+
+  Http::StatefulHeaderKeyFormatterOptRef formatter(headers->formatter());
+  EXPECT_EQ(true, formatter.has_value());
+  EXPECT_EQ("Slow Down", formatter->getReasonPhrase());
+}
+
 class LuaStreamInfoWrapperTest
     : public Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper> {
 public:
@@ -416,6 +436,41 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
                        .at("foo")
                        .string_value());
   wrapper.reset();
+}
+
+// Verify that binary values could also be extracted from dynamicMetadata().
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:dynamicMetadata():get("envoy.pp")
+      local bin_data = metadata["bin_data"]
+      local data_length = string.len(metadata["bin_data"])
+      for idx = 1, data_length do
+        testPrint('Hex Data: ' .. string.format('%x', string.byte(bin_data, idx)))
+      end
+    end
+  )EOF"};
+
+  ProtobufWkt::Value metadata_value;
+  constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
+  metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
+  ProtobufWkt::Struct metadata;
+  metadata.mutable_fields()->insert({"bin_data", metadata_value});
+
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+  (*stream_info.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+
+  EXPECT_CALL(printer_, testPrint("Hex Data: 68"));          // h (Hex: 68)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 65"));          // e (Hex: 65)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 0"));           // \0 (Hex: 0)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6c")).Times(2); // l (Hex: 6c)
+  EXPECT_CALL(printer_, testPrint("Hex Data: 6f"));          // 0 (Hex: 6f)
+
+  start("callMe");
 }
 
 // Set, get complex key/values in stream info dynamic metadata.

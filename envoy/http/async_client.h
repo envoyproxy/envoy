@@ -14,6 +14,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class FilterConfig;
+}
 namespace Http {
 
 /**
@@ -173,7 +176,7 @@ public:
    * A context from the caller of an async client.
    */
   struct ParentContext {
-    const StreamInfo::StreamInfo* stream_info;
+    const StreamInfo::StreamInfo* stream_info{nullptr};
   };
 
   /**
@@ -218,6 +221,15 @@ public:
       retry_policy = p;
       return *this;
     }
+    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+      filter_config_ = config;
+      return *this;
+    }
+
+    StreamOptions& setIsShadow(bool s) {
+      is_shadow = s;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -247,6 +259,10 @@ public:
     envoy::config::core::v3::Metadata metadata;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
+
+    OptRef<Router::FilterConfig> filter_config_;
+
+    bool is_shadow{false};
   };
 
   /**
@@ -284,6 +300,10 @@ public:
     }
     RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       StreamOptions::setRetryPolicy(p);
+      return *this;
+    }
+    RequestOptions& setIsShadow(bool s) {
+      StreamOptions::setIsShadow(s);
       return *this;
     }
     RequestOptions& setParentSpan(Tracing::Span& parent_span) {

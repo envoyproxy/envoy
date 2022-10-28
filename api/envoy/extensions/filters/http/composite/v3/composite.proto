@@ -15,7 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Composite]
-// Composite Filter :ref:`configuration overview <config_http_filters_cors>`.
+// Composite Filter :ref:`configuration overview <config_http_filters_composite>`.
 // [#extension: envoy.filters.http.composite]
 
 // :ref:`Composite filter <config_http_filters_composite>` config. The composite filter config

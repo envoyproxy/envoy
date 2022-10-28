@@ -15,6 +15,10 @@ or as a :ref:`HTTP filter <config_http_filters_rbac>` or both. If the request is
 by the network filter then the connection will be closed. If the request is deemed unauthorized by
 the HTTP filter the request will be denied with 403 (Forbidden) response.
 
+The RBAC filter's rules can be either configured with a list of
+:ref:`policies <envoy_v3_api_field_config.rbac.v3.RBAC.policies>` or the
+:ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`.
+
 Policy
 ------
 
@@ -26,13 +30,27 @@ the request, for example, the method and path of a HTTP request. The principal s
 downstream client identities of the request, for example, the URI SAN of the downstream client
 certificate. A policy is matched if its permissions and principals are matched at the same time.
 
-Shadow Policy
--------------
+.. _arch_overview_rbac_matcher:
+
+Matcher
+-------
+Instead of specifying :ref:`policies <envoy_v3_api_field_config.rbac.v3.RBAC.policies>`, the RBAC
+filter can also be configured with the :ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`.
+:ref:`Network inputs <extension_category_envoy.matching.network.input>` are available for both RBAC
+network filter and HTTP filter, and :ref:`HTTP inputs <extension_category_envoy.matching.http.input>`
+are only available in HTTP filter.
+
+:ref:`RBAC matcher extensions <api-v3_config_rbac_matchers>` are not compatible with the
+:ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`.
+
+Shadow Policy and Shadow Matcher
+--------------------------------
 
 The filter can be configured with a
-:ref:`shadow policy <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>` that doesn't
-have any effect (i.e. not deny the request) but only emit stats and log the result. This is useful
-for testing a rule before applying in production.
+:ref:`shadow policy <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>` or a
+:ref:`shadow matcher <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_matcher>` that
+doesn't have any effect (i.e. not deny the request) but only emit stats and log the result. This is
+useful for testing a rule before applying in production.
 
 .. _arch_overview_condition:
 

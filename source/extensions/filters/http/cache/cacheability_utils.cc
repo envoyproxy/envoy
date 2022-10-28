@@ -34,7 +34,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 
 bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
-  const absl::string_view scheme = Http::Utility::getScheme(headers);
+  const absl::string_view scheme = headers.getSchemeValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
 
   // Check if the request contains any conditional headers.

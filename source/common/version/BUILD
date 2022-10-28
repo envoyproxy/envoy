@@ -12,7 +12,7 @@ envoy_package()
 
 genrule(
     name = "generate_version_number",
-    srcs = ["//:VERSION"],
+    srcs = ["//:VERSION.txt"],
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
     visibility = ["//visibility:private"],
@@ -20,7 +20,7 @@ genrule(
 
 genrule(
     name = "generate_api_version_number",
-    srcs = ["//:API_VERSION"],
+    srcs = ["//:API_VERSION.txt"],
     outs = ["api_version_number.h"],
     cmd = """./$(location //tools/api_versioning:generate_api_version_header_bin) $< >$@""",
     tools = ["//tools/api_versioning:generate_api_version_header_bin"],

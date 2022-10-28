@@ -2,8 +2,8 @@
 #include "envoy/event/file_event.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fancy_logger.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -310,11 +310,11 @@ TEST_F(IoHandleImplTest, FlowControl) {
   auto& internal_buffer = *io_handle_->getWriteBuffer();
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
-    FANCY_LOG(debug, "internal buffer length = {}", internal_buffer.length());
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}", internal_buffer.length());
     EXPECT_TRUE(io_handle_->isReadable());
     bool writable = io_handle_->isWritable();
-    FANCY_LOG(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
-              writable);
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
+                   writable);
     if (writable) {
       writable_flipped = true;
     } else {
@@ -956,7 +956,7 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
   io_handle_->shutdown(ENVOY_SHUT_WR);
-  FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
+  ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
 
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
@@ -1117,6 +1117,37 @@ TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_handle_->close();
   io_handle_peer_->close();
+}
+
+class TestObject : public StreamInfo::FilterState::Object {
+public:
+  TestObject(int value) : value_(value) {}
+  int value_;
+};
+
+TEST_F(IoHandleImplTest, PassthroughState) {
+  auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
+  ProtobufWkt::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  ProtobufWkt::Value val;
+  val.set_string_value("val");
+  (*map.mutable_fields())["key"] = val;
+  StreamInfo::FilterState::Objects source_filter_state;
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state.push_back(
+      {object, StreamInfo::FilterState::StateType::ReadOnly,
+       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection, "object_key"});
+  ASSERT_NE(nullptr, io_handle_->passthroughState());
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
+
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  ASSERT_NE(nullptr, io_handle_peer_->passthroughState());
+  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
+  ASSERT_EQ("val",
+            dest_metadata.filter_metadata().at("envoy.test").fields().at("key").string_value());
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_NE(nullptr, dest_object);
+  ASSERT_EQ(object->value_, dest_object->value_);
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {

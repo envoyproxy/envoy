@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "source/common/config/xds_resource.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/router/context_impl.h"
@@ -14,12 +15,15 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/matcher/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/od_cds_api.h"
 #include "test/mocks/upstream/thread_aware_load_balancer.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -92,7 +96,7 @@ public:
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, http_context_, grpc_context_, router_context_);
+        *factory_.api_, http_context_, grpc_context_, router_context_, server_);
     cluster_manager_->setPrimaryClustersInitializedCb(
         [this, bootstrap]() { cluster_manager_->initializeSecondaryClusters(bootstrap); });
   }
@@ -137,7 +141,7 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
         *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-        router_context_);
+        router_context_, server_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -190,6 +194,7 @@ public:
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  NiceMock<Server::MockInstance> server_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
@@ -203,6 +208,255 @@ static_resources:
   return parseBootstrapFromV3Yaml(yaml);
 }
 
+class ODCDTest : public ClusterManagerImplTest {
+public:
+  void SetUp() override {
+    create(defaultConfig());
+    odcds_ = MockOdCdsApi::create();
+    odcds_handle_ = cluster_manager_->createOdCdsApiHandle(odcds_);
+  }
+
+  void TearDown() override {
+    odcds_.reset();
+    odcds_handle_.reset();
+    factory_.tls_.shutdownThread();
+  }
+
+  ClusterDiscoveryCallbackPtr createCallback() {
+    return std::make_unique<ClusterDiscoveryCallback>(
+        [this](ClusterDiscoveryStatus cluster_status) {
+          UNREFERENCED_PARAMETER(cluster_status);
+          ++callback_call_count_;
+        });
+  }
+
+  ClusterDiscoveryCallbackPtr createCallback(ClusterDiscoveryStatus expected_cluster_status) {
+    return std::make_unique<ClusterDiscoveryCallback>(
+        [this, expected_cluster_status](ClusterDiscoveryStatus cluster_status) {
+          EXPECT_EQ(expected_cluster_status, cluster_status);
+          ++callback_call_count_;
+        });
+  }
+
+  MockOdCdsApiSharedPtr odcds_;
+  OdCdsApiHandlePtr odcds_handle_;
+  std::chrono::milliseconds timeout_ = std::chrono::milliseconds(5000);
+  unsigned callback_call_count_ = 0u;
+};
+
+// Check that we create a valid handle for valid config source and null resource locator.
+TEST_F(ODCDTest, TestAllocate) {
+  envoy::config::core::v3::ConfigSource config;
+  OptRef<xds::core::v3::ResourceLocator> locator;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
+
+// Check that we create a valid handle for valid config source and resource locator.
+TEST_F(ODCDTest, TestAllocateWithLocator) {
+  envoy::config::core::v3::ConfigSource config;
+  ProtobufMessage::MockValidationVisitor mock_visitor;
+
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+
+  auto locator =
+      Config::XdsResourceIdentifier::decodeUrl("xdstp://foo/envoy.config.cluster.v3.Cluster/bar");
+  auto handle = cluster_manager_->allocateOdCdsApi(config, locator, mock_visitor);
+  EXPECT_NE(handle, nullptr);
+}
+
+// Check if requesting for an unknown cluster calls into ODCDS instead of invoking the callback.
+TEST_F(ODCDTest, TestRequest) {
+  auto cb = createCallback();
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check if repeatedly requesting for an unknown cluster calls only once into ODCDS instead of
+// invoking the callbacks.
+TEST_F(ODCDTest, TestRequestRepeated) {
+  auto cb1 = createCallback();
+  auto cb2 = createCallback();
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after the successful discovery of
+// the cluster and its following expiration (removal). Also make sure that the callback is called on
+// the successful discovery.
+TEST_F(ODCDTest, TestClusterRediscovered) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Available);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cluster_manager_->removeCluster("cluster_foo");
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after the expired discovery of the
+// cluster. Also make sure that the callback is called on the expired discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterExpiration) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyExpiredDiscovery("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check if requesting an unknown cluster calls into ODCDS, even after
+// the discovery found out that the cluster is missing in the
+// management server. Also make sure that the callback is called on
+// the failed discovery.
+TEST_F(ODCDTest, TestClusterRediscoveredAfterMissing) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Missing);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(2);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+  handle.reset();
+  cb = createCallback();
+  handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check that we do nothing if we get a notification about irrelevant
+// missing cluster.
+TEST_F(ODCDTest, TestIrrelevantNotifyMissingCluster) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Timeout);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->notifyMissingCluster("cluster_bar");
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check that the callback is not called when some other cluster is added.
+TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
+  auto cb = std::make_unique<ClusterDiscoveryCallback>([](ClusterDiscoveryStatus) {
+    ADD_FAILURE() << "The callback should not be called for irrelevant clusters";
+  });
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1");
+}
+
+// Start a couple of discoveries and drop the discovery handles in different order, make sure no
+// callbacks are invoked when discoveries are done.
+TEST_F(ODCDTest, TestDroppingHandles) {
+  auto cb1 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 1 should not be called"; });
+  auto cb2 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 2 should not be called"; });
+  auto cb3 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 3 should not be called"; });
+  auto cb4 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 4 should not be called"; });
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo1"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo2"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo3"));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo4"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo1", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo2", std::move(cb2), timeout_);
+  auto handle3 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo3", std::move(cb3), timeout_);
+  auto handle4 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo4", std::move(cb4), timeout_);
+
+  handle2.reset();
+  handle3.reset();
+  handle1.reset();
+  handle4.reset();
+
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo1"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo2"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo3"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo4"), "version1");
+}
+
+// Checks that dropping discovery handles will result in callbacks not being invoked.
+TEST_F(ODCDTest, TestHandles) {
+  auto cb1 = createCallback(ClusterDiscoveryStatus::Available);
+  auto cb2 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 2 should not be called"; });
+  auto cb3 = std::make_unique<ClusterDiscoveryCallback>(
+      [](ClusterDiscoveryStatus) { ADD_FAILURE() << "The callback 3 should not be called"; });
+  auto cb4 = createCallback(ClusterDiscoveryStatus::Available);
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  auto handle3 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb3), timeout_);
+  auto handle4 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb4), timeout_);
+
+  // handle1 and handle4 are left intact, so their respective callbacks will be invoked.
+  handle2.reset();
+  handle3.reset();
+
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_EQ(callback_call_count_, 2);
+}
+
+// Check if callback is invoked when trying to discover a cluster we already know about. It should
+// not call into ODCDS in such case.
+TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
+  auto cb = createCallback(ClusterDiscoveryStatus::Available);
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1");
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo")).Times(0);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Checks that the cluster manager detects that a thread has requested a cluster that some other
+// thread already did earlier, so it does not start another discovery process.
+TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto cb1 = createCallback();
+  auto cb2 = createCallback();
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  auto cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("another_fake_thread");
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+}
+
 class AlpnSocketFactory : public Network::RawBufferSocketFactory {
 public:
   bool supportsAlpn() const override { return true; }
@@ -212,10 +466,13 @@ class AlpnTestConfigFactory
     : public Envoy::Extensions::TransportSockets::RawBuffer::UpstreamRawBufferSocketFactory {
 public:
   std::string name() const override { return "envoy.transport_sockets.alpn"; }
-  Network::TransportSocketFactoryPtr
+  Network::UpstreamTransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override {
     return std::make_unique<AlpnSocketFactory>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
   }
 };
 
@@ -238,6 +495,8 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
             http_protocol_options: {}
       transport_socket:
         name: envoy.transport_sockets.alpn
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
   create(parseBootstrapFromV3Yaml(yaml));
 }
@@ -836,6 +1095,9 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   // envoy.load_balancers.custom_lb is registered by linking in
   // //test/integration/load_balancers:custom_lb_policy.
   const std::string yaml = fmt::format(R"EOF(
@@ -870,8 +1132,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().typed_extension_config().name(),
-            "envoy.load_balancers.custom_lb");
+  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
@@ -1087,9 +1348,8 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
       cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
       cluster_manager_->getThreadLocalCluster("cluster_1")->loadBalancer().chooseHost(nullptr));
 
-  // Local reference, primary reference, thread local reference, host reference, async client
-  // reference.
-  EXPECT_EQ(5U, cluster.info().use_count());
+  // Local reference, primary reference, thread local reference, host reference
+  EXPECT_EQ(4U, cluster.info().use_count());
 
   // Thread local reference should be gone.
   factory_.tls_.shutdownThread();
@@ -1764,7 +2024,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
-  Network::MockClientConnection* connection = new Network::MockClientConnection();
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   ON_CALL(*cluster2->info_, features())
       .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
   EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
@@ -1938,6 +2198,60 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+// Test that we drain or close all HTTP or TCP connection pool connections when there is a host
+// health failure and 'CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE' set to true.
+TEST_F(ClusterManagerImplTest,
+       CloseConnectionsOnHealthFailureWithCloseConnectionsOnHostHealthFailure) {
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(*cluster1->info_, features())
+      .WillRepeatedly(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
+  cluster1->info_->name_ = "some_cluster";
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+  MockHealthChecker health_checker;
+  ON_CALL(*cluster1, healthChecker()).WillByDefault(Return(&health_checker));
+
+  Outlier::MockDetector outlier_detector;
+  ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+  Http::ConnectionPool::MockInstance* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+  Tcp::ConnectionPool::MockInstance* cp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+
+  InSequence s;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+  EXPECT_CALL(*cluster1, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  create(parseBootstrapFromV3Json(json));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->tcpConnPool(ResourcePriority::Default, nullptr);
+
+  // Order of these calls is implementation dependent, so can't sequence them!
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, closeConnections());
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
@@ -3987,6 +4301,9 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   ConnectionPool::Instance::IdleCb drained_cb = []() {};
   EXPECT_CALL(*pool_mock, addIdleCallback(_));
   opt_cp.value().addIdleCallback(drained_cb);
+
+  EXPECT_CALL(*pool_mock, drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete));
+  opt_cp.value().drainConnections(ConnectionPool::DrainBehavior::DrainAndDelete);
 }
 
 // Test that the read only cross-priority host map in the main thread is correctly synchronized to
@@ -4090,6 +4407,9 @@ public:
 
 // Verify that configured upstream filters are added to client connections.
 TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   TestUpstreamNetworkFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedUpstreamNetworkFilterConfigFactory> registry(
       factory);
@@ -4469,7 +4789,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data = cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
@@ -4645,7 +4965,7 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsClusterOverride) {
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -4663,9 +4983,103 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
                     address: 127.0.0.1
                     port_value: 11001
       upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
           { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: [
+              { level: 10, name: 12, int_value: 13, state: STATE_PREBIND },
+              { level: 14, name: 15, int_value: 16, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(10, 12), 13},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(14, 15), 16}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndEmptyOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: []
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
   cluster_manager:
     upstream_bind_config:
       socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
@@ -4673,6 +5087,43 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
   initialize(yaml);
   NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
                       {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManangerOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(7, 8), 9}};
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
     names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
   }
@@ -4801,7 +5252,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data =
@@ -4912,6 +5363,52 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
   )EOF";
   initialize(yaml);
   expectSetsockoptSoKeepalive(7, 4, 1);
+}
+
+// Make sure the drainConnections() with a predicate can correctly exclude a host.
+TEST_F(ClusterManagerImplTest, DrainConnectionsPredicate) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Set up the HostSet.
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+  HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:81", time_system_);
+
+  HostVector hosts{host1, host2};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // Sending non-mergeable updates.
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  // Using RR LB get a pool for each host.
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
+  Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+  EXPECT_NE(cp1, cp2);
+
+  EXPECT_CALL(*cp1,
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*cp2, drainConnections(_)).Times(0);
+  cluster_manager_->drainConnections("cluster_1", [](const Upstream::Host& host) {
+    return host.address()->asString() == "127.0.0.1:80";
+  });
 }
 
 TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
@@ -5128,8 +5625,6 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
 TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.conn_pool_delete_when_idle", "true"}});
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -5390,6 +5885,34 @@ TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
                             EnvoyException, "gRPC client cluster 'added_via_api' is not static");
 }
 
+#ifdef WIN32
+TEST_F(ClusterManagerImplTest, LocalInterfaceNameForUpstreamConnectionThrowsInWin32) {
+  const std::string yaml = fmt::format(R"EOF(
+ static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    upstream_connection_options:
+      set_local_interface_name_on_upstream_connections: true
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 5678
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                            "set_local_interface_name_on_upstream_connections_ cannot be set to "
+                            "true on Windows platforms");
+}
+#endif
+
 class PreconnectTest : public ClusterManagerImplTest {
 public:
   void initialize(float ratio) {
@@ -5458,7 +5981,7 @@ TEST_F(PreconnectTest, PreconnectOff) {
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
 
   EXPECT_CALL(factory_, allocateTcpConnPool_(_))
       .Times(1)
@@ -5479,7 +6002,7 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
 
   EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(2)
@@ -5506,7 +6029,7 @@ TEST_F(PreconnectTest, PreconnectHighHttp) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_preconnect);
 }
@@ -5548,7 +6071,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called 3 times across the four hosts.
   EXPECT_EQ(3, http_preconnect);
 
@@ -5559,7 +6082,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
   http_preconnect = 0;
   http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   EXPECT_EQ(2, http_preconnect);
 }
 
@@ -5580,7 +6103,7 @@ TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
       }));
   auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
-  http_handle.value().newStream(decoder_, http_callbacks_);
+  http_handle.value().newStream(decoder_, http_callbacks_, {false, true});
   // Expect preconnect to be called once and then preconnecting is stopped.
   EXPECT_EQ(1, http_preconnect_calls);
 }

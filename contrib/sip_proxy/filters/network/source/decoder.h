@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -7,29 +9,13 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
-#include "contrib/sip_proxy/filters/network/source/protocol.h"
+#include "contrib/sip_proxy/filters/network/source/utility.h"
+#include "metadata.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
-
-using TrafficRoutingAssistantMap = std::map<std::string, std::map<std::string, std::string>>;
-
-#define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
-  FUNCTION(StopIteration)                                                                          \
-  FUNCTION(WaitForData)                                                                            \
-  FUNCTION(TransportBegin)                                                                         \
-  FUNCTION(MessageBegin)                                                                           \
-  FUNCTION(MessageEnd)                                                                             \
-  FUNCTION(TransportEnd)                                                                           \
-  FUNCTION(Done)
-
-/**
- * ProtocolState represents a set of states used in a state machine to decode
- * Sip requests and responses.
- */
-enum class State { ALL_PROTOCOL_STATES(GENERATE_ENUM) };
 
 class StateNameValues {
 public:
@@ -51,32 +37,18 @@ private:
 class DecoderStateMachine : public Logger::Loggable<Logger::Id::filter> {
 public:
   DecoderStateMachine(MessageMetadataSharedPtr& metadata, DecoderEventHandler& handler)
-      : metadata_(metadata), handler_(handler), state_(State::TransportBegin) {}
+      : metadata_(metadata), handler_(handler) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes
-   * the decoding state machine. Returns ProtocolState::WaitForData if more data
-   * is required to complete processing of a message. Returns
-   * ProtocolState::Done when the end of a message is successfully processed.
+   * the decoding state machine.
    * Once the Done state is reached, further invocations of run return
    * immediately with Done.
    *
    * @param buffer a buffer containing the remaining data to be processed
-   * @return ProtocolState returns with ProtocolState::WaitForData or
-   * ProtocolState::Done
-   * @throw Envoy Exception if thrown by the underlying Protocol
+   * @return State returns with State::Done
    */
   State run();
-
-  /**
-   * @return the current ProtocolState
-   */
-  State currentState() const { return state_; }
-
-  /**
-   * Set the current state. Used for testing only.
-   */
-  void setCurrentState(State state) { state_ = state; }
 
 private:
   friend class SipDecoderTest;
@@ -89,9 +61,6 @@ private:
     absl::optional<FilterStatus> filter_status_;
   };
 
-  // These functions map directly to the matching ProtocolState values. Each
-  // returns the next state or ProtocolState::WaitForData if more data is
-  // required.
   DecoderStatus transportBegin();
   DecoderStatus messageBegin();
   DecoderStatus messageEnd();
@@ -102,7 +71,6 @@ private:
 
   MessageMetadataSharedPtr metadata_;
   DecoderEventHandler& handler_;
-  State state_;
 };
 
 using DecoderStateMachinePtr = std::unique_ptr<DecoderStateMachine>;
@@ -115,9 +83,7 @@ public:
    * @return DecoderEventHandler& a new DecoderEventHandler for a message.
    */
   virtual DecoderEventHandler& newDecoderEventHandler(MessageMetadataSharedPtr metadata) PURE;
-  virtual absl::string_view getLocalIp() PURE;
-  virtual std::string getOwnDomain() PURE;
-  virtual std::string getDomainMatchParamName() PURE;
+  virtual std::shared_ptr<SipSettings> settings() const PURE;
 };
 
 /**
@@ -138,10 +104,19 @@ public:
    * @throw EnvoyException on Sip protocol errors
    */
   FilterStatus onData(Buffer::Instance& data, bool continue_handling = false);
-  std::string getOwnDomain() { return callbacks_.getOwnDomain(); }
-  std::string getDomainMatchParamName() { return callbacks_.getDomainMatchParamName(); }
+
+  std::shared_ptr<SipSettings> settings() { return callbacks_.settings(); };
 
   MessageMetadataSharedPtr metadata() { return metadata_; }
+
+  void restore(MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
+    complete();
+    metadata_ = metadata;
+    request_ = std::make_unique<ActiveRequest>(decoder_event_handler);
+    state_machine_ = std::make_unique<DecoderStateMachine>(metadata_, request_->handler_);
+  }
+
+  void complete();
 
 private:
   friend class SipConnectionManagerTest;
@@ -152,8 +127,6 @@ private:
     DecoderEventHandler& handler_;
   };
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
-
-  void complete();
 
   int reassemble(Buffer::Instance& data);
 
@@ -167,6 +140,7 @@ private:
 
   int decode();
 
+private:
   HeaderType currentHeader() { return current_header_; }
   size_t rawOffset() { return raw_offset_; }
   void setCurrentHeader(HeaderType data) { current_header_ = data; }
@@ -186,8 +160,6 @@ private:
 
   static absl::string_view domain(absl::string_view sip_header, HeaderType header_type);
   static void getParamFromHeader(absl::string_view header, MessageMetadataSharedPtr metadata);
-
-  int parseTopLine(absl::string_view& top_line);
 
   HeaderType current_header_{HeaderType::TopLine};
   size_t raw_offset_{0};
@@ -210,15 +182,7 @@ private:
     virtual int processVia(absl::string_view& header);
     virtual int processContact(absl::string_view& header);
     virtual int processPath(absl::string_view& header);
-    virtual int processEvent(absl::string_view& header) {
-      UNREFERENCED_PARAMETER(header);
-      return 0;
-    };
     virtual int processRoute(absl::string_view& header);
-    virtual int processCseq(absl::string_view& header) {
-      UNREFERENCED_PARAMETER(header);
-      return 0;
-    }
     virtual int processRecordRoute(absl::string_view& header);
     virtual int processServiceRoute(absl::string_view& header);
     virtual int processWwwAuth(absl::string_view& header);
@@ -266,7 +230,6 @@ private:
 
   protected:
     std::shared_ptr<HeaderHandler> handler_;
-    // Decoder& parent_;
   };
 
   class REGISTERHeaderHandler : public HeaderHandler {
@@ -282,7 +245,6 @@ private:
   class OK200HeaderHandler : public HeaderHandler {
   public:
     using HeaderHandler::HeaderHandler;
-    int processCseq(absl::string_view& header) override;
   };
 
   class GeneralHeaderHandler : public HeaderHandler {
@@ -293,7 +255,6 @@ private:
   class SUBSCRIBEHeaderHandler : public HeaderHandler {
   public:
     using HeaderHandler::HeaderHandler;
-    int processEvent(absl::string_view& header) override;
   };
 
   class FAILURE4XXHeaderHandler : public HeaderHandler {
@@ -344,18 +305,6 @@ private:
         : MessageHandler(std::make_shared<SUBSCRIBEHeaderHandler>(*this), parent) {}
     ~SUBSCRIBEHandler() override = default;
     void parseHeader(HeaderType& type, absl::string_view& header) override;
-    void setEventType(absl::string_view value) {
-      if (value == "reg") {
-        event_type_ = EventType::REG;
-      } else {
-        event_type_ = EventType::OTHERS;
-      }
-    }
-
-  private:
-    enum class EventType { REG, OTHERS };
-
-    EventType event_type_;
   };
 
   // This is used to handle Other Message
@@ -386,7 +335,6 @@ private:
   ActiveRequestPtr request_;
   MessageMetadataSharedPtr metadata_;
   DecoderStateMachinePtr state_machine_;
-  bool start_new_message_{true};
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;

@@ -1193,8 +1193,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   setUpTest(v2_empty_fault_config_yaml);
   Fault::FaultSettings delay_fault(convertYamlStrToProtoConfig(delay_with_upstream_cluster_yaml));
 
-  ON_CALL(*decoder_filter_callbacks_.route_,
-          mostSpecificPerFilterConfig("envoy.filters.http.fault"))
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&delay_fault));
 
   const std::string upstream_cluster("www1");

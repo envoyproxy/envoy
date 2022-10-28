@@ -48,10 +48,11 @@ message StatsConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.metrics.v2.StatsConfig";
 
-  // Each stat name is iteratively processed through these tag specifiers.
-  // When a tag is matched, the first capture group is removed from the name so
-  // later :ref:`TagSpecifiers <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` cannot match that
-  // same portion of the match.
+  // Each stat name is independently processed through these tag specifiers. When a tag is
+  // matched, the first capture group is not immediately removed from the name, so later
+  // :ref:`TagSpecifiers <envoy_v3_api_msg_config.metrics.v3.TagSpecifier>` can also match that
+  // same portion of the match. After all tag matching is complete, a tag-extracted version of
+  // the name is produced and is used in stats sinks that represent tags, such as Prometheus.
   repeated TagSpecifier stats_tags = 1;
 
   // Use all default tag regexes specified in Envoy. These can be combined with
@@ -120,7 +121,7 @@ message StatsMatcher {
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
   // <envoy_v3_api_msg_type.matcher.v3.StringMatcher>` protos:
   //
-  // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
+  // * If ``reject_all`` is set to `true`, no stats will be instantiated. If ``reject_all`` is set to
   //   `false`, all stats will be instantiated.
   //
   // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
@@ -186,7 +187,7 @@ message StatsMatcher {
   oneof stats_matcher {
     option (validate.required) = true;
 
-    // If `reject_all` is true, then all stats are disabled. If `reject_all` is false, then all
+    // If ``reject_all`` is true, then all stats are disabled. If ``reject_all`` is false, then all
     // stats are enabled.
     bool reject_all = 1;
 
@@ -219,7 +220,11 @@ message TagSpecifier {
   //
   // .. note::
   //
-  //   It is invalid to specify the same tag name twice in a config.
+  //   A stat name may be spelled in such a way that it matches two different
+  //   tag extractors for the same tag name. In that case, all but one of the
+  //   tag values will be dropped. It is not specified which tag value will be
+  //   retained. The extraction will only occur for one of the extractors, and
+  //   only the matched extraction will be removed from the tag name.
   string tag_name = 1;
 
   oneof tag_value {
@@ -265,18 +270,18 @@ message TagSpecifier {
     //     }
     //   ]
     //
-    // The two regexes of the specifiers will be processed in the definition order.
+    // The two regexes of the specifiers will be processed from the elaborated
+    // stat name.
     //
-    // The first regex will remove ``ios.``, leaving the tag extracted name
-    // ``http.connection_manager_1.user_agent.downstream_cx_total``. The tag
-    // ``envoy.http_user_agent`` will be added with tag value ``ios``.
+    // The first regex will save ``ios.`` as the tag value for ``envoy.http_user_agent``. It will
+    // leave it in the name for potential matching with additional tag specifiers. After all tag
+    // specifiers are processed the tags will be removed from the name.
     //
-    // The second regex will remove ``connection_manager_1.`` from the tag
-    // extracted name produced by the first regex
-    // ``http.connection_manager_1.user_agent.downstream_cx_total``, leaving
-    // ``http.user_agent.downstream_cx_total`` as the tag extracted name. The tag
-    // ``envoy.http_conn_manager_prefix`` will be added with the tag value
-    // ``connection_manager_1``.
+    // The second regex will populate tag ``envoy.http_conn_manager_prefix`` with value
+    // ``connection_manager_1.``, based on the original stat name.
+    //
+    // As a final step, the matched tags are removed, leaving
+    // ``http.user_agent.downstream_cx_total`` as the tag extracted name.
     string regex = 2 [(validate.rules).string = {max_bytes: 1024}];
 
     // Specifies a fixed tag value for the ``tag_name``.
@@ -287,7 +292,7 @@ message TagSpecifier {
 // Specifies a matcher for stats and the buckets that matching stats should use.
 message HistogramBucketSettings {
   // The stats that this rule applies to. The match is applied to the original stat name
-  // before tag-extraction, for example `cluster.exampleclustername.upstream_cx_length_ms`.
+  // before tag-extraction, for example ``cluster.exampleclustername.upstream_cx_length_ms``.
   type.matcher.v3.StringMatcher match = 1 [(validate.rules).message = {required: true}];
 
   // Each value is the upper bound of a bucket. Each bucket must be greater than 0 and unique.
@@ -299,7 +304,7 @@ message HistogramBucketSettings {
   }];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.statsd* sink. This sink does not support
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.statsd`` sink. This sink does not support
 // tagged metrics.
 // [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
@@ -348,7 +353,7 @@ message StatsdSink {
   string prefix = 3;
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.dog_statsd* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.dog_statsd`` sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
@@ -380,7 +385,7 @@ message DogStatsdSink {
   google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
 }
 
-// Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
+// Stats configuration proto schema for built-in ``envoy.stat_sinks.hystrix`` sink.
 // The sink emits stats in `text/event-stream
 // <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
 // formatted stream for use by `Hystrix dashboard
@@ -401,7 +406,7 @@ message HystrixSink {
   // in the process). The sink then outputs the aggregate statistics across the
   // current rolling window to the event stream(s).
   //
-  // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
+  // ``rolling_window(ms)`` = ``stats_flush_interval(ms)`` * ``num_of_buckets``
   //
   // More detailed explanation can be found in `Hystrix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.

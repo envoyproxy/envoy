@@ -59,7 +59,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
     // Get upstream address from request headers.
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
-        {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+        {":path", "/path"}, {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
     auto session_state = factory.create(request_headers);
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
@@ -82,6 +82,91 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
               Envoy::Http::Utility::makeSetCookieValue("override_host",
                                                        Envoy::Base64::encode("2.3.4.5:80", 10),
                                                        "/path", std::chrono::seconds(5), true));
+  }
+
+  {
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/path");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    // Get upstream address from request headers.
+    Envoy::Http::TestRequestHeaderMapImpl request_headers = {
+        {":path", "/not_match_path"},
+        {"cookie", "override_host=" + Envoy::Base64::encode("1.2.3.4:80", 10)}};
+    auto session_state = factory.create(request_headers);
+    EXPECT_EQ(nullptr, session_state);
+  }
+}
+
+TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
+  {
+    // Any request path will be accepted for empty cookie path.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_TRUE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_TRUE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    // Any request path will be accepted for root cookie path.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_TRUE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_TRUE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    // Request paths that start with the cookie path will be accepted for cookie path ends with '/'.
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/foo/");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_FALSE(factory.requestPathMatch("/"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo"));
+    EXPECT_FALSE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
+  }
+
+  {
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/foo");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
+    CookieBasedSessionStateFactory factory(config);
+
+    EXPECT_FALSE(factory.requestPathMatch("/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo"));
+    EXPECT_FALSE(factory.requestPathMatch("/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo/bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo#bar"));
+    EXPECT_TRUE(factory.requestPathMatch("/foo?bar"));
+    EXPECT_FALSE(factory.requestPathMatch("/foobar"));
   }
 }
 

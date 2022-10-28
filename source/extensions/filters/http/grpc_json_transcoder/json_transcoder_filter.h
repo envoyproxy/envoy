@@ -15,6 +15,7 @@
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
+#include "grpc_transcoding/response_to_json_translator.h"
 #include "grpc_transcoding/transcoder.h"
 #include "grpc_transcoding/type_helper.h"
 
@@ -107,6 +108,8 @@ public:
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
 
+  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
+
 private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
@@ -115,7 +118,6 @@ private:
                                            google::grpc::transcoding::RequestInfo* info) const;
 
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
-  void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
                                     std::vector<const ProtobufWkt::Field*>* field_path,
@@ -127,11 +129,12 @@ private:
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
-  Protobuf::util::JsonPrintOptions print_options_;
+  google::grpc::transcoding::JsonResponseTranslateOptions response_translate_options_;
 
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
+  bool case_insensitive_enum_parsing_{false};
 
   bool disabled_;
 };
@@ -143,7 +146,7 @@ using JsonTranscoderConfigSharedPtr = std::shared_ptr<JsonTranscoderConfig>;
  */
 class JsonTranscoderFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::http2> {
 public:
-  JsonTranscoderFilter(JsonTranscoderConfig& config);
+  JsonTranscoderFilter(const JsonTranscoderConfig& config);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -168,10 +171,17 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override {}
 
+  // shouldTranscodeResponse returns whether to transcode response based on
+  // the config and the request transcoding status.
+  bool shouldTranscodeResponse() {
+    return !error_ && transcoder_ && per_route_config_ && !per_route_config_->disabled();
+  }
+
 private:
-  bool checkIfTranscoderFailed(const std::string& details);
+  bool checkAndRejectIfRequestTranscoderFailed(const std::string& details);
+  bool checkAndRejectIfResponseTranscoderFailed();
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
-  void maybeSendHttpBodyRequestMessage();
+  void maybeSendHttpBodyRequestMessage(Buffer::Instance* data);
   /**
    * Builds response from HttpBody protobuf.
    * Returns true if at least one gRPC frame has processed.
@@ -188,7 +198,7 @@ private:
   bool decoderBufferLimitReached(uint64_t buffer_length);
   bool encoderBufferLimitReached(uint64_t buffer_length);
 
-  JsonTranscoderConfig& config_;
+  const JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
@@ -208,6 +218,9 @@ private:
   bool error_{false};
   bool has_body_{false};
   bool http_body_response_headers_set_{false};
+
+  // Don't buffer unary response data in the `FilterManager` buffer.
+  Buffer::OwnedImpl response_out_;
 };
 
 } // namespace GrpcJsonTranscoder

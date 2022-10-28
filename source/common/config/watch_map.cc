@@ -132,6 +132,9 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
     }
   }
 
+  // Execute external config validators.
+  config_validators_.executeValidators(type_url_, resources);
+
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (auto& watch : watches_) {
@@ -184,7 +187,7 @@ void WatchMap::onConfigUpdate(
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
-  std::vector<DecodedResourceImplPtr> decoded_resources;
+  std::vector<DecodedResourcePtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
@@ -206,6 +209,9 @@ void WatchMap::onConfigUpdate(
       *per_watch_removed[interested_watch].Add() = r;
     }
   }
+
+  // Execute external config validators.
+  config_validators_.executeValidators(type_url_, decoded_resources, removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {

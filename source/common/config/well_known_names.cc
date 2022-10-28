@@ -135,8 +135,16 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.(<address>.)*
-  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>)\.))");
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  // listener_manager.(worker_<id>.)*
+  // server.(worker_<id>.)*
+  addRe2(
+      WORKER_ID,
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)\.|server\.|listener_manager\.)worker_((\d+)\.))",
+      "");
+
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
   // vhost.(<virtual host name>.)*
   addTokenized(VIRTUAL_HOST, "vhost.$.**");
@@ -149,13 +157,26 @@ TagNameValues::TagNameValues() {
   // match.
   addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
-  // listener_manager.(worker_<id>.)*
-  addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
+  // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
+  addTokenized(ROUTE, "vhost.*.route.$.**");
+
+  // thrift.(<stat_prefix>.)*
+  addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
+
+  // (<stat_prefix>.).http_local_rate_limit.**
+  addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
+
+  // local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_NETWORK_RATELIMIT_PREFIX, "local_rate_limit.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
-                           const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, expandRegex(regex), substr, Regex::Type::Re2});
+                           const std::string& substr, const std::string& negative_matching_value) {
+  descriptor_vec_.emplace_back(
+      Descriptor{name, expandRegex(regex), substr, negative_matching_value, Regex::Type::Re2});
 }
 
 void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {

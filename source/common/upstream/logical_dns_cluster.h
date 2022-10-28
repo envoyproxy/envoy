@@ -33,10 +33,11 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+  LogicalDnsCluster(Server::Configuration::ServerFactoryContext& server_context,
+                    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                     Network::DnsResolverSharedPtr dns_resolver,
                     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                    Stats::ScopePtr&& stats_scope, bool added_via_api);
+                    Stats::ScopeSharedPtr&& stats_scope, bool added_via_api);
 
   ~LogicalDnsCluster() override;
 
@@ -67,7 +68,8 @@ private:
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   Event::TimerPtr resolve_timer_;
-  std::string dns_url_;
+  std::string dns_address_;
+  uint32_t dns_port_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
@@ -83,9 +85,10 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override;
+      Stats::ScopeSharedPtr&& stats_scope) override;
 };
 
 DECLARE_FACTORY(LogicalDnsClusterFactory);

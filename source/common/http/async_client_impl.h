@@ -41,9 +41,15 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 namespace Envoy {
 namespace Http {
+namespace {
+// Limit the size of buffer for data used for retries.
+// This is currently fixed to 64KB.
+constexpr uint64_t kBufferLimitForRetry = 1 << 16;
+} // namespace
 
 class AsyncStreamImpl;
 class AsyncRequestImpl;
@@ -87,6 +93,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
+  ~AsyncStreamImpl() override { router_.onDestroy(); }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -160,6 +167,13 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -191,6 +205,9 @@ private:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    const Router::RouteStatsContextOptRef routeStatsContext() const override {
+      return Router::RouteStatsContextOptRef();
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return Http::Code::InternalServerError;
     }
@@ -201,6 +218,10 @@ private:
     }
     void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
+    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                   bool) const override {
+      return {};
+    }
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
@@ -218,6 +239,8 @@ private:
     const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
       return internal_redirect_policy_;
     }
+    const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
+    const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -273,12 +296,16 @@ private:
     bool includeAttemptCountInResponse() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
     const std::string& routeName() const override { return route_name_; }
+    const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
+
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     std::unique_ptr<Router::RetryPolicy> retry_policy_;
 
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const Router::InternalRedirectPolicyImpl internal_redirect_policy_;
+    static const Router::PathMatcherSharedPtr path_matcher_;
+    static const Router::PathRewriterSharedPtr path_rewriter_;
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
@@ -289,6 +316,9 @@ private:
     absl::optional<std::chrono::milliseconds> timeout_;
     static const absl::optional<ConnectConfig> connect_config_nullopt_;
     const std::string route_name_;
+    // Pass early data option config through StreamOptions.
+    std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
+        new Router::DefaultEarlyDataPolicy(true)};
   };
 
   struct RouteImpl : public Router::Route {
@@ -323,14 +353,12 @@ private:
   bool complete() { return local_closed_ && remote_closed_; }
 
   // Http::StreamDecoderFilterCallbacks
-  const Network::Connection* connection() override { return nullptr; }
+  OptRef<const Network::Connection> connection() override { return {}; }
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
-  void resetStream() override;
+  void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+                   absl::string_view transport_failure_reason = "") override;
   Router::RouteConstSharedPtr route() override { return route_; }
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
-  void setRoute(Router::RouteConstSharedPtr) override {}
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
-  void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
@@ -397,7 +425,14 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
+  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
+    return nullptr;
+  }
+  void traversePerFilterConfig(
+      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
   void resetIdleTimer() override {}
   void setUpstreamOverrideHost(absl::string_view) override {}
   absl::optional<absl::string_view> upstreamOverrideHost() const override { return {}; }

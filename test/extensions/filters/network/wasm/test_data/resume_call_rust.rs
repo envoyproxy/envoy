@@ -3,8 +3,7 @@ use proxy_wasm::traits::{Context, StreamContext};
 use proxy_wasm::types::*;
 use std::time::Duration;
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_stream_context(|context_id, _| -> Box<dyn StreamContext> {
         Box::new(TestStream {
@@ -13,7 +12,7 @@ pub fn _start() {
             upstream_callout: None,
         })
     });
-}
+}}
 
 struct TestStream {
     context_id: u32,

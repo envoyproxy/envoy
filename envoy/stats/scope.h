@@ -6,7 +6,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
@@ -25,18 +24,45 @@ using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>
 using GaugeOptConstRef = absl::optional<std::reference_wrapper<const Gauge>>;
 using HistogramOptConstRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextReadout>>;
-using ScopePtr = std::unique_ptr<Scope>;
+using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
+
+// TODO(#20911): Until 2022, scopes were generally captured by the creator
+// as unique_ptr<Scope>. This has changed to std::shared_ptr<Scope>, and to
+// make this transition work we made ScopePtr an alias for ScopeSharedPtr. All
+// references in the Envoy repo are now removed, but there remain references
+// in external repos, so we'll leave this alias until we have some confidence
+// that external repos are cleaned up.
+using ScopePtr ABSL_DEPRECATED("Use ScopeSharedPtr() instead.") = ScopeSharedPtr;
 
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
  * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
  * (for example to free/delete all of them).
+ *
+ * We enable use of shared pointers for Scopes to make it possible for the admin
+ * stats handler to safely capture all the scope references and remain robust to
+ * other threads deleting those scopes while rendering an admin stats page.
+ *
+ * We use std::shared_ptr rather than Stats::RefcountPtr, which we use for other
+ * stats, because:
+ *  * existing uses of shared_ptr<Scope> exist in the Wasm extension and would need
+ *    to be rewritten to allow for RefcountPtr<Scope>.
+ *  * the main advantage of RefcountPtr is it's smaller per instance by (IIRC) 16
+ *    bytes, but there are not typically enough scopes that the extra per-scope
+ *    overhead would matter.
+ *  * It's a little less coding to use enable_shared_from_this compared to adding
+ *    a ref_count to the scope object, for each of its implementations.
  */
-class Scope {
+class Scope : public std::enable_shared_from_this<Scope> {
 public:
   virtual ~Scope() = default;
+
+  /** @return a shared_ptr for this */
+  ScopeSharedPtr getShared() { return shared_from_this(); }
+  /** @return a const shared_ptr for this */
+  ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -47,7 +73,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr createScope(const std::string& name) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -56,7 +82,7 @@ public:
    *
    * @param name supplies the scope's namespace prefix.
    */
-  virtual ScopePtr scopeFromStatName(StatName name) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name) PURE;
 
   /**
    * Deliver an individual histogram value to all registered sinks.

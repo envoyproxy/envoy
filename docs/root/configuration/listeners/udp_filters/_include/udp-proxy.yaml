@@ -20,7 +20,13 @@ static_resources:
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: service
-        cluster: service_udp
+        matcher:
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: service_udp
         upstream_socket_config:
           max_rx_datagram_size: 9000
   clusters:

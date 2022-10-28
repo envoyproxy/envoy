@@ -2,8 +2,8 @@
 
 Envoy Header-To-Metadata Filter
 ===============================
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_to_metadata.v3.Config>`
-* This filter should be configured with the name *envoy.filters.http.header_to_metadata*.
 
 This filter is configured with rules that will be matched against requests and responses.
 Each rule has either a cookie or a header and can be triggered either when the header
@@ -26,64 +26,32 @@ Example
 A sample filter configuration to route traffic to endpoints based on the presence or
 absence of a version header could be:
 
-.. code-block:: yaml
-
-  http_filters:
-    - name: envoy.filters.http.header_to_metadata
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-        request_rules:
-          - header: x-version
-            on_header_present:
-              metadata_namespace: envoy.lb
-              key: version
-              type: STRING
-            on_header_missing:
-              metadata_namespace: envoy.lb
-              key: default
-              value: 'true'
-              type: STRING
-            remove: false
+.. literalinclude:: _include/header-to-metadata-filter.yaml
+    :language: yaml
+    :lines: 25-40
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
 As with headers, the value of the specified cookie will be extracted from the request
 and added as metadata with the key specified.
 Removing a cookie when a rule matches is unsupported.
 
-.. code-block:: yaml
-
-  http_filters:
-    - name: envoy.filters.http.header_to_metadata
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-        request_rules:
-          - cookie: cookie
-            on_header_present:
-              metadata_namespace: envoy.lb
-              key: version
-              type: STRING
-            on_header_missing:
-              metadata_namespace: envoy.lb
-              key: default
-              value: 'true'
-              type: STRING
-            remove: false
-
+.. literalinclude:: _include/header-to-metadata-filter-cookies.yaml
+    :language: yaml
+    :lines: 25-40
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`header-to-metadata-filter-cookies.yaml <_include/header-to-metadata-filter-cookies.yaml>`
 
 A corresponding upstream cluster configuration could be:
 
-.. code-block:: yaml
-
-  clusters:
-    - name: versioned-cluster
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      lb_subset_config:
-        fallback_policy: ANY_ENDPOINT
-        subset_selectors:
-          - keys:
-              - default
-          - keys:
-              - version
+.. literalinclude:: _include/header-to-metadata-filter.yaml
+    :language: yaml
+    :lines: 45-55
+    :lineno-start: 45
+    :linenos:
+    :caption: :download:`header-to-metadata-filter.yaml <_include/header-to-metadata-filter.yaml>`
 
 This would then allow requests with the ``x-version`` header set to be matched against
 endpoints with the corresponding version. Whereas requests with that header missing
@@ -92,47 +60,21 @@ would be matched with the default endpoints.
 If the header's value needs to be transformed before it's added to the request as
 dynamic metadata, this filter supports regex matching and substitution:
 
-.. code-block:: yaml
-
-  http_filters:
-    - name: envoy.filters.http.header_to_metadata
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-        request_rules:
-          - header: ":path"
-            on_header_present:
-              metadata_namespace: envoy.lb
-              key: cluster
-              regex_value_rewrite:
-                pattern:
-                  google_re2: {}
-                  regex: "^/(cluster[\\d\\w-]+)/?.*$"
-                substitution: "\\1"
+.. literalinclude:: _include/header-to-metadata-filter-regex-substitution.yaml
+    :language: yaml
+    :lines: 25-37
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`header-to-metadata-filter-regex-substitution.yaml <_include/header-to-metadata-filter-regex-substitution.yaml>`
 
 Note that this filter also supports per route configuration:
 
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { prefix: "/version-to-metadata" }
-        route: { cluster: service }
-        typed_per_filter_config:
-          envoy.filters.http.header_to_metadata:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
-            request_rules:
-              - header: x-version
-                on_header_present:
-                  metadata_namespace: envoy.lb
-                  key: version
-                  type: STRING
-                remove: false
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
+.. literalinclude:: _include/header-to-metadata-filter-route-config.yaml
+    :language: yaml
+    :lines: 14-38
+    :lineno-start: 14
+    :linenos:
+    :caption: :download:`header-to-metadata-filter-route-config.yaml <_include/header-to-metadata-filter-route-config.yaml>`
 
 This can be used to either override the global configuration or if the global configuration
 is empty (no rules), it can be used to only enable the filter at a per route level.

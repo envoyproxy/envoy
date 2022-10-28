@@ -122,11 +122,9 @@ TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+  EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
 
-  LoadBalancerContext::OverrideHost expected_host{
-      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
-                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
   EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
 
   // Mock membership update and update host map shared pointer in the lb.

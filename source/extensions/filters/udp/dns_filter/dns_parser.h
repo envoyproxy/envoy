@@ -125,11 +125,16 @@ struct DnsParserCounters {
   Stats::Counter& underflow_counter;
   Stats::Counter& record_name_overflow;
   Stats::Counter& query_parsing_failure;
+  Stats::Counter& queries_with_additional_rrs;
+  Stats::Counter& queries_with_ans_or_authority_rrs;
 
   DnsParserCounters(Stats::Counter& underflow, Stats::Counter& record_name,
-                    Stats::Counter& query_parsing)
+                    Stats::Counter& query_parsing, Stats::Counter& queries_with_additional_rrs,
+                    Stats::Counter& queries_with_ans_or_authority_rrs)
       : underflow_counter(underflow), record_name_overflow(record_name),
-        query_parsing_failure(query_parsing) {}
+        query_parsing_failure(query_parsing),
+        queries_with_additional_rrs(queries_with_additional_rrs),
+        queries_with_ans_or_authority_rrs(queries_with_ans_or_authority_rrs) {}
 };
 
 // The flags have been verified with dig and this structure should not be modified. The flag
@@ -179,7 +184,8 @@ public:
   uint16_t response_code_;
   uint64_t retry_;
   uint16_t id_;
-  Network::DnsResolver::ResolutionStatus resolution_status_;
+  Network::DnsResolver::ResolutionStatus resolution_status_ =
+      Network::DnsResolver::ResolutionStatus::Success;
   DnsHeader header_;
   DnsHeader response_header_;
   DnsQueryPtrVec queries_;
@@ -230,66 +236,6 @@ public:
    * parsed from the buffer
    */
   DnsQueryRecordPtr parseDnsQueryRecord(const Buffer::InstancePtr& buffer, uint64_t& offset);
-
-  struct DnsAnswerCtx {
-    DnsAnswerCtx(const Buffer::InstancePtr& buffer, const absl::string_view record_name,
-                 const uint16_t record_type, const uint16_t record_class,
-                 const uint16_t available_bytes, const uint16_t data_length, const uint32_t ttl,
-                 uint64_t& offset)
-        : buffer_(buffer), record_name_(record_name), record_type_(record_type),
-          record_class_(record_class), available_bytes_(available_bytes), data_length_(data_length),
-          ttl_(ttl), offset_(offset) {}
-
-    const Buffer::InstancePtr& buffer_;
-    const std::string record_name_;
-    const uint16_t record_type_;
-    const uint16_t record_class_;
-    const uint16_t available_bytes_;
-    const uint16_t data_length_;
-    const uint32_t ttl_;
-    uint64_t& offset_;
-  };
-
-  /**
-   * @brief parse an A or AAAA DNS Record
-   *
-   * @param context the query context for which we are generating a response
-   * @return DnsAnswerRecordPtr a pointer to a DnsAnswerRecord object containing the parsed answer
-   * record
-   */
-  DnsAnswerRecordPtr parseDnsARecord(DnsAnswerCtx& context);
-
-  /**
-   * @brief parse a Server Selection (SRV) DNS Record
-   *
-   * @param context the query context for which we are generating a response
-   * @return DnsSrvRecordPtr a pointer to a DnsSrvRecord object containing the parsed server record
-   */
-  DnsSrvRecordPtr parseDnsSrvRecord(DnsAnswerCtx& context);
-
-  /**
-   * @brief parse a single answer record from a client request or filter response
-   *
-   * @param buffer a reference to a buffer containing a DNS request or response
-   * @param offset the buffer offset at which parsing is to begin. This parameter is updated when
-   * one record is parsed from the buffer and returned to the caller.
-   * @return DnsQueryRecordPtr a pointer to a DnsAnswerRecord object containing all query and answer
-   * data parsed from the buffer
-   */
-  DnsAnswerRecordPtr parseDnsAnswerRecord(const Buffer::InstancePtr& buffer, uint64_t& offset);
-
-  /**
-   * @brief Parse answer records using a single function. Answer records follow a common format
-   * so one function will suffice for reading them.
-   *
-   * @param answers a reference to the map containing the parsed records
-   * @param answer_count the indicated number of records we expect parsed from the request header
-   * @param buffer a reference to a buffer containing a DNS request or response
-   * @param offset a reference to an index into the buffer indicating the position where reading may
-   * begin
-   */
-  bool parseAnswerRecords(DnsAnswerMap& answers, const uint16_t answer_count,
-                          const Buffer::InstancePtr& buffer, uint64_t& offset);
 
   /**
    * @brief store Answer Records in the supplied collection after validating the record type
@@ -359,7 +305,8 @@ public:
                                         DnsParserCounters& counters);
   /**
    * @param buffer a reference to the incoming request object received by the listener
-   * @return bool true if all DNS records and flags were successfully parsed from the buffer
+   * @return bool true if it is a query message and all fields and flags were successfully parsed
+   * from the buffer
    */
   bool parseDnsObject(DnsQueryContextPtr& context, const Buffer::InstancePtr& buffer);
 

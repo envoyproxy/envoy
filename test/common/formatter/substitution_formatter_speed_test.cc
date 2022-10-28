@@ -18,7 +18,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     method: '%REQ(:METHOD)%'
     url: '%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
     protocol: '%PROTOCOL%'
-    respoinse_code: '%RESPONSE_CODE%'
+    response_code: '%RESPONSE_CODE%'
     bytes_sent: '%BYTES_SENT%'
     duration: '%DURATION%'
     referer: '%REQ(REFERER)%'
@@ -36,7 +36,7 @@ std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool type
     method: '%REQ(:METHOD)%'
     url: '%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
     protocol: '%PROTOCOL%'
-    respoinse_code: '%RESPONSE_CODE%'
+    response_code: '%RESPONSE_CODE%'
     bytes_sent: '%BYTES_SENT%'
     duration: '%DURATION%'
     referer: '%REQ(REFERER)%'
@@ -54,6 +54,23 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {
 }
 
 } // namespace
+
+// Test measures how fast Formatters are constructed from
+// LogFormat string.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AccessLogFormatterSetup(benchmark::State& state) {
+  static const char* LogFormat =
+      "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
+      "%REQ(:METHOD)% "
+      "%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% "
+      "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
+
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
+        std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+  }
+}
+BENCHMARK(BM_AccessLogFormatterSetup);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
@@ -170,11 +187,10 @@ BENCHMARK(BM_TypedJsonAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FormatterCommandParsing(benchmark::State& state) {
-  const std::string token = "(Listener:namespace:key):100";
+  const std::string token = "Listener:namespace:key";
   std::string listener, names, key;
-  absl::optional<size_t> len;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    Formatter::SubstitutionFormatParser::parseCommand(token, 1, ':', len, listener, names, key);
+    Formatter::SubstitutionFormatParser::parseSubcommand(token, ':', listener, names, key);
   }
 }
 BENCHMARK(BM_FormatterCommandParsing);

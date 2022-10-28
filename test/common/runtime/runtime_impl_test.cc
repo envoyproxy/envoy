@@ -549,29 +549,34 @@ TEST_F(StaticLoaderImplTest, All) {
 TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
   // Test that Quiche flags can be overwritten via Envoy runtime config.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false: true
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: false
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_spdy_testonly_default_false: false
   )EOF");
   SetQuicReloadableFlag(spdy_testonly_default_false, true);
-  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(spdy_testonly_default_false));
   setup();
-  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicReloadableFlag(spdy_testonly_default_false));
 
-  // Test 2 behaviors:
-  // 1. Removing overwritten config will make the flag fallback to default value.
-  // 2. Quiche flags can be overwritten again.
+  // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: true
   )EOF");
   setup();
-  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
-  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_FALSE(GetQuicReloadableFlag(spdy_testonly_default_false));
 }
 #endif
+
+TEST_F(StaticLoaderImplTest, RemovedFlags) {
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.removed_foo: true
+  )EOF");
+  EXPECT_ENVOY_BUG(setup(), "envoy.reloadable_features.removed_foo");
+}
 
 // Validate proto parsing sanity.
 TEST_F(StaticLoaderImplTest, ProtoParsing) {
@@ -841,9 +846,10 @@ TEST(NoRuntime, DefaultIntValues) {
   ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
 
   // Feature defaults should still work.
-  EXPECT_EQ(0x1230000ABCDULL,
-            getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL));
-  EXPECT_EQ(0, getInteger("envoy.reloadable_features.test_int_feature_zero", 0));
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(0x1230000ABCDULL,
+                getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
+      "requested an unsupported integer");
 }
 
 // Test RTDS layer(s).
@@ -869,7 +875,7 @@ public:
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
         .WillByDefault(testing::Invoke(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
                    const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());

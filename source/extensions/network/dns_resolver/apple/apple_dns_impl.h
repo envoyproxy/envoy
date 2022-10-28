@@ -16,6 +16,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
@@ -64,13 +65,20 @@ struct AppleDnsResolverStats {
  */
 class AppleDnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  AppleDnsResolverImpl(Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
+  AppleDnsResolverImpl(
+      const envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig&
+          proto_config,
+      Event::Dispatcher& dispatcher, Stats::Scope& root_scope);
 
   static AppleDnsResolverStats generateAppleDnsResolverStats(Stats::Scope& scope);
 
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  void resetNetworking() override {
+    // In the Apple DNS resolver each query is independent and handled by the OS so there is nothing
+    // to do here.
+  }
 
 private:
   struct PendingResolution;
@@ -99,7 +107,7 @@ private:
     void finishResolve();
 
     // Wrappers for the API calls.
-    DNSServiceErrorType dnsServiceGetAddrInfo();
+    DNSServiceErrorType dnsServiceGetAddrInfo(bool include_unroutable_families);
     void onDNSServiceGetAddrInfoReply(DNSServiceFlags flags, uint32_t interface_index,
                                       DNSServiceErrorType error_code, const char* hostname,
                                       const struct sockaddr* address, uint32_t ttl);
@@ -136,8 +144,9 @@ private:
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr initialize_failure_timer_;
   BackOffStrategyPtr backoff_strategy_;
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   AppleDnsResolverStats stats_;
+  bool include_unroutable_families_;
 };
 
 DECLARE_FACTORY(AppleDnsResolverFactory);

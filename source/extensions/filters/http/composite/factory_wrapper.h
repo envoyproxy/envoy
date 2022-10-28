@@ -18,14 +18,8 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
       : filter_(filter), dispatcher_(dispatcher) {}
 
   void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override;
-  void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr,
-                              Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override;
   void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override;
-  void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr,
-                              Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override;
   void addStreamFilter(Http::StreamFilterSharedPtr filter) override;
-  void addStreamFilter(Http::StreamFilterSharedPtr,
-                       Matcher::MatchTreeSharedPtr<Http::HttpMatchingData>) override;
   void addAccessLogHandler(AccessLog::InstanceSharedPtr) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 

@@ -2,12 +2,12 @@
 
 #include <string>
 
-#include "envoy/stats/symbol_table.h"
-
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
+
+class StatName;
 
 /**
  * General representation of a tag.

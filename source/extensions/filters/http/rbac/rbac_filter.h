@@ -16,21 +16,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+class ActionValidationVisitor : public Filters::Common::RBAC::ActionValidationVisitor {
+public:
+  absl::Status performDataInputValidation(
+      const Envoy::Matcher::DataInputFactory<Http::HttpMatchingData>& data_input,
+      absl::string_view type_url) override;
+};
+
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
   }
 
 private:
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  ActionValidationVisitor action_validation_visitor_;
+  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
+  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
 };
 
 /**
@@ -41,6 +50,7 @@ public:
   RoleBasedAccessControlFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope,
+      Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
@@ -53,12 +63,12 @@ public:
            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().ShadowEngineResultField;
   }
 
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
-  engine(const Router::RouteConstSharedPtr route,
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine*
+  engine(const Http::StreamFilterCallbacks* callbacks,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
 private:
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
@@ -67,8 +77,9 @@ private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
   const std::string shadow_rules_stat_prefix_;
 
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
-  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+  ActionValidationVisitor action_validation_visitor_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
+  std::unique_ptr<const Filters::Common::RBAC::RoleBasedAccessControlEngine> shadow_engine_;
 };
 
 using RoleBasedAccessControlFilterConfigSharedPtr =

@@ -1,7 +1,7 @@
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 
-#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -12,29 +12,29 @@
 
 namespace Envoy {
 namespace {
-class AlternateProtocolsCacheManagerTest : public testing::Test,
-                                           public Event::TestUsingSimulatedTime {
+class HttpServerPropertiesCacheManagerTest : public testing::Test,
+                                             public Event::TestUsingSimulatedTime {
 public:
-  AlternateProtocolsCacheManagerTest() {
+  HttpServerPropertiesCacheManagerTest() {
     options_.set_name("name");
     options_.mutable_max_entries()->set_value(10);
   }
   void initialize() {
     Http::AlternateProtocolsData data = {context_};
-    factory_ = std::make_unique<Http::AlternateProtocolsCacheManagerFactoryImpl>(singleton_manager_,
-                                                                                 tls_, data);
+    factory_ = std::make_unique<Http::HttpServerPropertiesCacheManagerFactoryImpl>(
+        singleton_manager_, tls_, data);
     manager_ = factory_->get();
   }
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
-  std::unique_ptr<Http::AlternateProtocolsCacheManagerFactoryImpl> factory_;
-  Http::AlternateProtocolsCacheManagerSharedPtr manager_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManagerFactoryImpl> factory_;
+  Http::HttpServerPropertiesCacheManagerSharedPtr manager_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
-TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
+TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig config;
   config.set_filename("foo");
   envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;

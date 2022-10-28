@@ -1,0 +1,22 @@
+diff --git a/dlb/libdlb/dlb_ops.h b/dlb/libdlb/dlb_ops.h
+index 3f384f8..bd621be 100644
+--- a/dlb/libdlb/dlb_ops.h
++++ b/dlb/libdlb/dlb_ops.h
+@@ -33,13 +33,13 @@ static void dlb_movntdq(struct dlb_enqueue_qe *qe4, uint64_t *pp_addr)
+     __v2di srcData1 = (__v2di){_qe[2], _qe[3]};
+     __v2di srcData2 = (__v2di){_qe[4], _qe[5]};
+     __v2di srcData3 = (__v2di){_qe[6], _qe[7]};
+-    __builtin_ia32_movntdq((__v2di *) pp_addr, (__v2di) srcData0);
++    __builtin_nontemporal_store((__v2di) srcData0, (__v2di *) pp_addr);
+     _mm_sfence();
+-    __builtin_ia32_movntdq((__v2di *) pp_addr, (__v2di) srcData1);
++    __builtin_nontemporal_store((__v2di) srcData1, (__v2di *) pp_addr);
+     _mm_sfence();
+-    __builtin_ia32_movntdq((__v2di *) pp_addr, (__v2di) srcData2);
++    __builtin_nontemporal_store((__v2di) srcData2, (__v2di *) pp_addr);
+     _mm_sfence();
+-    __builtin_ia32_movntdq((__v2di *) pp_addr, (__v2di) srcData3);
++    __builtin_nontemporal_store((__v2di) srcData3, (__v2di *) pp_addr);
+     /* movntdq requires an sfence between writes to the PP MMIO address */
+     _mm_sfence();
+ }

@@ -60,7 +60,7 @@ using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
 public:
-  AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+  AutonomousUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                      const Network::Address::InstanceConstSharedPtr& address,
                      const FakeUpstreamConfig& config, bool allow_incomplete_streams)
       : FakeUpstream(std::move(transport_socket_factory), address, config),
@@ -69,9 +69,9 @@ public:
         response_headers_(std::make_unique<Http::TestResponseHeaderMapImpl>(
             Http::TestResponseHeaderMapImpl({{":status", "200"}}))) {}
 
-  AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-                     Network::Address::IpVersion version, const FakeUpstreamConfig& config,
-                     bool allow_incomplete_streams)
+  AutonomousUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                     uint32_t port, Network::Address::IpVersion version,
+                     const FakeUpstreamConfig& config, bool allow_incomplete_streams)
       : FakeUpstream(std::move(transport_socket_factory), port, version, config),
         allow_incomplete_streams_(allow_incomplete_streams),
         response_trailers_(std::make_unique<Http::TestResponseTrailerMapImpl>()),

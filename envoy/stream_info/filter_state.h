@@ -27,6 +27,7 @@ using FilterStateSharedPtr = std::shared_ptr<FilterState>;
 class FilterState {
 public:
   enum class StateType { ReadOnly, Mutable };
+
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -45,7 +46,36 @@ public:
   //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
+  //
+  // Note that for more accurate book-keeping it is recommended to subscribe to
+  // the stream callbacks instead of relying on the destruction of the filter
+  // state.
+  //
+  // As a special case, objects that are marked as shared with the upstream
+  // become bound to the upstream connection life span in addition to the
+  // original stream life span. That means, for example, that a shared request
+  // span object may outlive the original request when it is shared, because it
+  // may be captured by an upstream connection for the original downstream
+  // request, which remains open after the downstream request completes.
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
+
+  // Objects stored in the filter state can optionally be shared between the
+  // upstrean and downstream filter state.
+  enum class StreamSharing {
+    // None implies the object is exclusive to the stream.
+    None,
+
+    // Mark a filter state object as shared with the upstream connection.
+    // Shared filter state objects are copied by reference from the downstream
+    // requests and connections to the upstream connection filter state. When
+    // upstream connections are re-used between streams, the downstream objects
+    // are captured for the first, initiating stream. To force distinct
+    // upstream connections, the shared filter state object must implement the
+    // hashing interface. Shared objects with distinct hashes will use distinct
+    // upstream connections. Note that this affects connection pooling,
+    // preventing any re-use of the upstream connections in the worst case.
+    SharedWithUpstreamConnection,
+  };
 
   class Object {
   public:
@@ -66,6 +96,16 @@ public:
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
   };
 
+  struct FilterObject {
+    std::shared_ptr<Object> data_;
+    StateType state_type_{StateType::ReadOnly};
+    StreamSharing stream_sharing_{StreamSharing::None};
+    std::string name_;
+  };
+
+  using Objects = std::vector<FilterObject>;
+  using ObjectsPtr = std::unique_ptr<Objects>;
+
   virtual ~FilterState() = default;
 
   /**
@@ -83,47 +123,46 @@ public:
    * data stored in FilterState.
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain,
+                       StreamSharing stream_sharing = StreamSharing::None) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
-   * @return a const reference to the stored data.
-   * An exception will be thrown if the data does not exist. This function
-   * will fail if the data stored under |data_name| cannot be dynamically
-   * cast to the type specified.
+   * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
+   * type does not match the expected type.
    */
-  template <typename T> const T& getDataReadOnly(absl::string_view data_name) const {
-    const T* result = dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
-    if (!result) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
-    }
-    return *result;
+  template <typename T> const T* getDataReadOnly(absl::string_view data_name) const {
+    return dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name));
   }
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
-   * @return a const reference to the stored data.
-   * An exception will be thrown if the data does not exist.
+   * @return a const pointer to the stored data or nullptr if the data does not exist.
    */
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable only).
-   * @return a non-const reference to the stored data if and only if the
-   * underlying data is mutable.
-   * An exception will be thrown if the data does not exist or if it is
-   * immutable. This function will fail if the data stored under
-   * |data_name| cannot be dynamically cast to the type specified.
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
+   * type does not match the expected type.
    */
-  template <typename T> T& getDataMutable(absl::string_view data_name) {
-    T* result = dynamic_cast<T*>(getDataMutableGeneric(data_name));
-    if (!result) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
-    }
-    return *result;
+  template <typename T> T* getDataMutable(absl::string_view data_name) {
+    return dynamic_cast<T*>(getDataMutableGeneric(data_name));
   }
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a pointer to the stored data or nullptr if the data does not exist.
+   * An exception will be thrown if the data is not mutable.
+   */
+  virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
+
+  /**
+   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @return a shared pointer to the stored data or nullptr if the data does not exist.
+   * An exception will be thrown if the data is not mutable.
+   */
+  virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;
 
   /**
    * @param data_name the name of the data being probed.
@@ -131,8 +170,7 @@ public:
    * data store.
    */
   template <typename T> bool hasData(absl::string_view data_name) const {
-    return (hasDataWithName(data_name) &&
-            (dynamic_cast<const T*>(getDataReadOnlyGeneric(data_name)) != nullptr));
+    return getDataReadOnly<T>(data_name) != nullptr;
   }
 
   /**
@@ -160,8 +198,10 @@ public:
    */
   virtual FilterStateSharedPtr parent() const PURE;
 
-protected:
-  virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
+  /**
+   * @return filter objects that are shared with the upstream connection.
+   **/
+  virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
 };
 
 } // namespace StreamInfo

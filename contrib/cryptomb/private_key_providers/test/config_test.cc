@@ -255,6 +255,51 @@ TEST_F(CryptoMbConfigTest, CreateZeroPollDelay) {
                           "Proto constraint validation failed");
 }
 
+TEST_F(CryptoMbConfigTest, CreateOneMillisecondPollDelay) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.001s
+        private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-4096.pem" }
+        )EOF";
+
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  CryptoMbPrivateKeyMethodProvider* cryptomb_provider =
+      dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(provider.get());
+  EXPECT_EQ(cryptomb_provider->getPollDelayForTest(), std::chrono::microseconds(1000));
+}
+
+TEST_F(CryptoMbConfigTest, CreateTwoMillisecondPollDelay) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.002s
+        private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-4096.pem" }
+        )EOF";
+
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  CryptoMbPrivateKeyMethodProvider* cryptomb_provider =
+      dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(provider.get());
+  EXPECT_EQ(cryptomb_provider->getPollDelayForTest(), std::chrono::microseconds(2000));
+}
+
+TEST_F(CryptoMbConfigTest, CreateLessThanOneMillisecondPollDelay) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3alpha.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.0009s
+        private_key: { "filename": "{{ test_rundir }}/contrib/cryptomb/private_key_providers/test/test_data/rsa-4096.pem" }
+        )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createWithConfig(yaml), EnvoyException,
+                          "Proto constraint validation failed");
+}
+
 TEST_F(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb

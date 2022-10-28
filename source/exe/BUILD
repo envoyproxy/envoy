@@ -96,15 +96,20 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_common_with_core_extensions_lib",
     deps = [
-        "//source/common/event:libevent_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/stats:thread_local_store_lib",
-        "//source/server:drain_manager_lib",
-        "//source/server:options_lib",
-        "//source/server:server_lib",
-        "//source/server:listener_hooks_lib",
-    ] + envoy_all_core_extensions(),
+               "//source/common/event:libevent_lib",
+               "//source/common/network:utility_lib",
+               "//source/common/stats:stats_lib",
+               "//source/common/stats:thread_local_store_lib",
+               "//source/server:drain_manager_lib",
+               "//source/server:options_lib",
+               "//source/server:server_lib",
+               "//source/server:listener_hooks_lib",
+           ] + envoy_all_core_extensions() +
+           # TODO(rojkov): drop io_uring dependency when it's fully integrated.
+           select({
+               "//bazel:linux": ["//source/common/io:io_uring_impl_lib"],
+               "//conditions:default": [],
+           }),
 )
 
 envoy_cc_library(
@@ -136,11 +141,11 @@ envoy_cc_library(
     name = "process_wide_lib",
     srcs = ["process_wide.cc"],
     hdrs = ["process_wide.h"],
-    external_deps = ["ares"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:nghttp2_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/server:proto_descriptors_lib",
     ],
 )

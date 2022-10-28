@@ -2,6 +2,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
@@ -37,6 +38,14 @@ public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
+    ON_CALL(*cm.thread_local_cluster_.cluster_.info_, createFilterChain(_))
+        .WillByDefault(Invoke([&](Envoy::Http::FilterChainManager& manager) -> void {
+          Envoy::Http::FilterFactoryCb factory_cb =
+              [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
@@ -93,13 +102,22 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_))
+        .WillByDefault(Invoke([&](Envoy::Http::FilterChainManager& manager) -> void {
+          Envoy::Http::FilterFactoryCb factory_cb =
+              [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+          };
+          manager.applyFilterFactoryCb({}, factory_cb);
+        }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
     EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
     EXPECT_CALL(mock_router_filter_, callbacks()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
-        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
+        mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>(), false,
+        false));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
     EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection_));
     tcp_upstream_ =
@@ -147,7 +165,7 @@ TEST_F(TcpUpstreamTest, Basic) {
 
 TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
@@ -170,7 +188,7 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
 TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
-      mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
+      mock_router_filter_.route_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
   mock_router_filter_.client_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));

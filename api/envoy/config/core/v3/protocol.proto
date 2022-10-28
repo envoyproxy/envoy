@@ -75,9 +75,9 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_stream_window_size = 2
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
-  // Similar to *initial_stream_window_size*, but for connection-level
+  // Similar to ``initial_stream_window_size``, but for connection-level
   // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults to 65536 (2^16).
-  // window. Currently, this has the same minimum/default as *initial_stream_window_size*.
+  // window. Currently, this has the same minimum/default as ``initial_stream_window_size``.
   //
   // NOTE: 16384 (2^14) is the minimum window size supported in Google QUIC. We only support increasing the default
   // window size now, so it's also the minimum.
@@ -109,7 +109,7 @@ message UpstreamHttpProtocolOptions {
   // Automatic validate upstream presented certificate for new upstream connections based on the
   // downstream HTTP host/authority header or any other arbitrary header when :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>`
   // is set, as seen by the :ref:`router filter <config_http_filters_router>`.
-  // This field is intended to be set with `auto_sni` field.
+  // This field is intended to be set with ``auto_sni`` field.
   bool auto_san_validation = 2;
 
   // An optional alternative to the host/authority header to be used for setting the SNI value.
@@ -117,7 +117,7 @@ message UpstreamHttpProtocolOptions {
   // :ref:`router filter <config_http_filters_router>`.
   // If unset, host/authority header will be used for populating the SNI. If the specified header
   // is not found or the value is empty, host/authority header will be used instead.
-  // This field is intended to be set with `auto_sni` and/or `auto_san_validation` fields.
+  // This field is intended to be set with ``auto_sni`` and/or ``auto_san_validation`` fields.
   // If none of these fields are set then setting this would be a no-op.
   string override_auto_sni_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
@@ -127,6 +127,7 @@ message UpstreamHttpProtocolOptions {
 // make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
 // HTTP Alternative Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
 // for the "HTTPS" DNS resource record.
+// [#next-free-field: 6]
 message AlternateProtocolsCacheOptions {
   // Allows pre-populating the cache with HTTP/3 alternate protocols entries with a 7 day lifetime.
   // This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
@@ -171,6 +172,17 @@ message AlternateProtocolsCacheOptions {
 
   // Allows pre-populating the cache with entries, as described above.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
+
+  // Optional list of hostnames suffixes for which Alt-Svc entries can be shared. For example, if
+  // this list contained the value ``.c.example.com``, then an Alt-Svc entry for ``foo.c.example.com``
+  // could be shared with ``bar.c.example.com`` but would not be shared with ``baz.example.com``. On
+  // the other hand, if the list contained the value ``.example.com`` then all three hosts could share
+  // Alt-Svc entries. Each entry must start with ``.``.  If a hostname matches multiple suffixes, the
+  // first listed suffix will be used.
+  //
+  // Since lookup in this list is O(n), it is recommended that the number of suffixes be limited.
+  // [#not-implemented-hide:]
+  repeated string canonical_suffixes = 5;
 }
 
 // [#next-free-field: 7]
@@ -247,7 +259,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -282,18 +294,18 @@ message Http1ProtocolOptions {
   // Handle HTTP requests with absolute URLs in the requests. These requests
   // are generally sent by clients to forward/explicit proxies. This allows clients to configure
   // envoy as their HTTP proxy. In Unix, for example, this is typically done by setting the
-  // *http_proxy* environment variable.
+  // ``http_proxy`` environment variable.
   google.protobuf.BoolValue allow_absolute_url = 1;
 
   // Handle incoming HTTP/1.0 and HTTP 0.9 requests.
   // This is off by default, and not fully standards compliant. There is support for pre-HTTP/1.1
   // style connect logic, dechunking, and handling lack of client host iff
-  // *default_host_for_http_10* is configured.
+  // ``default_host_for_http_10`` is configured.
   bool accept_http_10 = 2;
 
-  // A default host for HTTP/1.0 requests. This is highly suggested if *accept_http_10* is true as
+  // A default host for HTTP/1.0 requests. This is highly suggested if ``accept_http_10`` is true as
   // Envoy does not otherwise support HTTP/1.0 without a Host header.
-  // This is a no-op if *accept_http_10* is not true.
+  // This is a no-op if ``accept_http_10`` is not true.
   string default_host_for_http_10 = 3;
 
   // Describes how the keys for response headers should be formatted. By default, all header keys
@@ -311,7 +323,7 @@ message Http1ProtocolOptions {
   //   - The content length header is not present.
   bool enable_trailers = 5;
 
-  // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
+  // Allows Envoy to process requests/responses with both ``Content-Length`` and ``Transfer-Encoding``
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
   // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
@@ -319,6 +331,9 @@ message Http1ProtocolOptions {
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
   //   is proxied via multiple layers of proxies.
+  // [#comment:TODO: This field is ignored when the
+  // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
+  // is present.]
   bool allow_chunked_length = 6;
 
   // Allows invalid HTTP messaging. When this option is false, then Envoy will terminate
@@ -328,6 +343,13 @@ message Http1ProtocolOptions {
   // If set, this overrides any HCM :ref:`stream_error_on_invalid_http_messaging
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 7;
+
+  // Allows sending fully qualified URLs when proxying the first line of the
+  // response. By default, Envoy will only send the path components in the first line.
+  // If this is true, Envoy will create a fully qualified URI composing scheme
+  // (inferred if not present), host (from the host/:authority header) and path
+  // (from first line or :path header).
+  bool send_fully_qualified_url = 8;
 }
 
 message KeepaliveSettings {
@@ -336,7 +358,9 @@ message KeepaliveSettings {
   google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
-  // time period, the connection will be aborted.
+  // time period, the connection will be aborted. Note that in order to prevent the influence of
+  // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
+  // the connection, under the assumption that if a frame is received the connection is healthy.
   google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
     required: true
     gte {nanos: 1000000}
@@ -413,8 +437,8 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value initial_stream_window_size = 3
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
-  // Similar to *initial_stream_window_size*, but for connection-level flow-control
-  // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
+  // Similar to ``initial_stream_window_size``, but for connection-level flow-control
+  // window. Currently, this has the same minimum/maximum/default as ``initial_stream_window_size``.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
@@ -454,11 +478,11 @@ message Http2ProtocolOptions {
   // of PRIORITY frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   max_inbound_priority_frames_per_stream * (1 + opened_streams)
+  //   ``max_inbound_priority_frames_per_stream`` * (1 + ``opened_streams``)
   //
-  // the connection is terminated. For downstream connections the `opened_streams` is incremented when
+  // the connection is terminated. For downstream connections the ``opened_streams`` is incremented when
   // Envoy receives complete response headers from the upstream server. For upstream connection the
-  // `opened_streams` is incremented when Envoy send the HEADERS frame for a new stream. The
+  // ``opened_streams`` is incremented when Envoy send the HEADERS frame for a new stream. The
   // ``http2.inbound_priority_frames_flood`` stat tracks
   // the number of connections terminated due to flood mitigation. The default limit is 100.
   google.protobuf.UInt32Value max_inbound_priority_frames_per_stream = 10;
@@ -467,12 +491,12 @@ message Http2ProtocolOptions {
   // of WINDOW_UPDATE frames received over the lifetime of connection exceeds the value calculated
   // using this formula::
   //
-  //   5 + 2 * (opened_streams +
-  //            max_inbound_window_update_frames_per_data_frame_sent * outbound_data_frames)
+  //   5 + 2 * (``opened_streams`` +
+  //            ``max_inbound_window_update_frames_per_data_frame_sent`` * ``outbound_data_frames``)
   //
-  // the connection is terminated. For downstream connections the `opened_streams` is incremented when
+  // the connection is terminated. For downstream connections the ``opened_streams`` is incremented when
   // Envoy receives complete response headers from the upstream server. For upstream connections the
-  // `opened_streams` is incremented when Envoy sends the HEADERS frame for a new stream. The
+  // ``opened_streams`` is incremented when Envoy sends the HEADERS frame for a new stream. The
   // ``http2.inbound_priority_frames_flood`` stat tracks the number of connections terminated due to
   // flood mitigation. The default max_inbound_window_update_frames_per_data_frame_sent value is 10.
   // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,

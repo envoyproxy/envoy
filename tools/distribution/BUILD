@@ -5,10 +5,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-exports_files([
-    "distrotest.sh",
-])
-
 envoy_entry_point(
     name = "release",
     pkg = "envoy.distribution.release",

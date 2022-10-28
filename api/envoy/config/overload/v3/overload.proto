@@ -56,7 +56,7 @@ message ThresholdTrigger {
 message ScaledTrigger {
   // If the resource pressure is greater than this value, the trigger will be in the
   // :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
-  // `(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)`.
+  // ``(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)``.
   double scaling_threshold = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 
   // If the resource pressure is greater than this value, the trigger will enter saturation.

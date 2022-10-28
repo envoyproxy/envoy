@@ -72,7 +72,10 @@ Http::FilterHeadersStatus DecompressorFilter::decodeHeaders(Http::RequestHeaderM
   //      the upstream that this hop is able to decompress responses via the Accept-Encoding header.
   if (config_->responseDirectionConfig().decompressionEnabled() &&
       config_->requestDirectionConfig().advertiseAcceptEncoding()) {
-    headers.appendInline(accept_encoding_handle.handle(), config_->contentEncoding(), ",");
+    const std::string new_accept_encoding_header = Http::HeaderUtility::addEncodingToAcceptEncoding(
+        headers.getInlineValue(accept_encoding_handle.handle()), config_->contentEncoding());
+    headers.setInline(accept_encoding_handle.handle(), new_accept_encoding_header);
+
     ENVOY_STREAM_LOG(debug,
                      "DecompressorFilter::decodeHeaders advertise Accept-Encoding with value '{}'",
                      *decoder_callbacks_, headers.getInlineValue(accept_encoding_handle.handle()));

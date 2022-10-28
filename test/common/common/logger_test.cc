@@ -15,41 +15,58 @@ using testing::Invoke;
 
 namespace Envoy {
 namespace Logger {
+namespace {
 
 TEST(LoggerTest, StackingStderrSinkDelegate) {
   StderrSinkDelegate stacked(Envoy::Logger::Registry::getSink());
 }
 
 TEST(LoggerEscapeTest, LinuxEOL) {
-  EXPECT_EQ("line 1 \\n line 2\n", DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"));
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\n"), "line 1 \\n line 2\n");
+#endif
+}
+
+TEST(LoggerEscapeTest, MultipleTrailingLinxEOL) {
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1\n\n"), "line1\\n\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, WindowEOL) {
-  EXPECT_EQ("line 1 \\n line 2\r\n", DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"));
+#ifdef _WIN32
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\r\n");
+#else
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2\r\n"), "line 1 \\n line 2\\r\n");
+#endif
 }
 
 TEST(LoggerEscapeTest, NoTrailingWhitespace) {
-  EXPECT_EQ("line 1 \\n line 2", DelegatingLogSink::escapeLogLine("line 1 \n line 2"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \n line 2"), "line 1 \\n line 2");
 }
 
 TEST(LoggerEscapeTest, NoWhitespace) {
-  EXPECT_EQ("line1", DelegatingLogSink::escapeLogLine("line1"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line1"), "line1");
 }
 
 TEST(LoggerEscapeTest, AnyTrailingWhitespace) {
-  EXPECT_EQ("line 1 \\t tab 1 \\n line 2\t\n",
-            DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\n"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("line 1 \t tab 1 \n line 2\t\t"),
+            "line 1 \\t tab 1 \\n line 2\\t\\t");
 }
 
 TEST(LoggerEscapeTest, WhitespaceOnly) {
   // 8 spaces
-  EXPECT_EQ("        ", DelegatingLogSink::escapeLogLine("        "));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("        "), "        ");
 
   // Any whitespace characters
-  EXPECT_EQ("\r\n\t \r\n \n", DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n"));
+  EXPECT_EQ(DelegatingLogSink::escapeLogLine("\r\n\t \r\n \n\t"), "\\r\\n\\t \\r\\n \\n\\t");
 }
 
-TEST(LoggerEscapeTest, Empty) { EXPECT_EQ("", DelegatingLogSink::escapeLogLine("")); }
+TEST(LoggerEscapeTest, Empty) { EXPECT_EQ(DelegatingLogSink::escapeLogLine(""), ""); }
 
 TEST(JsonEscapeTest, Escape) {
   const auto expect_json_escape = [](absl::string_view to_be_escaped, absl::string_view escaped) {
@@ -97,9 +114,9 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1f", "\\u001f");
 }
 
-class LoggerCustomFlagsTest : public testing::Test {
+class LoggerCustomFlagsTest : public testing::TestWithParam<spdlog::logger*> {
 public:
-  LoggerCustomFlagsTest() : logger_(Registry::getSink()) {}
+  LoggerCustomFlagsTest() : logger_(GetParam()) {}
 
   void expectLogMessage(const std::string& pattern, const std::string& message,
                         const std::string& expected) {
@@ -113,29 +130,33 @@ public:
             CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
         .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
+    logger_->set_level(spdlog::level::info);
 
     testing::internal::CaptureStderr();
-    logger_->log(spdlog::details::log_msg("test", spdlog::level::info, message));
+    logger_->log(spdlog::level::info, message);
     EXPECT_EQ(absl::StrCat(expected, TestEnvironment::newLine),
               testing::internal::GetCapturedStderr());
   }
 
 protected:
-  DelegatingLogSinkSharedPtr logger_;
+  spdlog::logger* logger_;
 };
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsIs) {
+INSTANTIATE_TEST_SUITE_P(EnvoyAndFineGrainLoggerFormatTest, LoggerCustomFlagsTest,
+                         testing::ValuesIn(TestEnvironment::getSpdLoggersForTest()));
+
+TEST_P(LoggerCustomFlagsTest, LogMessageAsIs) {
   // This uses "%v", the default flag for printing the actual text to log.
   // https://github.com/gabime/spdlog/wiki/3.-Custom-formatting#pattern-flags.
   expectLogMessage("%v", "\n\nmessage\n\n", "\n\nmessage\n\n");
 }
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsEscaped) {
+TEST_P(LoggerCustomFlagsTest, LogMessageAsEscaped) {
   // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
   expectLogMessage("%_", "\n\nmessage\n\n", "\\n\\nmessage\\n\\n");
 }
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
+TEST_P(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
   // This uses "%j", the added custom flag that JSON escape the characters inside the log message
   // payload.
   expectLogMessage("%j", "message", "message");
@@ -248,5 +269,6 @@ TEST(LoggerTest, LogWithLogDetails) {
   ENVOY_LOG_MISC(info, "hello");
 }
 
+} // namespace
 } // namespace Logger
 } // namespace Envoy

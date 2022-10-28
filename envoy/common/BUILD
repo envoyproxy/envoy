@@ -60,6 +60,8 @@ envoy_cc_library(
     hdrs = ["regex.h"],
     deps = [
         ":matchers_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
     ],
 )
 
@@ -103,4 +105,19 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hashable_interface",
     hdrs = ["hashable.h"],
+)
+
+envoy_cc_library(
+    name = "union_string",
+    hdrs = [
+        "union_string.h",
+    ],
+    external_deps = [
+        "abseil_inlined_vector",
+        "abseil_variant",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+    ],
 )

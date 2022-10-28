@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 services:
 
   proxy:
@@ -13,9 +13,11 @@ services:
     - 19000:19000
 
   service1:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service1
 
   service2:
-    image: jmalloc/echo-server
+    build:
+      context: ../shared/echo
     hostname: service2

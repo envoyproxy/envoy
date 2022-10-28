@@ -36,14 +36,13 @@ using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 } // namespace
 
 template <class S, class F, class RQ, class RS>
-GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-                                       bool skip_subsequent_node,
-                                       const LocalInfo::LocalInfo& local_info,
-                                       Grpc::RawAsyncClientPtr&& async_client,
-                                       Event::Dispatcher& dispatcher,
-                                       const Protobuf::MethodDescriptor& service_method,
-                                       Random::RandomGenerator& random, Stats::Scope& scope,
-                                       const RateLimitSettings& rate_limit_settings)
+GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
+    std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
+    const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
+    Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+    Random::RandomGenerator& random, Stats::Scope& scope,
+    const RateLimitSettings& rate_limit_settings, CustomConfigValidatorsPtr&& config_validators,
+    XdsResourcesDelegateOptRef xds_resources_delegate, const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
@@ -51,7 +50,9 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
-          })) {
+          })),
+      config_validators_(std::move(config_validators)),
+      xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority) {
   Config::Utility::checkLocalInfo("ads", local_info);
   AllMuxes::get().insert(this);
 }
@@ -78,20 +79,23 @@ void GrpcMuxImpl<S, F, RQ, RS>::onDynamicContextUpdate(absl::string_view resourc
 template <class S, class F, class RQ, class RS>
 Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     const SubscriptionOptions& options) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     watch_map =
-        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_))
+        watch_maps_
+            .emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_, type_url,
+                                                          *config_validators_.get()))
             .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
-                                         type_url, *watch_maps_[type_url], resource_decoder));
+                                         type_url, *watch_maps_[type_url], resource_decoder,
+                                         xds_resources_delegate_, target_xds_authority_));
     subscription_ordering_.emplace_back(type_url);
   }
 
-  Watch* watch = watch_map->second->addWatch(callbacks, resource_decoder);
+  Watch* watch = watch_map->second->addWatch(callbacks, *resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
   updateWatch(type_url, watch, resources, options);
   return std::make_unique<WatchImpl>(type_url, watch, *this, options);
@@ -193,12 +197,12 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
 
   if (response_proto.has_control_plane()) {
     control_plane_stats.identifier_.set(response_proto.control_plane().identifier());
-  }
 
-  if (response_proto.control_plane().identifier() != sub->second->controlPlaneIdentifier()) {
-    sub->second->setControlPlaneIdentifier(response_proto.control_plane().identifier());
-    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", response_proto.type_url(),
-              sub->second->controlPlaneIdentifier());
+    if (response_proto.control_plane().identifier() != sub->second->controlPlaneIdentifier()) {
+      sub->second->setControlPlaneIdentifier(response_proto.control_plane().identifier());
+      ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", response_proto.type_url(),
+                sub->second->controlPlaneIdentifier());
+    }
   }
 
   pausable_ack_queue_.push(sub->second->handleResponse(response_proto));
@@ -359,10 +363,11 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const Protobuf::MethodDescriptor& service_method,
                            Random::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
-                           const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+                           const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+                           CustomConfigValidatorsPtr&& config_validators)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings) {}
+                  rate_limit_settings, std::move(config_validators)) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -379,14 +384,19 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const Protobuf::MethodDescriptor& service_method,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
-                         const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node)
+                         const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
+                         CustomConfigValidatorsPtr&& config_validators,
+                         XdsResourcesDelegateOptRef xds_resources_delegate,
+                         const std::string& target_xds_authority)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings) {}
+                  rate_limit_settings, std::move(config_validators), xds_resources_delegate,
+                  target_xds_authority) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,
-                                                  SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                                  SubscriptionCallbacks&,
+                                                  OpaqueResourceDecoderSharedPtr,
                                                   const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
