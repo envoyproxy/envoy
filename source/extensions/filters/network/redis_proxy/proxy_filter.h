@@ -92,6 +92,8 @@ public:
 
   bool connectionAllowed() { return connection_allowed_; }
 
+  Common::Redis::Client::Transaction& transaction() { return transaction_; }
+
 private:
   friend class RedisProxyFilterTest;
 
@@ -101,6 +103,7 @@ private:
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onQuit() override { parent_.onQuit(*this); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onAuth(const std::string& username, const std::string& password) override {
       parent_.onAuth(*this, username, password);
@@ -109,11 +112,14 @@ private:
       parent_.onResponse(*this, std::move(value));
     }
 
+    Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
+
     ProxyFilter& parent_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onQuit(PendingRequest& request);
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
@@ -127,6 +133,8 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  Common::Redis::Client::Transaction transaction_;
+  bool connection_quit_;
 };
 
 } // namespace RedisProxy

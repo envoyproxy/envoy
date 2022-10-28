@@ -86,11 +86,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "filter_factory_interface",
+    hdrs = ["filter_factory.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/grpc:status",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     external_deps = ["abseil_optional"],
     deps = [
         ":codec_interface",
+        ":filter_factory_interface",
         ":header_map_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:scope_tracker_interface",
@@ -124,6 +136,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        "//envoy/common:union_string",
         "//envoy/tracing:trace_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

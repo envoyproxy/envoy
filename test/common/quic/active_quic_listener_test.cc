@@ -145,8 +145,8 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
-                                                       quic_stat_names_);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
+                                                       validation_visitor_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -353,6 +353,12 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
                                            ->config()
                                            ->max_time_before_crypto_handshake()
                                            .ToMilliseconds());
+#ifndef WIN32
+  EXPECT_EQ(
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"),
+      static_cast<const EnvoyQuicServerConnection*>(session->connection())->actuallyDeferSend());
+#endif
   readFromClientSockets();
 }
 

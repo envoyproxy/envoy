@@ -1,10 +1,9 @@
 #pragma once
 
+#include "envoy/common/regex.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "absl/synchronization/mutex.h"
-#include "contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha/hyperscan.pb.h"
 #include "hs/hs.h"
 
 namespace Envoy {
@@ -14,26 +13,44 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 struct ScratchThreadLocal : public ThreadLocal::ThreadLocalObject {
-  explicit ScratchThreadLocal(const hs_database_t* database);
-  ~ScratchThreadLocal() override { hs_free_scratch(scratch_); }
+  ScratchThreadLocal(const hs_database_t* database, const hs_database_t* start_of_match_database);
+  ~ScratchThreadLocal() override;
+
   hs_scratch_t* scratch_{};
 };
 
-class Matcher : public Envoy::Matcher::InputMatcher {
+struct Bound {
+  Bound(uint64_t begin, uint64_t end);
+
+  bool operator<(const Bound& other) const;
+
+  uint64_t begin_;
+  uint64_t end_;
+};
+
+class Matcher : public Envoy::Regex::CompiledMatcher, public Envoy::Matcher::InputMatcher {
 public:
-  explicit Matcher(
-      const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config,
-      ThreadLocal::SlotAllocator& tls);
-  ~Matcher() override { hs_free_database(database_); }
+  Matcher(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
+          const std::vector<unsigned int>& ids, ThreadLocal::SlotAllocator& tls,
+          bool report_start_of_matching);
+  ~Matcher() override;
+
+  // Envoy::Regex::CompiledMatcher
+  bool match(absl::string_view value) const override;
+  std::string replaceAll(absl::string_view value, absl::string_view substitution) const override;
 
   // Envoy::Matcher::InputMatcher
   bool match(absl::optional<absl::string_view> input) override;
 
 private:
-  std::vector<unsigned int> flags_{};
-  std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
+  hs_database_t* start_of_match_database_{};
   ThreadLocal::TypedSlotPtr<ScratchThreadLocal> tls_;
+
+  // Compiles the Hyperscan database. It will throw on failure of insufficient memory or malformed
+  // regex patterns and flags. Vector parameters should have the same size.
+  void compile(const std::vector<const char*>& expressions, const std::vector<unsigned int>& flags,
+               const std::vector<unsigned int>& ids, hs_database_t** database);
 };
 
 } // namespace Hyperscan

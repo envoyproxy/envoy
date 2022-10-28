@@ -22,7 +22,7 @@ public:
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config,
-      const std::string& stats_prefix,
+      const std::string& stats_prefix, DualInfo,
       Server::Configuration::ServerFactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(

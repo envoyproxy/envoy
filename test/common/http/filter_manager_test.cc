@@ -18,6 +18,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Return;
 
@@ -218,7 +219,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
             EXPECT_THAT(local_reply_data.grpc_status_, testing::Optional(Grpc::Status::Internal));
             return Http::LocalErrorStatus::Continue;
           }));
-  EXPECT_CALL(filter_manager_callbacks_, resetStream());
+  EXPECT_CALL(filter_manager_callbacks_, resetStream(_, _));
   decoder_filter->callbacks_->sendLocalReply(Code::InternalServerError, "body", nullptr,
                                              Grpc::Status::Internal, "details");
 
@@ -349,7 +350,10 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   std::shared_ptr<Router::MockRoute> route(new NiceMock<Router::MockRoute>());
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
 
-  ON_CALL(filter_manager_callbacks_, route(_)).WillByDefault(Return(route));
+  NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
+      .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
+  ON_CALL(downstream_callbacks, route(_)).WillByDefault(Return(route));
 
   // Get a valid config by the custom filter name.
   EXPECT_CALL(*route, mostSpecificPerFilterConfig(testing::Eq("custom-name")))
@@ -407,10 +411,13 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
 
   // Do nothing for no route.
-  EXPECT_CALL(filter_manager_callbacks_, route(_)).WillOnce(Return(nullptr));
+  NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks;
+  ON_CALL(filter_manager_callbacks_, downstreamCallbacks)
+      .WillByDefault(Return(OptRef<DownstreamStreamFilterCallbacks>{downstream_callbacks}));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
-  EXPECT_CALL(filter_manager_callbacks_, route(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
   decoder_filter->callbacks_->traversePerFilterConfig(
       [](const Router::RouteSpecificFilterConfig&) {});
 

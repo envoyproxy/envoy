@@ -29,7 +29,7 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     san_matcher.set_san_type(san_type);
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
-      continue;
+      EXPECT_DEATH(createStringSanMatcher(san_matcher), "unhandled value");
     } else {
       const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
       EXPECT_NE(matcher.get(), nullptr);

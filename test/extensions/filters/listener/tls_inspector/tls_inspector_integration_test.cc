@@ -166,7 +166,7 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
   // will continue wait. Then the listener filter timeout timer will be triggered.
   Buffer::OwnedImpl buffer("fake data");
   client_->write(buffer, false);
-  // the timeout is set as one seconds, sleep 5 to trigger the timeout.
+  // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));

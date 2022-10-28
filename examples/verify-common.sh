@@ -57,7 +57,7 @@ cleanup_stack () {
     local path
     path="$1"
     run_log "Cleanup ($path)"
-    "$DOCKER_COMPOSE" down
+    "$DOCKER_COMPOSE" down --remove-orphans
 }
 
 cleanup () {

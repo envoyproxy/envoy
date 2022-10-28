@@ -32,7 +32,8 @@ TEST(Context, EmptyHeadersAttributes) {
   EXPECT_FALSE(header.has_value());
   EXPECT_EQ(0, headers.size());
   EXPECT_TRUE(headers.empty());
-  EXPECT_EQ(0, headers.ListKeys()->size());
+  EXPECT_TRUE(headers.ListKeys().ok());
+  EXPECT_EQ(0, headers.ListKeys().value()->size());
 }
 
 TEST(Context, InvalidRequest) {
@@ -62,9 +63,6 @@ TEST(Context, RequestAttributes) {
   absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(info, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(info, protocol()).WillRepeatedly(Return(Http::Protocol::Http2));
-
-  EXPECT_EQ(15, request.size());
-  EXPECT_FALSE(request.empty());
 
   {
     auto value = request[CelValue::CreateStringView(Undefined)];
@@ -181,7 +179,8 @@ TEST(Context, RequestAttributes) {
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
     EXPECT_EQ(9, map.size());
-    EXPECT_EQ(9, map.ListKeys()->size());
+    EXPECT_TRUE(map.ListKeys().ok());
+    EXPECT_EQ(9, map.ListKeys().value()->size());
 
     auto header = map[CelValue::CreateStringView(Referer)];
     EXPECT_TRUE(header.has_value());
@@ -289,8 +288,6 @@ TEST(Context, ResponseAttributes) {
   const absl::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
 
-  EXPECT_EQ(8, response.size());
-  EXPECT_FALSE(response.empty());
   {
     auto value = response[CelValue::CreateStringView(Undefined)];
     EXPECT_FALSE(value.has_value());
@@ -521,18 +518,6 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
   EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
-
-  EXPECT_EQ(12, connection.size());
-  EXPECT_FALSE(connection.empty());
-
-  EXPECT_EQ(12, upstream.size());
-  EXPECT_FALSE(connection.empty());
-
-  EXPECT_EQ(2, source.size());
-  EXPECT_FALSE(connection.empty());
-
-  EXPECT_EQ(2, destination.size());
-  EXPECT_FALSE(connection.empty());
 
   {
     auto value = connection[CelValue::CreateStringView(Undefined)];
@@ -765,7 +750,6 @@ TEST(Context, FilterStateAttributes) {
   filter_state.setData(key, accessor, StreamInfo::FilterState::StateType::ReadOnly);
 
   EXPECT_EQ(0, wrapper.size());
-  EXPECT_TRUE(wrapper.empty());
 
   {
     auto value = wrapper[CelValue::CreateStringView(missing)];

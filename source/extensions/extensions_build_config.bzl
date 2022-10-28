@@ -56,6 +56,7 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+    "envoy.health_checkers.thrift":                     "//source/extensions/health_checkers/thrift:config",
 
     #
     # Input Matchers
@@ -185,6 +186,7 @@ EXTENSIONS = {
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
     "envoy.filters.thrift.header_to_metadata":          "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:config",
+    "envoy.filters.thrift.payload_to_metadata":         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:config",
     "envoy.filters.thrift.rate_limit":                  "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
 
     #
@@ -299,11 +301,13 @@ EXTENSIONS = {
     #
 
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
+    "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
 
     #
     # QUIC extensions
     #
 
+    "envoy.quic.deterministic_connection_id_generator": "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
     "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
     "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
 
@@ -355,6 +359,11 @@ EXTENSIONS = {
 
     "envoy.http.header_validators.envoy_default":        "//source/extensions/http/header_validators/envoy_default:config",
 
+    #
+    # Path Pattern Match and Path Pattern Rewrite
+    #
+    "envoy.path.match.uri_template.uri_template_matcher": "//source/extensions/path/match/uri_template:config",
+    "envoy.path.rewrite.uri_template.uri_template_rewriter": "//source/extensions/path/rewrite/uri_template:config",
     #
     # Early Data option
     #

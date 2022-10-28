@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/filter_factory.h"
 #include "envoy/server/filter_config.h"
 
 namespace Envoy {
@@ -63,7 +64,7 @@ class FactoryBase : public CommonFactoryBase<ConfigProto, RouteConfigProto>,
 public:
   FactoryBase(const std::string& name) : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
-  Http::FilterFactoryCb
+  Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
@@ -71,7 +72,7 @@ public:
                                                  proto_config, context.messageValidationVisitor()),
                                              stats_prefix, context);
   }
-  virtual Http::FilterFactoryCb
+  virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
@@ -85,27 +86,37 @@ public:
   DualFactoryBase(const std::string& name)
       : CommonFactoryBase<ConfigProto, RouteConfigProto>(name) {}
 
-  Http::FilterFactoryCb
+  struct DualInfo {
+    DualInfo(Server::Configuration::UpstreamHttpFactoryContext& context)
+        : init_manager(context.initManager()), scope(context.scope()) {}
+    DualInfo(Server::Configuration::FactoryContext& context)
+        : init_manager(context.initManager()), scope(context.scope()) {}
+    Init::Manager& init_manager;
+    Stats::Scope& scope;
+  };
+
+  Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                                  proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, context.getServerFactoryContext());
+                                             stats_prefix, DualInfo(context),
+                                             context.getServerFactoryContext());
   }
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::ServerFactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.messageValidationVisitor()),
-                                             stats_prefix, context);
+  Envoy::Http::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message& proto_config, const std::string& stats_prefix,
+      Server::Configuration::UpstreamHttpFactoryContext& context) override {
+    return createFilterFactoryFromProtoTyped(
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            proto_config, context.getServerFactoryContext().messageValidationVisitor()),
+        stats_prefix, DualInfo(context), context.getServerFactoryContext());
   }
 
-  virtual Http::FilterFactoryCb
+  virtual Envoy::Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    const std::string& stats_prefix,
+                                    const std::string& stats_prefix, DualInfo info,
                                     Server::Configuration::ServerFactoryContext& context) PURE;
 };
 

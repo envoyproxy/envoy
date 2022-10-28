@@ -110,29 +110,28 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           !address->ip()->ipv6()->v6only()) {
         if (address->ip()->isAnyAddress()) {
           // Since both "::" with ipv4_compat and "0.0.0.0" can be supported.
-          // If there already one and it isn't shutdown for compatible addr,
-          // then won't insert a new one.
+          // Only override the listener when this is an update of the existing listener by
+          // checking the address, this ensures the Ipv4 address listener won't be override
+          // by the listener which has the same IPv4-mapped address.
           auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
           auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
           if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
-              ipv4_any_listener->second->listener_->listener() == nullptr) {
+              *ipv4_any_listener->second->address_ == *address) {
             tcp_listener_map_by_address_.insert_or_assign(ipv4_any_address, per_address_details);
           }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // Remove this check when runtime flag
-          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-          // If this isn't a valid Ipv4-mapped address, then do nothing.
-          if (v4_compatible_addr != nullptr) {
-            tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
-                                                          per_address_details);
-          }
+          // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+          // early.
+          ASSERT(v4_compatible_addr != nullptr);
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
+                                                        per_address_details);
         }
       }
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
       internal_listener_map_by_address_.insert_or_assign(
-          per_address_details->address_->asStringView(), per_address_details);
+          per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
@@ -166,19 +165,21 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             }
           } else {
             auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-            // Remove this check when runtime flag
-            // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-            if (v4_compatible_addr != nullptr) {
-              // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
-              // remove the v4 compatible addr item directly.
-              tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
-            }
+            // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+            // early.
+            ASSERT(v4_compatible_addr != nullptr);
+            // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
+            // remove the v4 compatible addr item directly.
+            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
           }
         }
-      } else if (internal_listener_map_by_address_.contains(address_view) &&
-                 internal_listener_map_by_address_[address_view]->listener_tag_ ==
-                     per_address_details->listener_tag_) {
-        internal_listener_map_by_address_.erase(address_view);
+      } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+        const auto& address_id = address->envoyInternalAddress()->addressId();
+        if (internal_listener_map_by_address_.contains(address_id) &&
+            internal_listener_map_by_address_[address_id]->listener_tag_ ==
+                per_address_details->listener_tag_) {
+          internal_listener_map_by_address_.erase(address_id);
+        }
       }
     }
     listener_map_by_tag_.erase(listener_iter);
@@ -288,11 +289,12 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  if (auto listener_it = internal_listener_map_by_address_.find(address->asStringView());
+  if (auto listener_it =
+          internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
       listener_it != internal_listener_map_by_address_.end()) {
-    return Network::InternalListenerOptRef(listener_it->second->internalListener().value().get());
+    return {listener_it->second->internalListener().value().get()};
   }
-  return OptRef<Network::InternalListener>();
+  return {};
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef

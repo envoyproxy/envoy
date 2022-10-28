@@ -204,8 +204,8 @@ private:
     AdminHandler& parent_;
   };
 
-  Http::Code handler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                     Buffer::Instance& response, Server::AdminStream& admin_stream);
+  Http::Code handler(Http::HeaderMap& response_headers, Buffer::Instance& response,
+                     Server::AdminStream& admin_stream);
   Http::Code badRequest(Buffer::Instance& response, absl::string_view error);
 
   Server::Admin& admin_;

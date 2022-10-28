@@ -55,6 +55,25 @@ TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
 }
 
+TEST_P(MultiplexedIntegrationTest, Http3StreamInfoDownstreamHandshakeTiming) {
+  if (downstreamProtocol() != Http::CodecType::HTTP3) {
+    // See SslIntegrationTest for equivalent tests for HTTP/1 and HTTP/2.
+    return;
+  }
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_FALSE(
+      response->headers().get(Http::LowerCaseString("downstream_handshake_complete")).empty());
+}
+
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
   ENVOY_LOG_MISC(warn, "manually lowering logs to error");
   LogLevelSetter save_levels(spdlog::level::err);
@@ -587,6 +606,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
 
 // Verifies small metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
+  // Make sure we have metadata coverage of the new style code.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -616,6 +637,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxySmallMetadataInRequest) {
 
 // Verifies large metadata can be sent at different locations of a request.
 TEST_P(Http2MetadataIntegrationTest, ProxyLargeMetadataInRequest) {
+  // Make sure we have metadata coverage of the old style code.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_upstream_filters", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1053,7 +1076,7 @@ TEST_P(MultiplexedIntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMix
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
 }
 
 TEST_P(MultiplexedIntegrationTest, GrpcRequestTimeout) {
@@ -1714,30 +1737,23 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
-  bool enable_new_codec_wrapper;
 };
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
   const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
-  const bool new_codec_wrapper = params.param.enable_new_codec_wrapper;
-  return absl::StrCat(is_ipv4 ? "IPv4" : "IPv6", new_codec_wrapper ? "WrappedNghttp2" : "Nghttp2");
+  return is_ipv4 ? "IPv4" : "IPv6";
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      GetParam().enable_new_codec_wrapper ? "true" : "false");
-  }
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {}
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      for (bool enable_new_codec_wrapper : {false, true}) {
-        v.push_back({ip_version, enable_new_codec_wrapper});
-      }
+      v.push_back({ip_version});
     }
     return v;
   }
@@ -2015,45 +2031,14 @@ TEST_P(Http2MetadataIntegrationTest, UpstreamMetadataAfterEndStream) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-static std::string on_local_reply_filter = R"EOF(
-name: on-local-reply-filter
-)EOF";
-
-TEST_P(MultiplexedIntegrationTest, OnLocalReply) {
-  config_helper_.prependFilter(on_local_reply_filter);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // The filter will send a local reply when receiving headers, the client
-  // should get a complete response.
-  {
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("original_reply", response->body());
-  }
-  // The filter will send a local reply when receiving headers, and interrupt
-  // that with a second reply sent from the encoder chain. The client will see
-  // the second response.
-  {
-    default_request_headers_.addCopy("dual-local-reply", "yes");
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("second_reply", response->body());
-  }
-  // The filter will send a local reply when receiving headers and reset the
-  // stream onLocalReply. The client will get a reset and no response even if
-  // dual local replies are on (from the prior request).
-  {
-    default_request_headers_.addCopy("reset", "yes");
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response->waitForReset());
-    ASSERT_FALSE(response->complete());
-  }
-}
-
 TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
@@ -2075,6 +2060,13 @@ TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
 }
 
 TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2111,6 +2103,13 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
 // HTTP/2 and HTTP/3 don't support 101 SwitchProtocol response code, the client should
 // reset the request.
 TEST_P(MultiplexedIntegrationTest, Reset101SwitchProtocolResponse) {
+#ifdef ENVOY_ENABLE_UHV
+  if (GetParam().http2_implementation == Http2Impl::Oghttp2 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+#endif
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });

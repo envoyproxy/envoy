@@ -3,7 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
-#include "quic_ssl_connection_info.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -74,7 +75,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     return;
   }
   if (!initialized_) {
-    // Delay close till the first OnCanWrite() call.
+    // Delay close till the first ProcessUdpPacket() call.
     close_type_during_initialize_ = type;
     return;
   }
@@ -130,10 +131,10 @@ void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool 
   IS_ENVOY_BUG("unexpected call to rawWrite");
 }
 
-void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
-                                                          size_t new_buffered_bytes) {
+void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_bytes,
+                                                          uint64_t new_buffered_bytes) {
   int64_t delta = new_buffered_bytes - old_buffered_bytes;
-  const size_t bytes_to_send_old = bytes_to_send_;
+  const uint64_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
     ENVOY_BUG(bytes_to_send_old > bytes_to_send_, "Underflowed");
@@ -147,6 +148,8 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
     if (close_type_during_initialize_.has_value()) {
+      ASSERT(!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"));
       close(close_type_during_initialize_.value());
       close_type_during_initialize_ = absl::nullopt;
     }
@@ -256,6 +259,13 @@ absl::optional<uint64_t> QuicFilterManagerConnectionImpl::congestionWindowInByte
   }
 
   return cwnd;
+}
+
+void QuicFilterManagerConnectionImpl::maybeHandleCloseDuringInitialize() {
+  if (close_type_during_initialize_.has_value()) {
+    close(close_type_during_initialize_.value());
+    close_type_during_initialize_ = absl::nullopt;
+  }
 }
 
 } // namespace Quic

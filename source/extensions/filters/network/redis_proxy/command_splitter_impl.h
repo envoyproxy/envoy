@@ -146,11 +146,13 @@ public:
 
   // SplitCallbacks
   bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
+  void onQuit() override { callbacks_.onQuit(); }
   void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
   void onAuth(const std::string& username, const std::string& password) override {
     callbacks_.onAuth(username, password);
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
+  Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -193,6 +195,23 @@ public:
 private:
   EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * TransactionRequest handles commands that are part of a Redis transaction.
+ * This includes MULTI, EXEC, DISCARD, and also all the commands that are
+ * part of the transaction.
+ */
+class TransactionRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency);
+
+private:
+  TransactionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                     TimeSource& time_source, bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -361,6 +380,7 @@ private:
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
+  CommandHandlerFactory<TransactionRequest> transaction_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;

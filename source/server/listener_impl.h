@@ -313,7 +313,8 @@ public:
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
-                                    const envoy::config::listener::v3::Listener& config);
+                                    const envoy::config::listener::v3::Listener& config,
+                                    Network::Socket::Type socket_type);
 
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;

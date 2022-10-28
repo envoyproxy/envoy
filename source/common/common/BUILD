@@ -20,6 +20,8 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_synchronization",
+        "abseil_stacktrace",
+        "abseil_symbolize",
     ],
     deps = [":minimal_logger_lib"],
 )
@@ -123,7 +125,10 @@ envoy_basic_cc_library(
         "abseil_strings",
         "fmtlib",
     ],
-    deps = ["//envoy/common:base_includes"],
+    deps = [
+        "//envoy/common:base_includes",
+        "@com_google_absl//absl/status",
+    ],
 )
 
 envoy_cc_library(
@@ -161,6 +166,7 @@ envoy_cc_library(
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
+        "//source/common/config:ttl_lib",
         "@com_github_google_quiche//:quiche_common_lib",
     ],
 )

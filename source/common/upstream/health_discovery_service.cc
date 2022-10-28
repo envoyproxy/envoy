@@ -114,7 +114,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
           // TODO(lilika): Add support for more granular options of
           // envoy::config::core::v3::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
+          if (host->coarseHealth() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
@@ -508,12 +508,9 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      params.server_context_.admin(), params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.localInfo(),
-      params.server_context_.mainThreadDispatcher(), params.stats_,
-      params.server_context_.singletonManager(), params.server_context_.threadLocal(),
-      params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-      params.server_context_.options(), params.server_context_.accessLogManager());
+      params.server_context_, params.ssl_context_manager_, *scope,
+      params.server_context_.clusterManager(), params.stats_,
+      params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory =
@@ -521,10 +518,10 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       params.cluster_.transport_socket_matches(), factory_context, socket_factory, *scope);
 
-  return std::make_unique<ClusterInfoImpl>(params.server_context_, params.cluster_,
-                                           params.bind_config_, params.server_context_.runtime(),
-                                           std::move(socket_matcher), std::move(scope),
-                                           params.added_via_api_, factory_context);
+  return std::make_unique<ClusterInfoImpl>(
+      params.server_context_.initManager(), params.server_context_, params.cluster_,
+      params.bind_config_, params.server_context_.runtime(), std::move(socket_matcher),
+      std::move(scope), params.added_via_api_, factory_context);
 }
 
 void HdsCluster::initHealthchecks() {

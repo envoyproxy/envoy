@@ -2,86 +2,65 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: build
-  change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: http
-  change: |
-    Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
-    This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: prometheus_stats
+- area: cache_filter
   change: |
-    removed blank line for being compatible with OpenMetrics.
+    add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: transport_socket
+- area: grpc_json_transcoder
   change: |
-    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
+    fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
+- area: router
+  change: |
+    fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: auto_config
-  change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
-- area: grpc
-  change: |
-    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
-- area: hcm
-  change: |
-    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
-- area: lightstep
-  change: |
-    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
-- area: listener
-  change: |
-    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
-- area: router
-  change: |
-    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+
+  - area: eds
+    change: |
+      removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
+  - area: listener
+    change: |
+      removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
+      removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
+      removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
-- area: http
+- area: generic_proxy
   change: |
-    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
-- area: dns_resolver
-  change: |
-    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
-- area: gzip
-  change: |
-    added support for :ref:`max_inflate_ratio<envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
-- area: build
-  change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: listener
-  change: |
-    added multiple listening addresses in single listener. :ref:`listener additional addresses<envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
-- area: thrift
-  change: |
-    added stats for downstream connection close to detect SR drop.
-- area: cors
-  change: |
-    added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+    added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
+    :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
 - area: upstream
   change: |
-    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
-- area: health check
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
+- area: thrift
   change: |
-    added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http health check http method.
-- area: access_log
+    added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
+- area: http
   change: |
-    updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+    allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
 
 deprecated:

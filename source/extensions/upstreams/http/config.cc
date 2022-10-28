@@ -107,6 +107,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     }
     use_downstream_protocol_ = true;
   }
+  http_filters_ = options.http_filters();
   if (options.has_auto_config()) {
     use_http2_ = true;
     use_alpn_ = true;

@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 23]
+// [#next-free-field: 26]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -189,6 +189,19 @@ message AccessLogCommon {
   // To configure this value, users should configure
   // :ref:`custom_tags <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.custom_tags>`.
   map<string, string> custom_tags = 22;
+
+  // For HTTP: Total duration in milliseconds of the request from the start time to the last byte out.
+  // For TCP: Total duration in milliseconds of the downstream connection.
+  // This is the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+  // and may be longer than ``time_to_last_downstream_tx_byte``.
+  google.protobuf.Duration duration = 23;
+
+  // For HTTP: Number of times the request is attempted upstream. Note that the field is omitted when the request was never attempted upstream.
+  // For TCP: Number of times the connection request is attempted upstream. Note that the field is omitted when the connect request was never attempted upstream.
+  uint32 upstream_request_attempt_count = 24;
+
+  // Connection termination details may provide additional information about why the connection was terminated by Envoy for L4 reasons.
+  string connection_termination_details = 25;
 }
 
 // Flags indicating occurrences during request/response processing.
@@ -296,7 +309,7 @@ message ResponseFlags {
 }
 
 // Properties of a negotiated TLS connection.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message TLSProperties {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.TLSProperties";
@@ -353,6 +366,9 @@ message TLSProperties {
 
   // The TLS session ID.
   string tls_session_id = 6;
+
+  // The ``JA3`` fingerprint when ``JA3`` fingerprinting is enabled.
+  string ja3_fingerprint = 7;
 }
 
 // [#next-free-field: 14]

@@ -185,7 +185,8 @@ public:
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
-  MOCK_METHOD(Host::Health, health, (), (const));
+  MOCK_METHOD(Host::Health, coarseHealth, (), (const));
+  MOCK_METHOD(Host::HealthStatus, healthStatus, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));
   MOCK_METHOD(Network::UpstreamTransportSocketFactory&, transportSocketFactory, (), (const));
@@ -197,7 +198,8 @@ public:
   MOCK_METHOD(uint32_t, weight, (), (const));
   MOCK_METHOD(void, weight, (uint32_t new_weight));
   MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, used, (bool new_used));
+  MOCK_METHOD(HostHandlePtr, acquireHandle, (), (const));
+
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));

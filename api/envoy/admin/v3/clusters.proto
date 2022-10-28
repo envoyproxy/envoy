@@ -30,7 +30,7 @@ message Clusters {
 }
 
 // Details an individual cluster's current status.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ClusterStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ClusterStatus";
 
@@ -84,6 +84,9 @@ message ClusterStatus {
 
   // Observability name of the cluster.
   string observability_name = 7;
+
+  // The :ref:`EDS service name <envoy_v3_api_field_config.cluster.v3.Cluster.EdsClusterConfig.service_name>` if the cluster is an EDS cluster.
+  string eds_service_name = 8;
 }
 
 // Current state of a particular host.

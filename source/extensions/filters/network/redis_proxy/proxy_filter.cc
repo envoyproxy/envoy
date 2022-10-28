@@ -53,11 +53,12 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
                          ProxyFilterConfigSharedPtr config)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
-      config_(config) {
+      config_(config), transaction_(this) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ =
       config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty();
+  connection_quit_ = false;
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -96,7 +97,16 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       }
       pending_requests_.pop_front();
     }
+    transaction_.close();
   }
+}
+
+void ProxyFilter::onQuit(PendingRequest& request) {
+  Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
+  response->type(Common::Redis::RespType::SimpleString);
+  response->asString() = "OK";
+  connection_quit_ = true;
+  request.onResponse(std::move(response));
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
@@ -165,11 +175,22 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
     callbacks_->connection().write(encoder_buffer_, false);
   }
 
+  if (pending_requests_.empty() && connection_quit_) {
+    callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    connection_quit_ = false;
+    return;
+  }
+
   // Check for drain close only if there are no pending responses.
   if (pending_requests_.empty() && config_->drain_decision_.drainClose() &&
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
+
+  // Check if there is an active transaction that needs to be closed.
+  if (transaction_.should_close_) {
+    transaction_.close();
   }
 }
 

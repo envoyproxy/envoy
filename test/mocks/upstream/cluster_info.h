@@ -29,6 +29,10 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
 
 class MockLoadBalancerSubsetInfo : public LoadBalancerSubsetInfo {
@@ -40,6 +44,8 @@ public:
   MOCK_METHOD(bool, isEnabled, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
               fallbackPolicy, (), (const));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
+              metadataFallbackPolicy, (), (const));
   MOCK_METHOD(const ProtobufWkt::Struct&, defaultSubset, (), (const));
   MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
   MOCK_METHOD(bool, localityWeightAware, (), (const));
@@ -64,6 +70,18 @@ public:
   absl::node_hash_map<std::string, std::unique_ptr<const TypedMetadata::Object>>& data() {
     return data_;
   }
+};
+
+class MockUpstreamLocalAddressSelector : public UpstreamLocalAddressSelector {
+public:
+  MockUpstreamLocalAddressSelector(Network::Address::InstanceConstSharedPtr& address);
+
+  MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddress,
+              (const Network::Address::InstanceConstSharedPtr& address,
+               const Network::ConnectionSocket::OptionsSharedPtr& connection_socket_options),
+              (const));
+
+  Network::Address::InstanceConstSharedPtr& address_;
 };
 
 class MockClusterInfo : public ClusterInfo {
@@ -107,8 +125,7 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
-  MOCK_METHOD(const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&, loadBalancingPolicy,
-              (), (const));
+  MOCK_METHOD(const ProtobufTypes::MessagePtr&, loadBalancingPolicy, (), (const));
   MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
@@ -139,12 +156,11 @@ public:
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
   MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
   MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, sourceAddress, (), (const));
+  MOCK_METHOD(std::shared_ptr<UpstreamLocalAddressSelector>, getUpstreamLocalAddressSelector, (),
+              (const));
   MOCK_METHOD(const LoadBalancerSubsetInfo&, lbSubsetInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, clusterSocketOptions, (),
-              (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
@@ -156,6 +172,13 @@ public:
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
+              (const));
+
+  MOCK_METHOD(void, createFilterChain, (Http::FilterChainManager & manager), (const));
+  MOCK_METHOD(bool, createUpgradeFilterChain,
+              (absl::string_view upgrade_type,
+               const Http::FilterChainFactory::UpgradeMap* upgrade_map,
+               Http::FilterChainManager& manager),
               (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
@@ -190,6 +213,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  std::shared_ptr<MockUpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};

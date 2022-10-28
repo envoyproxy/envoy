@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -63,8 +64,9 @@ public:
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
   FilterConfig config_;
-  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
   std::list<UpstreamRequestPtr> requests_;
+  Event::GlobalTimeSystem time_system_;
 };
 
 } // namespace Router

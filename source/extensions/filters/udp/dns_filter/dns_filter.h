@@ -50,6 +50,8 @@ namespace DnsFilter {
   COUNTER(downstream_tx_responses)                                                                 \
   COUNTER(query_buffer_underflow)                                                                  \
   COUNTER(query_parsing_failure)                                                                   \
+  COUNTER(queries_with_additional_rrs)                                                             \
+  COUNTER(queries_with_ans_or_authority_rrs)                                                       \
   COUNTER(record_name_overflow)                                                                    \
   HISTOGRAM(downstream_rx_bytes, Bytes)                                                            \
   HISTOGRAM(downstream_rx_query_latency, Milliseconds)                                             \

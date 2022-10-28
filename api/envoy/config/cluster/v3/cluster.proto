@@ -209,7 +209,7 @@ message Cluster {
 
   // Optionally divide the endpoints in this cluster into subsets defined by
   // endpoint metadata and selected by route and weighted cluster metadata.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message LbSubsetConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.LbSubsetConfig";
@@ -223,6 +223,52 @@ message Cluster {
       NO_FALLBACK = 0;
       ANY_ENDPOINT = 1;
       DEFAULT_SUBSET = 2;
+    }
+
+    enum LbSubsetMetadataFallbackPolicy {
+      // No fallback. Route metadata will be used as-is.
+      METADATA_NO_FALLBACK = 0;
+
+      // A special metadata key ``fallback_list`` will be used to provide variants of metadata to try.
+      // Value of ``fallback_list`` key has to be a list. Every list element has to be a struct - it will
+      // be merged with route metadata, overriding keys that appear in both places.
+      // ``fallback_list`` entries will be used in order until a host is found.
+      //
+      // ``fallback_list`` key itself is removed from metadata before subset load balancing is performed.
+      //
+      // Example:
+      //
+      // for metadata:
+      //
+      // .. code-block:: yaml
+      //
+      //   version: 1.0
+      //   fallback_list:
+      //     - version: 2.0
+      //       hardware: c64
+      //     - hardware: c32
+      //     - version: 3.0
+      //
+      // at first, metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "2.0", "hardware": "c64"}
+      //
+      // will be used for load balancing. If no host is found, metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "1.0", "hardware": "c32"}
+      //
+      // is next to try. If it still results in no host, finally metadata:
+      //
+      // .. code-block:: json
+      //
+      //   {"version": "3.0"}
+      //
+      // is used.
+      FALLBACK_LIST = 1;
     }
 
     // Specifications for subsets.
@@ -260,10 +306,7 @@ message Cluster {
       // Selects a mode of operation in which each subset has only one host. This mode uses the same rules for
       // choosing a host, but updating hosts is faster, especially for large numbers of hosts.
       //
-      // If a match is found to a host, that host will be used regardless of priority levels, unless the host is unhealthy.
-      //
-      // Currently, this mode is only supported if ``subset_selectors`` has only one entry, and ``keys`` contains
-      // only one entry.
+      // If a match is found to a host, that host will be used regardless of priority levels.
       //
       // When this mode is enabled, configurations that contain more than one host with the same metadata value for the single key in ``keys``
       // will use only one of the hosts with the given key; no requests will be routed to the others. The cluster gauge
@@ -349,6 +392,16 @@ message Cluster {
     // endpoint metadata if the endpoint metadata matches the value exactly OR it is a list value
     // and any of the elements in the list matches the criteria.
     bool list_as_any = 7;
+
+    // Fallback mechanism that allows to try different route metadata until a host is found.
+    // If load balancing process, including all its mechanisms (like
+    // :ref:`fallback_policy<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.fallback_policy>`)
+    // fails to select a host, this policy decides if and how the process is repeated using another metadata.
+    //
+    // The value defaults to
+    // :ref:`METADATA_NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
+    LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
+        [(validate.rules).enum = {defined_only: true}];
   }
 
   // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
@@ -462,8 +515,8 @@ message Cluster {
   // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
   // load balancing policy.
   message MaglevLbConfig {
-    // The table size for Maglev hashing. The Maglev aims for ‘minimal disruption’ rather than an absolute guarantee.
-    // Minimal disruption means that when the set of upstreams changes, a connection will likely be sent to the same
+    // The table size for Maglev hashing. Maglev aims for "minimal disruption" rather than an absolute guarantee.
+    // Minimal disruption means that when the set of upstream hosts change, a connection will likely be sent to the same
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
     // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
     google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
@@ -493,6 +546,10 @@ message Cluster {
     // The http header to override destination address if :ref:`use_http_header <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.use_http_header>`.
     // is set to true. If the value is empty, :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` will be used.
     string http_header_name = 2;
+
+    // The port to override for the original dst address. This port
+    // will take precedence over filter state and header override ports
+    google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
   }
 
   // Common configuration for all load balancer implementations.
@@ -1165,15 +1222,6 @@ message LoadBalancingPolicy {
   // supports. This provides a mechanism for starting to use new LB policies that are not yet
   // supported by all clients.
   repeated Policy policies = 1;
-}
-
-// An extensible structure containing the address Envoy should bind to when
-// establishing upstream connections.
-message UpstreamBindConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.UpstreamBindConfig";
-
-  // The address Envoy should bind to when establishing upstream connections.
-  core.v3.Address source_address = 1;
 }
 
 message UpstreamConnectionOptions {

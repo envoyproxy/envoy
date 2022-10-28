@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
+#include "envoy/grpc/context.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/grpc/codec.h"
@@ -24,7 +25,6 @@ namespace {
 // The expected usage pattern is that the map is populated once, and can then be queried lock-free
 // as long as it isn't being modified.
 class GrpcServiceMethodToRequestNamesMap {
-public:
 public:
   // Construct a map populated with the services/methods in method_list.
   GrpcServiceMethodToRequestNamesMap(Stats::SymbolTable& symbol_table,
@@ -93,7 +93,8 @@ struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
       : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
-        enable_upstream_stats_(proto_config.enable_upstream_stats()) {
+        enable_upstream_stats_(proto_config.enable_upstream_stats()),
+        replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
@@ -137,6 +138,7 @@ struct Config {
   Grpc::Context& context_;
   const bool emit_filter_state_;
   const bool enable_upstream_stats_;
+  const bool replace_dots_in_grpc_service_name_;
   bool stats_for_all_methods_{false};
   absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
@@ -153,7 +155,12 @@ public:
       if (cluster_) {
         if (config_->stats_for_all_methods_) {
           // Get dynamically-allocated Context::RequestStatNames from the context.
-          request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
+          if (config_->replace_dots_in_grpc_service_name_) {
+            request_names_ =
+                config_->context_.resolveDynamicServiceAndMethodWithDotReplaced(headers.Path());
+          } else {
+            request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
+          }
           do_stat_tracking_ = request_names_.has_value();
         } else {
           // This case handles both proto_config.stats_for_all_methods() == false,

@@ -131,7 +131,7 @@ Tools images
 
 The Envoy project ships images for tools that are separate from the proxy binary but are useful
 in supporting systems such as CI, configuration generation pipelines, etc. Currently installed
-tools in `/usr/local/bin` include:
+tools in ``/usr/local/bin`` include:
 
 * :ref:`Schema validator check tool <install_tools_schema_validator_check_tool>`
 
