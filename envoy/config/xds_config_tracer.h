@@ -35,7 +35,9 @@ struct TraceDetails {
 
 /**
  * An interface for hooking into xDS update events to provide the ablility to use some
- * external logger or processor in xDS update.
+ * external logger or processor in xDS update. This tracer provides the log point when
+ * the resources are received , when they are successfully processed and applied, and when
+ * there is any failure.
  *
  * Instance of this interface get invoked on the main Envoy thread. Thus, it is important
  * for implementations of this interface to not execute any blocking operations on the same
@@ -46,7 +48,13 @@ public:
   virtual ~XdsConfigTracer() = default;
 
   /**
-   * Log the decoded SotW xDS resources that are about to be ingested.
+   * Log the decoded SotW xDS resources ingestion status.
+   *
+   * This is called twice. One is at the time when the resouce is successfully parsed and
+   * before the ingestion. The other one is when the resource is successfully applied to Envoy
+   * and are about to be ACK'ed. The TraceDetails imply the status of ingestion process, e.g.,
+   * TraceState::INGESTED.
+   *
    * @param type_url The type url of xDS message.
    * @param resources List of decoded resources that reflect the latest state.
    * @param details The log point state and details.
@@ -57,6 +65,10 @@ public:
 
   /**
    * Log point for SotW xDS discovery response.
+   *
+   * This is mainly callded when there is any exception during the parse and ingestion process
+   * for SotW. The TraceDetails includes the error details and TraceState.
+   *
    * @param message The SotW discovery response message body.
    * @param details The log point state and details.
    */
@@ -64,7 +76,10 @@ public:
                    const TraceDetails& details) PURE;
 
   /**
-   * Log point for Delta xDS discovery response message when received, ingested, and failed.
+   * Log point for Delta xDS discovery response message when it is received, successfully applied,
+   * and is failed to process it. TraceDetailes can be 3 states, RECEIVE, INGESTED, and FAILED,
+   * including error details.
+   *
    * @param message The Delta discovery response message body.
    * @param details The log point state and details.
    */

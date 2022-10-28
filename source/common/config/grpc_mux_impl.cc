@@ -285,6 +285,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
+    // Log point when the resources are successfully parsed.
     if (xds_config_tracer_.has_value()) {
       xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::RECEIVE));
     }
@@ -292,6 +293,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
 
+    // Log point when the resources are successfully ingested.
     if (xds_config_tracer_.has_value()) {
       xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::INGESTED));
     }
@@ -305,6 +307,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+
+    // Log point when there is any exception during the parse and ingestion process.
     if (xds_config_tracer_.has_value()) {
       xds_config_tracer_->log(*message, TraceDetails(TraceState::FAILED, *error_detail));
     }

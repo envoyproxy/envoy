@@ -91,6 +91,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
 
+  // Log point when DelataDiscoveryResponse is received.
   if (xds_config_tracer_.has_value()) {
     xds_config_tracer_->log(*message, TraceDetails(TraceState::RECEIVE));
   }
@@ -115,6 +116,8 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   }
 
   auto ack = sub->second->sub_state_.handleResponse(*message);
+
+  // Log point after the response is processed, it can be INGESTED or FAILED state based on the ack.
   if (xds_config_tracer_.has_value()) {
     xds_config_tracer_->log(
         *message, TraceDetails(ack.error_detail_.code() == Grpc::Status::WellKnownGrpcStatus::Ok
