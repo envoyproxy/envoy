@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.pb.h"
 #include "envoy/network/connection.h"
@@ -24,8 +25,18 @@ public:
     setUpstreamCount(1);
   }
 
+  void setupBootstrapExtension(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    envoy::extensions::bootstrap::internal_listener::v3::InternalListener config;
+    if (buffer_size_specified_) {
+      config.mutable_buffer_size_kb()->set_value(buffer_size_);
+    }
+    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
+    boostrap_extension->mutable_typed_config()->PackFrom(config);
+    boostrap_extension->set_name("envoy.bootstrap.internal_listener");
+  }
   void initialize() override {
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      setupBootstrapExtension(bootstrap);
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters()->Add();
       cluster->set_name("internal_upstream");
@@ -101,11 +112,6 @@ public:
           auto* route = virtual_host->mutable_routes(0);
           route->mutable_route()->set_cluster("internal_upstream");
         });
-    config_helper_.addBootstrapExtension(R"EOF(
-    name: envoy.bootstrap.internal_listener
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
-    )EOF");
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
@@ -117,21 +123,42 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  // Send bidirectional data through the internal connection.
+  void internalConnectionBufferSizeTest() {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    // Send HTTP request with 10 KiB payload.
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10240);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    // Send HTTP response with 20 KiB payload.
+    upstream_request_->encodeData(20480, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(10240U, upstream_request_->bodyLength());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(20480U, response->body().size());
+    cleanupUpstreamAndDownstream();
+  }
+
+  Envoy::Http::TestRequestHeaderMapImpl request_header_{Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host.com"},
+      {"internal-header", "FOO"},
+  }};
   bool add_metadata_{true};
   bool use_transport_socket_{true};
+  bool buffer_size_specified_{false};
+  uint32_t buffer_size_{0};
 };
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "host.com"},
-      {"internal-header", "FOO"},
-  });
+  auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -166,13 +193,7 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "host.com"},
-      {"internal-header", "FOO"},
-  });
+  auto response = codec_client_->makeHeaderOnlyRequest(request_header_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -180,6 +201,44 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlowWithoutTransportSocket) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
   EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("-,-,-"));
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTestDefault) {
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 1048576",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest128KB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 128;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 131072",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest8MB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 8192;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 8388608",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest1KB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 1;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 1024",
+                      internalConnectionBufferSizeTest());
+}
+
+TEST_F(InternalUpstreamIntegrationTest, InternalConnectionBufSizeTest5KB) {
+  buffer_size_specified_ = true;
+  buffer_size_ = 5;
+  initialize();
+  EXPECT_LOG_CONTAINS("debug", "Internal client connection buffer size 5120",
+                      internalConnectionBufferSizeTest());
 }
 
 } // namespace

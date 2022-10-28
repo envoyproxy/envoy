@@ -794,9 +794,9 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->coarseHealth());
 
   // This is the first time we received an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -1456,31 +1456,55 @@ TEST_F(HostImplTest, HealthFlags) {
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
 
   // To begin with, no flags are set so we're healthy.
-  EXPECT_EQ(Host::Health::Healthy, host->health());
+  EXPECT_EQ(Host::Health::Healthy, host->coarseHealth());
 
   // Setting an unhealthy flag make the host unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
   // Setting a degraded flag on an unhealthy host has no effect.
   host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
 
   // If the degraded flag is the only thing set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If the EDS and active degraded flag is set, host is degraded.
   host->healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If only the EDS degraded is set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Degraded, host->health());
+  EXPECT_EQ(Host::Health::Degraded, host->coarseHealth());
 
   // If EDS and failed active hc is set, host is unhealthy.
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_EQ(Host::Health::Unhealthy, host->health());
+  EXPECT_EQ(Host::Health::Unhealthy, host->coarseHealth());
+}
+
+TEST_F(HostImplTest, HealthStatus) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1, 0,
+                                    Host::HealthStatus::DRAINING);
+
+  // To begin with, no flags are set so EDS status is used.
+  EXPECT_EQ(Host::HealthStatus::DRAINING, host->healthStatus());
+
+  // Setting an active unhealthy flag make the host unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+  host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // Setting a degraded flag on an unhealthy host has no effect.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::HealthStatus::UNHEALTHY, host->healthStatus());
+
+  // If the degraded flag is the only thing set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
 }
 
 // Test that it's not possible to do a HostDescriptionImpl with a unix
@@ -1804,7 +1828,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(Host::Health::Degraded,
-            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->coarseHealth());
 }
 
 TEST_F(StaticClusterImplTest, AltStatName) {
@@ -2434,7 +2458,7 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_F(StaticClusterImplTest, SourceAddressPriority) {
+TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
@@ -2451,7 +2475,215 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
+  }
+
+  {
+    // Test extra_source_addresses from bootstrap.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ("[2001::1]:0", cluster.info()
+                                 ->getUpstreamLocalAddressSelector()
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 .address_->asString());
+  }
+
+  {
+    // Test no same IP version in multiple source addresses.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
+  }
+
+  {
+    // Test two same IP version addresses.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("1.2.3.6");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has two same IP version source addresses. Only two "
+        "different IP version source addresses can be supported in BindConfig's source_address and "
+        "extra_source_addresses fields");
+  }
+
+  {
+    // Test more than two multiple source addresses
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::2");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Bootstrap's upstream binding config has more than one extra source addresses. Only "
+        "one extra source can be supported in BindConfig's extra_source_addresses field");
+  }
+
+  {
+    // Test non IP address case.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::PipeInstance>("/test");
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
+  }
+
+  const std::string cluster_address = "5.6.7.8";
+  config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+  {
+    // Verify source address from cluster config is used when present.
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
+  }
+
+  {
+    // Test cluster config has more than two multiple source addresses
+    config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+    config.mutable_upstream_bind_config()
+        ->add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    config.mutable_upstream_bind_config()
+        ->add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::2");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
+                                                        factory_context, std::move(scope), false),
+                              EnvoyException,
+                              "Cluster staticcluster's upstream binding config has more than one "
+                              "extra source addresses. Only one extra source can be "
+                              "supported in BindConfig's extra_source_addresses field");
+  }
+
+  {
+    // The source address from cluster config takes precedence over one from the bootstrap proto.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    config.mutable_upstream_bind_config()->clear_extra_source_addresses();
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
+  }
+}
+
+TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+
+  {
+    // Test more than two multiple source addresses
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
+        "2001::1");
+    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Can't specify both `extra_source_addresses` and `additional_source_addresses` in the "
+        "Bootstrap's upstream binding config");
+    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
   }
 
   {
@@ -2468,10 +2700,16 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(remote_address, nullptr)
+                               .address_->asString());
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("[2001::1]:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("[2001::1]:0", cluster.info()
+                                 ->getUpstreamLocalAddressSelector()
+                                 ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                 .address_->asString());
   }
 
   {
@@ -2487,7 +2725,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   {
@@ -2546,26 +2787,14 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
                               false);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
         std::make_shared<Network::Address::PipeInstance>("/test");
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressFn()(v6_remote_address)->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()
+                               ->getUpstreamLocalAddressSelector()
+                               ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                               .address_->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
   config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
-  {
-    // Verify source address from cluster config is used when present.
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
-        validation_visitor_);
-    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
-                              false);
-    Network::Address::InstanceConstSharedPtr remote_address =
-        std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
-  }
-
   {
     // Test cluster config has more than two multiple source addresses
     config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
@@ -2599,8 +2828,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
                               false);
     Network::Address::InstanceConstSharedPtr remote_address =
         std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
-    EXPECT_EQ(cluster_address,
-              cluster.info()->sourceAddressFn()(remote_address)->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
   }
 }
 

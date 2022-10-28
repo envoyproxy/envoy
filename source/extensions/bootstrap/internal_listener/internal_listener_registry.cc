@@ -13,9 +13,15 @@ namespace InternalListener {
 SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
 
 InternalListenerExtension::InternalListenerExtension(
-    Server::Configuration::ServerFactoryContext& server_context)
+    Server::Configuration::ServerFactoryContext& server_context,
+    const envoy::extensions::bootstrap::internal_listener::v3::InternalListener& config)
     : server_context_(server_context),
       tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {
+  // Get buffer size config in K bytes. The default buffer size is 1024 KiB.
+  buffer_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                     config, buffer_size_kb, InternalClientConnectionFactory::DefaultBufferSize) *
+                 1024;
+
   // Initialize this singleton before the listener manager potentially load a static internal
   // listener.
   server_context_.singletonManager().getTyped<TlsInternalListenerRegistry>(
@@ -43,14 +49,16 @@ void InternalListenerExtension::onServerInitialized() {
   // ``InternalClientConnectionFactory``.
   // Note that the per silo ``ConnectionHandler`` will add internal listeners into the per silo
   // registry.
-  Extensions::Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
-      tls_registry_->tls_slot_.get();
+  InternalClientConnectionFactory::registry_tls_slot_ = tls_registry_->tls_slot_.get();
+  InternalClientConnectionFactory::buffer_size_ = buffer_size_;
 }
 
 Server::BootstrapExtensionPtr InternalListenerFactory::createBootstrapExtension(
-    [[maybe_unused]] const Protobuf::Message& config,
-    Server::Configuration::ServerFactoryContext& context) {
-  return std::make_unique<InternalListenerExtension>(context);
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
+  const auto& message = MessageUtil::downcastAndValidate<
+      const envoy::extensions::bootstrap::internal_listener::v3::InternalListener&>(
+      config, context.messageValidationVisitor());
+  return std::make_unique<InternalListenerExtension>(context, message);
 }
 
 REGISTER_FACTORY(InternalListenerFactory, Server::Configuration::BootstrapExtensionFactory);

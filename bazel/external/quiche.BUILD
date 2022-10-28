@@ -2424,19 +2424,26 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "quic_core_connection_id_generator_interface_lib",
     hdrs = ["quiche/quic/core/connection_id_generator.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_core_versions_lib",
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "quic_core_deterministic_connection_id_generator_lib",
     srcs = ["quiche/quic/core/deterministic_connection_id_generator.cc"],
     hdrs = ["quiche/quic/core/deterministic_connection_id_generator.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_connection_id_generator_interface_lib",
@@ -2466,7 +2473,6 @@ envoy_cc_library(
         ":quic_core_crypto_encryption_lib",
         ":quic_core_framer_lib",
         ":quic_core_idle_network_detector_lib",
-        ":quic_core_legacy_version_encapsulator_lib",
         ":quic_core_mtu_discovery_lib",
         ":quic_core_network_blackhole_detector_lib",
         ":quic_core_one_block_arena_lib",
@@ -2932,6 +2938,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quic_core_connection_id_generator_interface_lib",
         ":quic_core_constants_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quic_core_crypto_encryption_lib",
@@ -3380,14 +3387,14 @@ envoy_cc_library(
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
             "quiche/quic/core/io/event_loop_socket_factory.cc",
-            "quiche/quic/core/io/event_loop_tcp_client_socket.cc",
+            "quiche/quic/core/io/event_loop_connecting_client_socket.cc",
         ],
     }),
     hdrs = select({
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": [
             "quiche/quic/core/io/event_loop_socket_factory.h",
-            "quiche/quic/core/io/event_loop_tcp_client_socket.h",
+            "quiche/quic/core/io/event_loop_connecting_client_socket.h",
         ],
     }),
     copts = quiche_copts,
@@ -3455,29 +3462,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":quic_platform_export",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_core_legacy_version_encapsulator_lib",
-    srcs = [
-        "quiche/quic/core/quic_legacy_version_encapsulator.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/quic_legacy_version_encapsulator.h",
-    ],
-    copts = quiche_copts,
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quic_core_crypto_crypto_handshake_lib",
-        ":quic_core_crypto_encryption_lib",
-        ":quic_core_packet_creator_lib",
-        ":quic_core_packets_lib",
-        ":quic_core_types_lib",
-        ":quic_core_utils_lib",
-        ":quic_platform",
-        ":quiche_common_platform",
     ],
 )
 
@@ -5358,8 +5342,9 @@ envoy_cc_test(
 
 envoy_cc_library(
     name = "quic_load_balancer_server_id_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_server_id.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_server_id.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_server_id.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_server_id.h"],
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -5372,8 +5357,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_load_balancer_config_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_config.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_config.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_config.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_config.h"],
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
@@ -5387,8 +5373,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_load_balancer_encoder_lib",
-    srcs = ["src/quic/load_balancer/load_balancer_encoder.cc"],
-    hdrs = ["src/quic/load_balancer/load_balancer_encoder.h"],
+    srcs = ["quiche/quic/load_balancer/load_balancer_encoder.cc"],
+    hdrs = ["quiche/quic/load_balancer/load_balancer_encoder.h"],
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],

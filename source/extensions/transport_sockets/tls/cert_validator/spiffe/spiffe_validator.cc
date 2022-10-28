@@ -185,8 +185,7 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     return false;
   }
   if (allow_expired_certificate_) {
-    X509_STORE_CTX_set_verify_cb(new_store_ctx.get(),
-                                 CertValidatorUtil::ignoreCertificateExpirationCallback);
+    CertValidatorUtil::setIgnoreCertificateExpiration(new_store_ctx.get());
   }
   auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {
