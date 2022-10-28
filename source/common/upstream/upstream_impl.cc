@@ -1036,7 +1036,7 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
   if (config.has_load_balancing_policy()) {
-    configureLbPolicies(config);
+    configureLbPolicies(config, server_context);
   } else {
     switch (config.lb_policy()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
@@ -1065,7 +1065,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_type_ = LoadBalancerType::ClusterProvided;
       break;
     case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-      configureLbPolicies(config);
+      configureLbPolicies(config, server_context);
       break;
     }
     }
@@ -1154,7 +1154,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 }
 
 // Configures the load balancer based on config.load_balancing_policy
-void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config) {
+void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
+                                          Server::Configuration::ServerFactoryContext& context) {
   if (config.has_lb_subset_config()) {
     throw EnvoyException(
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
@@ -1178,7 +1179,12 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
         Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
-      load_balancing_policy_ = policy;
+      // Load and validate the configuration.
+      load_balancing_policy_ = factory->createEmptyConfigProto();
+      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
+                                             context.messageValidationVisitor(),
+                                             *load_balancing_policy_);
+
       load_balancer_factory_ = factory;
       break;
     }

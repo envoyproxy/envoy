@@ -33,7 +33,6 @@ RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
 RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
-RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
 RUNTIME_GUARD(envoy_reloadable_features_closer_shadow_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_combine_sds_requests);
@@ -47,7 +46,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
 RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
 RUNTIME_GUARD(envoy_reloadable_features_http2_delay_keepalive_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
 RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -88,7 +86,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams)
 // TODO(rgs1): Make this enabled after Pinterest tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
-// Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // TODO(bencebeky): Finish BalsaParser implementation, then enable by default. See issue #21245.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
