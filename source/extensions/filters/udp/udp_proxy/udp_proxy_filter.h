@@ -25,8 +25,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
-// TODO(mattklein123): UDP session access logging.
-
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
