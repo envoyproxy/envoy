@@ -154,7 +154,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     return;
   }
   if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
-    auto varied_key =
+    absl::optional<Key> varied_key =
         variedRequestKey(simple_lookup_context.request(), *iter->second.response_headers_);
     if (!varied_key.has_value()) {
       on_complete(false);
@@ -166,7 +166,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
       return;
     }
   }
-  auto& entry = iter->second;
+  Entry& entry = iter->second;
 
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
@@ -254,11 +254,11 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  auto maybe_key = variedRequestKey(request, *response_headers);
-  if (!maybe_key.has_value()) {
+  absl::optional<Key> varied_key = variedRequestKey(request, *response_headers);
+  if (!varied_key.has_value()) {
     return SimpleHttpCache::Entry{};
   }
-  Key& varied_request_key = maybe_key.value();
+  Key& varied_request_key = varied_key.value();
 
   auto iter = map_.find(varied_request_key);
   if (iter == map_.end()) {
