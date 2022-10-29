@@ -1,6 +1,7 @@
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
+
 #include "source/common/upstream/load_balancer_impl.h"
 
 namespace Envoy {

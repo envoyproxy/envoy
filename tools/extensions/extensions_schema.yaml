@@ -117,6 +117,7 @@ categories:
 - envoy.tls_handshakers
 - envoy.generic_proxy.filters
 - envoy.generic_proxy.codecs
+- envoy.load_balancing_policies
 
 status_values:
 - name: stable

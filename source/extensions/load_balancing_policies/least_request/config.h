@@ -4,9 +4,8 @@
 #include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/extensions/load_balancing_policies/common/factory_base.h"
-
 #include "source/common/common/logger.h"
+#include "source/extensions/load_balancing_policies/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
