@@ -1325,7 +1325,7 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
   std::string transaction_commands =
       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
       makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-  const std::string& response = "";
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   ASSERT_TRUE(redis_client->write(transaction_commands));
 
