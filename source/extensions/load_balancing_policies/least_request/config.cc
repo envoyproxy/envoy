@@ -1,5 +1,6 @@
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -13,23 +14,17 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(Upstream::LoadBalancer
                                                           Runtime::Loader& runtime,
                                                           Random::RandomGenerator& random,
                                                           TimeSource& time_source) {
-  // Use the old proto type for now.
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig old_type_config;
-  try {
-    MessageUtil::wireCast(*cluster_info.loadBalancingPolicy(), old_type_config);
-  } catch (EnvoyException& e) {
-    // Cast failed and exit in debug mode. Continue in release mode with a error message.
-    ASSERT(false,
-           fmt::format("Failed to cast load balancing policy to least request: {}", e.what()));
-    ENVOY_LOG(error,
-              "Cannot cast least request load balancing policy configuration to "
-              "envoy::config::cluster::v3::Cluster::LeastRequestLbConfig: {}",
-              e.what());
-    old_type_config.Clear();
-  }
+
+  const auto* typed_config = dynamic_cast<
+      const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest*>(
+      cluster_info.loadBalancingPolicy().get());
+
+  RELEASE_ASSERT(typed_config != nullptr,
+                 "Invalid load balancing policy configuration for least request load balancer");
+
   return std::make_unique<Upstream::LeastRequestLoadBalancer>(
       params.priority_set, params.local_priority_set, cluster_info.stats(), runtime, random,
-      cluster_info.lbConfig(), old_type_config, time_source);
+      cluster_info.lbConfig(), *typed_config, time_source);
 }
 
 /**

@@ -11,6 +11,8 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.h"
+#include "envoy/extensions/load_balancing_policies/least_request/v3/least_request.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -575,25 +577,21 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+      const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest&
           least_request_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random, common_config,
-            (least_request_config.has_value() &&
-             least_request_config.value().has_slow_start_config())
+            (least_request_config.has_slow_start_config())
                 ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
-                      least_request_config.value().slow_start_config())
+                      least_request_config.slow_start_config())
                 : absl::nullopt,
             time_source),
-        choice_count_(
-            least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
-                : 2),
+        choice_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config, choice_count, 2)),
         active_request_bias_runtime_(
-            least_request_config.has_value() && least_request_config->has_active_request_bias()
+            least_request_config.has_active_request_bias()
                 ? absl::optional<Runtime::Double>(
-                      {least_request_config->active_request_bias(), runtime})
+                      {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt) {
     initialize();
   }
