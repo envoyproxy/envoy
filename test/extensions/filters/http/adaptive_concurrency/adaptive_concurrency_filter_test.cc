@@ -74,7 +74,7 @@ gradient_controller_config:
     value: 50
   concurrency_limit_params:
     concurrency_update_interval:
-      nanos: 100000000 # 100ms  
+      nanos: 100000000 # 100ms
   min_rtt_calc_params:
     interval:
       seconds: 30
