@@ -70,11 +70,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, TestEnableOverriddenFromRuntime) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
-  sample_aggregate_percentile:
-    value: 50
-  concurrency_limit_params:
-    concurrency_update_interval:
-      nanos: 100000000 # 100ms
+  sample_aggregate_percentile:makeConfig
   min_rtt_calc_params:
     interval:
       seconds: 30
@@ -386,7 +382,8 @@ gradient_controller_config:
 enabled:
   default_value: true
   runtime_key: "adaptive_concurrency.enabled"
-concurrency_limit_exceeded_status: 429
+concurrency_limit_exceeded_status:
+  code: 429
 )EOF";
 
   auto config = makeConfig(yaml_config);
@@ -422,7 +419,8 @@ gradient_controller_config:
 enabled:
   default_value: true
   runtime_key: "adaptive_concurrency.enabled"
-concurrency_limit_exceeded_status: 200
+concurrency_limit_exceeded_status:
+  code: 200
 )EOF";
 
   auto config = makeConfig(yaml_config);
