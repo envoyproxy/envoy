@@ -202,16 +202,16 @@ public:
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
       if (tunneling_config_helper_) {
-        return TunnelingConfigHelperOptConstRef(*tunneling_config_helper_);
+        return {*tunneling_config_helper_};
       } else {
-        return TunnelingConfigHelperOptConstRef();
+        return {};
       }
     }
     OnDemandConfigOptConstRef onDemandConfig() {
       if (on_demand_config_) {
-        return OnDemandConfigOptConstRef(*on_demand_config_);
+        return {*on_demand_config_};
       } else {
-        return OnDemandConfigOptConstRef();
+        return {};
       }
     }
 

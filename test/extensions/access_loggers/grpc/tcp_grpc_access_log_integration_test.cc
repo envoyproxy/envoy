@@ -406,38 +406,6 @@ tcp_logs:
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
-tcp_logs:
-  log_entry:
-    common_properties:
-      downstream_remote_address:
-        socket_address:
-          address: {}
-      downstream_local_address:
-        socket_address:
-          address: {}
-      upstream_remote_address:
-        socket_address:
-          address: {}
-      upstream_local_address:
-        socket_address:
-          address: {}
-      upstream_cluster: cluster_0
-      upstream_request_attempt_count: 1
-      downstream_direct_remote_address:
-        socket_address:
-          address: {}
-    connection_properties:
-      received_bytes: 3
-      sent_bytes: 5
-)EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
-
   cleanup();
 }
 
