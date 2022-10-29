@@ -43,7 +43,8 @@ public:
                                      Http::StreamEncoderFilterCallbacks& callbacks) override;
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata) override;
+                     const ResponseMetadata& metadata,
+                     std::function<void(bool)> on_complete) override;
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);

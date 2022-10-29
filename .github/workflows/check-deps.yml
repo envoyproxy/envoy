@@ -20,7 +20,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
       - name: Set up Python (3.10)
-        uses: actions/setup-python@b55428b1882923874294fa556849718a1d7f2ca5
+        uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
         with:
           python-version: "3.10"
 

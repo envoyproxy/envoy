@@ -15,12 +15,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     com_envoyproxy_protoc_gen_validate = dict(
         project_name = "protoc-gen-validate (PGV)",
         project_desc = "protoc plugin to generate polyglot message validators",
-        project_url = "https://github.com/envoyproxy/protoc-gen-validate",
-        version = "0.6.7",
-        sha256 = "4c692c62e16c168049bca2b2972b0a25222870cf53e61be30b50d761e58728bd",
-        release_date = "2022-03-04",
+        project_url = "https://github.com/bufbuild/protoc-gen-validate",
+        version = "0.6.13",
+        sha256 = "cfa8741c939387969550a305f237e627db26e3ca00c69c0d6a5148843d14655a",
+        release_date = "2022-10-03",
         strip_prefix = "protoc-gen-validate-{version}",
-        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/v{version}.tar.gz"],
         use_category = ["api"],
         implied_untracked_deps = [
             "com_github_iancoleman_strcase",
@@ -30,7 +30,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_x_text",
         ],
         license = "Apache-2.0",
-        license_url = "https://github.com/envoyproxy/protoc-gen-validate/blob/v{version}/LICENSE",
+        license_url = "https://github.com/bufbuild/protoc-gen-validate/blob/v{version}/LICENSE",
     ),
     com_github_cncf_udpa = dict(
         project_name = "xDS API",

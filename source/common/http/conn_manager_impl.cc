@@ -305,12 +305,17 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
 
-  // Create account, wiring the stream to use it for tracking bytes.
-  // If tracking is disabled, the wiring becomes a NOP.
-  auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
   Buffer::BufferMemoryAccountSharedPtr downstream_stream_account =
-      buffer_factory.createAccount(response_encoder.getStream());
-  response_encoder.getStream().setAccount(downstream_stream_account);
+      response_encoder.getStream().account();
+
+  if (downstream_stream_account == nullptr) {
+    // Create account, wiring the stream to use it for tracking bytes.
+    // If tracking is disabled, the wiring becomes a NOP.
+    auto& buffer_factory = read_callbacks_->connection().dispatcher().getWatermarkFactory();
+    downstream_stream_account = buffer_factory.createAccount(response_encoder.getStream());
+    response_encoder.getStream().setAccount(downstream_stream_account);
+  }
+
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_stream_account)));
 
@@ -765,37 +770,10 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
-  // See below for more information on this early return block.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
-                   "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    return;
-  }
-
-  // There are 2 issues in the blow code. First, `responseHeaders().has_value()` is not the best
-  // predicate. `remoteDecodeComplete()` is preferable. Second, `sendLocalReply()` smartly ends the
-  // stream if any response was pushed to decoder and explicitly `endStream()` is not required.
-  //
-  // The above code is expected to resolve both. The original code here before it is fully verified.
-  //
-  // TODO(lambdai): delete the block below along with the removal of
-  // `override_request_timeout_by_gateway_timeout`.
-
-  // If headers have not been sent to the user, send a 408.
-  if (responseHeaders().has_value()) {
-    // TODO(htuch): We could send trailers here with an x-envoy timeout header
-    // or gRPC status code, and/or set H2 RST_STREAM error.
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    connection_manager_.doEndStream(*this);
-  } else {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-  }
+  filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+                 "stream timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
@@ -1631,6 +1609,9 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::OperationName::Egress;
+  }
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
@@ -1639,10 +1620,14 @@ const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() c
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig()->verbose_;
+  return connection_manager_.config_.tracingConfig() &&
+         connection_manager_.config_.tracingConfig()->verbose_;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return Tracing::DefaultMaxPathTagLength;
+  }
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 

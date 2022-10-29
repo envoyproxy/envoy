@@ -46,7 +46,7 @@ public:
 
   std::vector<envoy::service::discovery::v3::Resource>
   getResources(const Config::XdsSourceId& source_id,
-               const std::vector<std::string>& resource_names) const override {
+               const absl::flat_hash_set<std::string>& resource_names) const override {
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& resource_name : resource_names) {
       auto it = ResourcesMap.find(makeKey(source_id, resource_name));
