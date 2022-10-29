@@ -70,7 +70,11 @@ TEST_F(AdaptiveConcurrencyFilterTest, TestEnableOverriddenFromRuntime) {
   std::string yaml_config =
       R"EOF(
 gradient_controller_config:
-  sample_aggregate_percentile:makeConfig
+  sample_aggregate_percentile:
+    value: 50
+  concurrency_limit_params:
+    concurrency_update_interval:
+      nanos: 100000000 # 100ms  
   min_rtt_calc_params:
     interval:
       seconds: 30
