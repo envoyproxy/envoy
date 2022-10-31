@@ -305,9 +305,11 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       absl::string_view destination_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enableHalfClose(), options, source_address);
+                                                enableHalfClose(), options, source_address,
+                                                destination_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -389,7 +391,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
       deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
       validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_);
+      use_real_stats_, use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -468,38 +470,25 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-// Assuming logs are newline delineated, return the start index of the nth entry.
-// If there are not n entries, it will return file.length() (end of the string
-// index)
-size_t entryIndex(const std::string& file, uint32_t entry) {
-  size_t index = 0;
-  for (uint32_t i = 0; i < entry; ++i) {
-    index = file.find('\n', index);
-    if (index == std::string::npos || index == file.length()) {
-      return file.length();
-    }
-    ++index;
-  }
-  return index;
-}
-
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
                                                   bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
-    size_t index = entryIndex(contents, entry);
-    if (contents.length() > index) {
-      if (!allow_excess_entries) {
-        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
-            << "Waiting for entry " << entry << " but it was not the last entry";
-      }
-      return contents.substr(index);
+    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    if (entries.size() >= entry + 1) {
+      // Often test authors will waitForAccessLog() for multiple requests, and
+      // not increment the entry number for the second wait. Guard against that.
+      EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
+          << "Waiting for entry index " << entry << " but it was not the last entry as there were "
+          << entries.size() << "\n"
+          << contents;
+      return entries[entry];
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: ", contents));
+  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
   return "";
 }
 

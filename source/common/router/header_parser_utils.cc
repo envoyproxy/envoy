@@ -5,8 +5,14 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/router/header_parser.h"
 
+#include "re2/re2.h"
+
 namespace Envoy {
 namespace Router {
+static const re2::RE2& getMetadataTranslatorPattern() {
+  CONSTRUCT_ON_FIRST_USE(re2::RE2,
+                         R"EOF(%(UPSTREAM|DYNAMIC)_METADATA\(\s*(\[(?:.|\r?\n)+?\]\s*)\)%)EOF");
+}
 
 // Related to issue 20389. Header formatters are parsed and processed by formatters defined in
 // source/common/formatter/substitution_formatter.cc. For backwards compatibility UPSTREAM_METADATA
@@ -16,19 +22,17 @@ namespace Router {
 // format.
 // TODO(cpakulski): Eventually JSON format should be deprecated in favor of colon format.
 std::string HeaderParser::translateMetadataFormat(const std::string& header_value) {
-  const std::regex command_w_args_regex(
-      R"EOF(%(UPSTREAM|DYNAMIC)_METADATA\(\s*(\[(?:.|\r?\n)+?\]\s*)\)%)EOF");
-  std::smatch m;
+  const re2::RE2& re = getMetadataTranslatorPattern();
+  ASSERT(re.ok());
   std::string new_header_value = header_value;
-  while (std::regex_search(new_header_value, m, command_w_args_regex)) {
-    ASSERT(m.size() == 3);
-    std::vector<std::string> params;
+  re2::StringPiece json_array, metadata_type;
+  while (re.PartialMatch(new_header_value, re, &metadata_type, &json_array)) {
     std::string new_format;
     TRY_ASSERT_MAIN_THREAD {
-      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(m.str(2));
+      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(json_array.as_string());
 
-      // The given json string may be an invalid object.
-      if (!parsed_params) {
+      // The given json string may be an invalid object or with an empty object array.
+      if (parsed_params == nullptr || parsed_params->asObjectArray().empty()) {
         // return original value
         return new_header_value;
       }
@@ -37,15 +41,14 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
         new_format += ":" + parsed_params->asObjectArray()[i]->asString();
       }
 
-      new_format = "%" + m.str(1) + "_METADATA(" + new_format + ")%";
+      new_format = "%" + metadata_type.as_string() + "_METADATA(" + new_format + ")%";
 
       ENVOY_LOG_MISC(
           warn,
           "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
-          m.str(1) + "_METADATA", new_format.c_str());
+          metadata_type.as_string() + "_METADATA", new_format.c_str());
 
-      auto index = new_header_value.find(m.str(0));
-      new_header_value.replace(index, m.str(0).length(), new_format);
+      re2::RE2::Replace(&new_header_value, re, new_format);
     }
     END_TRY
     catch (Json::Exception& e) {
@@ -56,6 +59,10 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   return new_header_value;
 }
 
+static const re2::RE2& getPerRequestTranslatorPattern() {
+  CONSTRUCT_ON_FIRST_USE(re2::RE2, R"EOF(%PER_REQUEST_STATE\((.+?)\)%)EOF");
+}
+
 // Related to issue 20389.
 // Header's formatter PER_REQUEST_STATE(key) is equivalent to substitution
 // formatter FILTER_STATE(key:PLAIN). translatePerRequestState method
@@ -63,17 +70,16 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
 // TODO(cpakulski): eventually PER_REQUEST_STATE formatter should be deprecated in
 // favor of FILTER_STATE.
 std::string HeaderParser::translatePerRequestState(const std::string& header_value) {
-  const std::regex command_w_args_regex(R"EOF(%PER_REQUEST_STATE\((.+?)\)%)EOF");
-  std::smatch m;
+  const re2::RE2& re = getPerRequestTranslatorPattern();
+  ASSERT(re.ok());
   std::string new_header_value = header_value;
-  while (std::regex_search(new_header_value, m, command_w_args_regex)) {
-    ASSERT(m.size() == 2);
-    std::string new_format = "%FILTER_STATE(" + m.str(1) + ":PLAIN)%";
+  re2::StringPiece required_state;
+  while (re.PartialMatch(new_header_value, re, &required_state)) {
+    std::string new_format = "%FILTER_STATE(" + required_state.as_string() + ":PLAIN)%";
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
-    auto index = new_header_value.find(m.str(0));
-    new_header_value.replace(index, m.str(0).length(), new_format);
+    re2::RE2::Replace(&new_header_value, re, new_format);
   }
   return new_header_value;
 }

@@ -89,6 +89,7 @@ contributors to envoy-setec and relevant Slack channels from:
   * Eric Sesterhenn ([ericsesterhennx41](https://github.com/ericsesterhennx41))
   * Ralf Weinmann ([rpw-x41](https://github.com/rpw-x41))
   * Dr. Andre Vehreschild ([vehre-x41](https://github.com/vehre-x41))
+  * Robert Femmer ([robertfemmer](https://github.com/robertfemmer))
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) expiring 12/31/2022. Review fixes for OSS-Fuzz bugs.

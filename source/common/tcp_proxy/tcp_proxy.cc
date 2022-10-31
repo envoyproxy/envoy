@@ -6,6 +6,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
@@ -468,7 +469,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   }
 
   generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
-                                                      this, *upstream_callbacks_);
+                                                      this, *upstream_callbacks_, getStreamInfo());
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -542,12 +543,28 @@ const Router::MetadataMatchCriteria* Filter::metadataMatchCriteria() {
   }
 }
 
+ProtobufTypes::MessagePtr TunnelResponseHeaders::serializeAsProto() const {
+  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
+  response_headers_->iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
+    auto* new_header = proto_out->add_headers();
+    new_header->set_key(std::string(e.key().getStringView()));
+    new_header->set_value(std::string(e.value().getStringView()));
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return proto_out;
+}
+
+const std::string& TunnelResponseHeaders::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_headers");
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
         config_message,
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.use_post()),
-      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())) {
+      header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
+      propagate_response_headers_(config_message.propagate_response_headers()) {
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
       config_message.hostname());
@@ -560,6 +577,17 @@ std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream
                                *Http::StaticEmptyHeaders::get().response_headers,
                                *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
                                absl::string_view());
+}
+
+void TunnelingConfigHelperImpl::propagateResponseHeaders(
+    Http::ResponseHeaderMapPtr&& headers,
+    const StreamInfo::FilterStateSharedPtr& filter_state) const {
+  if (!propagate_response_headers_) {
+    return;
+  }
+  filter_state->setData(
+      TunnelResponseHeaders::key(), std::make_shared<TunnelResponseHeaders>(std::move(headers)),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 void Filter::onConnectTimeout() {
@@ -599,6 +627,8 @@ Network::FilterStatus Filter::onNewConnection() {
   route_ = pickRoute();
   return establishUpstreamConnection();
 }
+
+bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
