@@ -45,10 +45,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Get the project root directory (../../..).
-    project_root_dir = pathlib.PurePath(__file__).parent.parent.parent
+    project_root_dir = pathlib.Path(__file__).parent.parent.parent
 
     # Check if we have VERSION.txt available
-    current_version_file = pathlib.Path(project_root_dir, "VERSION.txt")
+    current_version_file = project_root_dir.joinpath("VERSION.txt")
     if not current_version_file.exists():
         print(
             "Failed to read VERSION.txt. "
@@ -71,9 +71,9 @@ if __name__ == "__main__":
     github_token = os.environ.get(args.github_api_token_env_name)
     if github_token != None:
         # To avoid rate-limited API calls.
-        commit_info_request.add_header("Authorization", "Bearer " + github_token)
-    response = urllib.request.urlopen(commit_info_request)
-    commit_info = json.loads(response.read())
-    source_version_file = pathlib.Path(project_root_dir, "SOURCE_VERSION")
-    # Write the extracted current version commit hash "sha" to SOURCE_VERSION.
-    source_version_file.write_text(commit_info["sha"])
+        commit_info_request.add_header("Authorization", f"Bearer {github_token}")
+    with urllib.request.urlopen(commit_info_request) as response:
+        commit_info = json.loads(response.read())
+        source_version_file = project_root_dir.joinpath("SOURCE_VERSION")
+        # Write the extracted current version commit hash "sha" to SOURCE_VERSION.
+        source_version_file.write_text(commit_info["sha"])
