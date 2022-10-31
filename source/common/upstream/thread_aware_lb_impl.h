@@ -156,6 +156,8 @@ private:
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
+    // Ignore the params for the thread-aware LB.
+    LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;
