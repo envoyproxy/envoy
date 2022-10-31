@@ -116,3 +116,18 @@ index f881c04..4e4f7df 100644
  // The annotation changed compiler output and increased binary size so disable
  // for official builds.
  // TODO(crbug.com/1320670): Remove when issue is resolved.
+
+# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11220 lands
+
+diff --git a/base/BUILD b/base/BUILD
+index 60ca578..6a793a6 100644
+--- a/base/BUILD
++++ b/base/BUILD
+@@ -55,6 +55,7 @@ cc_library(
+         "strings/string_number_conversions.h",
+         "strings/utf_string_conversions.h",
+         "strings/utf_string_conversion_utils.h",
++        "win/win_handle_types.h",
+     ] + build_config.strings_hdrs,
+     copts = build_config.default_copts,
+     textual_hdrs = [
