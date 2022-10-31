@@ -27,5 +27,10 @@ void IoUringFactoryImpl::onServerInitialized() {
 
 bool IoUringFactoryImpl::currentThreadRegistered() { return tls_.currentThreadRegistered(); }
 
+FileEventAdapter& IoUringFactoryImpl::getFileEventAdapter() {
+  auto ret = tls_.get();
+  return ret.ref().getFileEventAdapter();
+}
+
 } // namespace Io
 } // namespace Envoy

@@ -21,7 +21,7 @@ constexpr socklen_t udsAddressLength() { return sizeof(sa_family_t); }
 } // namespace
 
 IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size,
-                                                 const Io::IoUringFactory& io_uring_factory,
+                                                 Io::IoUringFactory& io_uring_factory,
                                                  os_fd_t fd, bool socket_v6only,
                                                  absl::optional<int> domain)
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
@@ -56,12 +56,6 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     ::close(fd_);
   }
   uring.submit();
-  if (isLeader()) {
-    if (uring.isEventfdRegistered()) {
-      uring.unregisterEventfd();
-    }
-    file_event_adapter_.reset();
-  }
   SET_SOCKET_INVALID(fd_);
   return Api::ioCallUint64ResultNoError();
 }
@@ -207,7 +201,7 @@ Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstShared
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::listen(int backlog) {
-  file_event_adapter_ = std::make_unique<FileEventAdapter>(io_uring_factory_);
+  is_listen_socket_ = true;
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
@@ -240,10 +234,8 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
     res = uring.prepareConnect(fd_, address, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare connect");
   }
-  if (isLeader()) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-  }
+  // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+  uring.submit();
   return Api::SysCallIntResult{0, SOCKET_ERROR_IN_PROGRESS};
 }
 
@@ -313,22 +305,11 @@ Address::InstanceConstSharedPtr IoUringSocketHandleImpl::peerAddress() {
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType trigger, uint32_t events) {
-  // Check if this is a server socket accepting new connections.
-  if (isLeader()) {
-    // Multiple listeners in single thread, there can be registered by other listener.
-    if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
-      file_event_adapter_->initialize(dispatcher, trigger, events);
-    }
+  io_uring_factory_.getFileEventAdapter().initialize(dispatcher, trigger, events);
+
+  if (is_listen_socket_) {
     addAcceptRequest();
     io_uring_factory_.get().ref().submit();
-    cb_ = std::move(cb);
-    return;
-  }
-
-  // Check if this is going to become a leading client socket.
-  if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
-    file_event_adapter_ = std::make_unique<FileEventAdapter>(io_uring_factory_);
-    file_event_adapter_->initialize(dispatcher, trigger, events);
   }
 
   cb_ = std::move(cb);
@@ -353,7 +334,10 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   }
 }
 
-void IoUringSocketHandleImpl::resetFileEvents() { file_event_adapter_.reset(); }
+void IoUringSocketHandleImpl::resetFileEvents() {
+  // This isn't right, we should reset the whole file event.
+  io_uring_factory_.getFileEventAdapter().reset();
+}
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
@@ -510,46 +494,6 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
   default:
     PANIC("not implemented");
   }
-}
-
-void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
-  Io::IoUring& uring = io_uring_factory_.get().ref();
-  uring.forEveryCompletion([](void* user_data, int32_t result) {
-    auto req = static_cast<Io::Request*>(user_data);
-
-    if (req->iov_) {
-      delete[] req->iov_;
-    }
-
-    if (result < 0) {
-      ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
-    }
-
-    // For close, there is no iohandle value, but need to fix
-    if (!req->io_uring_handler_.has_value()) {
-      ENVOY_LOG(debug, "no iohandle");
-      return;
-    }
-
-    req->io_uring_handler_->get().onRequestCompletion(*req, result);
-
-    delete req;
-  });
-  uring.submit();
-}
-
-void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& dispatcher,
-                                                           Event::FileTriggerType trigger,
-                                                           uint32_t) {
-  ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
-                                 "file descriptor. This is not allowed.");
-
-  Io::IoUring& uring = io_uring_factory_.get().ref();
-  const os_fd_t event_fd = uring.registerEventfd();
-  // We only care about the read event of Eventfd, since we only receive the
-  // event here.
-  file_event_ = dispatcher.createFileEvent(
-      event_fd, [this](uint32_t) { onFileEvent(); }, trigger, Event::FileReadyType::Read);
 }
 
 void IoUringSocketHandleImpl::addAcceptRequest() {

@@ -106,6 +106,14 @@ public:
   virtual IoUringResult submit() PURE;
 };
 
+class FileEventAdapter {
+public:
+    virtual ~FileEventAdapter() = default;
+    virtual void initialize(Event::Dispatcher& dispatcher,
+                    Event::FileTriggerType trigger, uint32_t events) PURE;
+    virtual void reset() PURE;
+};
+
 /**
  * Abstract factory for IoUring wrappers.
  */
@@ -117,6 +125,8 @@ public:
    * Returns an instance of IoUring for the current thread.
    */
   virtual OptRef<IoUring> get() const PURE;
+
+  virtual FileEventAdapter& getFileEventAdapter() PURE;
 
   /**
    * Initializes a factory upon server readiness. For example this method can be
@@ -132,6 +142,7 @@ public:
   virtual ~IoUringWorker() = default;
 
   virtual IoUring& get() PURE;
+  virtual FileEventAdapter& getFileEventAdapter() PURE;
 };
 
 class IoUringHandler;

@@ -21,7 +21,7 @@ using IoUringSocketHandleImplOptRef =
  */
 class IoUringSocketHandleImpl final : public IoHandle, public Io::IoUringHandler, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringSocketHandleImpl(const uint32_t read_buffer_size, const Io::IoUringFactory&,
+  IoUringSocketHandleImpl(const uint32_t read_buffer_size, Io::IoUringFactory&,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                           absl::optional<int> domain = absl::nullopt);
   ~IoUringSocketHandleImpl() override;
@@ -75,33 +75,11 @@ public:
   void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
-  // FileEventAdapter adapts `io_uring` to libevent.
-  class FileEventAdapter {
-  public:
-    FileEventAdapter(const Io::IoUringFactory& io_uring_factory)
-        : io_uring_factory_(io_uring_factory) {}
-    void initialize(Event::Dispatcher& dispatcher,
-                    Event::FileTriggerType trigger, uint32_t events);
-
-  private:
-    void onFileEvent();
-
-    const Io::IoUringFactory& io_uring_factory_;
-    Event::FileEventPtr file_event_{nullptr};
-  };
-
   void addAcceptRequest();
   void addReadRequest();
 
-  // Checks if the io handle is the one that registered eventfd with `io_uring`.
-  // An io handle can be a leader in two cases:
-  //   1. it's a server socket accepting new connections;
-  //   2. it's a client socket about to connect to a remote socket, but created
-  //      in a thread without properly initialized `io_uring`.
-  bool isLeader() const { return file_event_adapter_ != nullptr; }
-
   const uint32_t read_buffer_size_;
-  const Io::IoUringFactory& io_uring_factory_;
+  Io::IoUringFactory& io_uring_factory_;
   os_fd_t fd_;
   int socket_v6only_;
   const absl::optional<int> domain_;
@@ -113,7 +91,6 @@ private:
   bool is_read_enabled_{true};
   int32_t bytes_already_wrote_{0};
   bool is_write_added_{false};
-  std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
   bool remote_closed_{false};
 
   // For accept
@@ -121,6 +98,8 @@ private:
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
   bool is_accept_added_{false};
   os_fd_t connection_fd_{INVALID_SOCKET};
+
+  bool is_listen_socket_{false};
 };
 
 } // namespace Network

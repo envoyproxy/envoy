@@ -17,6 +17,7 @@ public:
   OptRef<IoUring> get() const override;
   void onServerInitialized() override;
   bool currentThreadRegistered() override;
+  FileEventAdapter& getFileEventAdapter() override;
 
 private:
   const uint32_t io_uring_size_{};
