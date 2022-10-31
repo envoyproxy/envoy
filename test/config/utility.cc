@@ -982,6 +982,8 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
+    std::cout << "CLUSTER HERE \n";
+    std::cout << MessageUtil::getYamlStringFromMessage(*cluster);
     if (cluster->type() == envoy::config::cluster::v3::Cluster::EDS) {
       eds_hosts = true;
     } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
@@ -994,9 +996,12 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
           auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+          std::cout << "WE ARE IN THERE";
           if (lb_endpoint->endpoint().address().has_socket_address()) {
+            std::cout << "1";
             if (lb_endpoint->endpoint().address().socket_address().port_value() == 0 ||
                 override_port_zero) {
+              std::cout << "2";
               RELEASE_ASSERT(ports.size() > port_idx, "");
               lb_endpoint->mutable_endpoint()
                   ->mutable_address()

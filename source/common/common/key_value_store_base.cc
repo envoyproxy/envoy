@@ -72,19 +72,18 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents) {
       uint64_t ttl_int;
       auto token = getToken(contents, error);
       if (!token.has_value()) {
-        ENVOY_LOG(warn, error);
+        ENVOY_LOG(warn, "Failed to read TTL token" + error);
         return false;
       }
-      if (absl::SimpleAtoi(token.value(), &ttl_int)) {
-        ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(ttl_int)) -
-            time_source_.systemTime()));
-        if (ttl <= std::chrono::seconds(0)) {
-          continue;
-        }
-      } else {
+      if (!absl::SimpleAtoi(token.value(), &ttl_int)) {
         ENVOY_LOG(warn, "TTL was read from disk but failed to convert to integer");
         return false;
+      }
+      ttl.emplace(std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(ttl_int)) -
+          time_source_.systemTime()));
+      if (ttl <= std::chrono::seconds(0)) {
+        continue;
       }
     }
     addOrUpdate(key.value(), value.value(), ttl);
