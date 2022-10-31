@@ -111,7 +111,7 @@ def envoy_cc_library(
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
-    if not (alwayslink):
+    if alwayslink == None:
         alwayslink = select({
             repository + "//bazel:disable_library_autolink": 0,
             "//conditions:default": 1,
