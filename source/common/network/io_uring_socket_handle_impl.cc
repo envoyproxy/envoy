@@ -136,6 +136,12 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
     return {0, Api::IoErrorPtr(new IoSocketError(bytes_to_read_), IoSocketError::deleteIoError)};
   }
 
+  if (bytes_to_write_ > 0) {
+    uint64_t len = bytes_to_write_;
+    bytes_to_write_ = 0;
+    return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  }
+
   struct iovec* iovecs = new struct iovec[num_slice];
   struct iovec* iov = iovecs;
   uint64_t num_slices_to_write = 0;
@@ -162,14 +168,8 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
     uring.submit();
   }
 
-  if (bytes_to_write_ == 0) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
-  }
-
-  uint64_t len = bytes_to_write_;
-  bytes_to_write_ = 0;
-  return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  return {
+      0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
