@@ -29,6 +29,7 @@ envoy_cc_test(
     srcs = ["header_utility_test.cc"],
     repository = "@envoy",
     deps = [
+        "//library/common/bridge:utility_lib",
         "//library/common/data:utility_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
