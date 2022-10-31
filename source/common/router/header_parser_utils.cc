@@ -26,8 +26,8 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   const re2::RE2& re = getMetadataTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  re2::StringPiece matches[4];
-  while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 4)) {
+  re2::StringPiece matches[3];
+  while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
     TRY_ASSERT_MAIN_THREAD {
       std::string new_format;
       Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(matches[2]));
