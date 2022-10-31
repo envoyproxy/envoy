@@ -68,10 +68,12 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
 }
 
 bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
+
 Api::IoCallUint64Result IoUringSocketHandleImpl::readv(uint64_t /* max_length */,
                                                        Buffer::RawSlice* slices,
                                                        uint64_t num_slice) {
-  if (read_buf_ == nullptr) {
+  if (bytes_to_read_ == 0 || read_buf_ == nullptr) {
+    addReadRequest();
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
@@ -105,6 +107,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
   }
 
   if (bytes_to_read_ == 0 || read_buf_ == nullptr) {
+    addReadRequest();
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
@@ -157,9 +160,6 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
     }
     // Need to ensure the write request submitted.
     uring.submit();
-    // Make the IO handle start reading to avoid read timeout in procedures out of Envoy's scope
-    // including handshaking of TLS.
-    addReadRequest();
   }
 
   if (bytes_to_write_ == 0) {
@@ -482,11 +482,18 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     }
     break;
   }
-  case RequestType::Connect:
+  case RequestType::Connect: {
     ASSERT(req.iohandle_.has_value());
-    req.iohandle_->get().cb_(result < 0 ? Event::FileReadyType::Closed
-                                        : Event::FileReadyType::Write);
+    auto& iohandle = req.iohandle_->get();
+    if (result < 0) {
+      iohandle.cb_(Event::FileReadyType::Closed);
+      break;
+    }
+
+    iohandle.cb_(Event::FileReadyType::Write);
+    iohandle.addReadRequest();
     break;
+  }
   case RequestType::Write: {
     ASSERT(req.iohandle_.has_value());
     auto& iohandle = req.iohandle_->get();
