@@ -176,8 +176,8 @@ message RateLimitQuotaResponse {
     //
     // **Restarting the subscription**
     //
-    // If a new request is matched into a bucket previously abandoned, the data plane must behave as if it has never tracked the bucket,
-    // and it's the first request matched into it:
+    // If a new request is matched into a bucket previously abandoned, the data plane must behave
+    // as if it has never tracked the bucket, and it's the first request matched into it:
     //
     // 1. The process of :ref:`subscription and reporting
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
@@ -187,8 +187,9 @@ message RateLimitQuotaResponse {
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
     //    state.
     //
-    // 3. Once the new assignment is received, it's applied per "Applying the first assignment to the bucket" section of
-    //    the :ref:`QuotaAssignmentAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`.
+    // 3. Once the new assignment is received, it's applied per
+    //    "Applying the first assignment to the bucket" section of the :ref:`QuotaAssignmentAction
+    //    <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`.
     message AbandonAction {
     }
 
@@ -201,7 +202,9 @@ message RateLimitQuotaResponse {
       // Apply the quota assignment to the bucket.
       //
       // Commands the data plane to apply a rate limiting strategy to the bucket.
-      // The process of applying and expiring the rate limiting strategy is detailed in the :ref:`QuotaAssignmentAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`
+      // The process of applying and expiring the rate limiting strategy is detailed in the
+      // :ref:`QuotaAssignmentAction
+      // <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`
       // message.
       QuotaAssignmentAction quota_assignment_action = 2;
 
