@@ -11,9 +11,11 @@ envoy_package()
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
+    shard_count = 1,
     # Posix signal tests are irrelevant to Windows
     tags = [
         "backtrace",
+        "exclusive",
         "skip_on_windows",
     ],
     deps = [
@@ -27,6 +29,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fatal_action_test",
     srcs = ["fatal_action_test.cc"],
+    shard_count = 1,
+    tags = ["exclusive"],
     deps = [
         "//source/common/signal:fatal_error_handler_lib",
         "//test/mocks/server:instance_mocks",
