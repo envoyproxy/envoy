@@ -27,6 +27,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // We can implement the interface of :ref:`StreamFilter <contrib.go_plugin_api.plugin.StreamFilter>`
 // API by the GO language to achieve the effects of Envoy native filter.
+//
+// The filter based on the `APIs implementation
+// <https://github.com/mosn/envoy-go-filter-samples/blob/master/simple/filter.go>`_ for details.
+//
 // Then put the GO plugin source code into the ${OUTPUT}/src/ directory with the name of the plugin
 // for GO plugin builds.
 // The following examples implement limit and auth GO plugins.
