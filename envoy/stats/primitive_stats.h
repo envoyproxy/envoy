@@ -26,7 +26,6 @@ public:
     pending_increment_ += amount;
   }
   void inc() { add(1); }
-  void reset() { value_ = 0; }
   uint64_t latch() { return pending_increment_.exchange(0); }
 
 private:

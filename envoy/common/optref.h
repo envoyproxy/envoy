@@ -68,18 +68,6 @@ template <class T> struct OptRef : public absl::optional<std::reference_wrapper<
     return nullptr;
   }
 
-  /**
-   * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
-   */
-  const T* ptr() const {
-    if (this->has_value()) {
-      const T& ref = **this;
-      return &ref;
-    }
-
-    return nullptr;
-  }
-
   T& ref() { return **this; }
 
   const T& ref() const { return **this; }

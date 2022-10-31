@@ -59,8 +59,6 @@ class Scope : public std::enable_shared_from_this<Scope> {
 public:
   virtual ~Scope() = default;
 
-  /** @return a shared_ptr for this */
-  ScopeSharedPtr getShared() { return shared_from_this(); }
   /** @return a const shared_ptr for this */
   ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 

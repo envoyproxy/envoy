@@ -68,8 +68,6 @@ public:
 
   const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
 
-  const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
-
 private:
   absl::variant<AddrInfoResponse, SrvResponse> response_;
 };

@@ -106,20 +106,6 @@ public:
   // Only tests have a legitimate need for this today.
   Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
-  // Makes an admin-console request by path, calling handler() when complete.
-  // The caller can initiate this from any thread, but it posts the request
-  // onto the main thread, so the handler is called asynchronously.
-  //
-  // This is designed to be called from downstream consoles, so they can access
-  // the admin console information stream without opening up a network port.
-  //
-  // This should only be called while run() is active; ensuring this is the
-  // responsibility of the caller.
-  void adminRequest(absl::string_view path_and_query, absl::string_view method,
-                    const MainCommonBase::AdminRequestFn& handler) {
-    base_.adminRequest(path_and_query, method, handler);
-  }
-
   static std::string hotRestartVersion(bool hot_restart_enabled);
 
   /**

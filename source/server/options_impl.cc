@@ -374,8 +374,6 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
   }
 }
 
-uint32_t OptionsImpl::count() const { return count_; }
-
 void OptionsImpl::logError(const std::string& error) { throw MalformedArgvException(error); }
 
 Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {

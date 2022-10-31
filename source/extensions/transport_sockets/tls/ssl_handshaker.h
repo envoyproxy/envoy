@@ -115,22 +115,18 @@ using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
   HandshakerFactoryContextImpl(Api::Api& api, const Server::Options& options,
-                               absl::string_view alpn_protocols,
-                               Singleton::Manager& singleton_manager)
-      : api_(api), options_(options), alpn_protocols_(alpn_protocols),
-        singleton_manager_(singleton_manager) {}
+                               absl::string_view alpn_protocols, Singleton::Manager&)
+      : api_(api), options_(options), alpn_protocols_(alpn_protocols) {}
 
   // HandshakerFactoryContext
   Api::Api& api() override { return api_; }
   const Server::Options& options() const override { return options_; }
   absl::string_view alpnProtocols() const override { return alpn_protocols_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 private:
   Api::Api& api_;
   const Server::Options& options_;
   const std::string alpn_protocols_;
-  Singleton::Manager& singleton_manager_;
 };
 
 class HandshakerFactoryImpl : public Ssl::HandshakerFactory {

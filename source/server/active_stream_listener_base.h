@@ -69,12 +69,6 @@ public:
   }
 
   /**
-   * @return const std::list<std::unique_ptr<ActiveTcpSocket>>& the sockets going through the
-   * listener filters.
-   */
-  const std::list<std::unique_ptr<ActiveTcpSocket>>& sockets() const { return sockets_; }
-
-  /**
    * Schedule removal and destruction of all active connections owned by a filter chain.
    */
   virtual void removeFilterChain(const Network::FilterChain* filter_chain) PURE;

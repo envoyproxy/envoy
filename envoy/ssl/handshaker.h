@@ -72,11 +72,6 @@ public:
   virtual ~HandshakerFactoryContext() = default;
 
   /**
-   * Returns the singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
    * @return reference to the server options
    */
   virtual const Server::Options& options() const PURE;

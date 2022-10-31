@@ -155,7 +155,6 @@ public:
   const std::vector<std::string>& disabledExtensions() const override {
     return disabled_extensions_;
   }
-  uint32_t count() const;
   const std::string& socketPath() const override { return socket_path_; }
   mode_t socketMode() const override { return socket_mode_; }
 
