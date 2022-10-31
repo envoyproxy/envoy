@@ -134,5 +134,23 @@ public:
   virtual IoUring& get() PURE;
 };
 
+class IoUringHandler;
+
+enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
+
+struct Request {
+  absl::optional<std::reference_wrapper<IoUringHandler>> io_uring_handler_{absl::nullopt};
+  RequestType type_{RequestType::Unknown};
+  struct iovec* iov_{nullptr};
+  os_fd_t fd_{-1};
+  std::unique_ptr<uint8_t[]> buf_{};
+};
+
+class IoUringHandler {
+public:
+  virtual ~IoUringHandler() = default;
+  virtual void onRequestCompletion(const Request& req, int32_t result) PURE;
+};
+
 } // namespace Io
 } // namespace Envoy

@@ -39,7 +39,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   auto& uring = io_uring_factory_.get().ref();
   if (read_req_) {
-    auto req = new Request{*this, RequestType::Cancel};
+    auto req = new Io::Request{*this, Io::RequestType::Cancel};
     auto res = uring.prepareCancel(read_req_, req);
     if (res == Io::IoUringResult::Failed) {
       // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
@@ -49,7 +49,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     }
   }
 
-  auto req = new Request{absl::nullopt, RequestType::Close};
+  auto req = new Io::Request{absl::nullopt, Io::RequestType::Close};
   auto res = uring.prepareClose(fd_, req);
   if (res == Io::IoUringResult::Failed) {
     // Fall back to posix system call.
@@ -145,7 +145,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 
   if (num_slices_to_write > 0) {
     is_write_added_ = true; // don't add WRITE if it's been already added.
-    auto req = new Request{*this, RequestType::Write, iovecs};
+    auto req = new Io::Request{*this, Io::RequestType::Write, iovecs};
     auto& uring = io_uring_factory_.get().ref();
     auto res = uring.prepareWritev(fd_, iovecs, num_slice, 0, req);
     if (res == Io::IoUringResult::Failed) {
@@ -230,7 +230,7 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
   auto& uring = io_uring_factory_.get().ref();
-  auto req = new Request{*this, RequestType::Connect};
+  auto req = new Io::Request{*this, Io::RequestType::Connect};
   auto res = uring.prepareConnect(fd_, address, req);
   if (res == Io::IoUringResult::Failed) {
     res = uring.submit();
@@ -364,13 +364,14 @@ void IoUringSocketHandleImpl::addReadRequest() {
     return;
   }
 
-  read_req_ = new Request{*this, RequestType::Read};
+  read_req_ = new Io::Request{*this, Io::RequestType::Read};
   read_req_->buf_ = std::make_unique<uint8_t[]>(read_buffer_size_);
   read_req_->iov_ = new struct iovec[1];
   read_req_->iov_->iov_base = read_req_->buf_.get();
   read_req_->iov_->iov_len = read_buffer_size_;
   auto& uring = io_uring_factory_.get().ref();
   auto res = uring.prepareReadv(fd_, read_req_->iov_, 1, 0, read_req_);
+
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     uring.submit();
@@ -431,14 +432,14 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
   return selected_interface_name;
 }
 
-void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
+void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
                                                   int32_t result) {
   if (result < 0) {
     ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
   }
 
   switch (req.type_) {
-  case RequestType::Accept:
+  case Io::RequestType::Accept:
     // This is hacky fix, we should check the req is valid or not.
     if (fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
@@ -452,7 +453,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
       cb_(Event::FileReadyType::Read);
     }
     break;
-  case RequestType::Read: {
+  case Io::RequestType::Read: {
     // Read is cancellable.
     if (result == -ECANCELED) {
       return;
@@ -470,7 +471,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
     }
     if (result > 0) {
       Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-          const_cast<Request&>(req).buf_.release(), result,
+          const_cast<Io::Request&>(req).buf_.release(), result,
           [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
             delete[] reinterpret_cast<const uint8_t*>(data);
             delete this_fragment;
@@ -480,7 +481,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
     cb_(Event::FileReadyType::Read);
     break;
   }
-  case RequestType::Connect: {
+  case Io::RequestType::Connect: {
     if (result < 0) {
       cb_(Event::FileReadyType::Closed);
       return;
@@ -490,7 +491,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
     addReadRequest();
     break;
   }
-  case RequestType::Write: {
+  case Io::RequestType::Write: {
     // This is hacky fix, we should check the req is valid or not.
     if (fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
@@ -502,9 +503,9 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
     cb_(Event::FileReadyType::Write);
     break;
   }
-  case RequestType::Close:
+  case Io::RequestType::Close:
     break;
-  case RequestType::Cancel:
+  case Io::RequestType::Cancel:
     break;
   default:
     PANIC("not implemented");
@@ -514,7 +515,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
   Io::IoUring& uring = io_uring_factory_.get().ref();
   uring.forEveryCompletion([](void* user_data, int32_t result) {
-    auto req = static_cast<Request*>(user_data);
+    auto req = static_cast<Io::Request*>(user_data);
 
     if (req->iov_) {
       delete[] req->iov_;
@@ -525,12 +526,13 @@ void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
     }
 
     // For close, there is no iohandle value, but need to fix
-    if (!req->iohandle_.has_value()) {
+    if (!req->io_uring_handler_.has_value()) {
       ENVOY_LOG(debug, "no iohandle");
       return;
     }
-    req->iohandle_->get().onRequestCompletion(*req, result);
-  
+
+    req->io_uring_handler_->get().onRequestCompletion(*req, result);
+
     delete req;
   });
   uring.submit();
@@ -553,7 +555,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
 void IoUringSocketHandleImpl::addAcceptRequest() {
   is_accept_added_ = true;
   auto& uring = io_uring_factory_.get().ref();
-  auto req = new Request{*this, RequestType::Accept, nullptr, fd_};
+  auto req = new Io::Request{*this, Io::RequestType::Accept, nullptr, fd_};
   auto res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.

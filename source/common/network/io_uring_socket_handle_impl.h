@@ -13,23 +13,13 @@ namespace Network {
 
 class IoUringSocketHandleImpl;
 
-enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
-
 using IoUringSocketHandleImplOptRef =
     absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
-
-struct Request {
-  IoUringSocketHandleImplOptRef iohandle_{absl::nullopt};
-  RequestType type_{RequestType::Unknown};
-  struct iovec* iov_{nullptr};
-  os_fd_t fd_{-1};
-  std::unique_ptr<uint8_t[]> buf_{};
-};
 
 /**
  * IoHandle derivative for sockets.
  */
-class IoUringSocketHandleImpl final : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
+class IoUringSocketHandleImpl final : public IoHandle, public Io::IoUringHandler, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringSocketHandleImpl(const uint32_t read_buffer_size, const Io::IoUringFactory&,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
@@ -81,6 +71,9 @@ public:
   absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
   absl::optional<std::string> interfaceName() override;
 
+  // IoUringHandler
+  void onRequestCompletion(const Io::Request& req, int32_t result) override;
+
 private:
   // FileEventAdapter adapts `io_uring` to libevent.
   class FileEventAdapter {
@@ -99,7 +92,6 @@ private:
 
   void addAcceptRequest();
   void addReadRequest();
-  void onRequestCompletion(const Request& req, int32_t result);
 
   // Checks if the io handle is the one that registered eventfd with `io_uring`.
   // An io handle can be a leader in two cases:
@@ -117,7 +109,7 @@ private:
   Event::FileReadyCb cb_;
   Buffer::OwnedImpl read_buf_;
   int32_t bytes_to_read_{0};
-  Request* read_req_{nullptr};
+  Io::Request* read_req_{nullptr};
   bool is_read_enabled_{true};
   int32_t bytes_already_wrote_{0};
   bool is_write_added_{false};
