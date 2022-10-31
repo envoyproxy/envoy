@@ -18,7 +18,8 @@ envoy_error_code_t errorCodeFromLocalStatus(Http::Code status);
 template <class T> envoy_map makeEnvoyMap(const T& map) {
   envoy_map new_map;
   new_map.length = std::size(map);
-  new_map.entries = new envoy_map_entry[std::size(map)];
+  new_map.entries =
+      static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * std::size(map)));
 
   uint64_t i = 0;
   for (const auto& e : map) {
