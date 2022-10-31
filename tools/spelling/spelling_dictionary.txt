@@ -28,7 +28,6 @@ BSON
 BPF
 Bdecoded
 Bencoded
-Dso
 GiB
 Repick
 SION
@@ -162,7 +161,6 @@ delims
 dereferencing
 differentially
 dnsresolvers
-dso
 endpos
 fo
 ghi
@@ -237,7 +235,6 @@ hls
 integrations
 jkl
 lang
-libgo
 libsxg
 LLVM
 LPT
