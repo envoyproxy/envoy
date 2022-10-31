@@ -10,6 +10,7 @@
 
 import argparse
 import json
+import os
 import pathlib
 import sys
 import urllib.request
@@ -21,6 +22,14 @@ if __name__ == "__main__":
         dest="skip_error_in_git",
         help="Skip returning error on exit when the current directory is a git repository.",
         action="store_true")
+    parser.add_argument(
+        "--github_api_token_env_name",
+        dest="github_api_token_env_name",
+        help="The system environment variable name that holds GitHub API token. "
+        "This is advisable to provide this to avoid rate-limited calls.",
+        type=str,
+        action="store",
+        default="GITHUB_TOKEN")
     args = parser.parse_args()
 
     # Simple check if a .git directory exists. When we are in a Git repo, we should rely on git.
@@ -35,8 +44,11 @@ if __name__ == "__main__":
             sys.exit(0)
         sys.exit(1)
 
+    # Get the project root directory (../../..).
+    project_root_dir = pathlib.Path(__file__).parent.parent.parent
+
     # Check if we have VERSION.txt available
-    current_version_file = pathlib.Path("VERSION.txt")
+    current_version_file = project_root_dir.joinpath("VERSION.txt")
     if not current_version_file.exists():
         print(
             "Failed to read VERSION.txt. "
@@ -54,9 +66,14 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Fetch the current version commit information from GitHub.
-    with urllib.request.urlopen("https://api.github.com/repos/envoyproxy/envoy/commits/v"
-                                + current_version) as response:
+    commit_info_request = urllib.request.Request(
+        "https://api.github.com/repos/envoyproxy/envoy/commits/v" + current_version)
+    github_token = os.environ.get(args.github_api_token_env_name)
+    if github_token != None:
+        # To avoid rate-limited API calls.
+        commit_info_request.add_header("Authorization", f"Bearer {github_token}")
+    with urllib.request.urlopen(commit_info_request) as response:
         commit_info = json.loads(response.read())
-        source_version_file = pathlib.Path("SOURCE_VERSION")
+        source_version_file = project_root_dir.joinpath("SOURCE_VERSION")
         # Write the extracted current version commit hash "sha" to SOURCE_VERSION.
         source_version_file.write_text(commit_info["sha"])

@@ -5,6 +5,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: cache_filter
+  change: |
+    add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
+- area: oauth2
+  change: |
+    Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -14,10 +20,16 @@ bug_fixes:
 - area: router
   change: |
     fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
+- area: oauth2
+  change: |
+    fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+  - area: eds
+    change: |
+      removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
   - area: listener
     change: |
       removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
@@ -35,8 +47,12 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
   - area: http
     change: |
+      removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
       removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
       removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+  - area: http
+    change: |
+      removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
 - area: generic_proxy
@@ -46,7 +62,9 @@ new_features:
 - area: upstream
   change: |
     added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
-
+- area: thrift
+  change: |
+    added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
