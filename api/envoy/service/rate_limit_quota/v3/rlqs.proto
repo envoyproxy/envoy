@@ -126,7 +126,7 @@ message RateLimitQuotaResponse {
     //   the current bucket assignment is ``expired``, the data plane must immediately
     //   end the current assignment, report the bucket usage, and apply the new assignment.
     //   The new assignment becomes bucket's ``active`` assignment.
-    // `` If the rate limiting strategy is the same as the bucket's ``active`` (not ``expired``)
+    // * If the rate limiting strategy is the same as the bucket's ``active`` (not ``expired``)
     //   assignment, the data plane should extend the duration of the ``active`` assignment
     //   for the duration of the new assignment provided in the :ref:`assignment_time_to_live
     //   <envoy_v3_api_field_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction.assignment_time_to_live>`
@@ -156,7 +156,6 @@ message RateLimitQuotaResponse {
       google.protobuf.Duration assignment_time_to_live = 2 [(validate.rules).duration = {gte {}}];
 
       // Configures the local rate limiter for the request matched to the bucket.
-      //
       // If not set, allow all requests.
       type.v3.RateLimitStrategy rate_limit_strategy = 3;
     }
@@ -188,9 +187,8 @@ message RateLimitQuotaResponse {
     //    <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
     //    state.
     //
-    // 3. Once the new assignment is received, it's applied per
-    //    "Applying the first assignment to the bucket" section of the :ref:`QuotaAssignmentAction
-    //    <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`.
+    // 3. Once the new assignment is received, it's applied per "Applying the first assignment to the bucket" section of
+    //    the :ref:`QuotaAssignmentAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`.
     message AbandonAction {
     }
 
@@ -203,9 +201,7 @@ message RateLimitQuotaResponse {
       // Apply the quota assignment to the bucket.
       //
       // Commands the data plane to apply a rate limiting strategy to the bucket.
-      // The process of applying and expiring the rate limiting strategy is detailed in the
-      // :ref:`QuotaAssignmentAction
-      // <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`
+      // The process of applying and expiring the rate limiting strategy is detailed in the :ref:`QuotaAssignmentAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction>`
       // message.
       QuotaAssignmentAction quota_assignment_action = 2;
 
@@ -244,7 +240,6 @@ message RateLimitQuotaResponse {
 // .. note::
 //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
 //   ``{ b: 'B', a: 'A' }`` are identical.
-//
 message BucketId {
   map<string, string> bucket = 1 [(validate.rules).map = {
     min_pairs: 1
