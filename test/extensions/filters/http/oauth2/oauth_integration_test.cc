@@ -401,6 +401,13 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
   test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 
   doAuthenticationFlow("token_secret", "hmac_secret");
+  if (lds_connection_ != nullptr) {
+    AssertionResult result = lds_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = lds_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    lds_connection_.reset();
+  }
 }
 class OauthIntegrationTestWithBasicAuth : public OauthIntegrationTest {
   void setOauthConfig() override {

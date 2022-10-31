@@ -47,6 +47,7 @@ private:
     LbFactory(const Upstream::HostSharedPtr& host) : host_(host) {}
 
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(host_); }
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
     const Upstream::HostSharedPtr host_;
   };
@@ -62,10 +63,9 @@ public:
     return Envoy::ProtobufTypes::MessagePtr{new ::test::integration::custom_lb::CustomLbConfig()};
   }
 
-  Upstream::ThreadAwareLoadBalancerPtr
-  create(const Upstream::PrioritySet&, Upstream::ClusterStats&, Stats::Scope&, Runtime::Loader&,
-         Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy&) override {
+  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo&,
+                                              const Upstream::PrioritySet&, Runtime::Loader&,
+                                              Random::RandomGenerator&, TimeSource&) override {
     return std::make_unique<ThreadAwareLbImpl>();
   }
 };

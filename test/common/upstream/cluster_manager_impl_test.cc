@@ -1132,8 +1132,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().typed_extension_config().name(),
-            "envoy.load_balancers.custom_lb");
+  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
