@@ -511,28 +511,26 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
   }
 }
 
-void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Request& req,
-                                                                    int32_t result) {
-  if (result < 0) {
-    ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
-  }
-
-  // For close, there is no iohandle value, but need to fix
-  if (!req.iohandle_.has_value()) {
-    ENVOY_LOG(debug, "no iohandle");
-    return;
-  }
-  req.iohandle_->get().onRequestCompletion(req, result);
-}
-
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
   Io::IoUring& uring = io_uring_factory_.get().ref();
-  uring.forEveryCompletion([this](void* user_data, int32_t result) {
+  uring.forEveryCompletion([](void* user_data, int32_t result) {
     auto req = static_cast<Request*>(user_data);
-    onRequestCompletion(*req, result);
+
     if (req->iov_) {
       delete[] req->iov_;
     }
+
+    if (result < 0) {
+      ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
+    }
+
+    // For close, there is no iohandle value, but need to fix
+    if (!req->iohandle_.has_value()) {
+      ENVOY_LOG(debug, "no iohandle");
+      return;
+    }
+    req->iohandle_->get().onRequestCompletion(*req, result);
+  
     delete req;
   });
   uring.submit();

@@ -92,7 +92,6 @@ private:
 
   private:
     void onFileEvent();
-    void onRequestCompletion(const Request& req, int32_t result);
 
     const Io::IoUringFactory& io_uring_factory_;
     Event::FileEventPtr file_event_{nullptr};
