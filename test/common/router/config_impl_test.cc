@@ -9314,7 +9314,6 @@ virtual_hosts:
       EnvoyException, "path_match_policy.path_template /rest/{on==e}/{two} is invalid");
 }
 
-
 TEST_F(RouteMatcherTest, PatternMatchInvalidPlacedWildcard) {
   const std::string yaml = R"EOF(
 virtual_hosts:
