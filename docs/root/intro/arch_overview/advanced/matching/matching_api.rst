@@ -86,6 +86,18 @@ are available in some contexts:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
 
+Matching actions
+################
+
+The action in the matcher framework typically refers to the selected resource by name.
+
+Network filter chain matching supports the following extensions:
+
+.. _extension_envoy.matching.actions.format_string:
+
+* :ref:`Format string action <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>` computes the filter chain name
+  from the connection dynamic metadata and its filter state.
+
 Filter Integration
 ##################
 

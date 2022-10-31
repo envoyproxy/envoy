@@ -100,13 +100,14 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
-using FilterChainActionFactoryContext =
-    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
 
 class FilterChainBaseAction : public virtual Matcher::Action {
 public:
   virtual ~FilterChainBaseAction() = default;
-  virtual const Network::FilterChain* get() const PURE;
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
 };
 
 class FilterChainImpl : public Network::DrainableFilterChain {
@@ -404,6 +405,9 @@ private:
 
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
+
+  // Index filter chains by name, used by the matcher actions.
+  FilterChainsByName filter_chains_by_name_;
 };
 } // namespace Server
 } // namespace Envoy
