@@ -404,7 +404,8 @@ TEST(TestConfig, AddPlatformFilter) {
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
-TEST(TestConfig, StringAccessors) {
+// TODO(RyanTheOptimist): This test seems to be flaky. #2641
+TEST(TestConfig, DISABLED_StringAccessors) {
   std::string name("accessor_name");
   EngineBuilder engine_builder;
   std::string data_string = "envoy string";
