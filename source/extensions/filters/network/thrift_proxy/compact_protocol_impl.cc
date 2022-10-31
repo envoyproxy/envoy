@@ -112,14 +112,18 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
     return false;
   }
 
+  validateFieldId(id);
+  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
+  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
+  return true;
+}
+
+void CompactProtocolImpl::validateFieldId(int32_t id) {
   if ((id < 0 && !Runtime::runtimeFeatureEnabled(
                      "envoy.reloadable_features.thrift_allow_negative_field_ids")) ||
       id < std::numeric_limits<int16_t>::min() || id > std::numeric_limits<int16_t>::max()) {
     throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
   }
-  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
-  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
-  return true;
 }
 
 bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
@@ -179,12 +183,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    if ((id < 0 && !Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.thrift_allow_negative_field_ids")) ||
-        id < std::numeric_limits<int16_t>::min() || id > std::numeric_limits<int16_t>::max()) {
-      throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
-    }
-
+    validateFieldId(id);
     compact_field_type = static_cast<CompactFieldType>(delta_and_type);
     compact_field_id = static_cast<int16_t>(id);
   } else {
