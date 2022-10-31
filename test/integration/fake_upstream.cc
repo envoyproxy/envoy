@@ -333,19 +333,10 @@ public:
                              headers_with_underscores_action) {}
 
   void updateConcurrentStreams(uint32_t max_streams) {
-    int rc;
-    if (use_new_codec_wrapper_) {
-      absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
-      settings.insert(settings.end(), {{http2::adapter::MAX_CONCURRENT_STREAMS, max_streams}});
-      adapter_->SubmitSettings(settings);
-      rc = adapter_->Send();
-    } else {
-      absl::InlinedVector<nghttp2_settings_entry, 1> settings;
-      settings.insert(settings.end(), {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, max_streams}});
-      rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, settings.data(), settings.size());
-      ASSERT(rc == 0);
-      rc = nghttp2_session_send(session_);
-    }
+    absl::InlinedVector<http2::adapter::Http2Setting, 1> settings;
+    settings.push_back({http2::adapter::MAX_CONCURRENT_STREAMS, max_streams});
+    adapter_->SubmitSettings(settings);
+    const int rc = adapter_->Send();
     ASSERT(rc == 0);
   }
 };
