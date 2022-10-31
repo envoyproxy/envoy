@@ -189,7 +189,7 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   }
 
   // Check if there is an active transaction that needs to be closed.
-  if (transaction_.should_close_) {
+  if (transaction_.should_close_ && pending_requests_.empty()) {
     transaction_.close();
   }
 }

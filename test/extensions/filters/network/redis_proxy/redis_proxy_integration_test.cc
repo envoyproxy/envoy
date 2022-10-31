@@ -1317,6 +1317,28 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransa
   redis_client->close();
 }
 
+// This test verifies that a transaction can be pipelined.
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 1> fake_upstream_connection;
+  std::string transaction_commands =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
+      makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(transaction_commands));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], transaction_commands, response,
+                                fake_upstream_connection[0]);
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  redis_client->close();
+}
+
 // TODO: Add full transaction test.
 
 } // namespace
