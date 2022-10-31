@@ -8,17 +8,31 @@
 # Note: This script can only be executed from project root directory of an extracted "release"
 # tarball.
 
+import argparse
 import json
 import pathlib
 import sys
 import urllib.request
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Write current source version")
+    parser.add_argument(
+        "--skip_error_in_git",
+        dest="skip_error_in_git",
+        help="Skip returning error on exit when the current directory is a git repository.",
+        action="store_true")
+    args = parser.parse_args()
+
     # Simple check if a .git directory exists. When we are in a Git repo, we should rely on git.
     if pathlib.Path(".git").exists():
         print(
             "Failed to create SOURCE_VERSION. "
             "Run this script from an extracted release tarball directory.")
+        if args.skip_error_in_git:
+            # We can optionally "silent" the error and the workspace status check will be done using
+            # git instead.
+            print("Workspace status check will be done using git.")
+            sys.exit(0)
         sys.exit(1)
 
     # Check if we have VERSION.txt available

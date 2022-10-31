@@ -873,11 +873,10 @@ public:
   }
 
   /**
-   * @return const envoy::config::cluster::v3::LoadBalancingPolicy_Policy& the load balancing policy
-   * to use for this cluster.
+   * @return const ProtobufWkt::Message& the validated load balancing policy configuration to use
+   * for this cluster.
    */
-  virtual const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
-  loadBalancingPolicy() const PURE;
+  virtual const ProtobufTypes::MessagePtr& loadBalancingPolicy() const PURE;
 
   /**
    * @return the load balancer factory for this cluster if the load balancing type is

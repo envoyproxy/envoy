@@ -198,7 +198,7 @@ request_rules:
 }
 
 /**
- * Test the value gets written as a number.
+ * Test the invalid value won't get written as a number.
  */
 TEST_F(HeaderToMetadataTest, NumberTypeTest) {
   const std::string request_config_yaml = R"EOF(

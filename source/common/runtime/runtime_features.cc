@@ -33,7 +33,6 @@ RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
 RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
-RUNTIME_GUARD(envoy_reloadable_features_append_to_accept_content_encoding_only_once);
 RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
 RUNTIME_GUARD(envoy_reloadable_features_closer_shadow_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_combine_sds_requests);
@@ -41,15 +40,12 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_new_stream_with_early_data_and_http3);
 RUNTIME_GUARD(envoy_reloadable_features_correct_remote_address);
 RUNTIME_GUARD(envoy_reloadable_features_delta_xds_subscription_state_tracking_fix);
-RUNTIME_GUARD(envoy_reloadable_features_deprecate_global_ints);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_await_headers_on_upstream_timeout_to_emit_stats);
 RUNTIME_GUARD(envoy_reloadable_features_do_not_count_mapped_pages_as_free);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
 RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
-RUNTIME_GUARD(envoy_reloadable_features_http1_lazy_read_disable);
 RUNTIME_GUARD(envoy_reloadable_features_http2_delay_keepalive_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_http2_new_codec_wrapper);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
 RUNTIME_GUARD(envoy_reloadable_features_http_100_continue_case_insensitive);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -61,13 +57,10 @@ RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
-RUNTIME_GUARD(envoy_reloadable_features_override_request_timeout_by_gateway_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_skip_delay_close);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
-RUNTIME_GUARD(envoy_reloadable_features_strict_check_on_ipv4_compat);
-RUNTIME_GUARD(envoy_reloadable_features_support_locality_update_on_eds_cluster_endpoints);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_top_level_ecds_stats);
@@ -90,7 +83,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams)
 // TODO(rgs1): Make this enabled after Pinterest tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
-// Requires envoy_reloadable_features_http2_new_codec_wrapper to be enabled.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // TODO(bencebeky): Finish BalsaParser implementation, then enable by default. See issue #21245.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
@@ -215,16 +207,8 @@ void maybeSetDeprecatedInts(absl::string_view name, uint32_t value) {
     return;
   }
 
-  // DO NOT ADD MORE FLAGS HERE. This function deprecated and being removed.
-  if (name == "envoy.http.headermap.lazy_map_min_size") {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.deprecate_global_ints")) {
-      IS_ENVOY_BUG(absl::StrCat(
-          "The Envoy community is attempting to remove global integers. Given you use ", name,
-          " please immediately file an upstream issue to retain the functionality as it will "
-          "otherwise be removed following the usual deprecation cycle."));
-    }
-    absl::SetFlag(&FLAGS_envoy_headermap_lazy_map_min_size, value);
-  } else if (name == "re2.max_program_size.error_level") {
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated.
+  else if (name == "re2.max_program_size.error_level") {
     absl::SetFlag(&FLAGS_re2_max_program_size_error_level, value);
   } else if (name == "re2.max_program_size.warn_level") {
     absl::SetFlag(&FLAGS_re2_max_program_size_warn_level, value);
