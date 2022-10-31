@@ -87,7 +87,7 @@ private:
   public:
     FileEventAdapter(const Io::IoUringFactory& io_uring_factory)
         : io_uring_factory_(io_uring_factory) {}
-    void initialize(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+    void initialize(Event::Dispatcher& dispatcher,
                     Event::FileTriggerType trigger, uint32_t events);
 
   private:
@@ -95,12 +95,13 @@ private:
     void onRequestCompletion(const Request& req, int32_t result);
 
     const Io::IoUringFactory& io_uring_factory_;
-    Event::FileReadyCb cb_;
     Event::FileEventPtr file_event_{nullptr};
   };
 
   void addAcceptRequest();
   void addReadRequest();
+  void onRequestCompletion(const Request& req, int32_t result);
+
   // Checks if the io handle is the one that registered eventfd with `io_uring`.
   // An io handle can be a leader in two cases:
   //   1. it's a server socket accepting new connections;

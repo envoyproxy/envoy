@@ -317,17 +317,18 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   if (isLeader()) {
     // Multiple listeners in single thread, there can be registered by other listener.
     if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
-      file_event_adapter_->initialize(dispatcher, cb, trigger, events);
+      file_event_adapter_->initialize(dispatcher, trigger, events);
     }
     addAcceptRequest();
     io_uring_factory_.get().ref().submit();
+    cb_ = std::move(cb);
     return;
   }
 
   // Check if this is going to become a leading client socket.
   if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
     file_event_adapter_ = std::make_unique<FileEventAdapter>(io_uring_factory_);
-    file_event_adapter_->initialize(dispatcher, cb, trigger, events);
+    file_event_adapter_->initialize(dispatcher, trigger, events);
   }
 
   cb_ = std::move(cb);
@@ -430,25 +431,24 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
   return selected_interface_name;
 }
 
-void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Request& req,
-                                                                    int32_t result) {
+void IoUringSocketHandleImpl::onRequestCompletion(const Request& req,
+                                                  int32_t result) {
   if (result < 0) {
     ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
   }
 
   switch (req.type_) {
   case RequestType::Accept:
-    ASSERT(req.iohandle_.has_value());
     // This is hacky fix, we should check the req is valid or not.
-    if (req.iohandle_->get().fd_ == -1) {
+    if (fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       break;
     }
 
-    ASSERT(!SOCKET_VALID(req.iohandle_->get().connection_fd_));
-    req.iohandle_->get().addAcceptRequest();
+    ASSERT(!SOCKET_VALID(connection_fd_));
+    addAcceptRequest();
     if (result >= 0) {
-      req.iohandle_->get().connection_fd_ = result;
+      connection_fd_ = result;
       cb_(Event::FileReadyType::Read);
     }
     break;
@@ -457,17 +457,16 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
     if (result == -ECANCELED) {
       return;
     }
-    ASSERT(req.iohandle_.has_value());
-    auto& iohandle = req.iohandle_->get();
+
     // This is hacky fix, we should check the req is valid or not.
-    if (iohandle.fd_ == -1) {
+    if (fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       return;
     }
 
-    iohandle.bytes_to_read_ = result;
+    bytes_to_read_ = result;
     if (result == 0) {
-      iohandle.remote_closed_ = true;
+      remote_closed_ = true;
     }
     if (result > 0) {
       Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
@@ -476,35 +475,31 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
             delete[] reinterpret_cast<const uint8_t*>(data);
             delete this_fragment;
           });
-      iohandle.read_buf_.addBufferFragment(*fragment);
+      read_buf_.addBufferFragment(*fragment);
     }
-    iohandle.cb_(Event::FileReadyType::Read);
+    cb_(Event::FileReadyType::Read);
     break;
   }
   case RequestType::Connect: {
-    ASSERT(req.iohandle_.has_value());
-    auto& iohandle = req.iohandle_->get();
     if (result < 0) {
-      iohandle.cb_(Event::FileReadyType::Closed);
+      cb_(Event::FileReadyType::Closed);
       return;
     }
 
-    iohandle.cb_(Event::FileReadyType::Write);
-    iohandle.addReadRequest();
+    cb_(Event::FileReadyType::Write);
+    addReadRequest();
     break;
   }
   case RequestType::Write: {
-    ASSERT(req.iohandle_.has_value());
-    auto& iohandle = req.iohandle_->get();
     // This is hacky fix, we should check the req is valid or not.
-    if (iohandle.fd_ == -1) {
+    if (fd_ == -1) {
       ENVOY_LOG_MISC(debug, "the uring's fd already closed");
       return;
     }
 
-    iohandle.bytes_already_wrote_ = result;
-    iohandle.is_write_added_ = false;
-    iohandle.cb_(Event::FileReadyType::Write);
+    bytes_already_wrote_ = result;
+    is_write_added_ = false;
+    cb_(Event::FileReadyType::Write);
     break;
   }
   case RequestType::Close:
@@ -514,6 +509,20 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
   default:
     PANIC("not implemented");
   }
+}
+
+void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Request& req,
+                                                                    int32_t result) {
+  if (result < 0) {
+    ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
+  }
+
+  // For close, there is no iohandle value, but need to fix
+  if (!req.iohandle_.has_value()) {
+    ENVOY_LOG(debug, "no iohandle");
+    return;
+  }
+  req.iohandle_->get().onRequestCompletion(req, result);
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
@@ -530,13 +539,11 @@ void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& dispatcher,
-                                                           Event::FileReadyCb cb,
                                                            Event::FileTriggerType trigger,
                                                            uint32_t) {
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                  "file descriptor. This is not allowed.");
 
-  cb_ = std::move(cb);
   Io::IoUring& uring = io_uring_factory_.get().ref();
   const os_fd_t event_fd = uring.registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
