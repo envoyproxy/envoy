@@ -52,6 +52,7 @@ removed_config_or_runtime:
       removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
   - area: http
     change: |
+      removed ``envoy.reloadable_features.http_100_continue_case_insensitive`` and legacy code paths.
       removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
