@@ -101,13 +101,34 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::
   }
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
-  if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
+  const auto scope_pos = ip_address.rfind('%');
+  if (scope_pos == std::string::npos) {
+    // Parse IPv6 with no scope.
+    if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) != 1) {
+      return nullptr;
+    }
     sa6.sin6_family = AF_INET6;
-    sa6.sin6_port = htons(port);
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only));
+  } else {
+    // Parse IPv6 with scope using getaddrinfo().
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    struct addrinfo* res = nullptr;
+    // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
+    // a name resolution service.
+    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+    hints.ai_family = AF_INET6;
+    // Hint that getaddrinfo() need not return a linked list of answers.
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
+    if (getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res) != 0) {
+      return nullptr;
+    }
+    sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+    freeaddrinfo(res);
   }
-  return nullptr;
+  sa6.sin6_port = htons(port);
+  return instanceOrNull(
+      Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only));
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,

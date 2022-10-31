@@ -1,3 +1,8 @@
+#ifndef WIN32
+#include <net/if.h>
+
+#endif
+
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -27,6 +32,42 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 namespace {
+
+struct Interface {
+  std::string name;
+  uint32_t if_index;
+};
+
+// Helper function that returns any usable interface present while running the test.
+#ifndef WIN32
+StatusOr<Interface> getLocalNetworkInterface() {
+  struct ifaddrs* ifaddr;
+
+  if (getifaddrs(&ifaddr) == -1) {
+    return absl::FailedPreconditionError("getifaddrs failed");
+  }
+
+  // Find a viable interface to return for the test. Note that for the purpose of testing the
+  // parseInternetAddressNoThrow it enough to return any interface no matter from the IP assigned.
+  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    Interface ifc;
+    ifc.name = std::string(ifa->ifa_name);
+    ifc.if_index = if_nametoindex(ifa->ifa_name);
+    freeifaddrs(ifaddr);
+    return ifc;
+  };
+  freeifaddrs(ifaddr);
+  return absl::NotFoundError("no interface available");
+}
+#else
+StatusOr<Interface> getLocalNetworkInterface() {
+  return absl::UnimplementedError("not available in windows");
+}
+#endif
 
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
@@ -120,6 +161,7 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("/foo"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::]"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
+  EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fe80::1%"));
 
   EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddress("1.2.3.4")->asString());
   EXPECT_EQ("0.0.0.0:0", Utility::parseInternetAddress("0.0.0.0")->asString());
@@ -140,6 +182,16 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ("[1::2:3]:0", Utility::parseInternetAddressNoThrow("1::2:3")->asString());
   EXPECT_EQ("[a::1]:0", Utility::parseInternetAddressNoThrow("a::1")->asString());
   EXPECT_EQ("[a:b:c:d::]:0", Utility::parseInternetAddressNoThrow("a:b:c:d::")->asString());
+
+  StatusOr<Interface> ifc = getLocalNetworkInterface();
+  if (ifc.ok()) {
+    EXPECT_EQ(
+        absl::StrCat("[fe80::1]:0"),
+        Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->name))->asString());
+    EXPECT_EQ(
+        absl::StrCat("[fe80::1]:0"),
+        Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index))->asString());
+  }
 }
 
 TEST(NetworkUtility, ParseInternetAddressAndPort) {
