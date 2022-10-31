@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/thread_local/thread_local.h"
-
 #include "source/common/io/io_uring.h"
 
 #include "liburing.h"
@@ -11,7 +9,7 @@ namespace Io {
 
 bool isIoUringSupported();
 
-class IoUringImpl : public IoUring, public ThreadLocal::ThreadLocalObject {
+class IoUringImpl : public IoUring {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
@@ -37,23 +35,6 @@ private:
   struct io_uring ring_ {};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
-};
-
-class IoUringFactoryImpl : public IoUringFactory {
-public:
-  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                     ThreadLocal::SlotAllocator& tls);
-
-  // IoUringFactory
-  // TODO (soulxu): rename this method, it only about `get`.
-  OptRef<IoUring> get() const override;
-  void onServerInitialized() override;
-  bool currentThreadRegistered() override;
-
-private:
-  const uint32_t io_uring_size_{};
-  const bool use_submission_queue_polling_{};
-  ThreadLocal::TypedSlot<IoUringImpl> tls_;
 };
 
 } // namespace Io

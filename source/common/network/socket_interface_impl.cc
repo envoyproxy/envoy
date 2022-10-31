@@ -6,6 +6,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/io/io_uring_factory.h"
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"

@@ -254,6 +254,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
+        "//source/common/io:io_uring_factory_lib",
         "//source/common/io:io_uring_impl_lib",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],

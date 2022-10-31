@@ -2,6 +2,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/network/address_impl.h"
 
@@ -124,6 +125,13 @@ public:
   virtual void onServerInitialized() PURE;
 
   virtual bool currentThreadRegistered() PURE;
+};
+
+class IoUringWorker : public ThreadLocal::ThreadLocalObject {
+public:
+  virtual ~IoUringWorker() = default;
+
+  virtual IoUring& get() PURE;
 };
 
 } // namespace Io
