@@ -207,12 +207,25 @@ Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstShared
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::listen(int backlog) {
-  file_event_adapter_ = std::make_unique<FileEventAdapter>(read_buffer_size_, io_uring_factory_);
+  file_event_adapter_ = std::make_unique<FileEventAdapter>(io_uring_factory_);
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
 IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
-  return file_event_adapter_->accept(addr, addrlen);
+  if (!is_accept_added_) {
+    return nullptr;
+  }
+
+  ASSERT(SOCKET_VALID(connection_fd_));
+
+  is_accept_added_ = false;
+  *addr = remote_addr_;
+  *addrlen = remote_addr_len_;
+  auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
+                                                             connection_fd_);
+  SET_SOCKET_INVALID(connection_fd_);
+  io_handle->addReadRequest();
+  return io_handle;
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -306,14 +319,14 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
       file_event_adapter_->initialize(dispatcher, cb, trigger, events);
     }
-    file_event_adapter_->addAcceptRequest(fd_);
+    addAcceptRequest();
     io_uring_factory_.get().ref().submit();
     return;
   }
 
   // Check if this is going to become a leading client socket.
   if (!io_uring_factory_.get().ref().isEventfdRegistered()) {
-    file_event_adapter_ = std::make_unique<FileEventAdapter>(read_buffer_size_, io_uring_factory_);
+    file_event_adapter_ = std::make_unique<FileEventAdapter>(io_uring_factory_);
     file_event_adapter_->initialize(dispatcher, cb, trigger, events);
   }
 
@@ -417,24 +430,6 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
   return selected_interface_name;
 }
 
-IoHandlePtr IoUringSocketHandleImpl::FileEventAdapter::accept(struct sockaddr* addr,
-                                                              socklen_t* addrlen) {
-  if (!is_accept_added_) {
-    return nullptr;
-  }
-
-  ASSERT(SOCKET_VALID(connection_fd_));
-
-  is_accept_added_ = false;
-  *addr = remote_addr_;
-  *addrlen = remote_addr_len_;
-  auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
-                                                             connection_fd_);
-  SET_SOCKET_INVALID(connection_fd_);
-  io_handle->addReadRequest();
-  return io_handle;
-}
-
 void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Request& req,
                                                                     int32_t result) {
   if (result < 0) {
@@ -443,10 +438,17 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 
   switch (req.type_) {
   case RequestType::Accept:
-    ASSERT(!SOCKET_VALID(connection_fd_));
-    addAcceptRequest(req.fd_);
+    ASSERT(req.iohandle_.has_value());
+    // This is hacky fix, we should check the req is valid or not.
+    if (req.iohandle_->get().fd_ == -1) {
+      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
+      break;
+    }
+
+    ASSERT(!SOCKET_VALID(req.iohandle_->get().connection_fd_));
+    req.iohandle_->get().addAcceptRequest();
     if (result >= 0) {
-      connection_fd_ = result;
+      req.iohandle_->get().connection_fd_ = result;
       cb_(Event::FileReadyType::Read);
     }
     break;
@@ -543,15 +545,15 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
       event_fd, [this](uint32_t) { onFileEvent(); }, trigger, Event::FileReadyType::Read);
 }
 
-void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest(os_fd_t fd) {
+void IoUringSocketHandleImpl::addAcceptRequest() {
   is_accept_added_ = true;
   auto& uring = io_uring_factory_.get().ref();
-  auto req = new Request{absl::nullopt, RequestType::Accept, nullptr, fd};
-  auto res = uring.prepareAccept(fd, &remote_addr_, &remote_addr_len_, req);
+  auto req = new Request{*this, RequestType::Accept, nullptr, fd_};
+  auto res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     uring.submit();
-    res = uring.prepareAccept(fd, &remote_addr_, &remote_addr_len_, req);
+    res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
 }

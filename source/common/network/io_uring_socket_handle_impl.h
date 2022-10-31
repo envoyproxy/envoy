@@ -85,27 +85,21 @@ private:
   // FileEventAdapter adapts `io_uring` to libevent.
   class FileEventAdapter {
   public:
-    FileEventAdapter(const uint32_t read_buffer_size, const Io::IoUringFactory& io_uring_factory)
-        : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory) {}
+    FileEventAdapter(const Io::IoUringFactory& io_uring_factory)
+        : io_uring_factory_(io_uring_factory) {}
     void initialize(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                     Event::FileTriggerType trigger, uint32_t events);
-    IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen);
-    void addAcceptRequest(os_fd_t fd);
 
   private:
     void onFileEvent();
     void onRequestCompletion(const Request& req, int32_t result);
 
-    const uint32_t read_buffer_size_;
     const Io::IoUringFactory& io_uring_factory_;
     Event::FileReadyCb cb_;
     Event::FileEventPtr file_event_{nullptr};
-    os_fd_t connection_fd_{INVALID_SOCKET};
-    bool is_accept_added_{false};
-    struct sockaddr remote_addr_;
-    socklen_t remote_addr_len_{sizeof(remote_addr_)};
   };
 
+  void addAcceptRequest();
   void addReadRequest();
   // Checks if the io handle is the one that registered eventfd with `io_uring`.
   // An io handle can be a leader in two cases:
@@ -129,6 +123,12 @@ private:
   bool is_write_added_{false};
   std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
   bool remote_closed_{false};
+
+  // For accept
+  struct sockaddr remote_addr_;
+  socklen_t remote_addr_len_{sizeof(remote_addr_)};
+  bool is_accept_added_{false};
+  os_fd_t connection_fd_{INVALID_SOCKET};
 };
 
 } // namespace Network
