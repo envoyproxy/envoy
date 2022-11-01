@@ -1,7 +1,8 @@
 # 1. Use already imported python dependencies
 # 2. Disable pointer compression (limits the maximum number of WasmVMs).
-# 3. Add support for --define=no_debug_info=1.
-# 4. Don't expose Wasm C API (only Wasm C++ API).
+# 3. Add support for --define=no_debug_info=1. 
+# 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
+# 5. Don't expose Wasm C API (only Wasm C++ API).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 4e89f90e7e..ced403d5aa 100644
@@ -30,7 +31,7 @@ index 4e89f90e7e..3fcb38b3f3 100644
  
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index e957c0fad3..eee285ab60 100644
+index e957c0fad3..a6de50e6ab 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
 @@ -116,6 +116,7 @@ def _default_args():
@@ -41,13 +42,33 @@ index e957c0fad3..eee285ab60 100644
                  "-std=c++17",
              ],
              "@v8//bazel/config:is_gcc": [
-@@ -151,6 +152,11 @@ def _default_args():
+@@ -131,6 +132,7 @@ def _default_args():
+                 "-Wno-redundant-move",
+                 "-Wno-return-type",
+                 "-Wno-stringop-overflow",
++                "-Wno-nonnull",
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+                 "-std=gnu++17",
+@@ -151,6 +153,23 @@ def _default_args():
                  "-fno-integrated-as",
              ],
              "//conditions:default": [],
 +        }) + select({
 +            "@envoy//bazel:no_debug_info": [
 +                "-g0",
++            ],
++            "//conditions:default": [],
++        }) + select({
++            "@v8//bazel/config:is_macos": [
++                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
++                "-Wno-range-loop-analysis",
++
++                # To supress warning on deprecated declaration on v8 code. For example:
++                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
++                # is deprecated: first deprecated in macOS 13.0.
++                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
++                "-Wno-deprecated-declarations",
 +            ],
 +            "//conditions:default": [],
          }),
