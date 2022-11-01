@@ -54,9 +54,9 @@ if [[ "${1:-}" == "--android" ]]; then
   SDKMANAGER="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
   $SDKMANAGER --uninstall "ndk-bundle"
   echo "y" | $SDKMANAGER "ndk;21.4.7075529"
-  ln -sfn $ANDROID_SDK_ROOT/ndk/21.4.7075529 "${ANDROID_SDK_ROOT}/ndk-bundle"
+  ln -sfn "${ANDROID_SDK_ROOT}/ndk/21.4.7075529" "${ANDROID_SDK_ROOT}/ndk-bundle"
 
   # Download and set up build-tools 30.0.3, 31.0.0 is missing dx.jar.
   $SDKMANAGER --install "build-tools;30.0.3"
-  echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
+  echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/21.4.7075529" >> "$GITHUB_ENV"
 fi
