@@ -112,13 +112,13 @@ the following:
   stream when it's read disabled. There will be a callback scheduled to drain
   these when the stream is read enabled, it can also be drained if the stream is
   read enabled, and the stream is invoked with additional data.
-* The codec's recieve buffer high watermark is still used in consideration for
+* The codec's receive buffer high watermark is still used in consideration for
   granting peer stream additional window (preserving existing protocol flow
-  control). The codec's recieve buffer high watermark was rarely used prior as we'd
+  control). The codec's receive buffer high watermark was rarely used prior as we'd
   eagerly dispatch data through the filter chain. An exceptions where it could be
   triggered is if a filter in the filter chain either injects data triggering watermark.
-  The codec's recieve buffer no longer read disables the stream, as we could be
-  read disabled elsewhere, buffer data in codec's recieve buffer hitting high
+  The codec's receive buffer no longer read disables the stream, as we could be
+  read disabled elsewhere, buffer data in codec's receive buffer hitting high
   watermark and never switch back to being read enabled.
 * One side effect of deferring stream processing is the need to defer processing
   stream close. See ``deferred_stream_close`` in

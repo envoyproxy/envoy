@@ -286,7 +286,10 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
+  # Make sure that there are no regressions to building Envoy with autolink disabled.
+  EXTRA_OPTIONS=(
+    "--define" "library_autolink=disabled")
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}"  "${EXTRA_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
   bazel_envoy_binary_build debug
