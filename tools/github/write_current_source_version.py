@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "https://api.github.com/repos/envoyproxy/envoy/commits/v" + current_version)
     if github_token := os.environ.get(args.github_api_token_env_name):
         # Reference: https://github.com/octokit/auth-token.js/blob/902a172693d08de998250bf4d8acb1fdb22377a4/src/with-authorization-prefix.ts#L6-L12.
-        authorization_header_prefix = "bearer" if len(github_token.split(".")) is 3 else "token"
+        authorization_header_prefix = "bearer" if len(github_token.split(".")) == 3 else "token"
         # To avoid rate-limited API calls.
         commit_info_request.add_header(
             "Authorization", f"{authorization_header_prefix} {github_token}")
