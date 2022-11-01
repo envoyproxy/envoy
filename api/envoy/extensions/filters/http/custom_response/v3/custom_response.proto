@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.custom_response.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/substitution_format_string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -34,6 +34,7 @@ message CustomResponse {
 
   // Custom response policy to redirect the original response to a different
   // upstream.
+  // [#next-free-field: 7]
   message RedirectPolicy {
     // The host that will serve the custom response.
     //
