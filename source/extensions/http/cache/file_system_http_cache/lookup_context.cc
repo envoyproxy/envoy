@@ -16,12 +16,12 @@ std::string FileLookupContext::filepath() {
   return absl::StrCat(cache_.cachePath(), cache_.generateFilename(key_));
 }
 
+bool FileLookupContext::workInProgress() const { return cache_.workInProgress(key()); }
+
 void FileLookupContext::getHeaders(LookupHeadersCallback&& cb) {
-  if (work_in_progress_) {
-    // Don't use a cache entry if it has write operations in flight.
-    cb(LookupResult{});
-    return;
-  }
+  // TODO(ravenblack): Consider adding a memory cache check here for uncacheable keys, to save
+  // on the repeated filesystem hit. Capture some performance metrics to see if it's worth it.
+  // If migrating to "shared stream" implementation, this question answers itself.
   absl::MutexLock lock(&mu_);
   getHeadersWithLock(std::move(cb));
 }

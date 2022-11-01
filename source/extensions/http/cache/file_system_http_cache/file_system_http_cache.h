@@ -60,6 +60,9 @@ public:
   // For the factory to ensure there aren't incompatible configs on the same path.
   const ConfigProto& config() { return config_; }
 
+  // Returns true if the given key currently has a stream writing to it.
+  bool workInProgress(const Key& key);
+
   // Inserts the key into entries_being_written_, excluding it from being written to by
   // another task until the returned Cleanup is destroyed.
   //
@@ -102,17 +105,12 @@ private:
   const ConfigProto config_;
 
   absl::Mutex cache_mu_;
-  // When a new cache entry is being written, its key will be here with no HeaderData,
-  // and the cache file will not be present. The cache miss will be detected normally, and
-  // this should be checked before writing; cancel the write if another thread is already
-  // writing the same entry, or if the file exists at write-time.
-  // When a cache entry is in the process of having its headers updated, its key will be
-  // here with populated HeaderData; this should be checked after finding the cache hit,
-  // because if headers are being written we should not read them from the file as the
-  // data might be partially updated.
+  // When a new cache entry is being written, its key will be here and the cache file
+  // will not be present. The cache miss will be detected normally from the filesystem.
+  // This should be checked before writing; cancel the write if another thread is already
+  // writing the same entry.
   absl::flat_hash_set<Key, MessageUtil, MessageUtil>
       entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
-  size_t operations_in_flight_ ABSL_GUARDED_BY(cache_mu_) = 0;
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
 };

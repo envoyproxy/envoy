@@ -26,9 +26,8 @@ using HttpFilters::Cache::LookupTrailersCallback;
 
 class FileLookupContext : public LookupContext {
 public:
-  FileLookupContext(FileSystemHttpCache& cache, LookupRequest&& lookup, bool work_in_progress)
-      : cache_(cache), key_(lookup.key()), lookup_(std::move(lookup)),
-        work_in_progress_(work_in_progress) {}
+  FileLookupContext(FileSystemHttpCache& cache, LookupRequest&& lookup)
+      : cache_(cache), key_(lookup.key()), lookup_(std::move(lookup)) {}
 
   // From LookupContext
   void getHeaders(LookupHeadersCallback&& cb) final;
@@ -41,7 +40,7 @@ public:
 
   const LookupRequest& lookup() const { return lookup_; }
   const Key& key() const { return key_; }
-  bool workInProgress() const { return work_in_progress_; }
+  bool workInProgress() const;
 
 private:
   void getHeadersWithLock(LookupHeadersCallback cb) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
@@ -65,7 +64,6 @@ private:
   Key key_ ABSL_GUARDED_BY(mu_);
 
   const LookupRequest lookup_;
-  const bool work_in_progress_;
 };
 
 // TODO(ravenblack): A CacheEntryInProgressReader should be implemented to prevent
