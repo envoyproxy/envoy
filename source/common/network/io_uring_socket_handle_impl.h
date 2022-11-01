@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/io/io_uring.h"
 
@@ -21,6 +22,7 @@ struct Request {
   IoUringSocketHandleImplOptRef iohandle_{absl::nullopt};
   RequestType type_{RequestType::Unknown};
   struct iovec* iov_{nullptr};
+  std::unique_ptr<uint8_t[]> buf_{};
 };
 
 /**
@@ -120,12 +122,11 @@ private:
   const absl::optional<int> domain_;
 
   Event::FileReadyCb cb_;
-  struct iovec iov_;
-  std::unique_ptr<uint8_t[]> read_buf_{nullptr};
+  Buffer::OwnedImpl read_buf_;
   int32_t bytes_to_read_{0};
   Request* read_req_{nullptr};
   bool is_read_enabled_{true};
-  int32_t bytes_to_write_{0};
+  int32_t bytes_already_wrote_{0};
   bool is_write_added_{false};
   std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
   bool remote_closed_{false};
