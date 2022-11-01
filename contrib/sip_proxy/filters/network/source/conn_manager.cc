@@ -169,9 +169,9 @@ ConnectionManager::ConnectionManager(
       downstream_connection_infos_(downstream_connection_infos),
       upstream_transaction_infos_(upstream_transaction_infos) {}
 
-ConnectionManager::~ConnectionManager() { 
+ConnectionManager::~ConnectionManager() {
   stats_.downstream_connection_.dec();
-  ENVOY_LOG(debug, "Destroying connection manager"); 
+  ENVOY_LOG(debug, "Destroying connection manager");
 }
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
@@ -187,7 +187,8 @@ void ConnectionManager::storeDownstreamConnectionInCache() {
       read_callbacks_->connection().connectionInfoProvider().directRemoteAddress()->asString() +
       "@" + random_generator_.uuid();
   local_origin_ingress_ = OriginIngress(thread_id, downstream_conn_id);
-  auto downstream_conn = std::make_shared<ConnectionManager::DownstreamConnection>(*this, downstream_conn_id);
+  auto downstream_conn =
+      std::make_shared<ConnectionManager::DownstreamConnection>(*this, downstream_conn_id);
   downstream_connection_infos_->insertDownstreamConnection(downstream_conn_id, downstream_conn);
 
   ENVOY_LOG(info, "Cached downstream connection with thread_id={}, downstream_connection_id={}",
@@ -562,8 +563,7 @@ ConnectionManager::DownstreamActiveTrans::transportBegin(MessageMetadataSharedPt
   return ActiveTrans::transportBegin(metadata);
 }
 
-FilterStatus
-ConnectionManager::DownstreamActiveTrans::transportEnd() {
+FilterStatus ConnectionManager::DownstreamActiveTrans::transportEnd() {
   parent_.stats_.downstream_request_.inc();
   return ActiveTrans::transportEnd();
 }
@@ -652,10 +652,11 @@ ConnectionManager::UpstreamActiveTrans::transportBegin(MessageMetadataSharedPtr 
   return ActiveTrans::transportBegin(metadata);
 }
 
-FilterStatus
-ConnectionManager::UpstreamActiveTrans::transportEnd() {
+FilterStatus ConnectionManager::UpstreamActiveTrans::transportEnd() {
   parent_.stats_.upstream_response_.inc();
-  parent_.stats_.counterFromElements(methodStr[metadata_->methodType()], "upstream_response_proxied").inc();
+  parent_.stats_
+      .counterFromElements(methodStr[metadata_->methodType()], "upstream_response_proxied")
+      .inc();
   return ActiveTrans::transportEnd();
 }
 
@@ -685,7 +686,8 @@ void ConnectionManager::UpstreamActiveTrans::sendLocalReply(const DirectResponse
     return;
   }
 
-  if (auto status = ActiveTrans::messageBegin(response_metadata); status == FilterStatus::StopIteration) {
+  if (auto status = ActiveTrans::messageBegin(response_metadata);
+      status == FilterStatus::StopIteration) {
     return;
   }
 
@@ -784,7 +786,9 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData
     const absl::optional<std::string>& return_destination) {
   std::string&& k = std::string(metadata->transactionId().value());
   if (metadata->msgType() == MsgType::Request) {
-    stats().counterFromElements(methodStr[metadata->methodType()], "upstream_request_received").inc();
+    stats()
+        .counterFromElements(methodStr[metadata->methodType()], "upstream_request_received")
+        .inc();
   }
 
   if (upstreamTransactionInfos()->hasTransaction(k)) {
@@ -812,8 +816,8 @@ void DownstreamConnectionInfos::init() {
       });
 }
 
-void DownstreamConnectionInfos::insertDownstreamConnection(std::string conn_id,
-                                                           std::shared_ptr<SipFilters::DecoderFilterCallbacks> callback) {
+void DownstreamConnectionInfos::insertDownstreamConnection(
+    std::string conn_id, std::shared_ptr<SipFilters::DecoderFilterCallbacks> callback) {
   if (!hasDownstreamConnection(conn_id)) {
     ENVOY_LOG(trace, "Insert into Downstream connection map {}", conn_id);
 

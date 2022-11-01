@@ -119,19 +119,18 @@ public:
 
     proto_config_.set_stat_prefix("test");
     auto sip_settings = std::make_shared<SipSettings>(proto_config_.settings());
-    
+
     EXPECT_CALL(callback_, settings()).WillRepeatedly(Return(sip_settings));
-    EXPECT_CALL(callback_, newDecoderEventHandler(_)).WillRepeatedly(testing::DoAll(
-      testing::Invoke( this, &SipDecoderTest::copyMetadata), Return(decode_event_handler)));
+    EXPECT_CALL(callback_, newDecoderEventHandler(_))
+        .WillRepeatedly(testing::DoAll(testing::Invoke(this, &SipDecoderTest::copyMetadata),
+                                       Return(decode_event_handler)));
 
     decoder_ = std::make_unique<Decoder>(callback_);
   }
 
-  void copyMetadata(MessageMetadataSharedPtr metadata) { 
-    metadata_ = metadata; 
-  }
-  
-  void setMetadataStateToHandleAffinity(MessageMetadataSharedPtr metadata) { 
+  void copyMetadata(MessageMetadataSharedPtr metadata) { metadata_ = metadata; }
+
+  void setMetadataStateToHandleAffinity(MessageMetadataSharedPtr metadata) {
     metadata->setState(State::HandleAffinity);
   }
 
@@ -250,7 +249,8 @@ TEST_F(SipDecoderTest, DecodeREGISTER) {
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Expires: 7200\x0d\x0a"
       "Supported: 100rel,timer\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "Require: Path\x0d\x0a"
       "Path: "
@@ -284,7 +284,7 @@ TEST_F(SipDecoderTest, DecodeREGISTER) {
 
 TEST_F(SipDecoderTest, DecodeOK200) {
   initializeDecoder();
-  
+
   const std::string SIP_OK200_FULL =
       "SIP/2.0 200 OK\x0d\x0a"
       "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
@@ -303,7 +303,8 @@ TEST_F(SipDecoderTest, DecodeOK200) {
       "\x0d\x0a";
   buffer_.add(SIP_OK200_FULL);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Response);
   EXPECT_EQ(metadata_->methodType(), MethodType::Ok200);
 
@@ -324,7 +325,8 @@ TEST_F(SipDecoderTest, DecodeOK200) {
       "\x0d\x0a";
   buffer_.add(SIP_OK200_REGISTER);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Response);
   EXPECT_EQ(metadata_->methodType(), MethodType::Ok200);
 }
@@ -347,7 +349,8 @@ TEST_F(SipDecoderTest, DecodeOK200EmptyHeader) {
       "\x0d\x0a";
   buffer_.add(SIP_OK200_EMPTY_HEADER);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Response);
   EXPECT_EQ(metadata_->methodType(), MethodType::Ok200);
 }
@@ -370,7 +373,8 @@ TEST_F(SipDecoderTest, DecodeOK200DifferentHeaderFormats) {
       "\x0d\x0a";
   buffer_.add(SIP_OK200_DIFF_HEADER_FORMATS);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Response);
   EXPECT_EQ(metadata_->methodType(), MethodType::Ok200);
 }
@@ -423,7 +427,8 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "Event: feature-status-exchange\x0d\x0a"
       "\x0d\x0a";
@@ -443,7 +448,8 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
       "CSeq: 2 SUBSCRIBE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "Event: reg\x0d\x0a"
       "\x0d\x0a";
@@ -488,7 +494,8 @@ TEST_F(SipDecoderTest, DecodeFAILURE4XX) {
       "\x0d\x0a";
   buffer_.add(SIP_FAILURE4XX_FULL);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Response);
   EXPECT_EQ(metadata_->methodType(), MethodType::Failure4xx);
 }
@@ -564,7 +571,8 @@ TEST_F(SipDecoderTest, DecodeACK) {
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "CSeq: 2 ACK\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>;tag=1\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
@@ -611,7 +619,8 @@ TEST_F(SipDecoderTest, DecodeUPDATE) {
       "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
       "CSeq: 2 UPDATE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>;tag=1\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Max-Forwards: 70\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
@@ -703,7 +712,8 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUNDNOHEADER);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), false);
@@ -729,17 +739,20 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUND);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), true);
   EXPECT_EQ(metadata_->originIngress()->getThreadID(), "3@10.0.0.1");
-  EXPECT_EQ(metadata_->originIngress()->getDownstreamConnectionID(), "11.0.0.10:15060@aa-bb-cc-dd-ee-ff");
+  EXPECT_EQ(metadata_->originIngress()->getDownstreamConnectionID(),
+            "11.0.0.10:15060@aa-bb-cc-dd-ee-ff");
   metadata_->removeXEnvoyOriginIngressHeader();
   auto operation = metadata_->operationList().at(metadata_->operationList().size() - 1);
   EXPECT_EQ(operation.type_, OperationType::Delete);
@@ -767,12 +780,14 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
-      "X-Envoy-Origin-Ingress: 3@10.0.0.1; downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: 3@10.0.0.1; "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUND_NO_THREADSTART);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), true);
@@ -802,12 +817,14 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
       "CSeq: 1 INVITE\x0d\x0a"
       "Contact: <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
-      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1 downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
+      "X-Envoy-Origin-Ingress: thread=3@10.0.0.1 "
+      "downstream-connection=11.0.0.10:15060@aa-bb-cc-dd-ee-ff\x0d\x0a"
       "Content-Length:  0\x0d\x0a"
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUND_NO_THREADEND);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), true);
@@ -840,7 +857,8 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUND_NO_DSCONNSTART);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), true);
@@ -873,7 +891,8 @@ TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_OUTBOUND_NO_DSCONNEND);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->hasXEnvoyOriginIngressHeader(), true);
@@ -895,7 +914,8 @@ TEST_F(SipDecoderTest, DecodeINVITEMultipleRecordRoutes) {
       "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
       "local:5060>\x0d\x0a"
       "Record-Route: "
-      "<sip:+16959000000:15306;opaque=127.0.0.1;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+      "<sip:+16959000000:15306;opaque=127.0.0.1;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed."
+      "cncs.svc.cluster."
       "local:5060>\x0d\x0a"
       "Record-Route: "
       "<sip:+16959000000:15306;role=anch;lr;transport=udp;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
@@ -907,7 +927,8 @@ TEST_F(SipDecoderTest, DecodeINVITEMultipleRecordRoutes) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_MULTPLERECORDROUTES);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->operationList().size(), 1);
@@ -942,7 +963,8 @@ TEST_F(SipDecoderTest, DecodeINVITEMultipleServiceRoutes) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_MULTPLESERVICEROUTES);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->operationList().size(), 1);
@@ -975,7 +997,8 @@ TEST_F(SipDecoderTest, DecodeINVITEPNokiaCookieIPMappingWrong) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE_PCOOKIEWRONG);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->msgType(), MsgType::Request);
   EXPECT_EQ(metadata_->methodType(), MethodType::Invite);
   EXPECT_EQ(metadata_->pCookieIpMap().has_value(), false);
@@ -1011,13 +1034,15 @@ TEST_F(SipDecoderTest, CheckDecoderStateMachineWorking) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->state(), State::Done);
 }
 
 TEST_F(SipDecoderTest, CheckDecoderStateMachineWorkingWithPendingTransactions) {
   NiceMock<SipProxy::MockDecoderEventHandler> decoder_event_handler;
-  ON_CALL(decoder_event_handler, messageBegin(_)).WillByDefault(Return(FilterStatus::StopIteration));
+  ON_CALL(decoder_event_handler, messageBegin(_))
+      .WillByDefault(Return(FilterStatus::StopIteration));
   initializeDecoder(yaml, &decoder_event_handler);
 
   const std::string SIP_INVITE =
@@ -1039,20 +1064,23 @@ TEST_F(SipDecoderTest, CheckDecoderStateMachineWorkingWithPendingTransactions) {
       "\x0d\x0a";
   buffer_.add(SIP_INVITE);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->state(), State::MessageEnd);
 
   metadata_->setState(State::HandleAffinity);
   decoder_->restore(metadata_, decoder_event_handler);
   ON_CALL(decoder_event_handler, messageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
 
-  EXPECT_EQ(decoder_->onData(buffer_, true), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, true),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->state(), State::Done);
 }
 
 TEST_F(SipDecoderTest, CheckDecoderStateMachineWorkingWithPendingTransactionsWrong) {
   NiceMock<SipProxy::MockDecoderEventHandler> decoder_event_handler;
-  ON_CALL(decoder_event_handler, messageBegin(_)).WillByDefault(Return(FilterStatus::StopIteration));
+  ON_CALL(decoder_event_handler, messageBegin(_))
+      .WillByDefault(Return(FilterStatus::StopIteration));
   initializeDecoder(yaml, &decoder_event_handler);
 
   const std::string SIP_INVITE =
@@ -1074,14 +1102,16 @@ TEST_F(SipDecoderTest, CheckDecoderStateMachineWorkingWithPendingTransactionsWro
       "\x0d\x0a";
   buffer_.add(SIP_INVITE);
 
-  EXPECT_EQ(decoder_->onData(buffer_, false), Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
+  EXPECT_EQ(decoder_->onData(buffer_, false),
+            Extensions::NetworkFilters::SipProxy::FilterStatus::StopIteration);
   EXPECT_EQ(metadata_->state(), State::MessageEnd);
 
   metadata_->setState(State::StopIteration);
   decoder_->restore(metadata_, decoder_event_handler);
   ON_CALL(decoder_event_handler, messageBegin(_)).WillByDefault(Return(FilterStatus::Continue));
 
-  EXPECT_EXIT(decoder_->onData(buffer_, true), testing::KilledBySignal(SIGABRT), "panic: not reached");
+  EXPECT_EXIT(decoder_->onData(buffer_, true), testing::KilledBySignal(SIGABRT),
+              "panic: not reached");
 }
 
 } // namespace SipProxy

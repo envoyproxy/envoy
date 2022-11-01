@@ -527,9 +527,7 @@ private:
       return parent_.upstream_transaction_infos_;
     }
 
-    void onReset() override {
-      ASSERT(false, "onReset() not implemented");
-    };
+    void onReset() override { ASSERT(false, "onReset() not implemented"); };
 
     std::shared_ptr<TrafficRoutingAssistantHandler> traHandler() override {
       ASSERT(false, "traHandler() not implemented");
@@ -620,7 +618,7 @@ public:
   void init();
   ~DownstreamConnectionInfos() = default;
 
-  void insertDownstreamConnection(std::string conn_id, 
+  void insertDownstreamConnection(std::string conn_id,
                                   std::shared_ptr<SipFilters::DecoderFilterCallbacks> callback);
   size_t size();
 

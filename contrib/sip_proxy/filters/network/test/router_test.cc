@@ -39,8 +39,9 @@ namespace Router {
 
 class SipRouterTest : public testing::Test {
 public:
-  SipRouterTest() : thread_factory_(Thread::threadFactoryForTest()), 
-  origin_ingress_(OriginIngress("", "")), stats_(SipFilterStats::generateStats("test.", store_)) {}
+  SipRouterTest()
+      : thread_factory_(Thread::threadFactoryForTest()), origin_ingress_(OriginIngress("", "")),
+        stats_(SipFilterStats::generateStats("test.", store_)) {}
   ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
@@ -125,13 +126,15 @@ public:
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stats_));
     EXPECT_CALL(config_, settings()).WillRepeatedly(Return(sip_settings_));
 
-    filter_ = new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_, transaction_infos_, downstream_connection_infos_, upstream_transaction_infos_);
+    filter_ = new NiceMock<MockConnectionManager>(config_, random_, time_source_, context_,
+                                                  transaction_infos_, downstream_connection_infos_,
+                                                  upstream_transaction_infos_);
     EXPECT_CALL(*filter_, settings()).WillRepeatedly(Return(sip_settings_));
 
     tra_handler_ = std::make_shared<NiceMock<SipProxy::MockTrafficRoutingAssistantHandler>>(
         *filter_, dispatcher_, sip_proxy_config_.settings().tra_service_config(), context_,
         stream_info);
-    
+
     filter_callbacks_ = std::make_shared<NiceMock<SipFilters::MockDecoderFilterCallbacks>>();
     downstream_connection_infos_->insertDownstreamConnection("xyz", filter_callbacks_);
 
@@ -149,8 +152,10 @@ public:
 
     EXPECT_CALL(callbacks_, settings()).WillRepeatedly(Return(sip_settings_));
     ON_CALL(callbacks_, transactionInfos()).WillByDefault(Return(transaction_infos_));
-    ON_CALL(callbacks_, downstreamConnectionInfos()).WillByDefault(Return(downstream_connection_infos_));
-    ON_CALL(callbacks_, upstreamTransactionInfos()).WillByDefault(Return(upstream_transaction_infos_));
+    ON_CALL(callbacks_, downstreamConnectionInfos())
+        .WillByDefault(Return(downstream_connection_infos_));
+    ON_CALL(callbacks_, upstreamTransactionInfos())
+        .WillByDefault(Return(upstream_transaction_infos_));
     EXPECT_CALL(callbacks_, traHandler()).WillRepeatedly(Return(tra_handler_));
     callbacks_.origin_ingress_ = origin_ingress_;
     ON_CALL(callbacks_, originIngress()).WillByDefault(Return(origin_ingress_));
@@ -180,8 +185,8 @@ public:
         "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
         "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
-        "Content-Type: application/sdp\x0d\x0a" 
-        + additional_headers +
+        "Content-Type: application/sdp\x0d\x0a" +
+        additional_headers +
         "Content-Length:  0\x0d\x0a"
         "\x0d\x0a";
     Buffer::OwnedImpl buffer_;
@@ -206,7 +211,8 @@ public:
   }
 
   void initializeMetadataResponse(MethodType method = MethodType::Ok200,
-                          bool set_destination = true, std::string additional_headers = "") {
+                                  bool set_destination = true,
+                                  std::string additional_headers = "") {
     const std::string SIP_OK200_FULL =
         "SIP/2.0 200 OK\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
@@ -220,8 +226,8 @@ public:
         "Path: "
         "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192."
         "169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id>\x0d\x0a"
-        "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a"
-        + additional_headers +
+        "P-Nokia-Cookie-IP-Mapping: S1F1=10.0.0.1\x0d\x0a" +
+        additional_headers +
         "Content-Length:  0\x0d\x0a"
         "\x0d\x0a";
     Buffer::OwnedImpl buffer_;
@@ -261,9 +267,7 @@ public:
     EXPECT_EQ(status, router_->messageBegin(metadata_));
   }
 
-  void startResponse(FilterStatus status = FilterStatus::StopIteration) {
-    startRequest(status);
-  }
+  void startResponse(FilterStatus status = FilterStatus::StopIteration) { startRequest(status); }
 
   void connectUpstream() {
     EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
@@ -298,9 +302,7 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void completeResponse() {
-    completeRequest();
-  }
+  void completeResponse() { completeRequest(); }
 
   void returnResponse(MsgType msg_type = MsgType::Response) {
     Buffer::OwnedImpl buffer;
@@ -385,12 +387,15 @@ public:
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
-  void initUpstreamRequest(const std::string& origin_ingress_value, std::string additional_headers = "") {
+  void initUpstreamRequest(const std::string& origin_ingress_value,
+                           std::string additional_headers = "") {
     Buffer::OwnedImpl buffer;
     if (!origin_ingress_value.empty()) {
-      initializeMetadata(MsgType::Request, MethodType::Invite, false, "X-Envoy-Origin-Ingress:" + origin_ingress_value + "\x0d\x0a" + additional_headers);
+      initializeMetadata(MsgType::Request, MethodType::Invite, false,
+                         "X-Envoy-Origin-Ingress:" + origin_ingress_value + "\x0d\x0a" +
+                             additional_headers);
     } else {
-      initializeMetadata(MsgType::Request, MethodType::Invite, false,  additional_headers);
+      initializeMetadata(MsgType::Request, MethodType::Invite, false, additional_headers);
     }
     buffer.add(metadata_->rawMsg());
     upstream_callbacks_->onUpstreamData(buffer, false);
@@ -449,7 +454,6 @@ public:
   std::shared_ptr<SipSettings> sip_settings_;
   OriginIngress origin_ingress_;
   SipFilterStats stats_;
-  
 
   RouteConstSharedPtr route_ptr_;
   std::unique_ptr<Router> router_;
@@ -1127,7 +1131,8 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeaderWithPrevValue) {
   initializeTrans(sip_protocol_options_yaml);
   initializeRouter();
   initializeTransaction();
-  initializeMetadata(MsgType::Request, MethodType::Invite, false, "X-Envoy-Origin-Ingress: thread=123; downstream-connection=abc\x0d\x0a");
+  initializeMetadata(MsgType::Request, MethodType::Invite, false,
+                     "X-Envoy-Origin-Ingress: thread=123; downstream-connection=abc\x0d\x0a");
   startRequest();
   connectUpstream();
 
@@ -1135,8 +1140,9 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeaderWithPrevValue) {
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
         auto header_name =
             std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
-        EXPECT_THAT(buffer.toString(), testing::Not(testing::HasSubstr(
-                    "X-Envoy-Origin-Ingress: thread=123; downstream-connection=abc")));
+        EXPECT_THAT(buffer.toString(),
+                    testing::Not(testing::HasSubstr(
+                        "X-Envoy-Origin-Ingress: thread=123; downstream-connection=abc")));
         EXPECT_THAT(buffer.toString(),
                     testing::HasSubstr(header_name + ": " + origin_ingress_.toHeaderValue()));
         buffer.drain(buffer.length());
@@ -1164,8 +1170,8 @@ TEST_F(SipRouterTest, AddXEnvoyOriginIngressHeaderUpstreamSupportDisabled) {
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
         auto header_name =
             std::string(HeaderTypes::get().header2Str(HeaderType::XEnvoyOriginIngress));
-        EXPECT_THAT(buffer.toString(), testing::Not(
-                    testing::HasSubstr(header_name + ": " + origin_ingress_.toHeaderValue())));
+        EXPECT_THAT(buffer.toString(), testing::Not(testing::HasSubstr(
+                                           header_name + ": " + origin_ingress_.toHeaderValue())));
         buffer.drain(buffer.length());
       }));
 
@@ -1188,21 +1194,19 @@ TEST_F(SipRouterTest, UpstreamRequest) {
   connectUpstream();
   completeRequest();
 
-  EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).WillOnce(
-    Invoke([](MessageMetadataSharedPtr metadata,
-        RouteConstSharedPtr,
-        const absl::optional<std::string>&) -> SipFilters::ResponseStatus {
-          EXPECT_EQ(metadata->operationList().size(), 1);
-          auto operation = metadata->operationList().at(0);
-          EXPECT_EQ(operation.type_, OperationType::Delete);
-          EXPECT_EQ(operation.position_, metadata->rawMsg().find("X-Envoy-Origin-Ingress"));
-          EXPECT_EQ(metadata->listHeader(XEnvoyOriginIngress).size(), 0);
-          return SipFilters::ResponseStatus::Complete;
-        })
-  );
-  
+  EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _))
+      .WillOnce(Invoke([](MessageMetadataSharedPtr metadata, RouteConstSharedPtr,
+                          const absl::optional<std::string>&) -> SipFilters::ResponseStatus {
+        EXPECT_EQ(metadata->operationList().size(), 1);
+        auto operation = metadata->operationList().at(0);
+        EXPECT_EQ(operation.type_, OperationType::Delete);
+        EXPECT_EQ(operation.position_, metadata->rawMsg().find("X-Envoy-Origin-Ingress"));
+        EXPECT_EQ(metadata->listHeader(XEnvoyOriginIngress).size(), 0);
+        return SipFilters::ResponseStatus::Complete;
+      }));
+
   initUpstreamRequest(origin_ingress_.toHeaderValue());
-  
+
   destroyRouter();
 }
 
@@ -1221,21 +1225,19 @@ TEST_F(SipRouterTest, UpstreamRequestDownstreamConnectionFail) {
   connectUpstream();
   completeRequest();
 
-  EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).WillOnce(
-    Invoke([](MessageMetadataSharedPtr metadata,
-        RouteConstSharedPtr,
-        const absl::optional<std::string>&) -> SipFilters::ResponseStatus {
-          EXPECT_EQ(metadata->operationList().size(), 1);
-          auto operation = metadata->operationList().at(0);
-          EXPECT_EQ(operation.type_, OperationType::Delete);
-          EXPECT_EQ(operation.position_, metadata->rawMsg().find("X-Envoy-Origin-Ingress"));
-          EXPECT_EQ(metadata->listHeader(XEnvoyOriginIngress).size(), 0);
-          return SipFilters::ResponseStatus::Reset;
-        })
-  );
-  
+  EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _))
+      .WillOnce(Invoke([](MessageMetadataSharedPtr metadata, RouteConstSharedPtr,
+                          const absl::optional<std::string>&) -> SipFilters::ResponseStatus {
+        EXPECT_EQ(metadata->operationList().size(), 1);
+        auto operation = metadata->operationList().at(0);
+        EXPECT_EQ(operation.type_, OperationType::Delete);
+        EXPECT_EQ(operation.position_, metadata->rawMsg().find("X-Envoy-Origin-Ingress"));
+        EXPECT_EQ(metadata->listHeader(XEnvoyOriginIngress).size(), 0);
+        return SipFilters::ResponseStatus::Reset;
+      }));
+
   initUpstreamRequest(origin_ingress_.toHeaderValue());
-  
+
   destroyRouter();
 }
 
@@ -1255,8 +1257,9 @@ TEST_F(SipRouterTest, UpstreamRequestUpstreamSupportDisabled) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled", initUpstreamRequest(origin_ingress_.toHeaderValue()));
-  
+  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled",
+                      initUpstreamRequest(origin_ingress_.toHeaderValue()));
+
   destroyRouter();
 }
 
@@ -1274,21 +1277,22 @@ TEST_F(SipRouterTest, UpstreamRequestInvalidMessage) {
   startRequest();
   connectUpstream();
   completeRequest();
-  
+
   Buffer::OwnedImpl buffer;
   const std::string SIP_INVITE =
-        "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
-        "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
-        "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
-        "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
-        "Content-Type: application/sdp\x0d\x0a" 
-        "Content-Length:  0\x0d\x0a"
-        "\x0d\x0a";
+      "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
+      "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
+      "Content-Type: application/sdp\x0d\x0a"
+      "Content-Length:  0\x0d\x0a"
+      "\x0d\x0a";
   buffer.add(SIP_INVITE);
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Dropping upstream request with no well formatted header", initUpstreamRequest(buffer));
-  
+  EXPECT_LOG_CONTAINS("error", "Dropping upstream request with no well formatted header",
+                      initUpstreamRequest(buffer));
+
   destroyRouter();
 }
 
@@ -1308,8 +1312,9 @@ TEST_F(SipRouterTest, UpstreamRequestNoXEnvoyOriginIngressHeader) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Dropping upstream request with no X-Envoy-Origin-Ingress header", initUpstreamRequest(""));
-  
+  EXPECT_LOG_CONTAINS("error", "Dropping upstream request with no X-Envoy-Origin-Ingress header",
+                      initUpstreamRequest(""));
+
   destroyRouter();
 }
 
@@ -1329,8 +1334,10 @@ TEST_F(SipRouterTest, UpstreamRequestInvalidXEnvoyOriginIngressHeader) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Dropping upstream request with invalid format of X-Envoy-Origin-Ingress header", initUpstreamRequest("invalid"));
-  
+  EXPECT_LOG_CONTAINS(
+      "error", "Dropping upstream request with invalid format of X-Envoy-Origin-Ingress header",
+      initUpstreamRequest("invalid"));
+
   destroyRouter();
 }
 
@@ -1350,8 +1357,9 @@ TEST_F(SipRouterTest, UpstreamRequestWrongThread) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Thread ID error received different from local thread ID", initUpstreamRequest("thread=error; downstream-connection=xyz"));
-  
+  EXPECT_LOG_CONTAINS("error", "Thread ID error received different from local thread ID",
+                      initUpstreamRequest("thread=error; downstream-connection=xyz"));
+
   destroyRouter();
 }
 
@@ -1371,8 +1379,10 @@ TEST_F(SipRouterTest, UpstreamRequestWrongDownstreamConn) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "No downstream connection found for error", initUpstreamRequest("thread=" + origin_ingress_.getThreadID() + "; downstream-connection=error"));
-  
+  EXPECT_LOG_CONTAINS("error", "No downstream connection found for error",
+                      initUpstreamRequest("thread=" + origin_ingress_.getThreadID() +
+                                          "; downstream-connection=error"));
+
   destroyRouter();
 }
 
@@ -1394,11 +1404,10 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestInNewConnection) {
 
   EXPECT_CALL(upstream_connection_, write(_, _))
       .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_THAT(buffer.toString(),
-                    testing::HasSubstr("SIP/2.0 200 OK"));
+        EXPECT_THAT(buffer.toString(), testing::HasSubstr("SIP/2.0 200 OK"));
         buffer.drain(buffer.length());
       }));
-      
+
   completeResponse();
 
   destroyRouter();
@@ -1422,8 +1431,7 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestEmptyDestination) {
 
   EXPECT_CALL(upstream_connection_, write(_, _))
       .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_THAT(buffer.toString(),
-                    testing::HasSubstr("SIP/2.0 200 OK"));
+        EXPECT_THAT(buffer.toString(), testing::HasSubstr("SIP/2.0 200 OK"));
         buffer.drain(buffer.length());
       }));
 
@@ -1445,7 +1453,6 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestNoHost) {
   initializeMetadataResponse();
 
   EXPECT_CALL(upstream_connection_, write(_, _)).Times(0);
-
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -1474,7 +1481,7 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestInConnectedUpstreamConnection) {
   connectUpstream();
   completeRequest();
   destroyRouter();
-  
+
   initUpstreamRequest(origin_ingress_.toHeaderValue());
 
   initializeRouter();
@@ -1482,7 +1489,7 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestInConnectedUpstreamConnection) {
   initializeTransaction();
   initializeMetadataResponse();
   startResponse(FilterStatus::Continue);
-  
+
   destroyRouter();
 }
 
@@ -1499,9 +1506,9 @@ TEST_F(SipRouterTest, ResponseToUpstreamRequestInConnectingUpstreamConnection) {
   initializeTransaction();
   initializeMetadata(MsgType::Request);
   startRequest();
-  
+
   startResponse(FilterStatus::StopIteration);
-  
+
   destroyRouter();
 }
 
@@ -1521,8 +1528,9 @@ TEST_F(SipRouterTest, LocalReplyToUpstreamRequest) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled", initUpstreamRequest(origin_ingress_.toHeaderValue()));
-  
+  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled",
+                      initUpstreamRequest(origin_ingress_.toHeaderValue()));
+
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
   std::shared_ptr<UpstreamConnection> upstream_connection_ptr =
       transaction_info_ptr->getUpstreamConnection("10.0.0.1");
@@ -1530,15 +1538,15 @@ TEST_F(SipRouterTest, LocalReplyToUpstreamRequest) {
 
   EXPECT_CALL(upstream_connection_, write(_, _))
       .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_THAT(buffer.toString(),
-                    testing::HasSubstr("SIP/2.0 503 Service Unavailable"));
+        EXPECT_THAT(buffer.toString(), testing::HasSubstr("SIP/2.0 503 Service Unavailable"));
         EXPECT_THAT(buffer.toString(),
                     testing::HasSubstr("Reason: Testing upstream local replies"));
         buffer.drain(buffer.length());
       }));
 
-  upstream_connection_ptr->onError(metadata_, ErrorCode::ServiceUnavailable, "Testing upstream local replies");
-  
+  upstream_connection_ptr->onError(metadata_, ErrorCode::ServiceUnavailable,
+                                   "Testing upstream local replies");
+
   destroyRouter();
 }
 
@@ -1558,8 +1566,9 @@ TEST_F(SipRouterTest, LocalReplyToUpstreamRequestConnectionClosed) {
   completeRequest();
 
   EXPECT_CALL(*filter_callbacks_, upstreamData(_, _, _)).Times(0);
-  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled", initUpstreamRequest(origin_ingress_.toHeaderValue()));
-  
+  EXPECT_LOG_CONTAINS("error", "Upstream transaction support disabled",
+                      initUpstreamRequest(origin_ingress_.toHeaderValue()));
+
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
   std::shared_ptr<UpstreamConnection> upstream_connection_ptr =
       transaction_info_ptr->getUpstreamConnection("10.0.0.1");
@@ -1568,8 +1577,9 @@ TEST_F(SipRouterTest, LocalReplyToUpstreamRequestConnectionClosed) {
   EXPECT_CALL(upstream_connection_, write(_, _)).Times(0);
 
   upstream_connection_ptr->releaseConnection(true);
-  upstream_connection_ptr->onError(metadata_, ErrorCode::ServiceUnavailable, "Testing upstream local replies");
-  
+  upstream_connection_ptr->onError(metadata_, ErrorCode::ServiceUnavailable,
+                                   "Testing upstream local replies");
+
   destroyRouter();
 }
 
@@ -1586,7 +1596,7 @@ TEST_F(SipRouterTest, UpstreamConnectionReset) {
   initializeMetadata(MsgType::Request);
   startRequest();
   connectUpstream();
-  
+
   auto& transaction_info_ptr = (*transaction_infos_)[cluster_name_];
   std::shared_ptr<UpstreamConnection> upstream_connection_ptr =
       transaction_info_ptr->getUpstreamConnection("10.0.0.1");
@@ -1595,9 +1605,10 @@ TEST_F(SipRouterTest, UpstreamConnectionReset) {
   EXPECT_THROW(upstream_connection_ptr->onResetStream(ConnectionPool::PoolFailureReason::Overflow),
                AppException);
   upstream_connection_ptr->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
-  upstream_connection_ptr->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  upstream_connection_ptr->onResetStream(
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   upstream_connection_ptr->onResetStream(ConnectionPool::PoolFailureReason::Timeout);
-  
+
   destroyRouter();
 }
 
@@ -1623,7 +1634,7 @@ TEST_F(SipRouterTest, HandleAffinityNoAffinityConfigured) {
       "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>");
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 0);
 
   destroyRouter();
@@ -1652,7 +1663,7 @@ TEST_F(SipRouterTest, HandleAffinityNoAffinityConfiguredForceNoLoadBalancer) {
   EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
   EXPECT_THROW(router_->messageBegin(metadata_), AppException);
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 0);
 
   destroyRouter();
@@ -1676,7 +1687,7 @@ TEST_F(SipRouterTest, HandleAffinityNoAffinityConfiguredForceLoadBalancer) {
   metadata_->affinity().clear();
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 0);
 
   destroyRouter();
@@ -1698,7 +1709,7 @@ TEST_F(SipRouterTest, HandleAffinitySessionAffinityConfigured) {
   metadata_->affinity().clear();
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 1);
   EXPECT_EQ(metadata_->affinityIteration()->header(), "Route");
   EXPECT_EQ(metadata_->affinityIteration()->type(), "ep");
@@ -1725,7 +1736,7 @@ TEST_F(SipRouterTest, HandleAffinitySessionAffinityConfiguredWithRegisterMsg) {
   metadata_->affinity().clear();
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 0);
 
   destroyRouter();
@@ -1748,7 +1759,7 @@ TEST_F(SipRouterTest, HandleAffinityRegistrationAffinityConfigured) {
   metadata_->setOpaque("10.0.0.1");
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 1);
   EXPECT_EQ(metadata_->affinityIteration()->header(), "Route");
   EXPECT_EQ(metadata_->affinityIteration()->type(), "ep");
@@ -1776,7 +1787,7 @@ TEST_F(SipRouterTest, HandleAffinityRegistrationAffinityConfiguredWithNonRegiste
   metadata_->setOpaque("10.0.0.1");
 
   startRequest();
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 0);
 
   destroyRouter();
@@ -1820,17 +1831,18 @@ TEST_F(SipRouterTest, HandleAffinityCustomizedAffinityConfigured) {
       HeaderType::TopLine,
       "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0<lskpmc=10.0.0.1>");
   metadata_->removeMsgHeader(HeaderType::Route);
-  metadata_->addMsgHeader(
-      HeaderType::Path,
-      "Path: <sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster.local:5060;inst-ip=192.169.110.53;lr;ottag=ue_term;bidx=563242011197570;access-type=ADSL;x-alu-prset-id;header_route=10.0.0.1>");
-  metadata_->addMsgHeader(
-      HeaderType::XEnvoyOriginIngress,"XEnvoyOriginIngress");
+  metadata_->addMsgHeader(HeaderType::Path,
+                          "Path: "
+                          "<sip:10.177.8.232;x-fbi=cfed;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+                          "local:5060;inst-ip=192.169.110.53;lr;ottag=ue_term;bidx=563242011197570;"
+                          "access-type=ADSL;x-alu-prset-id;header_route=10.0.0.1>");
+  metadata_->addMsgHeader(HeaderType::XEnvoyOriginIngress, "XEnvoyOriginIngress");
 
   EXPECT_CALL(callbacks_, route()).WillRepeatedly(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillRepeatedly(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
-  
+
   EXPECT_EQ(metadata_->affinity().size(), 3);
   EXPECT_EQ(metadata_->affinityIteration()->header(), "");
   EXPECT_EQ(metadata_->affinityIteration()->type(), "ep");

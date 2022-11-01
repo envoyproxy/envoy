@@ -75,10 +75,10 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   }
 
   // Map of upstream transactions per worker thread
-  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos = 
+  std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos =
       std::make_shared<SipProxy::UpstreamTransactionInfos>(
-      context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
-                                 proto_config.settings(), transaction_timeout, 32000)));
+          context.threadLocal(), static_cast<std::chrono::milliseconds>(PROTOBUF_GET_MS_OR_DEFAULT(
+                                     proto_config.settings(), transaction_timeout, 32000)));
   upstream_transaction_infos->init();
 
   // Map of downstream connections per worker thread

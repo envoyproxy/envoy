@@ -32,7 +32,8 @@ namespace SipProxy {
 class SipTraTest : public testing::Test {
 public:
   SipTraTest() : stream_info_(time_source_, nullptr) {}
-  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep> initTraHandler(bool stream_start_failing = false) {
+  std::shared_ptr<SipProxy::MockTrafficRoutingAssistantHandlerDeep>
+  initTraHandler(bool stream_start_failing = false) {
     std::string tra_yaml = R"EOF(
                grpc_service:
                  envoy_grpc:
@@ -364,7 +365,8 @@ TEST_F(SipTraTest, Misc) {
   MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>("");
   metadata->setMethodType(MethodType::Register);
   metadata->addMsgHeader(HeaderType::From, "user@sip.com");
-  grpc_client.createTrafficRoutingAssistant("lskpmc", data, metadata->traContext(), span_, stream_info_);
+  grpc_client.createTrafficRoutingAssistant("lskpmc", data, metadata->traContext(), span_,
+                                            stream_info_);
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_cb->onCreateInitialMetadata(request_headers);
