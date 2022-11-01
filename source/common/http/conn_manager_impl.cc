@@ -770,37 +770,10 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
-  // See below for more information on this early return block.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
-                   "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    return;
-  }
-
-  // There are 2 issues in the blow code. First, `responseHeaders().has_value()` is not the best
-  // predicate. `remoteDecodeComplete()` is preferable. Second, `sendLocalReply()` smartly ends the
-  // stream if any response was pushed to decoder and explicitly `endStream()` is not required.
-  //
-  // The above code is expected to resolve both. The original code here before it is fully verified.
-  //
-  // TODO(lambdai): delete the block below along with the removal of
-  // `override_request_timeout_by_gateway_timeout`.
-
-  // If headers have not been sent to the user, send a 408.
-  if (responseHeaders().has_value()) {
-    // TODO(htuch): We could send trailers here with an x-envoy timeout header
-    // or gRPC status code, and/or set H2 RST_STREAM error.
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    connection_manager_.doEndStream(*this);
-  } else {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-  }
+  filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+                 "stream timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
@@ -975,19 +948,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
-  // This lambda should be erased when
-  // `envoy.reloadable_features.http_100_continue_case_insensitive` is removed.
-  auto is100Continue = [](absl::string_view request_expect) {
-    return request_expect == Headers::get().ExpectValues._100Continue ||
-           (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http_100_continue_case_insensitive") &&
-            // The Expect field-value is case-insensitive.
-            // https://tools.ietf.org/html/rfc7231#section-5.1.1
-            absl::EqualsIgnoreCase(request_expect, Headers::get().ExpectValues._100Continue));
-  };
-
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
-      is100Continue(request_headers_->Expect()->value().getStringView())) {
+      // The Expect field-value is case-insensitive.
+      // https://tools.ietf.org/html/rfc7231#section-5.1.1
+      absl::EqualsIgnoreCase((request_headers_->Expect()->value().getStringView()),
+                             Headers::get().ExpectValues._100Continue)) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());

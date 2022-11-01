@@ -217,13 +217,13 @@ paths:
     - test/test_common/wasm_base.h
 
 dir_order:
-  - envoy
-  - common
-  - source
-  - exe
-  - server
-  - extensions
-  - test
+- envoy
+- common
+- source
+- exe
+- server
+- extensions
+- test
 
 re:
   codeowners_contrib: (/contrib/[^@]*\s+)(@.*)
