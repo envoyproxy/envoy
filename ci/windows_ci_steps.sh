@@ -88,7 +88,7 @@ fi
 
 # Complete envoy-static build
 if [[ $BUILD_ENVOY_STATIC -eq 1 ]]; then
-  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build --output_groups=+pdb_file "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
+  bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
 
   # Copy binary and pdb to delivery directory
   cp -f bazel-bin/source/exe/envoy-static.exe "${ENVOY_DELIVERY_DIR}/envoy.exe"
