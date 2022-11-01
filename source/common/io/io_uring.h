@@ -114,6 +114,8 @@ public:
     virtual void reset() PURE;
 };
 
+class IoUringWorker;
+
 /**
  * Abstract factory for IoUring wrappers.
  */
@@ -121,12 +123,11 @@ class IoUringFactory {
 public:
   virtual ~IoUringFactory() = default;
 
+  virtual OptRef<IoUringWorker> getIoUringWorker() const PURE;
   /**
    * Returns an instance of IoUring for the current thread.
    */
   virtual OptRef<IoUring> get() const PURE;
-
-  virtual FileEventAdapter& getFileEventAdapter() PURE;
 
   /**
    * Initializes a factory upon server readiness. For example this method can be
@@ -141,8 +142,10 @@ class IoUringWorker : public ThreadLocal::ThreadLocalObject {
 public:
   virtual ~IoUringWorker() = default;
 
+  virtual void initialize(Event::Dispatcher& dispatcher,
+                          Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual void reset() PURE;
   virtual IoUring& get() PURE;
-  virtual FileEventAdapter& getFileEventAdapter() PURE;
 };
 
 class IoUringHandler;

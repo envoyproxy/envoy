@@ -80,6 +80,7 @@ private:
 
   const uint32_t read_buffer_size_;
   Io::IoUringFactory& io_uring_factory_;
+  OptRef<Io::IoUringWorker> io_uring_worker_{absl::nullopt};
   os_fd_t fd_;
   int socket_v6only_;
   const absl::optional<int> domain_;

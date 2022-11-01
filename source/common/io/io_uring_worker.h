@@ -28,8 +28,10 @@ private:
 class IoUringWorkerImpl : public IoUringWorker {
 public:
     IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
+    void initialize(Event::Dispatcher& dispatcher,
+                    Event::FileTriggerType trigger, uint32_t events) override;
+    void reset() override { file_event_adapter_.reset(); }
     IoUring& get() override;
-    FileEventAdapter& getFileEventAdapter() override;
 
 private:
     IoUringImpl io_uring_impl_;

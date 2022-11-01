@@ -10,6 +10,14 @@ IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submissi
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
       tls_(tls) {}
 
+OptRef<IoUringWorker> IoUringFactoryImpl::getIoUringWorker() const {
+  auto ret = tls_.get();
+  if (ret == absl::nullopt) {
+    return absl::nullopt;
+  }
+  return ret.ref();
+}
+
 OptRef<IoUring> IoUringFactoryImpl::get() const {
   auto ret = tls_.get();
   if (ret == absl::nullopt) {
@@ -26,11 +34,6 @@ void IoUringFactoryImpl::onServerInitialized() {
 }
 
 bool IoUringFactoryImpl::currentThreadRegistered() { return tls_.currentThreadRegistered(); }
-
-FileEventAdapter& IoUringFactoryImpl::getFileEventAdapter() {
-  auto ret = tls_.get();
-  return ret.ref().getFileEventAdapter();
-}
 
 } // namespace Io
 } // namespace Envoy

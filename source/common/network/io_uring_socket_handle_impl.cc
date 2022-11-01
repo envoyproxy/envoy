@@ -305,7 +305,8 @@ Address::InstanceConstSharedPtr IoUringSocketHandleImpl::peerAddress() {
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType trigger, uint32_t events) {
-  io_uring_factory_.getFileEventAdapter().initialize(dispatcher, trigger, events);
+  io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
+  io_uring_worker_.ref().initialize(dispatcher, trigger, events);
 
   if (is_listen_socket_) {
     addAcceptRequest();
@@ -336,7 +337,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::resetFileEvents() {
   // This isn't right, we should reset the whole file event.
-  io_uring_factory_.getFileEventAdapter().reset();
+  io_uring_worker_.ref().reset();
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {

@@ -12,12 +12,12 @@ public:
   IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                      ThreadLocal::SlotAllocator& tls);
 
+  OptRef<IoUringWorker> getIoUringWorker() const override;
   // IoUringFactory
   // TODO (soulxu): rename this method, it only about `get`.
   OptRef<IoUring> get() const override;
   void onServerInitialized() override;
   bool currentThreadRegistered() override;
-  FileEventAdapter& getFileEventAdapter() override;
 
 private:
   const uint32_t io_uring_size_{};

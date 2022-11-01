@@ -41,12 +41,13 @@ void FileEventAdapterImpl::initialize(Event::Dispatcher& dispatcher,
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling) :
     io_uring_impl_(io_uring_size, use_submission_queue_polling), file_event_adapter_(io_uring_impl_) { }
 
-IoUring& IoUringWorkerImpl::get() {
-    return io_uring_impl_;
+void IoUringWorkerImpl::initialize(Event::Dispatcher& dispatcher,
+                Event::FileTriggerType trigger, uint32_t events) {
+  file_event_adapter_.initialize(dispatcher, trigger, events);
 }
 
-FileEventAdapter& IoUringWorkerImpl::getFileEventAdapter() {
-    return file_event_adapter_;
+IoUring& IoUringWorkerImpl::get() {
+    return io_uring_impl_;
 }
 
 } // namespace Io
