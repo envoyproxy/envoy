@@ -601,13 +601,13 @@ TEST_F(FilterTest, ActiveStreamAddFiltersOrder) {
   EXPECT_EQ(3, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(3, active_stream->encoderFiltersForTest().size());
 
-  EXPECT_EQ(filter_0.get(), active_stream->decoderFiltersForTest()[0].get());
-  EXPECT_EQ(filter_1.get(), active_stream->decoderFiltersForTest()[1].get());
-  EXPECT_EQ(filter_2.get(), active_stream->decoderFiltersForTest()[2].get());
+  EXPECT_EQ(filter_0.get(), active_stream->decoderFiltersForTest()[0]->filter_.get());
+  EXPECT_EQ(filter_1.get(), active_stream->decoderFiltersForTest()[1]->filter_.get());
+  EXPECT_EQ(filter_2.get(), active_stream->decoderFiltersForTest()[2]->filter_.get());
 
-  EXPECT_EQ(filter_2.get(), active_stream->encoderFiltersForTest()[0].get());
-  EXPECT_EQ(filter_1.get(), active_stream->encoderFiltersForTest()[1].get());
-  EXPECT_EQ(filter_0.get(), active_stream->encoderFiltersForTest()[2].get());
+  EXPECT_EQ(filter_2.get(), active_stream->encoderFiltersForTest()[0]->filter_.get());
+  EXPECT_EQ(filter_1.get(), active_stream->encoderFiltersForTest()[1]->filter_.get());
+  EXPECT_EQ(filter_0.get(), active_stream->encoderFiltersForTest()[2]->filter_.get());
 }
 
 TEST_F(FilterTest, ActiveStreamFiltersContinueDecoding) {
