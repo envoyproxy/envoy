@@ -139,6 +139,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
@@ -176,6 +177,7 @@ envoy_cc_benchmark_binary(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:utility_lib",
         "//source/common/config/xds_mux:grpc_mux_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",

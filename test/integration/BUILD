@@ -136,6 +136,7 @@ envoy_cc_test(
     srcs = ["eds_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:load_balancer_lib",
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",

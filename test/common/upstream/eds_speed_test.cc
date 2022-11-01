@@ -14,6 +14,7 @@
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/eds.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -76,7 +77,7 @@ public:
             refresh_delay: 1s
     )EOF",
                  Envoy::Upstream::Cluster::InitializePhase::Secondary);
-    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
     if (multiplex_eds) {
       EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
     } else {
@@ -99,7 +100,7 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
     eds_callbacks_ = multiplex_eds ? cm_.multiplexed_subscription_factory_.callbacks_
                                    : cm_.subscription_factory_.callbacks_;
     subscription_ = std::make_unique<Config::GrpcSubscriptionImpl>(

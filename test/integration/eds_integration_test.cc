@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include "test/config/utility.h"
@@ -611,7 +612,7 @@ protected:
     eds_cluster_config->mutable_eds_config()->set_resource_api_version(
         envoy::config::core::v3::ApiVersion::V3);
     if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
-      eds_cluster_config->set_multiplex_eds(true);
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.multiplex_eds", "true");
     }
     auto* api_config_source = eds_cluster_config->mutable_eds_config()->mutable_api_config_source();
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);

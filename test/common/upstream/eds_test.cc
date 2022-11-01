@@ -134,13 +134,13 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
     eds_callbacks_ = multiplex_eds ? cm_.multiplexed_subscription_factory_.callbacks_
                                    : cm_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    auto multiplex_eds = eds_cluster_.eds_cluster_config().multiplex_eds();
+    bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
     if (multiplex_eds) {
       EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
     } else {
@@ -2489,7 +2489,8 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
                             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
-TEST_F(EdsTest, MultiplexEdsEnabledInApi) {
+TEST_F(EdsTest, MultiplexEdsEnabledViaRuntime) {
+  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
   EXPECT_CALL(cm_.multiplexed_subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _));
   EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _)).Times(0);
@@ -2498,7 +2499,6 @@ TEST_F(EdsTest, MultiplexEdsEnabledInApi) {
       connect_timeout: 0.25s
       type: EDS
       eds_cluster_config:
-        multiplex_eds: true
         eds_config:
           resource_api_version: V3
           api_config_source:
@@ -2511,7 +2511,8 @@ TEST_F(EdsTest, MultiplexEdsEnabledInApi) {
                Cluster::InitializePhase::Secondary);
 }
 
-TEST_F(EdsTest, MultiplexEdsDisabledInApi) {
+TEST_F(EdsTest, MultiplexEdsDisabledViaRuntime) {
+  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "false"}});
   EXPECT_CALL(cm_.multiplexed_subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
       .Times(0);
   EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _));
@@ -2520,7 +2521,6 @@ TEST_F(EdsTest, MultiplexEdsDisabledInApi) {
       connect_timeout: 0.25s
       type: EDS
       eds_cluster_config:
-        multiplex_eds: false
         eds_config:
           resource_api_version: V3
           api_config_source:
@@ -2534,13 +2534,13 @@ TEST_F(EdsTest, MultiplexEdsDisabledInApi) {
 }
 
 TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiType) {
+  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
   EXPECT_THROW_WITH_MESSAGE(
       resetCluster(R"EOF(
       name: some_cluster
       connect_timeout: 0.25s
       type: EDS
       eds_cluster_config:
-        multiplex_eds: true
         eds_config:
           api_config_source:
             api_type: REST

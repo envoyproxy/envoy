@@ -9,6 +9,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -37,7 +38,7 @@ EdsClusterImpl::EdsClusterImpl(
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  if (cluster.eds_cluster_config().multiplex_eds()) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds")) {
     if (eds_config.api_config_source().api_type() !=
             envoy::config::core::v3::ApiConfigSource::GRPC &&
         eds_config.api_config_source().api_type() !=
@@ -45,7 +46,7 @@ EdsClusterImpl::EdsClusterImpl(
       throw EnvoyException("EDS multiplexing can only be configured for GRPC and DELTA_GRPC type "
                            "of api config source.");
     }
-    ENVOY_LOG(debug, "Multiplexing EDS updates over single stream for cluster ", cluster_name_);
+    ENVOY_LOG(trace, "Multiplexing EDS updates over single stream for cluster ", cluster_name_);
     subscription_ =
         factory_context.clusterManager()
             .multiplexedSubscriptionFactory()
