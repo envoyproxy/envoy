@@ -2,6 +2,7 @@
 
 set -e
 
+# shellcheck disable=SC1091
 . envoy/tools/shell_utils.sh
 
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.

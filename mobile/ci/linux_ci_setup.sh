@@ -24,6 +24,8 @@ echo "y" | $SDKMANAGER --install "ndk;21.4.7075529"
 $SDKMANAGER --install "platforms;android-30"
 $SDKMANAGER --install "build-tools;30.0.2"
 
-echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/21.4.7075529" >> $GITHUB_ENV
+{
+    echo "ANDROID_HOME=${ANDROID_HOME}"
+    echo "ANDROID_SDK_ROOT=${ANDROID_HOME}"
+    echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/21.4.7075529"
+}  >> "$GITHUB_ENV"
