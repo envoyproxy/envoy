@@ -47,11 +47,11 @@ envoy_cc_test(
     data = [
         ":server_test_data",
         "//configs:example_configs",
-        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//test/config_test:example_configs_test_setup.sh",
     ],
     env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
