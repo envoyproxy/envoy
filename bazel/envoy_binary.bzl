@@ -4,11 +4,11 @@ load(
     ":envoy_internal.bzl",
     "envoy_copts",
     "envoy_dbg_linkopts",
+    "envoy_exported_symbols_input",
     "envoy_external_dep_path",
+    "envoy_select_exported_symbols",
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
-    "envoy_exported_symbols_input",
-    "envoy_select_exported_symbols",
 )
 
 # Envoy C++ binary targets should be specified with this function.
