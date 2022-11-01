@@ -1,4 +1,4 @@
-load("@pip//:requirements.bzl", "requirement")
+load("@mobile_pip3//:requirements.bzl", "requirement")
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@python_abi//:abi.bzl", "abi_tag", "python_tag")
 load("@rules_python//python:defs.bzl", "py_library")
