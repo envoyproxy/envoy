@@ -520,6 +520,7 @@ envoy_cc_library(
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":logical_dns_cluster_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
