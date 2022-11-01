@@ -182,7 +182,8 @@ public:
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
-        .WillByDefault(SaveArg<0>(&access_log_data_));
+        .WillByDefault(
+            Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
@@ -290,16 +291,31 @@ use_original_src_ip: true
 
   // Return the config from yaml, plus one file access log with the specified format
   envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig
-  accessLogConfig(const std::string& yaml, const std::string& access_log_format) {
+  accessLogConfig(const std::string& yaml, const std::string& session_access_log_format,
+                  const std::string& proxy_access_log_format) {
     auto config = readConfig(yaml);
 
-    envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
-    access_log->set_name("envoy.access_loggers.file");
-    envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
-    file_access_log.set_path("unused");
-    file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        access_log_format);
-    access_log->mutable_typed_config()->PackFrom(file_access_log);
+    if (!session_access_log_format.empty()) {
+      envoy::config::accesslog::v3::AccessLog* session_access_log =
+          config.mutable_access_log()->Add();
+      session_access_log->set_name("envoy.access_loggers.file");
+      envoy::extensions::access_loggers::file::v3::FileAccessLog session_file_access_log;
+      session_file_access_log.set_path("unused");
+      session_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+          session_access_log_format);
+      session_access_log->mutable_typed_config()->PackFrom(session_file_access_log);
+    }
+
+    if (!proxy_access_log_format.empty()) {
+      envoy::config::accesslog::v3::AccessLog* proxy_access_log =
+          config.mutable_proxy_access_log()->Add();
+      proxy_access_log->set_name("envoy.access_loggers.file");
+      envoy::extensions::access_loggers::file::v3::FileAccessLog proxy_file_access_log;
+      proxy_file_access_log.set_path("unused");
+      proxy_file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+          proxy_access_log_format);
+      proxy_access_log->mutable_typed_config()->PackFrom(proxy_file_access_log);
+    }
     return config;
   }
 
@@ -329,6 +345,7 @@ use_original_src_ip: true
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
   StringViewSaver access_log_data_;
+  std::vector<std::string> output_;
   bool expect_gro_{};
   const Network::Address::InstanceConstSharedPtr upstream_address_;
   const Network::Address::InstanceConstSharedPtr peer_address_;
@@ -383,10 +400,20 @@ public:
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)%";
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)%";
+
+  const std::string proxy_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:datagrams_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:bytes_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:datagrams_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:session_total)% "
+      "%DYNAMIC_METADATA(udp.proxy.proxy:idle_timeout)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -400,7 +427,7 @@ matcher:
 upstream_socket_config:
   prefer_gro: false
   )EOF",
-                        access_log_format),
+                        session_access_log_format, proxy_access_log_format),
         true, false);
 
   expectSessionCreate(upstream_address_);
@@ -425,7 +452,9 @@ upstream_socket_config:
   checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 17 /*tx_bytes*/, 3 /*tx_datagrams*/);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "17 3 17 3");
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "17 3 17 3 0 1 0");
+  EXPECT_EQ(output_.back(), "17 3 17 3");
 }
 
 // Route with source IP.
@@ -475,7 +504,12 @@ matcher:
 TEST_F(UdpProxyFilterTest, IdleTimeout) {
   InSequence s;
 
-  setup(readConfig(R"EOF(
+  const std::string session_access_log_format = "";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:session_total)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:idle_timeout)%";
+
+  setup(accessLogConfig(R"EOF(
 stat_prefix: foo
 matcher:
   on_no_match:
@@ -484,7 +518,8 @@ matcher:
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
-  )EOF"));
+  )EOF",
+                        session_access_log_format, proxy_access_log_format));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
@@ -501,19 +536,28 @@ matcher:
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_.front(), "2 1");
 }
 
 // Verify downstream send and receive error handling.
 TEST_F(UdpProxyFilterTest, SendReceiveErrorHandling) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:cluster_name)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)%";
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:errors_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:errors_received)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:session_total)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:idle_timeout)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -525,7 +569,7 @@ matcher:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
   )EOF",
-                        access_log_format));
+                        session_access_log_format, proxy_access_log_format));
 
   filter_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
   EXPECT_EQ(1, config_->stats().downstream_sess_rx_errors_.value());
@@ -565,20 +609,25 @@ matcher:
              ->value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 10 1 1 0 2");
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "1 0 1 0");
+  EXPECT_EQ(output_.back(), "fake_cluster 0 10 1 0 2");
 }
 
 // Verify upstream connect error handling.
 TEST_F(UdpProxyFilterTest, ConnectErrorHandling) {
   InSequence s;
 
-  const std::string access_log_format = "%DYNAMIC_METADATA(udp.proxy:cluster_name)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:bytes_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:errors_received)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_sent)% "
-                                        "%DYNAMIC_METADATA(udp.proxy:datagrams_received)%";
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:bytes_received)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:errors_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_sent)% "
+      "%DYNAMIC_METADATA(udp.proxy.session:datagrams_received)%";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:errors_received)% "
+                                              "%DYNAMIC_METADATA(udp.proxy.proxy:session_total)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -590,7 +639,7 @@ matcher:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
   )EOF",
-                        access_log_format));
+                        session_access_log_format, proxy_access_log_format));
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true, 1);
@@ -604,7 +653,9 @@ matcher:
              ->value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_.value(), "fake_cluster 0 5 0 0 0 1");
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "0 1");
+  EXPECT_EQ(output_.back(), "fake_cluster 0 5 0 0 1");
 }
 
 // No upstream host handling.
@@ -633,7 +684,11 @@ matcher:
 TEST_F(UdpProxyFilterTest, NoUpstreamClusterAtCreation) {
   InSequence s;
 
-  setup(readConfig(R"EOF(
+  const std::string session_access_log_format = "";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)%";
+
+  setup(accessLogConfig(R"EOF(
 stat_prefix: foo
 matcher:
   on_no_match:
@@ -642,11 +697,16 @@ matcher:
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
-  )EOF"),
+  )EOF",
+                        session_access_log_format, proxy_access_log_format),
         false);
 
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_.front(), "1");
 }
 
 // Dynamic cluster addition and removal handling.

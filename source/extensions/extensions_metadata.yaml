@@ -771,21 +771,21 @@ envoy.matching.matchers.ip:
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
 envoy.path.match.uri_template.uri_template_matcher:
-    categories:
-    - envoy.path.match
-    security_posture: robust_to_untrusted_downstream_and_upstream
-    status: stable
-    undocumented: true
-    type_urls:
-    - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+  categories:
+  - envoy.path.match
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  undocumented: true
+  type_urls:
+  - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
 envoy.path.rewrite.uri_template.uri_template_rewriter:
-      categories:
-      - envoy.path.rewrite
-      security_posture: robust_to_untrusted_downstream_and_upstream
-      status: stable
-      undocumented: true
-      type_urls:
-      - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+  categories:
+  - envoy.path.rewrite
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  undocumented: true
+  type_urls:
+  - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
@@ -1096,17 +1096,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
