@@ -21,35 +21,35 @@ import sys
 
 # https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
 class SubstitutionCodeBlock(CodeBlock):
-  """
+    """
   Similar to CodeBlock but replaces placeholders with variables. See "substitutions" below.
   """
 
-  def run(self):
-    """
+    def run(self):
+        """
     Replace placeholders with given variables.
     """
-    app = self.state.document.settings.env.app
-    new_content = []
-    existing_content = self.content
-    for item in existing_content:
-      for pair in app.config.substitutions:
-        original, replacement = pair
-        item = item.replace(original, replacement)
-      new_content.append(item)
+        app = self.state.document.settings.env.app
+        new_content = []
+        existing_content = self.content
+        for item in existing_content:
+            for pair in app.config.substitutions:
+                original, replacement = pair
+                item = item.replace(original, replacement)
+            new_content.append(item)
 
-    self.content = new_content
-    return list(CodeBlock.run(self))
+        self.content = new_content
+        return list(CodeBlock.run(self))
 
 
 def setup(app):
-  app.add_config_value('release_level', '', 'env')
-  app.add_config_value('substitutions', [], 'html')
-  app.add_directive('substitution-code-block', SubstitutionCodeBlock)
+    app.add_config_value('release_level', '', 'env')
+    app.add_config_value('substitutions', [], 'html')
+    app.add_directive('substitution-code-block', SubstitutionCodeBlock)
 
 
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
-  raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
+    raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
 
 release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
 blob_sha = os.environ['ENVOY_BLOB_SHA']
@@ -101,7 +101,7 @@ copyright = u'{} {}'.format(datetime.now().year, author)
 # built documents.
 
 if not os.environ.get('ENVOY_DOCS_VERSION_STRING'):
-  raise Exception("ENVOY_DOCS_VERSION_STRING env var must be defined")
+    raise Exception("ENVOY_DOCS_VERSION_STRING env var must be defined")
 
 # The short X.Y version.
 version = os.environ['ENVOY_DOCS_VERSION_STRING']

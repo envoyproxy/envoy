@@ -5,7 +5,6 @@ from library.python.envoy_requests import gevent
 from library.python.envoy_requests import threading
 from library.python.envoy_requests.response import Response
 
-
 METHODS = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE"]
 
 

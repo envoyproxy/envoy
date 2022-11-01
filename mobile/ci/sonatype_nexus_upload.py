@@ -16,14 +16,15 @@ except ImportError:  # python 2
 
 _USER_CREDS = os.environ.get("READWRITE_USER", "")
 _KEY_CREDS = os.environ.get("READWRITE_API_KEY", "")
-BASE64_ENCODED_CREDENTIALS = base64.b64encode("{}:{}".format(_USER_CREDS, _KEY_CREDS).encode()).decode()
+BASE64_ENCODED_CREDENTIALS = base64.b64encode("{}:{}".format(_USER_CREDS,
+                                                             _KEY_CREDS).encode()).decode()
 
 _ARTIFACT_HOST_URL = "https://oss.sonatype.org/service/local/staging"
 _GROUP_ID = "io.envoyproxy.envoymobile"
 _ARTIFACT_ID = "envoy"
-_LOCAL_INSTALL_PATH = os.path.expanduser("~/.m2/repository/{directory}/envoy".format(
-    directory=_GROUP_ID.replace(".", "/"),
-    artifact_id=_ARTIFACT_ID))
+_LOCAL_INSTALL_PATH = os.path.expanduser(
+    "~/.m2/repository/{directory}/envoy".format(
+        directory=_GROUP_ID.replace(".", "/"), artifact_id=_ARTIFACT_ID))
 
 
 def _resolve_name(file):
@@ -63,11 +64,7 @@ def _install_locally(version, files):
     for file in files:
         suffix, file_extension = _resolve_name(file)
         basename = "{name}-{version}{suffix}.{extension}".format(
-            name=_ARTIFACT_ID,
-            version=version,
-            suffix=suffix,
-            extension=file_extension
-        )
+            name=_ARTIFACT_ID, version=version, suffix=suffix, extension=file_extension)
 
         shutil.copyfile(file, os.path.join(path, basename))
         print("{file_name}\n{sha}\n".format(file_name=file, sha=_sha256(file)))
@@ -89,17 +86,14 @@ def _urlopen_retried(request, max_retries=500, attempt=1, delay_sec=1):
         if max_retries > attempt and e.code >= 500:
             print(
                 "[{retry_attempt}/{max_retries} Retry attempt] Retrying request after {delay}s."
-                " Received error code {code}"
-                    .format(
-                    retry_attempt=attempt,
-                    max_retries=max_retries,
-                    delay=delay_sec,
-                    code=e.code
-                ))
+                " Received error code {code}".format(
+                    retry_attempt=attempt, max_retries=max_retries, delay=delay_sec, code=e.code))
             time.sleep(delay_sec)
             return _urlopen_retried(request, max_retries, attempt + 1)
         elif max_retries <= attempt:
-            print("Retry limit reached. Will not continue to retry. Received error code {}".format(e.code))
+            print(
+                "Retry limit reached. Will not continue to retry. Received error code {}".format(
+                    e.code))
             raise e
         else:
             raise e
@@ -108,11 +102,7 @@ def _urlopen_retried(request, max_retries=500, attempt=1, delay_sec=1):
 def _create_staging_repository(profile_id):
     try:
         url = os.path.join(_ARTIFACT_HOST_URL, "profiles/{}/start".format(profile_id))
-        data = {
-            'data': {
-                'description': ''
-            }
-        }
+        data = {'data': {'description': ''}}
         request = Request(url)
         request.add_header("Authorization", "Basic {}".format(BASE64_ENCODED_CREDENTIALS))
         request.add_header("Content-Type", "application/json")
@@ -137,27 +127,19 @@ def _upload_files(staging_id, version, files, ascs, sha256):
         print("Uploading file {}".format(file))
         suffix, file_extension = _resolve_name(file)
         basename = "{name}-{version}{suffix}.{extension}".format(
-            name=_ARTIFACT_ID,
-            version=version,
-            suffix=suffix,
-            extension=file_extension
-        )
+            name=_ARTIFACT_ID, version=version, suffix=suffix, extension=file_extension)
 
         artifact_url = os.path.join(
-            _ARTIFACT_HOST_URL,
-            "deployByRepositoryId/{}".format(staging_id),
-            _GROUP_ID.replace('.', "/"),
-            _ARTIFACT_ID,
-            version,
-            basename
-        )
+            _ARTIFACT_HOST_URL, "deployByRepositoryId/{}".format(staging_id),
+            _GROUP_ID.replace('.', "/"), _ARTIFACT_ID, version, basename)
 
         try:
             with open(file, "rb") as f:
                 request = Request(artifact_url, f.read())
 
             request.add_header("Authorization", "Basic {}".format(BASE64_ENCODED_CREDENTIALS))
-            request.add_header("Content-Type", "application/x-{extension}".format(extension=file_extension))
+            request.add_header(
+                "Content-Type", "application/x-{extension}".format(extension=file_extension))
             request.get_method = lambda: "PUT"
             _urlopen_retried(request)
             uploaded_file_count = uploaded_file_count + 1
@@ -175,12 +157,7 @@ def _upload_files(staging_id, version, files, ascs, sha256):
 
 def _close_staging_repository(profile_id, staging_id):
     url = os.path.join(_ARTIFACT_HOST_URL, "profiles/{}/finish".format(profile_id))
-    data = {
-        'data': {
-            'stagedRepositoryId': staging_id,
-            'description': ''
-        }
-    }
+    data = {'data': {'stagedRepositoryId': staging_id, 'description': ''}}
 
     try:
         request = Request(url)
@@ -196,12 +173,7 @@ def _close_staging_repository(profile_id, staging_id):
 
 def _drop_staging_repository(staging_id, message):
     url = os.path.join(_ARTIFACT_HOST_URL, "bulk/drop")
-    data = {
-        'data': {
-            'stagedRepositoryIds': [staging_id],
-            'description': message
-        }
-    }
+    data = {'data': {'stagedRepositoryIds': [staging_id], 'description': message}}
 
     try:
         request = Request(url)
@@ -217,12 +189,7 @@ def _drop_staging_repository(staging_id, message):
 
 def _release_staging_repository(staging_id):
     url = os.path.join(_ARTIFACT_HOST_URL, "bulk/promote")
-    data = {
-        'data': {
-            'stagedRepositoryIds': [staging_id],
-            'description': ''
-        }
-    }
+    data = {'data': {'stagedRepositoryIds': [staging_id], 'description': ''}}
 
     try:
         request = Request(url)
@@ -258,26 +225,37 @@ def _sha256(file_name):
 
 def _build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile_id", required=False,
-                        help="""
+    parser.add_argument(
+        "--profile_id",
+        required=False,
+        help="""
                         The staging profile id of the sonatype repository target.
                         This is the id in the sonatype web ui. The REST api is:
                         curl -u {usr}:{psswrd} -H "Accept: application/json"
                         https://oss.sonatype.org//nexus/service/local/staging/profile_repositories
                         """)
-    parser.add_argument("--version", default="LOCAL-SNAPSHOT",
-                        help="""
+    parser.add_argument(
+        "--version",
+        default="LOCAL-SNAPSHOT",
+        help="""
                         The version of the artifact to be published. `LOCAL-SNAPSHOT` is defaulted
                         if the version is not set. This version should be consistent with the pom.xml
                         provided.
                         """)
-    parser.add_argument("--local", nargs='?', const=True, default=False,
-                        help="""
+    parser.add_argument(
+        "--local",
+        nargs='?',
+        const=True,
+        default=False,
+        help="""
                         For installing artifacts into local maven. For now, we only support
                         installing to the path `~/.m2/repository/io/envoyproxy/envoymobile/`
                         """)
-    parser.add_argument("--files", nargs="+", required=True,
-                        help="""
+    parser.add_argument(
+        "--files",
+        nargs="+",
+        required=True,
+        help="""
                         Files to upload
 
                         The checklist for Envoy Mobile files are:
@@ -286,8 +264,11 @@ def _build_parser():
                             envoy-sources.jar
                             envoy-javadoc.jar
                         """)
-    parser.add_argument("--signed_files", nargs="+", required=False,
-                        help="""
+    parser.add_argument(
+        "--signed_files",
+        nargs="+",
+        required=False,
+        help="""
                         Files to upload.
                         Sonatype requires uploaded artifacts to be gpg signed
 
@@ -320,7 +301,8 @@ if __name__ == "__main__":
         try:
             print("Uploading files...")
             sha256_files = _create_sha256_files(args.files)
-            uploaded_file_count = _upload_files(staging_id, version, args.files, args.signed_files, sha256_files)
+            uploaded_file_count = _upload_files(
+                staging_id, version, args.files, args.signed_files, sha256_files)
             if uploaded_file_count > 0:
                 print("Uploading files complete!")
                 print("Closing staging repository...")
@@ -336,7 +318,9 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
 
-            print("Unable to complete file upload. Will attempt to drop staging id: [{}]".format(staging_id))
+            print(
+                "Unable to complete file upload. Will attempt to drop staging id: [{}]".format(
+                    staging_id))
             try:
                 _drop_staging_repository(staging_id, "droppng release due to error")
                 sys.exit("Dropping staging id: [{}] successful.".format(staging_id))

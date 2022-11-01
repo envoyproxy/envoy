@@ -1,4 +1,5 @@
 import gevent.monkey
+
 gevent.monkey.patch_all()
 
 import gevent
@@ -7,7 +8,6 @@ import requests
 from gevent.pool import Group
 
 from library.python.envoy_requests import gevent as envoy_requests
-
 
 envoy_requests.pre_build_engine()
 

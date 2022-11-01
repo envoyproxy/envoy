@@ -14,7 +14,6 @@ import envoy_engine
 from ..response import Response
 from .executor import Executor
 
-
 Data = Optional[Union[bytes, str, Dict[str, Any], List[Tuple[str, Any]]]]
 NormalData = bytes
 
@@ -31,7 +30,9 @@ def make_stream(
     response: Response,
     set_stream_complete: Callable[[], None],
 ):
-    def _on_headers(headers: envoy_engine.ResponseHeaders, _: bool, intel: envoy_engine.StreamIntel):
+
+    def _on_headers(
+            headers: envoy_engine.ResponseHeaders, _: bool, intel: envoy_engine.StreamIntel):
         response.status_code = headers.http_status()
         for key in headers:
             value = headers[key]
@@ -48,7 +49,9 @@ def make_stream(
     def _on_complete(intel: envoy_engine.StreamIntel, _: envoy_engine.FinalStreamIntel):
         set_stream_complete()
 
-    def _on_error(error: envoy_engine.EnvoyError, intel: envoy_engine.StreamIntel, _: envoy_engine.FinalStreamIntel):
+    def _on_error(
+            error: envoy_engine.EnvoyError, intel: envoy_engine.StreamIntel,
+            _: envoy_engine.FinalStreamIntel):
         response.envoy_error = error
         set_stream_complete()
 
@@ -56,16 +59,12 @@ def make_stream(
         set_stream_complete()
 
     return (
-        engine.stream_client()
-        .new_stream_prototype()
-        .set_on_headers(executor.wrap(_on_headers))
-        .set_on_data(executor.wrap(_on_data))
-        .set_on_trailers(executor.wrap(_on_trailers))
-        .set_on_complete(executor.wrap(_on_complete))
-        .set_on_error(executor.wrap(_on_error))
-        .set_on_cancel(executor.wrap(_on_cancel))
-        .start(False)
-    )
+        engine.stream_client().new_stream_prototype().set_on_headers(
+            executor.wrap(_on_headers)).set_on_data(executor.wrap(_on_data)).set_on_trailers(
+                executor.wrap(_on_trailers)).set_on_complete(
+                    executor.wrap(_on_complete)).set_on_error(
+                        executor.wrap(_on_error)).set_on_cancel(
+                            executor.wrap(_on_cancel)).start(False))
 
 
 def send_request(
@@ -92,9 +91,7 @@ def send_request(
         structured_url.path,
     )
     if norm_timeout_ms > 0:
-        request_headers_builder.add(
-            "x-envoy-upstream-rq-timeout-ms", str(norm_timeout_ms)
-        )
+        request_headers_builder.add("x-envoy-upstream-rq-timeout-ms", str(norm_timeout_ms))
     for key, values in norm_headers.items():
         for value in values:
             request_headers_builder.add(key, value)

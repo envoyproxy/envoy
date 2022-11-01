@@ -38,7 +38,10 @@ def request(*args, **kwargs) -> Response:
     engine_running.wait()
 
     stream = make_stream(
-        engine, executor, response, lambda: stream_complete.set(),
+        engine,
+        executor,
+        response,
+        lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     stream_complete.wait()
@@ -82,17 +85,17 @@ Func = TypeVar("Func", bound=Callable[..., Any])
 
 
 class GeventExecutor(Executor):
+
     def __init__(self):
         self.group = Group()
-        self.channel: GeventChannel[
-            Tuple[Callable, List[Any], Dict[str, Any]]
-        ] = GeventChannel()
+        self.channel: GeventChannel[Tuple[Callable, List[Any], Dict[str, Any]]] = GeventChannel()
         self.spawn_work_greenlet = gevent.spawn(self._spawn_work)
 
     def __del__(self):
         self.spawn_work_greenlet.kill()
 
     def wrap(self, fn: Func) -> Func:
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             self.channel.put((fn, args, kwargs))
@@ -106,6 +109,7 @@ class GeventExecutor(Executor):
 
 
 class GeventChannel(Generic[T]):
+
     def __init__(self):
         self.hub = gevent.get_hub()
         self.watcher = self.hub.loop.async_()

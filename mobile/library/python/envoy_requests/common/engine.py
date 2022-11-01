@@ -23,9 +23,7 @@ class Engine:
 
         cls._handle = (
             engine_builder.add_log_level(cls.log_level).set_on_engine_running(
-                executor.wrap(set_engine_running)
-            )
-        ).build()
+                executor.wrap(set_engine_running))).build()
         atexit.register(lambda: cls._handle.terminate())
 
     @classmethod
