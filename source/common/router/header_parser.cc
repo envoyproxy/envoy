@@ -355,65 +355,47 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
-  if (stream_info != nullptr) {
-    // Create local copy of headers to add and replace. This is required
-    // to execute all formatters using the original received headers.
-    // Only after all the formatters produced the new values of the headers, the headers are set.
-    std::vector<std::pair<const Http::LowerCaseString&, const std::string>> headers_to_add,
-        headers_to_overwrite;
-    for (const auto& [key, entry] : headers_to_add_) {
-      const std::string value =
-          entry.formatter_->format(request_headers, response_headers, *stream_info);
-      if (!value.empty() || entry.add_if_empty_) {
-        switch (entry.append_action_) {
-          PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+  // Temporary storage to hold evaluated values of headers to add and replace. This is required
+  // to execute all formatters using the original received headers.
+  // Only after all the formatters produced the new values of the headers, the headers are set.
+  // absl::InlinedVector is optimized for 4 headers. After that it behaves as normal std::vector.
+  absl::InlinedVector<std::pair<const Http::LowerCaseString&, const std::string>, 4> headers_to_add,
+      headers_to_overwrite;
+  std::string value_buffer;
+  for (const auto& [key, entry] : headers_to_add_) {
+    absl::string_view value;
+    if (stream_info != nullptr) {
+      value_buffer = entry.formatter_->format(request_headers, response_headers, *stream_info);
+      value = value_buffer;
+    } else {
+      value = entry.original_value_;
+    }
+    if (!value.empty() || entry.add_if_empty_) {
+      switch (entry.append_action_) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+        headers_to_add.emplace_back(key, value);
+        break;
+      case HeaderValueOption::ADD_IF_ABSENT:
+        if (auto header_entry = headers.get(key); header_entry.empty()) {
           headers_to_add.emplace_back(key, value);
-          break;
-        case HeaderValueOption::ADD_IF_ABSENT:
-          if (auto header_entry = headers.get(key); header_entry.empty()) {
-            headers_to_add.emplace_back(key, value);
-          }
-          break;
-        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-          headers_to_overwrite.emplace_back(key, value);
-          break;
         }
+        break;
+      case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+        headers_to_overwrite.emplace_back(key, value);
+        break;
       }
     }
+  }
 
-    // First overwrite all headers which need to be overwritten.
-    for (const auto& header : headers_to_overwrite) {
-      headers.setReferenceKey(header.first, header.second);
-    }
+  // First overwrite all headers which need to be overwritten.
+  for (const auto& header : headers_to_overwrite) {
+    headers.setReferenceKey(header.first, header.second);
+  }
 
-    // Now add headers which should be added.
-    for (const auto& header : headers_to_add) {
-      headers.addReferenceKey(header.first, header.second);
-    }
-  } else {
-    // The logic below is very similar to code executed when stream_info != nullptr,
-    // It is possible to combine two branches of "if" statement into more elegant code,
-    // but based on performance testing, using separate branches depending on value
-    // of stream_info resulted in the most efficient code.
-    for (const auto& [key, entry] : headers_to_add_) {
-      if (!entry.original_value_.empty() || entry.add_if_empty_) {
-        switch (entry.append_action_) {
-          PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-        case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-          headers.addReferenceKey(key, entry.original_value_);
-          break;
-        case HeaderValueOption::ADD_IF_ABSENT:
-          if (auto header_entry = headers.get(key); header_entry.empty()) {
-            headers.addReferenceKey(key, entry.original_value_);
-          }
-          break;
-        case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-          headers.setReferenceKey(key, entry.original_value_);
-          break;
-        }
-      }
-    }
+  // Now add headers which should be added.
+  for (const auto& header : headers_to_add) {
+    headers.addReferenceKey(header.first, header.second);
   }
 }
 
