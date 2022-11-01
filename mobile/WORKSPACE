@@ -66,6 +66,9 @@ python_configure(name = "local_config_python", python_version = "3")
 load("//bazel:python.bzl", "declare_python_abi")
 declare_python_abi(name = "python_abi", python_version = "3")
 
+load("@mobile_pip3//:requirements.bzl", pip_dependencies = "install_deps")
+pip_dependencies()
+
 load("//bazel:android_configure.bzl", "android_configure")
 android_configure(
     name = "local_config_android",

@@ -6,7 +6,7 @@ load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
-load("@rules_python//python:pip.bzl", "pip_install")
+load("@rules_python//python:pip.bzl", "pip_parse")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
 
@@ -110,7 +110,8 @@ def python_dependencies():
     # pip_install(
     #     requirements = ":dev_requirements.txt",
     # )
-    pip_install(
-        requirements = "//third_party/python:requirements.txt",
+    pip_parse(
+        name = "mobile_pip3",
+        requirements_lock = "//third_party/python:requirements.txt",
         timeout = 1000,
     )
