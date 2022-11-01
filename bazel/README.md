@@ -48,9 +48,11 @@ Given all required [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/lat
 > The environment variable name that holds the token can also be customized by setting `--github_api_token_env_name`.
 > In a GitHub Actions workflow file, you can set this token from [`secrets.GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret).
 
+Examples:
+
 ```console
-GITHUB_TOKEN=<GITHUB_TOKEN> python3 ./tools/github/write_current_source_version.py
-MY_TOKEN=<GITHUB_TOKEN> python3 ./tools/github/write_current_source_version.py --github_api_token_env_name=MY_TOKEN
+GITHUB_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py
+MY_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py --github_api_token_env_name=MY_TOKEN
 ```
 
 ## Quick start Bazel build for developers
