@@ -335,6 +335,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   if (events & Event::FileReadyType::Read) {
     is_read_enabled_ = true;
     addReadRequest();
+    cb_(Event::FileReadyType::Read);
   } else {
     is_read_enabled_ = false;
   }
