@@ -1,6 +1,5 @@
 import requests
 
-
 # since we already have requests installed for the benchmark
 # we reuse it to make sure that the echo server works as expected
 # requests provides a basis of correctness against which we can

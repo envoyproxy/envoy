@@ -9,6 +9,7 @@ import envoy_engine
 
 
 class Response:
+
     def __init__(self):
         self.body_raw = bytearray()
         self.status_code: Optional[int] = None

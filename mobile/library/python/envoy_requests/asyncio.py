@@ -30,7 +30,10 @@ async def request(*args, **kwargs) -> Response:
     await engine_running.wait()
 
     stream = make_stream(
-        engine, executor, response, lambda: stream_complete.set(),
+        engine,
+        executor,
+        response,
+        lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     await stream_complete.wait()
@@ -73,10 +76,12 @@ Func = TypeVar("Func", bound=Callable[..., Any])
 
 
 class AsyncioExecutor(Executor):
+
     def __init__(self):
         self.loop = asyncio.get_running_loop()
 
     def wrap(self, fn: Func) -> Func:
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             self.loop.call_soon_threadsafe(fn, *args, **kwargs)

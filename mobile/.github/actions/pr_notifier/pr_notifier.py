@@ -31,6 +31,7 @@ REVIEWERS = {
     'snowp': 'U93KTPQP6',
 }
 
+
 def get_slo_hours():
     # on Monday, allow for 24h + 48h
     if datetime.date.today().weekday() == 0:
@@ -58,8 +59,7 @@ def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
 
 # Adds reminder lines to the appropriate assignee to review the assigned PRs
 # Returns true if one of the assignees is in the primary_assignee_map, false otherwise.
-def add_reminders(
-        assignees, assignees_and_prs, message, primary_assignee_map):
+def add_reminders(assignees, assignees_and_prs, message, primary_assignee_map):
     has_primary_assignee = False
     for assignee_info in assignees:
         assignee = assignee_info.login
@@ -92,7 +92,7 @@ def track_prs():
         if pr_info.draft:
             continue
         # envoy-mobile currently doesn't triage unassigned PRs.
-        if not(pr_info.assignees):
+        if not (pr_info.assignees):
             continue
 
         # Update the time based on the time zone delta from github's

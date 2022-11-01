@@ -34,7 +34,10 @@ def request(*args, **kwargs) -> Response:
     engine_running.wait()
 
     stream = make_stream(
-        engine, executor, response, lambda: stream_complete.set(),
+        engine,
+        executor,
+        response,
+        lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     stream_complete.wait()
@@ -77,10 +80,12 @@ Func = TypeVar("Func", bound=Callable[..., Any])
 
 
 class ThreadingExecutor(Executor):
+
     def __init__(self):
         self.lock = Lock()
 
     def wrap(self, fn: Func) -> Func:
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             with self.lock:

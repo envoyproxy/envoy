@@ -53,9 +53,7 @@ def test_send_data_str(http_server_url: str):
     assert json.get("headers", {}).get("charset") == "utf8"
 
 
-@pytest.mark.parametrize(
-    "data", [{"hello": "world encoding"}, [("hello", "world encoding")]]
-)
+@pytest.mark.parametrize("data", [{"hello": "world encoding"}, [("hello", "world encoding")]])
 def test_send_data_form_urlencoded(http_server_url: str, data):
     response = envoy_requests.post(
         http_server_url,
@@ -66,10 +64,7 @@ def test_send_data_form_urlencoded(http_server_url: str, data):
     assert json.get("body") == "hello=world+encoding"
     assert json.get("method") == "POST"
     assert json.get("path") == "/"
-    assert (
-        json.get("headers", {}).get("content-type")
-        == "application/x-www-form-urlencoded"
-    )
+    assert (json.get("headers", {}).get("content-type") == "application/x-www-form-urlencoded")
     assert json.get("headers", {}).get("charset") == "utf8"
 
 
@@ -77,6 +72,5 @@ def test_envoy_error():
     response = envoy_requests.get("http://127.0.0.1:0/fake-url")
     assert response.envoy_error is not None
     assert response.envoy_error.error_code == envoy_requests.ErrorCode.ConnectionFailure
-    assert re.match((
-       "^upstream_reset_before_response_started{connection_failure"
-    ), response.envoy_error.message)
+    assert re.match(("^upstream_reset_before_response_started{connection_failure"),
+                    response.envoy_error.message)

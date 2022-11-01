@@ -17,7 +17,6 @@ from library.python.envoy_engine import ResponseTrailers
 from library.python.envoy_engine import StreamClient
 from library.python.envoy_engine import StreamPrototype
 
-
 T = TypeVar("T")
 
 
@@ -29,6 +28,7 @@ T = TypeVar("T")
 # a base class's fields rather than manually writing out all of the properties
 # and methods.
 class CompositionalInheritor(Generic[T]):
+
     def __init__(self, base: T):
         self.base = base
 
@@ -39,6 +39,7 @@ class CompositionalInheritor(Generic[T]):
 # we have to define wrappers around everything from EngineBuilder -> StreamPrototype
 # in order to wrap all callbacks in the GeventExecutor
 class GeventEngineBuilder(EngineBuilder):
+
     def __init__(self):
         super().__init__()
         self.executor = GeventExecutor()
@@ -52,6 +53,7 @@ class GeventEngineBuilder(EngineBuilder):
 
 
 class GeventEngine(CompositionalInheritor[Engine]):
+
     def __init__(self, base: Engine):
         super().__init__(base)
 
@@ -60,6 +62,7 @@ class GeventEngine(CompositionalInheritor[Engine]):
 
 
 class GeventStreamClient(CompositionalInheritor[StreamClient]):
+
     def __init__(self, base: StreamClient):
         super().__init__(base)
 
@@ -68,11 +71,13 @@ class GeventStreamClient(CompositionalInheritor[StreamClient]):
 
 
 class GeventStreamPrototype(CompositionalInheritor[StreamPrototype]):
+
     def __init__(self, base: StreamClient):
         super().__init__(base)
         self.executor = GeventExecutor()
 
-    def set_on_headers(self, closure: Callable[[ResponseHeaders, bool], None]) -> "GeventStreamPrototype":
+    def set_on_headers(
+            self, closure: Callable[[ResponseHeaders, bool], None]) -> "GeventStreamPrototype":
         self.base.set_on_headers(self.executor(closure))
         return self
 
@@ -80,7 +85,8 @@ class GeventStreamPrototype(CompositionalInheritor[StreamPrototype]):
         self.base.set_on_data(self.executor(closure))
         return self
 
-    def set_on_trailers(self, closure: Callable[[ResponseTrailers, bool], None]) -> "GeventStreamPrototype":
+    def set_on_trailers(
+            self, closure: Callable[[ResponseTrailers, bool], None]) -> "GeventStreamPrototype":
         self.base.set_on_trailers(self.executor(closure))
         return self
 
@@ -98,10 +104,12 @@ class GeventStreamPrototype(CompositionalInheritor[StreamPrototype]):
 
 
 class GeventExecutor():
+
     def __init__(self):
         super().__init__()
         self.group = Group()
-        self.channel: ThreadsafeChannel[Tuple[Callable, List[Any], Dict[str, Any]]] = ThreadsafeChannel()
+        self.channel: ThreadsafeChannel[Tuple[Callable, List[Any],
+                                              Dict[str, Any]]] = ThreadsafeChannel()
         self.spawn_work_greenlet = gevent.spawn(self._spawn_work)
 
     def __del__(self):
@@ -109,9 +117,11 @@ class GeventExecutor():
         self.spawn_work_greenlet.kill()
 
     def __call__(self, fn: Callable) -> Callable:
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             self.channel.put((fn, args, kwargs))
+
         return wrapper
 
     def _spawn_work(self):
@@ -121,6 +131,7 @@ class GeventExecutor():
 
 
 class ThreadsafeChannel(Generic[T]):
+
     def __init__(self):
         self.hub = gevent.get_hub()
         self.watcher = self.hub.loop.async_()

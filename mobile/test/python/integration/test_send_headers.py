@@ -1,7 +1,6 @@
 from library.python.envoy_requests.common.engine import Engine
 from library.python.envoy_requests import get
 
-
 API_LISTENER_TYPE = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 ASSERTION_FILTER_TYPE = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 

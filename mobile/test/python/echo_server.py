@@ -4,6 +4,7 @@ import json
 
 
 class EchoServerHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
         self._serve_echo()
 
@@ -42,7 +43,8 @@ class EchoServerHandler(BaseHTTPRequestHandler):
 
         request_data = {
             "body": body,
-            "headers": {key: self.headers[key] for key in self.headers.keys()},
+            "headers": {key: self.headers[key]
+                        for key in self.headers.keys()},
             "method": self.command,
             "path": self.path,
         }

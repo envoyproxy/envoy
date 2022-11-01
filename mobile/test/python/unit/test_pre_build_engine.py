@@ -20,7 +20,6 @@ def spy_on_build(impl):
         yield spied_build
 
 
-
 @pytest.mark.standalone
 @pytest.mark.asyncio
 async def test_pre_build_engine_asyncio():
