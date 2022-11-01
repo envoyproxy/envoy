@@ -40,14 +40,14 @@ static_resources:
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     health_checks:
-      - interval: 2s
-        timeout: 3s
-        no_traffic_interval: 4s
-        no_traffic_healthy_interval: 4s
-        unhealthy_threshold: 1
-        healthy_threshold: 1
-        http_health_check:
-          path: "/"
+    - interval: 2s
+      timeout: 3s
+      no_traffic_interval: 4s
+      no_traffic_healthy_interval: 4s
+      unhealthy_threshold: 1
+      healthy_threshold: 1
+      http_health_check:
+        path: "/"
     load_assignment:
       cluster_name: backend
       endpoints:
@@ -55,55 +55,55 @@ static_resources:
           region: local
           zone: zone-1
         load_balancing_weight: 1
-        priority: 0 # highest
+        priority: 0  # highest
         lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: backend-local-1
-                  port_value: 8000
-              health_check_config:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend-local-1
                 port_value: 8000
-              hostname: backend-local-1
+            health_check_config:
+              port_value: 8000
+            hostname: backend-local-1
       - locality:
           region: local
           zone: zone-2
         load_balancing_weight: 1
         priority: 1
         lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: backend-local-2
-                  port_value: 8000
-              health_check_config:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend-local-2
                 port_value: 8000
-              hostname: backend-local-2
+            health_check_config:
+              port_value: 8000
+            hostname: backend-local-2
       - locality:
           region: remote
           zone: zone-1
         load_balancing_weight: 1
         priority: 1
         lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: backend-remote-1
-                  port_value: 8000
-              health_check_config:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend-remote-1
                 port_value: 8000
-              hostname: backend-remote-1
+            health_check_config:
+              port_value: 8000
+            hostname: backend-remote-1
       - locality:
           region: remote
           zone: zone-2
         load_balancing_weight: 1
         priority: 2
         lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: backend-remote-2
-                  port_value: 8000
-              health_check_config:
+        - endpoint:
+            address:
+              socket_address:
+                address: backend-remote-2
                 port_value: 8000
-              hostname: backend-remote-2
+            health_check_config:
+              port_value: 8000
+            hostname: backend-remote-2
