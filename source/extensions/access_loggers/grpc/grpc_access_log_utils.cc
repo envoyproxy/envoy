@@ -315,6 +315,11 @@ void Utility::extractCommonAccessLogProperties(
     const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
     tag_applier->applyLog(common_access_log, ctx);
   }
+
+  // If the stream is not complete, then this log entry is intermediate log entry.
+  if (!stream_info.requestComplete().has_value()) {
+    common_access_log.set_intermediate_log_entry(true);
+  }
 }
 
 } // namespace GrpcCommon

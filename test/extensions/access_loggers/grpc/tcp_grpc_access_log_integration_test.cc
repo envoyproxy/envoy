@@ -387,10 +387,10 @@ tcp_logs:
       downstream_direct_remote_address:
         socket_address:
           address: {}
+      intermediate_log_entry: true
     connection_properties:
       received_bytes: 3
       sent_bytes: 5
-    intermediate_log_entry: true
 )EOF",
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),

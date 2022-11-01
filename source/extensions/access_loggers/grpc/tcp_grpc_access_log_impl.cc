@@ -46,11 +46,6 @@ void TcpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_header,
   connection_properties.set_received_bytes(stream_info.bytesReceived());
   connection_properties.set_sent_bytes(stream_info.bytesSent());
 
-  // If the stream is not complete, then this log entry is intermediate log entry.
-  if (!stream_info.requestComplete().has_value()) {
-    log_entry.set_intermediate_log_entry(true);
-  }
-
   // request_properties->set_request_body_bytes(stream_info.bytesReceived());
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
