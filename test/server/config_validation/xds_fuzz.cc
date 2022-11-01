@@ -64,9 +64,8 @@ XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& inp
                                          : "DELTA_GRPC")),
       verifier_(input.config().sotw_or_delta()), actions_(input.actions()), version_(1),
       ip_version_(TestEnvironment::getIpVersionsForTest()[0]) {
-  if (use_unified_mux) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                    use_unified_mux ? "true" : "false");
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = false;
