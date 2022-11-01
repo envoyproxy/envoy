@@ -17,13 +17,14 @@ namespace SipProxy {
 #define ALL_SIP_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                            \
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-  COUNTER(request)                                                                                 \
-  COUNTER(response)                                                                                \
-  COUNTER(response_error)                                                                          \
-  COUNTER(response_exception)                                                                      \
-  COUNTER(response_reply)                                                                          \
-  COUNTER(response_success)                                                                        \
-  GAUGE(request_active, Accumulate)                                                                \
+  GAUGE(downstream_connection, Accumulate)                                                         \
+  COUNTER(downstream_request)                                                                      \
+  COUNTER(downstream_response)                                                                     \
+  COUNTER(downstream_response_error)                                                               \
+  COUNTER(downstream_response_exception)                                                           \
+  COUNTER(downstream_response_reply)                                                               \
+  COUNTER(downstream_response_success)                                                             \
+  GAUGE(downstream_request_active, Accumulate)                                                     \
   HISTOGRAM(request_time, Milliseconds)                                                            \
   COUNTER(upstream_request)                                                                        \
   COUNTER(upstream_response)                                                                       \
@@ -32,7 +33,7 @@ namespace SipProxy {
   COUNTER(upstream_response_reply)                                                                 \
   COUNTER(upstream_response_success)                                                               \
   GAUGE(upstream_request_active, Accumulate)                                                       \
-  HISTOGRAM(upstream_request_time, Milliseconds)
+  HISTOGRAM(upstream_request_time, Milliseconds)    
 
 /**
  * Struct definition for all sip proxy stats. @see stats_macros.h

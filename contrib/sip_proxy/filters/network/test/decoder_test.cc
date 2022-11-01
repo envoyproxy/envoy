@@ -232,9 +232,9 @@ TEST_F(SipDecoderTest, DecodeINVITE) {
 
   Buffer::OwnedImpl response_buffer;
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeREGISTER) {
@@ -277,9 +277,9 @@ TEST_F(SipDecoderTest, DecodeREGISTER) {
   buffer_.add(SIP_REGISTER_FULL);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeOK200) {
@@ -401,9 +401,9 @@ TEST_F(SipDecoderTest, DecodeGeneral) {
   buffer_.add(SIP_CANCEL_FULL);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
@@ -450,9 +450,9 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
   buffer_.add(SIP_SUBSCRIBE_REG);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(2U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeFAILURE4XX) {
@@ -547,9 +547,9 @@ TEST_F(SipDecoderTest, DecodeEMPTY) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeACK) {
@@ -571,9 +571,9 @@ TEST_F(SipDecoderTest, DecodeACK) {
   buffer_.add(SIP_ACK_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeBYE) {
@@ -594,9 +594,9 @@ TEST_F(SipDecoderTest, DecodeBYE) {
   buffer_.add(SIP_BYE_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeUPDATE) {
@@ -618,9 +618,9 @@ TEST_F(SipDecoderTest, DecodeUPDATE) {
   buffer_.add(SIP_UPDATE_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeREFER) {
@@ -641,9 +641,9 @@ TEST_F(SipDecoderTest, DecodeREFER) {
   buffer_.add(SIP_REFER_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeNOTIFY) {
@@ -670,9 +670,9 @@ TEST_F(SipDecoderTest, DecodeNOTIFY) {
   buffer_.add(SIP_NOTIFY_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.downstream_request").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipDecoderTest, DecodeINVITEOutboundTransaction) {

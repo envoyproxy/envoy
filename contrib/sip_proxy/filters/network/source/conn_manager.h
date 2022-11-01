@@ -366,7 +366,7 @@ private:
   struct DownstreamActiveTrans : public ActiveTrans {
     DownstreamActiveTrans(ConnectionManager& parent, MessageMetadataSharedPtr metadata)
         : ActiveTrans(parent, metadata) {
-      stats().request_active_.inc();
+      stats().downstream_request_active_.inc();
       request_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
           stats().request_time_, parent_.time_source_);
     }
@@ -374,7 +374,7 @@ private:
     ~DownstreamActiveTrans() override {
       ENVOY_LOG(debug, "DownstreamActiveTrans Dtor");
       request_timer_->complete();
-      stats().request_active_.dec();
+      stats().downstream_request_active_.dec();
 
       parent_.eraseActiveTransFromPendingList(transaction_id_);
     }

@@ -169,10 +169,14 @@ ConnectionManager::ConnectionManager(
       downstream_connection_infos_(downstream_connection_infos),
       upstream_transaction_infos_(upstream_transaction_infos) {}
 
-ConnectionManager::~ConnectionManager() { ENVOY_LOG(debug, "Destroying connection manager"); }
+ConnectionManager::~ConnectionManager() { 
+  stats_.downstream_connection_.dec();
+  ENVOY_LOG(debug, "Destroying connection manager"); 
+}
 
 Network::FilterStatus ConnectionManager::onNewConnection() {
   storeDownstreamConnectionInCache();
+  stats_.downstream_connection_.inc();
   ENVOY_LOG(debug, "Creating connection manager");
   return Network::FilterStatus::Continue;
 }
@@ -298,13 +302,13 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 
   switch (result) {
   case DirectResponse::ResponseType::SuccessReply:
-    stats_.response_success_.inc();
+    stats_.downstream_response_success_.inc();
     break;
   case DirectResponse::ResponseType::ErrorReply:
-    stats_.response_error_.inc();
+    stats_.downstream_response_error_.inc();
     break;
   case DirectResponse::ResponseType::Exception:
-    stats_.response_exception_.inc();
+    stats_.downstream_response_exception_.inc();
     break;
   }
   stats_.counterFromElements("", "local-generated-response").inc();
@@ -451,7 +455,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ENVOY_STREAM_LOG(debug, "send response {}\n{}", parent_, buffer.length(), buffer.toString());
   cm.read_callbacks_->connection().write(buffer, false);
 
-  cm.stats_.response_.inc();
+  cm.stats_.downstream_response_.inc();
   cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
 
   return FilterStatus::Continue;
@@ -560,7 +564,7 @@ ConnectionManager::DownstreamActiveTrans::transportBegin(MessageMetadataSharedPt
 
 FilterStatus
 ConnectionManager::DownstreamActiveTrans::transportEnd() {
-  parent_.stats_.request_.inc();
+  parent_.stats_.downstream_request_.inc();
   return ActiveTrans::transportEnd();
 }
 
@@ -651,6 +655,7 @@ ConnectionManager::UpstreamActiveTrans::transportBegin(MessageMetadataSharedPtr 
 FilterStatus
 ConnectionManager::UpstreamActiveTrans::transportEnd() {
   parent_.stats_.upstream_response_.inc();
+  parent_.stats_.counterFromElements(methodStr[metadata_->methodType()], "upstream_response_proxied").inc();
   return ActiveTrans::transportEnd();
 }
 
@@ -778,6 +783,9 @@ SipFilters::ResponseStatus ConnectionManager::DownstreamConnection::upstreamData
     MessageMetadataSharedPtr metadata, Router::RouteConstSharedPtr return_route,
     const absl::optional<std::string>& return_destination) {
   std::string&& k = std::string(metadata->transactionId().value());
+  if (metadata->msgType() == MsgType::Request) {
+    stats().counterFromElements(methodStr[metadata->methodType()], "upstream_request_received").inc();
+  }
 
   if (upstreamTransactionInfos()->hasTransaction(k)) {
     auto active_trans = upstreamTransactionInfos()->getTransaction(k);

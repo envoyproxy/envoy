@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -284,8 +285,8 @@ settings:
     try {
       trans->upstreamData(filter_->decoder_->metadata_, nullptr, absl::nullopt);
     } catch (const EnvoyException& ex) {
-      filter_->stats_.response_exception_.inc();
-      EXPECT_EQ(1U, filter_->stats_.response_exception_.value());
+      filter_->stats_.downstream_response_exception_.inc();
+      EXPECT_EQ(1U, filter_->stats_.downstream_response_exception_.value());
     }
 
     // EnvoyException
@@ -302,8 +303,8 @@ settings:
     try {
       trans->upstreamData(filter_->decoder_->metadata_, nullptr, absl::nullopt);
     } catch (const EnvoyException& ex) {
-      filter_->stats_.response_exception_.inc();
-      EXPECT_EQ(2U, filter_->stats_.response_exception_.value());
+      filter_->stats_.downstream_response_exception_.inc();
+      EXPECT_EQ(2U, filter_->stats_.downstream_response_exception_.value());
     }
 
     // transportEnd throw envoyException
@@ -321,8 +322,8 @@ settings:
       // transportEnd throw envoyException
       response_decoder.onData(filter_->decoder_->metadata());
     } catch (const EnvoyException& ex) {
-      filter_->stats_.response_exception_.inc();
-      EXPECT_EQ(3U, filter_->stats_.response_exception_.value());
+      filter_->stats_.downstream_response_exception_.inc();
+      EXPECT_EQ(3U, filter_->stats_.downstream_response_exception_.value());
     }
 
     // end_stream = false
@@ -506,11 +507,12 @@ settings:
   }
 
   void initializeMetadata(MsgType msg_type, MethodType method = MethodType::Invite,
-                          bool set_destination = true) {
+                          bool set_destination = true, std::string trans_id = "<branch=cluster>", 
+                          std::string top_line = "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0") {
 
-    const std::string SIP_INVITE = // addNewMsgHeader needs a raw_msg with a Content header
-        "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
-        "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=cluster\x0d\x0a"
+    const std::string SIP_MESSAGE = // addNewMsgHeader needs a raw_msg with a Content header
+        top_line + "\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060;" + trans_id + "\x0d\x0a"
         "From: <sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
         "To: <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
@@ -518,19 +520,15 @@ settings:
         "Content-Length:  0\x0d\x0a"
         "\x0d\x0a";
     Buffer::OwnedImpl buffer_;
-    buffer_.add(SIP_INVITE);
+    buffer_.add(SIP_MESSAGE);
 
     metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
     metadata_->setMethodType(method);
     metadata_->setMsgType(msg_type);
-    metadata_->setTransactionId("<branch=cluster>");
-    metadata_->setEP("10.0.0.1");
-    metadata_->affinity().emplace_back("Route", "ep", "ep", false, false);
-    metadata_->addMsgHeader(
-        HeaderType::Route,
-        "Route: "
-        "<sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp;x-suri="
-        "sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>");
+    trans_id_ = trans_id;
+    metadata_->setTransactionId(trans_id_);
+    top_line_ = top_line;
+    metadata_->addMsgHeader(HeaderType::TopLine, top_line_);
     metadata_->addMsgHeader(HeaderType::From, "User.0001@10.0.0.1:5060");
     metadata_->resetAffinityIteration();
     if (set_destination) {
@@ -563,18 +561,19 @@ settings:
     initializeFilter(yaml);
   }
 
-  void generateUpstreamRequest() {
+  void generateUpstreamRequest(MethodType method_type = MethodType::Invite, std::string trans_id = "<branch=cluster>", 
+                          std::string top_line = "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0") {
     std::string ds_conn_id = filter_->originIngress()->getDownstreamConnectionID();
     upstream_callback_ = &downstream_connection_infos_->getDownstreamConnection(ds_conn_id);
 
-    initializeMetadata(MsgType::Request, MethodType::Invite, true);
+    initializeMetadata(MsgType::Request, method_type, true, trans_id, top_line);
 
     upstream_callback_->upstreamData(metadata_, nullptr, "10.0.0.1");
   }
 
-  void generateResponseToUpstreamRequest() {
-    const std::string SIP_OK200_FULL =
-        "SIP/2.0 200 OK\x0d\x0a"
+  void generateResponseToUpstreamRequest(std::string error_code = "200 OK") {
+    const std::string SIP_RESPONSE =
+        "SIP/2.0 " + error_code + "\x0d\x0a"
         "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
         "CSeq: 1 INVITE\x0d\x0a"
         "Contact: "
@@ -582,11 +581,11 @@ settings:
         "TCP>\x0d\x0a"
         "Record-Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
         "Route: <sip:+16959000000:15306;role=anch;lr;transport=udp>\x0d\x0a"
-        "Via: SIP/2.0/TCP 11.0.0.10:15060;branch=" + std::string(metadata_->transactionId().value()) + "\x0d\x0a"
+        "Via: SIP/2.0/TCP 11.0.0.10:15060; " + trans_id_ + "\x0d\x0a"
         "Content-Length:  0\x0d\x0a"
         "\x0d\x0a";
 
-    buffer_.add(SIP_OK200_FULL);
+    buffer_.add(SIP_RESPONSE);
 
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   }
@@ -611,6 +610,8 @@ settings:
   std::shared_ptr<SipProxy::UpstreamTransactionInfos> upstream_transaction_infos_;
   SipFilters::DecoderFilterSharedPtr custom_filter_;
   MessageMetadataSharedPtr metadata_;
+  std::string trans_id_ = "";
+  std::string top_line_ = "";
   SipFilters::DecoderFilterCallbacks* upstream_callback_;
 
   NiceMock<Api::MockApi> api_;
@@ -672,8 +673,8 @@ settings:
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 
   const std::string SIP_ACK_FULL =
       "ACK sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
@@ -748,8 +749,8 @@ settings:
   buffer_.add(SIP_INVITE_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesSipCallEndStream) {
@@ -805,8 +806,8 @@ settings:
   buffer_.add(SIP_INVITE_FULL);
 
   EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_response").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesSipCallInvalidMessage) {
@@ -864,8 +865,8 @@ settings:
   buffer_.add(SIP_INVITE_NO_VIA);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_request").value());
 
   const std::string SIP_INVITE_NO_TRANSID =
       "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
@@ -895,8 +896,8 @@ settings:
   buffer_.add(SIP_INVITE_NO_TRANSID);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_request").value());
 
   const std::string SIP_INVITE_NO_FROM =
       "INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0\x0d\x0a"
@@ -925,8 +926,8 @@ settings:
   buffer_.add(SIP_INVITE_NO_TRANSID);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.downstream_request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.downstream_request").value());
 }
 
 TEST_F(SipConnectionManagerTest, ContinueHandling) {
@@ -1258,10 +1259,16 @@ TEST_F(SipConnectionManagerTest, NewConnectionCreated) {
   EXPECT_TRUE(downstream_connection_infos_->hasDownstreamConnection(ds_conn_id));
   std::string stored_ds_conn_id = downstream_connection_infos_->getDownstreamConnection(ds_conn_id).originIngress()->getDownstreamConnectionID();
   EXPECT_EQ(stored_ds_conn_id, ds_conn_id);
+
+  EXPECT_EQ(1U, stats_.downstream_connection_.value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequest) {
   initializeFilterForUpstreamTests();
+
+  EXPECT_EQ(0U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(0U, stats_.upstream_request_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
@@ -1270,15 +1277,51 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequest) {
         buffer.drain(buffer.length());
       }));
 
+
   generateUpstreamRequest();
 
   EXPECT_EQ(1U, upstream_transaction_infos_->size());
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(1U, stats_.upstream_request_.value());
+  EXPECT_EQ(1U, stats_.counterFromElements(methodStr[metadata_->methodType()], "upstream_request_received").value());
 }
 
-TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequestTwice) {
+TEST_F(SipConnectionManagerTest, OnDataHandlesTwoUpstreamRequest) {
   initializeFilterForUpstreamTests();
+
+  EXPECT_EQ(0U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(0U, stats_.upstream_request_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_THAT(buffer.toString(),
+                    testing::HasSubstr(metadata_->header(HeaderType::TopLine).text()));
+        buffer.drain(buffer.length());
+      }));
+  generateUpstreamRequest(MethodType::Invite, "<branch=cluster1>");
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
+      .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_THAT(buffer.toString(),
+                    testing::HasSubstr(metadata_->header(HeaderType::TopLine).text()));
+        buffer.drain(buffer.length());
+      }));
+  generateUpstreamRequest(MethodType::Notify, "<branch=cluster2>", "NOTIFY sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0");
+
+  EXPECT_EQ(2U, upstream_transaction_infos_->size());
+  EXPECT_EQ(2U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(2U, stats_.upstream_request_.value());
+  EXPECT_EQ(1U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
+  EXPECT_EQ(1U, stats_.counterFromElements(methodStr[MethodType::Notify], "upstream_request_received").value());
+}
+
+TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequestSentTwice) {
+  initializeFilterForUpstreamTests();
+
+  EXPECT_EQ(0U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(0U, stats_.upstream_request_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _))
       .WillOnce(Invoke([this](Buffer::Instance& buffer, bool) -> void {
@@ -1299,14 +1342,19 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequestTwice) {
         buffer.drain(buffer.length());
       }));
 
-  upstream_callback_->upstreamData(metadata_, nullptr, "10.0.0.1");
+  generateUpstreamRequest();
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(2U, stats_.upstream_request_.value());
+  EXPECT_EQ(2U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequestException) {
   initializeFilterForUpstreamTests();
+
+  EXPECT_EQ(0U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(0U, stats_.upstream_request_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, _)).WillOnce(testing::Throw(EnvoyException("testing")));
 
@@ -1314,6 +1362,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesUpstreamRequestException) {
 
   EXPECT_EQ(0U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_request_.value());
+  EXPECT_EQ(1U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_request_received").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequest) {
@@ -1322,11 +1371,13 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequest) {
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 
   generateResponseToUpstreamRequest();
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(1U, stats_.upstream_response_.value());
+  EXPECT_EQ(1U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToNonExistingUpstreamRequest) {
@@ -1337,6 +1388,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToNonExistingUpstreamReque
 
   EXPECT_EQ(0U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestError) {
@@ -1345,6 +1397,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestError) {
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 
   ON_CALL(*(config_->router_filter_), transportBegin(_)).WillByDefault(Return(FilterStatus::StopIteration));
   
@@ -1352,6 +1405,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestError) {
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestEnvoyException) {
@@ -1360,6 +1414,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestEnvoyExce
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 
   ON_CALL(*(config_->router_filter_), transportBegin(_)).WillByDefault(testing::Throw(EnvoyException("testing")));
   
@@ -1367,6 +1422,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestEnvoyExce
 
   EXPECT_EQ(0U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 }
 
 TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestAppException) {
@@ -1375,6 +1431,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestAppExcept
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 
   ON_CALL(*(config_->router_filter_), transportBegin(_)).WillByDefault(testing::Throw(AppException(AppExceptionType::InternalError, "msg")));
   
@@ -1382,6 +1439,7 @@ TEST_F(SipConnectionManagerTest, OnDataHandlesResponseToUpstreamRequestAppExcept
 
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(0U, stats_.upstream_response_.value());
+  EXPECT_EQ(0U, stats_.counterFromElements(methodStr[MethodType::Invite], "upstream_response_proxied").value());
 }
 
 TEST_F(SipConnectionManagerTest, SendUpstreamLocalReply_SuccessReply) {
@@ -1515,10 +1573,16 @@ TEST_F(SipConnectionManagerTest, ConnectionClosed) {
   std::string stored_ds_conn_id = downstream_connection_infos_->getDownstreamConnection(ds_conn_id).originIngress()->getDownstreamConnectionID();
   EXPECT_EQ(stored_ds_conn_id, ds_conn_id);
 
+  EXPECT_EQ(1U, stats_.downstream_connection_.value());
+
   upstream_callback_ = &downstream_connection_infos_->getDownstreamConnection(ds_conn_id);
   upstream_callback_->resetDownstreamConnection();
   EXPECT_FALSE(downstream_connection_infos_->hasDownstreamConnection(ds_conn_id));
   EXPECT_EQ(downstream_connection_infos_->size(), 0);
+
+  filter_= nullptr;
+
+  EXPECT_EQ(0U, stats_.downstream_connection_.value());
 }
 
 TEST_F(SipConnectionManagerTest, ConnectionClosedWhileHandlingUpstreamRequest) {
@@ -1536,6 +1600,7 @@ TEST_F(SipConnectionManagerTest, ConnectionClosedWhileHandlingUpstreamRequest) {
   EXPECT_EQ(1U, upstream_transaction_infos_->size());
   EXPECT_EQ(1U, stats_.upstream_request_active_.value());
   EXPECT_EQ(1U, stats_.upstream_request_.value());
+  EXPECT_EQ(1U, stats_.downstream_connection_.value());
 
   std::string ds_conn_id = filter_->originIngress()->getDownstreamConnectionID();
   EXPECT_EQ(downstream_connection_infos_->size(), 1);
@@ -1548,7 +1613,10 @@ TEST_F(SipConnectionManagerTest, ConnectionClosedWhileHandlingUpstreamRequest) {
   EXPECT_FALSE(downstream_connection_infos_->hasDownstreamConnection(ds_conn_id));
   EXPECT_EQ(downstream_connection_infos_->size(), 0);
 
+  filter_= nullptr;
+
   EXPECT_EQ(0U, stats_.upstream_request_active_.value());
+  EXPECT_EQ(0U, stats_.downstream_connection_.value());
 }
 
 TEST_F(SipConnectionManagerTest, UpstreamTransactionsInfoAuditExpiring) {
