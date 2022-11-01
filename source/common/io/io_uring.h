@@ -106,14 +106,6 @@ public:
   virtual IoUringResult submit() PURE;
 };
 
-class FileEventAdapter {
-public:
-    virtual ~FileEventAdapter() = default;
-    virtual void initialize(Event::Dispatcher& dispatcher,
-                    Event::FileTriggerType trigger, uint32_t events) PURE;
-    virtual void reset() PURE;
-};
-
 class IoUringWorker;
 
 /**
@@ -142,8 +134,7 @@ class IoUringWorker : public ThreadLocal::ThreadLocalObject {
 public:
   virtual ~IoUringWorker() = default;
 
-  virtual void initialize(Event::Dispatcher& dispatcher,
-                          Event::FileTriggerType trigger, uint32_t events) PURE;
+  virtual void start(Event::Dispatcher& dispatcher) PURE;
   virtual void reset() PURE;
   virtual IoUring& get() PURE;
 };

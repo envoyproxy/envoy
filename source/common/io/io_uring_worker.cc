@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Io {
 
-void FileEventAdapterImpl::onFileEvent() {
+void IoUringWorkerImpl::onFileEvent() {
   io_uring_impl_.forEveryCompletion([](void* user_data, int32_t result) {
     auto req = static_cast<Io::Request*>(user_data);
 
@@ -23,9 +23,10 @@ void FileEventAdapterImpl::onFileEvent() {
   io_uring_impl_.submit();
 }
 
-void FileEventAdapterImpl::initialize(Event::Dispatcher& dispatcher,
-                                                           Event::FileTriggerType trigger,
-                                                           uint32_t) {
+IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling) :
+    io_uring_impl_(io_uring_size, use_submission_queue_polling) { }
+
+void IoUringWorkerImpl::start(Event::Dispatcher& dispatcher) {
   // This means already registered the file event.
   if (file_event_ != nullptr) {
     return;
@@ -35,15 +36,7 @@ void FileEventAdapterImpl::initialize(Event::Dispatcher& dispatcher,
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
   file_event_ = dispatcher.createFileEvent(
-      event_fd, [this](uint32_t) { onFileEvent(); }, trigger, Event::FileReadyType::Read);
-}
-
-IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling) :
-    io_uring_impl_(io_uring_size, use_submission_queue_polling), file_event_adapter_(io_uring_impl_) { }
-
-void IoUringWorkerImpl::initialize(Event::Dispatcher& dispatcher,
-                Event::FileTriggerType trigger, uint32_t events) {
-  file_event_adapter_.initialize(dispatcher, trigger, events);
+      event_fd, [this](uint32_t) { onFileEvent(); }, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }
 
 IoUring& IoUringWorkerImpl::get() {

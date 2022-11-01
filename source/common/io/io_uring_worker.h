@@ -8,34 +8,20 @@
 namespace Envoy {
 namespace Io {
 
-// FileEventAdapter adapts `io_uring` to libevent.
-class FileEventAdapterImpl : public FileEventAdapter, protected Logger::Loggable<Logger::Id::io> {
-public:
-  FileEventAdapterImpl(IoUringImpl& io_uring_impl) : io_uring_impl_(io_uring_impl) {}
-
-  void initialize(Event::Dispatcher& dispatcher,
-                  Event::FileTriggerType trigger, uint32_t events) override;
-
-  void reset() override { file_event_.reset(); }
-
-private:
-  void onFileEvent();
-
-  IoUringImpl& io_uring_impl_;
-  Event::FileEventPtr file_event_{nullptr};
-};
-
-class IoUringWorkerImpl : public IoUringWorker {
+class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
     IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
-    void initialize(Event::Dispatcher& dispatcher,
-                    Event::FileTriggerType trigger, uint32_t events) override;
-    void reset() override { file_event_adapter_.reset(); }
+
+    void start(Event::Dispatcher& dispatcher) override;
+    void reset() override { file_event_.reset(); }
+
     IoUring& get() override;
 
 private:
+    void onFileEvent();
+
     IoUringImpl io_uring_impl_;
-    FileEventAdapterImpl file_event_adapter_;
+    Event::FileEventPtr file_event_{nullptr};
 };
 
 } // namespace Io

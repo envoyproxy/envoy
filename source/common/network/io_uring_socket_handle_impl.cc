@@ -304,9 +304,9 @@ Address::InstanceConstSharedPtr IoUringSocketHandleImpl::peerAddress() {
 
 void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
-                                                  Event::FileTriggerType trigger, uint32_t events) {
+                                                  Event::FileTriggerType, uint32_t) {
   io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
-  io_uring_worker_.ref().initialize(dispatcher, trigger, events);
+  io_uring_worker_.ref().start(dispatcher);
 
   if (is_listen_socket_) {
     addAcceptRequest();
