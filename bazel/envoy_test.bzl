@@ -14,6 +14,8 @@ load(
     "envoy_select_force_libcpp",
     "envoy_stdlib_deps",
     "tcmalloc_external_dep",
+    "envoy_exported_symbols_input",
+    "envoy_select_exported_symbols",
 )
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
@@ -70,7 +72,9 @@ def _envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"]) + envoy_dbg_linkopts()
+    }) + envoy_select_force_libcpp([], ["-lstdc++fs", "-latomic"])
+       + envoy_dbg_linkopts()
+       + envoy_select_exported_symbols(["-Wl,-E"])
 
 # Envoy C++ fuzz test targets. These are not included in coverage runs.
 def envoy_cc_fuzz_test(
@@ -106,6 +110,7 @@ def envoy_cc_fuzz_test(
     native.cc_test(
         name = name,
         copts = envoy_copts("@envoy", test = True),
+        additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts() + select({
             "@envoy//bazel:libfuzzer": ["-fsanitize=fuzzer"],
             "//conditions:default": [],
@@ -166,6 +171,7 @@ def envoy_cc_test(
         srcs = srcs,
         data = data,
         copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
+        additional_linker_inputs = envoy_exported_symbols_input(),
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
