@@ -55,6 +55,9 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
+- area: build
+  change: |
+    added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
