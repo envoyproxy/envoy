@@ -85,7 +85,9 @@ if __name__ == "__main__":
     except urllib.error.HTTPError as e:
         status_code = e.code
         if e.code in (http.HTTPStatus.UNAUTHORIZED, http.HTTPStatus.FORBIDDEN):
-            print(f"Please check the GitHub token provided in {args.github_api_token_env_name} environment variable. {e.reason}.")
+            print(
+                f"Please check the GitHub token provided in {args.github_api_token_env_name} environment variable. {e.reason}."
+            )
             sys.exit(1)
         else:
             raise Exception(f"Failed since {e.reason} ({status_code}).")
