@@ -729,6 +729,9 @@ public:
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
+  const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
+    return tcp_pool_idle_timeout_;
+  }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
@@ -899,6 +902,7 @@ private:
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;

@@ -168,7 +168,7 @@ protected:
                         Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                         ConnPoolBase& parent)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
-                       transport_socket_options, state_),
+                       transport_socket_options, state_, absl::nullopt),
           parent_(parent) {}
 
     void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
@@ -178,7 +178,7 @@ protected:
 
     Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
       return std::make_unique<TestActiveTcpClient>(
-          *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1);
+          *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1, absl::nullopt);
     }
 
     void onConnDestroyed() override { parent_.onConnDestroyedForTest(); }
@@ -249,8 +249,9 @@ public:
   TcpConnPoolImplDestructorTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
-    conn_pool_ = std::make_unique<ConnPoolImpl>(
-        dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
+    conn_pool_ =
+        std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
+                                       nullptr, nullptr, state_, absl::nullopt);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
   ~TcpConnPoolImplDestructorTest() override = default;

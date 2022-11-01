@@ -17,7 +17,7 @@ Envoy::ConnectionPool::ActiveClientPtr HttpConnPoolImplMixed::instantiateActiveC
         http_server_properties_cache_, origin_, host());
   }
   return std::make_unique<Tcp::ActiveTcpClient>(
-      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams);
+      *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), initial_streams, absl::nullopt);
 }
 
 CodecClientPtr

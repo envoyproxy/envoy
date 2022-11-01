@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/stats/timespan_impl.h"
@@ -14,10 +13,11 @@ namespace Tcp {
 
 ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent,
                                  const Upstream::HostConstSharedPtr& host,
-                                 uint64_t concurrent_stream_limit)
+                                 uint64_t concurrent_stream_limit,
+                                 absl::optional<std::chrono::milliseconds> idle_timeout)
     : Envoy::ConnectionPool::ActiveClient(parent, host->cluster().maxRequestsPerConnection(),
                                           concurrent_stream_limit),
-      parent_(parent) {
+      parent_(parent), idle_timeout_(idle_timeout) {
   Upstream::Host::CreateConnectionData data = host->createConnection(
       parent_.dispatcher(), parent_.socketOptions(), parent_.transportSocketOptions());
   real_host_description_ = data.host_description_;
@@ -32,6 +32,11 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
                                    &host->cluster().stats().bind_errors_, nullptr});
   connection_->noDelay(true);
   connection_->connect();
+
+  if (idle_timeout_.has_value()) {
+    idle_timer_ = connection_->dispatcher().createTimer([this]() -> void { onIdleTimeout(); });
+    resetIdleTimer();
+  }
 }
 
 ActiveTcpClient::~ActiveTcpClient() {
@@ -55,6 +60,7 @@ void ActiveTcpClient::clearCallbacks() {
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
   parent_.checkForIdleAndCloseIdleConnsIfDraining();
+  resetIdleTimer();
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
@@ -82,6 +88,25 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
       // Clear the pointer to avoid using it again.
       callbacks_ = nullptr;
     }
+  }
+}
+
+void ActiveTcpClient::onIdleTimeout() {
+  ENVOY_CONN_LOG(debug, "idle timeout", *this);
+  parent_.host()->cluster().stats().upstream_cx_idle_timeout_.inc();
+  close();
+}
+
+void ActiveTcpClient::disableIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    idle_timer_->disableTimer();
+  }
+}
+
+void ActiveTcpClient::resetIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    ASSERT(idle_timeout_.has_value());
+    idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
 
