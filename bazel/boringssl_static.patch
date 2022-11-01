@@ -6,7 +6,7 @@ index 1ec2bdf18..50fe0f050 100644
      # it should not be set on Apple platforms, where it instead disables APIs
      # we use. See compat(5) and sys/cdefs.h.
      "-D_XOPEN_SOURCE=700",
-+    # https://bugs.chromium.org/p/boringssl/issues/detail?id=492
++    # TODO(keith): Remove https://bugs.chromium.org/p/boringssl/issues/detail?id=492
 +    "-Wno-array-bounds",
 +    "-Wno-stringop-overflow",
 +    "-Wno-unknown-warning-option",
