@@ -119,11 +119,16 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
 }
 
 void CompactProtocolImpl::validateFieldId(int32_t id) {
-  if ((id < 0 && !Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.thrift_allow_negative_field_ids")) ||
-      id < std::numeric_limits<int16_t>::min() || id > std::numeric_limits<int16_t>::max()) {
-    throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
+  if (id >= 0 && id <= std::numeric_limits<int16_t>::max()) {
+    return;
   }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_allow_negative_field_ids") &&
+      id < 0 && id >= std::numeric_limits<int16_t>::min()) {
+    return;
+  }
+
+  throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
 }
 
 bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {

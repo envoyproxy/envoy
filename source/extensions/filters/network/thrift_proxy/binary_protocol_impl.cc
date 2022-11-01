@@ -87,10 +87,15 @@ bool BinaryProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& r
 }
 
 void BinaryProtocolImpl::validateFieldId(int16_t id) {
-  if (id < 0 && !Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.thrift_allow_negative_field_ids")) {
-    throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
+  if (id >= 0) {
+    return;
   }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.thrift_allow_negative_field_ids")) {
+    return;
+  }
+
+  throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
 }
 
 bool BinaryProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
