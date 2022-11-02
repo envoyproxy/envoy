@@ -4,6 +4,38 @@
 namespace Envoy {
 namespace Io {
 
+void IoUringAcceptSocket::onRequestCompeltion(const Request& req, int32_t result) {
+  if (req.type_ == RequestType::Accept) {
+    if (result < 0) {
+      ENVOY_LOG(debug, "Accept request failed");
+      return;
+    }
+    ENVOY_LOG(debug, "New socket accepted");
+    connection_fd_ = result;
+    AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
+    io_uring_handler_.onAcceptSocket(param);
+    submitRequest();
+    return;
+  }
+  ASSERT(false);
+}
+
+void IoUringAcceptSocket::submitRequest() {
+  auto req = new Request();
+  req->type_ = RequestType::Accept;
+  req->io_uring_socket_ = *this;
+
+  auto res = io_uring_impl_.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
+  }
+  ENVOY_LOG(debug, "Submit new accept request");
+  io_uring_impl_.submit();
+}
+
 void IoUringWorkerImpl::onFileEvent() {
   io_uring_impl_.forEveryCompletion([](void* user_data, int32_t result) {
     auto req = static_cast<Io::Request*>(user_data);
@@ -78,7 +110,14 @@ void IoUringWorkerImpl::start(Event::Dispatcher& dispatcher) {
 }
 
 IoUring& IoUringWorkerImpl::get() {
-    return io_uring_impl_;
+  return io_uring_impl_;
+}
+
+void IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
+  std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(fd, io_uring_impl_, handler);
+  socket->start();
+  sockets_.insert({fd, std::move(socket)});
+  io_uring_impl_.submit();
 }
 
 } // namespace Io
