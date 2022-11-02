@@ -19,7 +19,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
           SINGLETON_MANAGER_REGISTERED_NAME(generic_route_config_provider_manager),
           [&context] { return std::make_shared<RouteConfigProviderManagerImpl>(context.admin()); });
 
-  auto config =
+  const auto config =
       std::make_shared<FilterConfig>(proto_config, context, *route_config_provider_manager);
   return [route_config_provider_manager, config,
           &context](Envoy::Network::FilterManager& filter_manager) -> void {
