@@ -335,8 +335,6 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
-// TODO(alyssawilk) after landing this, remove all the duplicate getters and
-// setters from StreamInfo.
 class UpstreamInfo {
 public:
   virtual ~UpstreamInfo() = default;
@@ -401,6 +399,17 @@ public:
    * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
+
+  /**
+   * @param upstream_remote_address sets the remote address of the upstream connection.
+   */
+  virtual void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) PURE;
+
+  /**
+   * @return the upstream remote address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const PURE;
 
   /**
    * @param failure_reason the upstream transport failure reason.
@@ -731,6 +740,8 @@ public:
    * @param downstream_bytes_meter, the bytes meter for downstream http stream.
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
+
+  virtual bool isShadow() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {

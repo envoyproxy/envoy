@@ -36,7 +36,7 @@ namespace {
 
 class EdsTest : public testing::Test {
 public:
-  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
+  EdsTest() { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -123,28 +123,30 @@ public:
   }
 
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
-    local_info_.node_.mutable_locality()->set_zone("us-east-1a");
+    server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
-    eds_callbacks_ = multiplex_eds ? cm_.multiplexed_subscription_factory_.callbacks_
-                                   : cm_.subscription_factory_.callbacks_;
+    eds_callbacks_ =
+        multiplex_eds
+            ? server_context_.cluster_manager_.multiplexed_subscription_factory_.callbacks_
+            : server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    bool multiplex_eds = Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds");
-    if (multiplex_eds) {
-      EXPECT_CALL(*cm_.multiplexed_subscription_factory_.subscription_, start(_));
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds")) {
+      EXPECT_CALL(*server_context_.cluster_manager_.multiplexed_subscription_factory_.subscription_,
+                  start(_));
     } else {
-      EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
+      EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     }
     cluster_->initialize([this] { initialized_ = true; });
   }
@@ -161,20 +163,11 @@ public:
   Stats::TestUtil::TestStore stats_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
-  NiceMock<MockClusterManager> cm_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   EdsClusterImplSharedPtr cluster_;
   Config::SubscriptionCallbacks* eds_callbacks_{};
   NiceMock<Random::MockRandomGenerator> random_;
   TestScopedRuntime runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
-  Server::MockOptions options_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -529,7 +522,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
   // First check that EDS is correctly mapping
-  // HealthStatus values to the expected health() status.
+  // HealthStatus values to the expected coarseHealth() status.
   const std::vector<std::pair<envoy::config::core::v3::HealthStatus, Host::Health>>
       health_status_expected = {
           {envoy::config::core::v3::UNKNOWN, Host::Health::Healthy},
@@ -558,7 +551,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(hosts.size(), health_status_expected.size());
 
     for (uint32_t i = 0; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -569,10 +562,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
 
     for (uint32_t i = 1; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -584,10 +577,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_EQ(Host::Health::Healthy, hosts[hosts.size() - 1]->health());
+    EXPECT_EQ(Host::Health::Healthy, hosts[hosts.size() - 1]->coarseHealth());
 
     for (uint32_t i = 1; i < hosts.size() - 1; ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -600,7 +593,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
   }
 
   // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
@@ -609,7 +602,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
   }
 
   // Finally, mark host 0 healthy again via active health check. It should be
@@ -617,7 +610,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Healthy, hosts[0]->coarseHealth());
   }
 
   const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
@@ -626,7 +619,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->coarseHealth());
   }
 
   // We should rebuild the cluster since we went from healthy -> degraded.
@@ -641,7 +634,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->coarseHealth());
   }
 
   // Since the host health didn't change, expect no rebuild.
@@ -871,10 +864,10 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
-    EXPECT_EQ(hosts[0]->health(), Host::Health::Unhealthy);
+    EXPECT_EQ(hosts[0]->coarseHealth(), Host::Health::Unhealthy);
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
-    EXPECT_EQ(hosts[1]->health(), Host::Health::Healthy);
+    EXPECT_EQ(hosts[1]->coarseHealth(), Host::Health::Healthy);
   }
 
   // Now remove the first host. Even though it is still passing active HC, since EDS has
@@ -1564,71 +1557,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
   }
 }
 
-// Validate that onConfigUpdate() does not update the endpoint locality if fix for the issue,
-// https://github.com/envoyproxy/envoy/issues/12392, is disabled.
-// Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
-// verified that locality update does not happen on eds cluster endpoints.
-TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
-  runtime_.mergeValues(
-      {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-  auto* endpoints = cluster_load_assignment.add_endpoints();
-  auto* locality = endpoints->mutable_locality();
-  locality->set_region("oceania");
-  locality->set_zone("hello");
-  locality->set_sub_zone("world");
-
-  {
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.4");
-    endpoint_address->set_port_value(80);
-  }
-  {
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("2.3.4.5");
-    endpoint_address->set_port_value(80);
-  }
-
-  initialize();
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-
-  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(hosts.size(), 2);
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_EQ(0, hosts[i]->priority());
-    const auto& locality = hosts[i]->locality();
-    EXPECT_EQ("oceania", locality.region());
-    EXPECT_EQ("hello", locality.zone());
-    EXPECT_EQ("world", locality.sub_zone());
-  }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
-
-  // Update locality now
-  locality->set_region("space");
-  locality->set_zone("station");
-  locality->set_sub_zone("mars");
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-
-  // runtime flag is disabled, verify that locality does not get updated
-  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(updatedHosts.size(), 2);
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_EQ(0, updatedHosts[i]->priority());
-    const auto& locality = updatedHosts[i]->locality();
-    EXPECT_EQ("oceania", locality.region());
-    EXPECT_EQ("hello", locality.zone());
-    EXPECT_EQ("world", locality.sub_zone());
-  }
-}
-
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
@@ -2041,7 +1969,7 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
 
 // Make sure config updates with P!=0 are rejected for the local cluster.
 TEST_F(EdsTest, NoPriorityForLocalCluster) {
-  cm_.local_cluster_name_ = "name";
+  server_context_.cluster_manager_.local_cluster_name_ = "name";
   resetCluster();
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -2367,7 +2295,7 @@ TEST_F(EdsTest, MalformedIP) {
 class EdsAssignmentTimeoutTest : public EdsTest {
 public:
   EdsAssignmentTimeoutTest() {
-    EXPECT_CALL(dispatcher_, createTimer_(_))
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
         .WillOnce(Invoke([this](Event::TimerCb cb) {
           timer_cb_ = cb;
           EXPECT_EQ(nullptr, interval_timer_);
@@ -2491,9 +2419,11 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
 
 TEST_F(EdsTest, MultiplexEdsEnabledViaRuntime) {
   runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
-  EXPECT_CALL(cm_.multiplexed_subscription_factory_,
+  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _));
-  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
   resetCluster(R"EOF(
       name: some_cluster
       connect_timeout: 0.25s
@@ -2513,9 +2443,11 @@ TEST_F(EdsTest, MultiplexEdsEnabledViaRuntime) {
 
 TEST_F(EdsTest, MultiplexEdsDisabledViaRuntime) {
   runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "false"}});
-  EXPECT_CALL(cm_.multiplexed_subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
       .Times(0);
-  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _));
+  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _));
   resetCluster(R"EOF(
       name: some_cluster
       connect_timeout: 0.25s
@@ -2554,9 +2486,11 @@ TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiType) {
 }
 
 TEST_F(EdsTest, MultiplexEdsDisabledByDefault) {
-  EXPECT_CALL(cm_.multiplexed_subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
+  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
       .Times(0);
-  EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _));
+  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _));
   resetCluster(R"EOF(
       name: some_cluster
       connect_timeout: 0.25s

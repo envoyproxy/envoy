@@ -1,11 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/server/active_tcp_listener.h"
@@ -49,6 +51,33 @@ private:
   Envoy::Event::FileEventPtr dlb_event_;
 };
 
+// The dir should always be "/dev" in production.
+// For test it is a temporary directory.
+// Return Dlb device id, absl::nullopt means error.
+static absl::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
+  uint device_id = config_id;
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat buffer;
+
+  std::string device_path = fmt::format("{}/dlb{}", dir, device_id);
+  if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ != 0) {
+    int i = 0;
+    // auto detect available dlb devices, now the max number of dlb device id is 63.
+    const int max_id = 64;
+    for (; i < max_id; i++) {
+      device_path = fmt::format("{}/dlb{}", dir, i);
+      if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ == 0) {
+        device_id = i;
+        break;
+      }
+    }
+    if (i == 64) {
+      return absl::nullopt;
+    }
+  }
+  return absl::optional<uint>{device_id};
+}
+
 class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,
                                     public Logger::Loggable<Logger::Id::config> {
 public:
@@ -84,11 +113,8 @@ public:
     if (!cap.combined_credits) {
       args.ldb_credit_pool_id = ldb_pool;
       args.dir_credit_pool_id = dir_pool;
-      args.num_ldb_credits = 32;
-      args.num_dir_credits = 32;
     } else {
       args.credit_pool_id = ldb_pool;
-      args.num_credits = 32;
     }
     args.cq_depth = cq_depth;
     args.num_ldb_event_state_entries = cq_depth * 2;
@@ -130,7 +156,6 @@ public:
 #endif
 };
 
-REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
 using DlbConnectionBalanceFactorySingleton = InjectableSingleton<DlbConnectionBalanceFactory>;
 
 /**

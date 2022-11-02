@@ -36,7 +36,7 @@ public:
                  Http::AsyncClient::FailureReason f) override PURE;
 };
 
-class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
+class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
       : cm_(cm), uri_(uri) {}

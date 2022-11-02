@@ -184,6 +184,8 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
   GrpcMuxSharedPtr mux;
   switch (api_config_source.api_type()) {
   case envoy::config::core::v3::ApiConfigSource::GRPC: {
+    const std::string control_plane_id =
+        Utility::getGrpcControlPlane(api_config_source).value_or("");
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
       mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
@@ -191,7 +193,8 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
               ->createUncachedRawAsyncClient(),
           dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source), local_info_,
-          api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators));
+          api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+          xds_resources_delegate_, control_plane_id);
     } else {
       mux = std::make_shared<Config::GrpcMuxImpl>(
           local_info_,
@@ -201,7 +204,7 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
           dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source),
           api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-          xds_resources_delegate_, Utility::getGrpcControlPlane(api_config_source).value_or(""));
+          xds_resources_delegate_, control_plane_id);
     }
     break;
   }

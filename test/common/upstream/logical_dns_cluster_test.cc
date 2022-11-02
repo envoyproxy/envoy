@@ -36,6 +36,7 @@ using testing::AnyNumber;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -46,15 +47,15 @@ protected:
   LogicalDnsClusterTest() : api_(Api::createApiForTest(stats_store_, random_)) {}
 
   void setupFromV3Yaml(const std::string& yaml) {
-    resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, cm, stats_store_, validation_visitor_);
     cluster_ = std::make_shared<LogicalDnsCluster>(server_context_, cluster_config, runtime_,
                                                    dns_resolver_, factory_context, std::move(scope),
                                                    false);
@@ -77,7 +78,7 @@ protected:
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
                       uint32_t expected_port, uint32_t expected_hc_port) {
-    EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).Times(AnyNumber());
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     setupFromV3Yaml(config);
 
@@ -102,11 +103,11 @@ protected:
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
-    EXPECT_CALL(dispatcher_,
+    EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
     logical_host->outlierDetector().putHttpResponseCode(200);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
@@ -122,11 +123,12 @@ protected:
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-    EXPECT_CALL(dispatcher_,
+    EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    Host::CreateConnectionData data = logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    Host::CreateConnectionData data =
+        logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
     EXPECT_FALSE(data.host_description_->canary());
     EXPECT_EQ(&cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->cluster(),
               &data.host_description_->cluster());
@@ -156,11 +158,11 @@ protected:
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-    EXPECT_CALL(dispatcher_,
+    EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
@@ -171,11 +173,11 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-    EXPECT_CALL(dispatcher_,
+    EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
     // Empty Success should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
@@ -183,18 +185,16 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Success, {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
-    EXPECT_CALL(dispatcher_,
+    EXPECT_CALL(server_context_.dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.3:443")), _, _, _))
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
-    logical_host->createConnection(dispatcher_, nullptr, nullptr);
+    logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
     // Make sure we cancel.
     EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
-
-    tls_.shutdownThread();
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -205,19 +205,13 @@ protected:
   Network::MockActiveDnsQuery active_dns_query_;
   NiceMock<Random::MockRandomGenerator> random_;
   Network::DnsResolver::ResolveCb dns_callback_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<LogicalDnsCluster> cluster_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
-  Server::MockOptions options_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
@@ -300,7 +294,6 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthChecker().setUnhealthy(
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
-  tls_.shutdownThread();
 }
 
 TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
@@ -349,8 +342,6 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, {});
-
-  tls_.shutdownThread();
 }
 
 TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
@@ -393,8 +384,6 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
   dns_callback_(Network::DnsResolver::ResolutionStatus::Failure,
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
-
-  tls_.shutdownThread();
 }
 
 TEST_F(LogicalDnsClusterTest, BadConfig) {

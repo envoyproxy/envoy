@@ -439,6 +439,7 @@ envoy_cc_test(
         ":integration_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],
 )
 
@@ -616,10 +617,6 @@ envoy_cc_test(
     name = "protocol_integration_test",
     srcs = [
         "instantiate_protocol_integration_test.cc",
-    ],
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
@@ -816,6 +813,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//source/server:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
@@ -1066,6 +1064,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1454,6 +1453,7 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],
@@ -1682,13 +1682,6 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_fuzz_test(
-    name = "h2_wrapped_capture_fuzz_test",
-    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
-    corpus = "h2_corpus",
-    deps = [":h2_fuzz_lib"],
-)
-
-envoy_cc_fuzz_test(
     name = "h2_capture_persistent_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
     copts = ["-DPERSISTENT_FUZZER"],
@@ -1881,10 +1874,6 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3([
         "quic_protocol_integration_test.cc",
     ]),
-    args = [
-        # for coverage, until this defaults true.
-        "--runtime-feature-override-for-tests=envoy.reloadable_features.allow_upstream_inline_write",
-    ],
     data = ["//test/config/integration/certs"],
     shard_count = 12,
     tags = [

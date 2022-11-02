@@ -78,16 +78,18 @@ public:
     removeCallbacksHelper(callbacks);
   }
   uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
-  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-    return connection()->connectionInfoProvider().localAddress();
+  const Network::ConnectionInfoProvider& connectionInfoProvider() override {
+    return connection()->connectionInfoProvider();
   }
+
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
     buffer_memory_account_ = account;
   }
 
   // SendBufferMonitor
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override {
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override {
     if (new_buffered_bytes == old_buffered_bytes) {
       return;
     }

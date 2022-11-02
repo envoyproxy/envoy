@@ -8,11 +8,24 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
+
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(Buffer::Instance& buffer) {
+  SelfContainedParser parser;
+  while (parser.parser().getStatus() == Http::Http1::ParserStatus::Ok &&
+         !parser.headersComplete() && buffer.length() != 0) {
+    auto slice = buffer.frontSlice();
+    int parsed = parser.parser().execute(static_cast<const char*>(slice.mem_), slice.len_);
+    buffer.drain(parsed);
+  }
+  return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
+         parser.headersComplete() && parser.parser().statusCode() == 200;
+}
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
@@ -45,8 +58,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::doWrite(Buffer::Instance& buffer,
 
 Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) {
   if (need_to_strip_connect_response_) {
-    // Limit the CONNECT response headers to an arbitrary 200 bytes.
-    constexpr uint32_t MAX_RESPONSE_HEADER_SIZE = 200;
+    // Limit the CONNECT response headers to an arbitrary 2000 bytes.
+    constexpr uint32_t MAX_RESPONSE_HEADER_SIZE = 2000;
     char peek_buf[MAX_RESPONSE_HEADER_SIZE];
     Api::IoCallUint64Result result =
         callbacks_->ioHandle().recv(peek_buf, MAX_RESPONSE_HEADER_SIZE, MSG_PEEK);
@@ -68,16 +81,13 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
       ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
-    // Note this is not in any way proper HTTP/1.1 parsing.
-    // Before this is used with any untrusted upstream, proper checks should
-    // be done rather than this.
-    if (!absl::StartsWith(peek_data, "HTTP/1.1 200")) {
-      ENVOY_CONN_LOG(trace, "Response does not match strict connect checks",
+    // Make sure the response is a valid connect response and all the data is consumed.
+    if (!isValidConnectResponse(buffer) || buffer.length() != 0) {
+      ENVOY_CONN_LOG(trace, "Response does not appear to be a successful CONNECT upgrade",
                      callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
     ENVOY_CONN_LOG(trace, "Successfully stripped CONNECT header", callbacks_->connection());
-    buffer.drain(buffer.length());
     need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);

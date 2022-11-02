@@ -95,7 +95,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
-        parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
+        parent_.callbacks()->tracingConfig(),
+        absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
         parent.timeSource().systemTime());
     if (parent.attemptCount() != 1) {
       // This is a retry request, add this metadata to span.
@@ -142,7 +143,7 @@ void UpstreamRequest::cleanUp() {
 
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
-                                                     Tracing::EgressConfig::get());
+                                                     parent_.callbacks()->tracingConfig());
   }
 
   if (per_try_timeout_ != nullptr) {
@@ -553,10 +554,11 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void UpstreamRequest::onPoolReady(
-    std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
-    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                                  Upstream::HostDescriptionConstSharedPtr host,
+                                  const Network::ConnectionInfoProvider& address_provider,
+                                  StreamInfo::StreamInfo& info,
+                                  absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -606,7 +608,8 @@ void UpstreamRequest::onPoolReady(
   } else {
     upstream_info.setUpstreamFilterState(filter_state);
   }
-  upstream_info.setUpstreamLocalAddress(upstream_local_address);
+  upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
+  upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
@@ -663,6 +666,8 @@ void UpstreamRequest::onPoolReady(
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
+
+  stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();

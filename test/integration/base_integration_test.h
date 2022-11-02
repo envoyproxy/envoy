@@ -99,7 +99,8 @@ public:
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
                     Network::Address::InstanceConstSharedPtr source_address =
-                        Network::Address::InstanceConstSharedPtr());
+                        Network::Address::InstanceConstSharedPtr(),
+                    absl::string_view destination_address = "");
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -505,6 +506,12 @@ protected:
 
   // If true, skip checking stats for missing tag-extraction rules.
   bool skip_tag_extraction_rule_check_{};
+
+  // By default, node metadata (node name, cluster name, locality) for the test server gets set to
+  // hard-coded values in the OptionsImpl ("node_name", "cluster_name", etc.). Set to true if your
+  // test specifies the node metadata in the Bootstrap configuration and that's what you want to use
+  // for node info in Envoy.
+  bool use_bootstrap_node_metadata_{false};
 
 private:
   // Configuration for the fake upstream.

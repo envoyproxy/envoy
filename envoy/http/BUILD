@@ -136,6 +136,7 @@ envoy_cc_library(
     ],
     deps = [
         ":header_formatter_interface",
+        "//envoy/common:union_string",
         "//envoy/tracing:trace_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
