@@ -1,8 +1,12 @@
 #ifndef WIN32
 #include <net/if.h>
 
+#else
+#include <winsock2.h>
+#include <iphlpapi.h>
 #endif
 
+#include <cstdlib>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -64,7 +68,39 @@ StatusOr<Interface> getLocalNetworkInterface() {
   return absl::NotFoundError("no interface available");
 }
 #else
+// Helper function that returns any usable interface present on windows. Adapted the example from
+// https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses?redirectedfrom=MSDN
 StatusOr<Interface> getLocalNetworkInterface() {
+  unsigned long buffer_size = 15000;
+  // Set the flags to pass to GetAdaptersAddresses
+  unsigned long flags = GAA_FLAG_SKIP_DNS_SERVER;
+
+  // The address family of the addresses to retrieve.
+  unsigned long family = AF_UNSPEC;
+  PIP_ADAPTER_ADDRESSES ifaddr = (IP_ADAPTER_ADDRESSES*)malloc(buffer_size);
+  if (GetAdaptersAddresses(family, flags, nullptr, ifaddr, &buffer_size) != NO_ERROR) {
+    free(ifaddr);
+    return absl::FailedPreconditionError("GetAdaptersAddresses failed");
+  }
+  for (PIP_ADAPTER_ADDRESSES ifa = ifaddr; ifa != nullptr; ifa = ifa->Next) {
+    Interface ifc;
+    ifc.name = ifa->AdapterName;
+    switch (family) {
+    case AF_INET:
+      ifc.if_index = ifa->IfIndex;
+      break;
+    case AF_INET6:
+      ifc.if_index = ifa->Ipv6IfIndex;
+      break;
+    default:
+      // This should not really happen.
+      continue;
+    };
+
+    free(ifaddr);
+    return ifc;
+  }
+  free(ifaddr);
   return absl::UnimplementedError("not available in windows");
 }
 #endif
