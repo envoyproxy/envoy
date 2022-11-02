@@ -88,10 +88,17 @@ public:
   }
 };
 
+class NullRouteMatcherImpl : public RouteMatcher {
+public:
+  // RouteMatcher
+  RouteEntryConstSharedPtr routeEntry(const Request&) const override { return nullptr; }
+};
+
 class RouteMatcherImpl : public RouteMatcher, Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
-                   Envoy::Server::Configuration::FactoryContext& context);
+                   Envoy::Server::Configuration::ServerFactoryContext& context,
+                   bool validate_clusters_default = false);
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
 
