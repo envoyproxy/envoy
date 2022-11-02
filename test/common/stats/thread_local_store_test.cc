@@ -11,6 +11,7 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/memory/stats.h"
+#include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -1684,78 +1685,6 @@ TEST_F(HistogramTest, ForEachHistogram) {
   EXPECT_EQ(deleted_histogram.unit(), Histogram::Unit::Unspecified);
 }
 
-TEST_F(HistogramTest, ForEachSinkedHistogram) {
-  StatNamePool pool(store_->symbolTable());
-
-  std::unique_ptr<TestUtil::TestSinkPredicates> sink_predicates =
-      std::make_unique<TestUtil::TestSinkPredicates>();
-  std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
-  std::vector<std::reference_wrapper<Histogram>> unsinked_histograms;
-
-  const size_t num_stats = 11;
-  // Create some histograms before setting the predicates.
-  for (size_t idx = 0; idx < num_stats / 2; ++idx) {
-    auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
-    //  sink every 3rd stat
-    if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
-      sinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    } else {
-      unsinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    }
-  }
-
-  store_->setSinkPredicates(std::move(sink_predicates));
-
-  // Create some histograms after setting the predicates.
-  for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
-    auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
-    // sink every 3rd stat
-    if ((idx + 1) % 3 == 0) {
-      static_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr())
-          ->sinkedStatNames()
-          .insert(stat_name);
-      sinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    } else {
-      unsinked_histograms.emplace_back(
-          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-    }
-  }
-
-  EXPECT_EQ(sinked_histograms.size(), 3);
-  EXPECT_EQ(unsinked_histograms.size(), 8);
-
-  size_t num_sinked_histograms = 0;
-  size_t num_iterations = 0;
-  store_->forEachSinkedHistogram(
-      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations, sink_predicates = static_cast<TestUtil::TestSinkPredicates*>(
-                            store_->sinkPredicates().ptr())](ParentHistogram& histogram) {
-        EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
-                  sink_predicates->sinkedStatNames().end());
-        ++num_iterations;
-      });
-  EXPECT_EQ(num_sinked_histograms, 3);
-  EXPECT_EQ(num_iterations, 3);
-
-  // Verify that rejecting histograms removes them from the sink set.
-  envoy::config::metrics::v3::StatsConfig stats_config_;
-  stats_config_.mutable_stats_matcher()->set_reject_all(true);
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
-  num_sinked_histograms = 0;
-  num_iterations = 0;
-  store_->forEachSinkedHistogram(
-      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations](ParentHistogram&) { ++num_iterations; });
-  EXPECT_EQ(num_sinked_histograms, 0);
-  EXPECT_EQ(num_iterations, 0);
-}
-
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
@@ -2030,9 +1959,129 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
 }
 
+enum class EnableIncludeHistograms { No = 0, Yes };
+class HistogramParameterisedTest : public HistogramTest,
+                                   public ::testing::WithParamInterface<EnableIncludeHistograms> {
+public:
+  HistogramParameterisedTest() : api_(Api::createApiForTest(*store_)) {
+    local_info_.node_.set_cluster("");
+  }
+
+protected:
+  void SetUp() override {
+    HistogramTest::SetUp();
+    ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(
+        GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
+    envoy.reloadable_features.enable_include_histograms: true
+    )EOF"
+                                                   : R"EOF(
+    envoy.reloadable_features.enable_include_histograms: false
+    )EOF");
+    envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("base");
+      layer->mutable_static_layer()->MergeFrom(base);
+    }
+    {
+      auto* layer = layered_runtime.add_layers();
+      layer->set_name("admin");
+      layer->mutable_admin_layer();
+    }
+    loader_ =
+        std::make_unique<Runtime::LoaderImpl>(dispatcher_, tls_, layered_runtime, local_info_,
+                                              *store_, generator_, validation_visitor_, *api_);
+  }
+
+  Event::MockDispatcher dispatcher_;
+  Api::ApiPtr api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Random::MockRandomGenerator generator_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  std::unique_ptr<Runtime::LoaderImpl> loader_;
+};
+
+TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
+  StatNamePool pool(store_->symbolTable());
+
+  std::unique_ptr<TestUtil::TestSinkPredicates> sink_predicates =
+      std::make_unique<TestUtil::TestSinkPredicates>();
+  std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
+  std::vector<std::reference_wrapper<Histogram>> unsinked_histograms;
+
+  const size_t num_stats = 11;
+  // Create some histograms before setting the predicates.
+  for (size_t idx = 0; idx < num_stats / 2; ++idx) {
+    auto name = absl::StrCat("histogram.", idx);
+    StatName stat_name = pool.add(name);
+    //  sink every 3rd stat
+    if ((idx + 1) % 3 == 0) {
+      sink_predicates->sinkedStatNames().insert(stat_name);
+      sinked_histograms.emplace_back(
+          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
+    } else {
+      unsinked_histograms.emplace_back(
+          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
+    }
+  }
+
+  store_->setSinkPredicates(std::move(sink_predicates));
+
+  // Create some histograms after setting the predicates.
+  for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
+    auto name = absl::StrCat("histogram.", idx);
+    StatName stat_name = pool.add(name);
+    // sink every 3rd stat
+    if ((idx + 1) % 3 == 0) {
+      static_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr())
+          ->sinkedStatNames()
+          .insert(stat_name);
+      sinked_histograms.emplace_back(
+          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
+    } else {
+      unsinked_histograms.emplace_back(
+          store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
+    }
+  }
+
+  EXPECT_EQ(sinked_histograms.size(), 3);
+  EXPECT_EQ(unsinked_histograms.size(), 8);
+
+  size_t num_sinked_histograms = 0;
+  size_t num_iterations = 0;
+  store_->forEachSinkedHistogram(
+      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
+      [&num_iterations, sink_predicates = static_cast<TestUtil::TestSinkPredicates*>(
+                            store_->sinkPredicates().ptr())](ParentHistogram& histogram) {
+        if (GetParam() == EnableIncludeHistograms::Yes) {
+          EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
+                    sink_predicates->sinkedStatNames().end());
+        }
+        ++num_iterations;
+      });
+  if (GetParam() == EnableIncludeHistograms::Yes) {
+    EXPECT_EQ(num_sinked_histograms, 3);
+    EXPECT_EQ(num_iterations, 3);
+  } else {
+    EXPECT_EQ(num_sinked_histograms, 11);
+    EXPECT_EQ(num_iterations, 11);
+  }
+  // Verify that rejecting histograms removes them from the sink set.
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  num_sinked_histograms = 0;
+  num_iterations = 0;
+  store_->forEachSinkedHistogram(
+      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
+      [&num_iterations](ParentHistogram&) { ++num_iterations; });
+  EXPECT_EQ(num_sinked_histograms, 0);
+  EXPECT_EQ(num_iterations, 0);
+}
+
 // Verify that histograms that are not flushed to sinks are merged in the call
 // to mergeHistograms
-TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
+TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
   StatNamePool pool(store_->symbolTable());
   store_->setSinkPredicates(std::make_unique<TestUtil::TestSinkPredicates>());
   auto& sink_predicates =
@@ -2067,12 +2116,19 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
     store_->forEachSinkedHistogram(
         [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
         [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
-          EXPECT_NE(sink_predicates.sinkedStatNames().find(histogram.statName()),
-                    sink_predicates.sinkedStatNames().end());
+          if (GetParam() == EnableIncludeHistograms::Yes) {
+            EXPECT_NE(sink_predicates.sinkedStatNames().find(histogram.statName()),
+                      sink_predicates.sinkedStatNames().end());
+          }
           ++num_iterations;
         });
-    EXPECT_EQ(num_sinked_histograms, 1);
-    EXPECT_EQ(num_iterations, 1);
+    if (GetParam() == EnableIncludeHistograms::Yes) {
+      EXPECT_EQ(num_sinked_histograms, 1);
+      EXPECT_EQ(num_iterations, 1);
+    } else {
+      EXPECT_EQ(num_sinked_histograms, 2);
+      EXPECT_EQ(num_iterations, 2);
+    }
   });
 
   EXPECT_THAT(h1.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 1,"));
@@ -2084,5 +2140,12 @@ TEST_F(HistogramTest, UnsinkedHistogramsAreMerged) {
   EXPECT_EQ(h2.used(), true);
 }
 
+INSTANTIATE_TEST_SUITE_P(HistogramParameterisedTestGroup, HistogramParameterisedTest,
+                         testing::Values(EnableIncludeHistograms::Yes, EnableIncludeHistograms::No),
+                         [](const testing::TestParamInfo<EnableIncludeHistograms>& info) {
+                           return info.param == EnableIncludeHistograms::No
+                                      ? "DisableIncludeHistograms"
+                                      : "EnableIncludeHistograms";
+                         });
 } // namespace Stats
 } // namespace Envoy
