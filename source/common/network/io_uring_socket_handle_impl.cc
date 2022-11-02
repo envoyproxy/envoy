@@ -37,6 +37,12 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
+  if (is_listen_socket_) {
+   io_uring_worker_.ref().closeSocket(fd_);
+   SET_SOCKET_INVALID(fd_);
+   return Api::ioCallUint64ResultNoError();
+  }
+
   auto& uring = io_uring_factory_.get().ref();
   if (read_req_) {
     auto req = new Io::Request{*this, Io::RequestType::Cancel};

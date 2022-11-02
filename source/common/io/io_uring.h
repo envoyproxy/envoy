@@ -156,6 +156,7 @@ public:
 
   virtual os_fd_t fd() const PURE;
   virtual void start() PURE;
+  virtual void close() PURE;
 
   virtual void onRequestCompeltion(const Request& req, int32_t result) PURE;
 };
@@ -168,6 +169,8 @@ public:
   virtual void reset() PURE;
 
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+  virtual void closeSocket(os_fd_t fd) PURE;
+  virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
 
   virtual IoUring& get() PURE;
 };
