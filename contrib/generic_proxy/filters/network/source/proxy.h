@@ -193,6 +193,8 @@ public:
     encoder_filters_.emplace_back(std::move(filter));
   }
 
+  void initializeFilterChain(FilterChainFactory& factory);
+
   Envoy::Event::Dispatcher& dispatcher();
   const CodecFactory& downstreamCodec();
   void resetStream();
