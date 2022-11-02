@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: build
+  change: |
+    moved the original_dst cluster to extensions. If you use this cluster and override extensions_build_config.bzl you will now need to include it explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -23,6 +26,9 @@ bug_fixes:
 - area: oauth2
   change: |
     fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
+- area: generic_proxy
+  change: |
+    fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -58,8 +64,38 @@ removed_config_or_runtime:
     change: |
       removed ``envoy.reloadable_features.http_100_continue_case_insensitive`` and legacy code paths.
       removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
+- area: eds
+  change: |
+    removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
+- area: listener
+  change: |
+    removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
+    removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
+    removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http_100_continue_case_insensitive`` and legacy code paths.
+    removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
+- area: build
+  change: |
+    added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
@@ -73,5 +109,14 @@ new_features:
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+- area: thrift_proxy
+  change: |
+    added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
+- area: udp_proxy
+  change: |
+    added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: mobile
+  change: |
+    started merging the Envoy mobile library into the main Envoy repo.
 
 deprecated:
