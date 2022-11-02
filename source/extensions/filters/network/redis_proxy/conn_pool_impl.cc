@@ -274,7 +274,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     transaction.connection_established_ = true;
   }
 
-  pending_requests_.emplace_back(*this, std::move(request), callbacks);
+  pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
   PendingRequest& pending_request = pending_requests_.back();
 
   if (!transaction.active_) {
@@ -399,9 +399,10 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
 
 InstanceImpl::PendingRequest::PendingRequest(InstanceImpl::ThreadLocalPool& parent,
                                              RespVariant&& incoming_request,
-                                             PoolCallbacks& pool_callbacks)
+                                             PoolCallbacks& pool_callbacks,
+                                             Upstream::HostConstSharedPtr& host)
     : parent_(parent), incoming_request_(std::move(incoming_request)),
-      pool_callbacks_(pool_callbacks) {}
+      pool_callbacks_(pool_callbacks), host_(host) {}
 
 InstanceImpl::PendingRequest::~PendingRequest() {
   if (request_handler_) {
@@ -426,7 +427,7 @@ void InstanceImpl::PendingRequest::onFailure() {
   parent_.onRequestCompleted();
 }
 
-bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
+void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
                                                  const std::string& host_address,
                                                  bool ask_redirection) {
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
@@ -438,15 +439,17 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
       !parent_.makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
                                  null_client_callbacks)) {
     onResponse(std::move(value));
-    return false;
-  }
-  request_handler_ = parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
-  if (!request_handler_) {
-    onResponse(std::move(value));
-    return false;
+    host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
   } else {
-    parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
-    return true;
+    request_handler_ =
+        parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
+    if (!request_handler_) {
+      onResponse(std::move(value));
+      host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+    } else {
+      parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
+      host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+    }
   }
 }
 
