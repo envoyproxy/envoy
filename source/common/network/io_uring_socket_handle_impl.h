@@ -76,7 +76,6 @@ public:
   void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
-  void addAcceptRequest();
   void addReadRequest();
 
   const uint32_t read_buffer_size_;
@@ -95,14 +94,7 @@ private:
   bool is_write_added_{false};
   bool remote_closed_{false};
 
-  // For accept
-  struct sockaddr remote_addr_;
-  socklen_t remote_addr_len_{sizeof(remote_addr_)};
-  bool is_accept_added_{false};
-  os_fd_t connection_fd_{INVALID_SOCKET};
-
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
-
   bool is_listen_socket_{false};
 };
 

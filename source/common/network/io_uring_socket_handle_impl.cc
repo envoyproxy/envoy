@@ -219,21 +219,6 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   accepted_socket_param_ = absl::nullopt;
 
   return io_handle;
-
-  // if (!is_accept_added_) {
-  //   return nullptr;
-  // }
-
-  // ASSERT(SOCKET_VALID(connection_fd_));
-
-  // is_accept_added_ = false;
-  // *addr = remote_addr_;
-  // *addrlen = remote_addr_len_;
-  // auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
-  //                                                            connection_fd_);
-  // SET_SOCKET_INVALID(connection_fd_);
-  // io_handle->addReadRequest();
-  // return io_handle;
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -454,18 +439,9 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
 
   switch (req.type_) {
   case Io::RequestType::Accept:
-    // This is hacky fix, we should check the req is valid or not.
-    if (fd_ == -1) {
-      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
-      break;
-    }
-
-    ASSERT(!SOCKET_VALID(connection_fd_));
-    addAcceptRequest();
-    if (result >= 0) {
-      connection_fd_ = result;
-      cb_(Event::FileReadyType::Read);
-    }
+    // All the logic moved to IoUring worker, suppose
+    // not reach here anymore.
+    PANIC("not impelement");
     break;
   case Io::RequestType::Read: {
     // Read is cancellable.
@@ -523,19 +499,6 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
     break;
   default:
     PANIC("not implemented");
-  }
-}
-
-void IoUringSocketHandleImpl::addAcceptRequest() {
-  is_accept_added_ = true;
-  auto& uring = io_uring_factory_.get().ref();
-  auto req = new Io::Request{*this, Io::RequestType::Accept, nullptr, fd_};
-  auto res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-    res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
 }
 
