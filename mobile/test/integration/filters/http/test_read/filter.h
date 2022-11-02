@@ -14,7 +14,9 @@ namespace HttpFilters {
 namespace TestRead {
 
 /**
- * This is a test-only filter to return specified error code based on a request header.
+ * This is a test-only filter to return specified error code based on a request url query string.
+ * It either simulates the requested error if the url query matches the error patterns
+ * or does nothing
  */
 class TestReadFilter final : public Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::filter> {

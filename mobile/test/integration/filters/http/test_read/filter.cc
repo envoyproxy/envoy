@@ -8,17 +8,30 @@ namespace TestRead {
 
 Http::FilterHeadersStatus TestReadFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                         bool) {
-  // sample path is /failed?start=0x10000
+  // sample path is /failed?error=0x10000
   Http::Utility::QueryParams query_parameters =
       Http::Utility::parseQueryString(request_headers.Path()->value().getStringView());
+  auto error = query_parameters.find("error");
   uint64_t response_flag;
-  if (absl::SimpleAtoi(query_parameters.at("start"), &response_flag)) {
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        TestReadFilter::mapErrorToResponseFlag(response_flag));
+  if (error != query_parameters.end() && absl::SimpleAtoi(error->second, &response_flag)) {
+    // set response error code
+    StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
+    stream_info.setResponseFlag(TestReadFilter::mapErrorToResponseFlag(response_flag));
+
+    // check if we want a quic server error: sample path is /failed?quic=1&error=0x10000
+    if (query_parameters.find("quic") != query_parameters.end()) {
+      stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+      stream_info.upstreamInfo()->setUpstreamProtocol(Http::Protocol::Http3);
+    }
+
+    // trigger the error and stop iteration to other filters
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "test_read filter threw: ", nullptr,
                                        absl::nullopt, "");
+    return Http::FilterHeadersStatus::StopIteration;
   }
-  return Http::FilterHeadersStatus::StopIteration;
+
+  // continue to other filters since the provided query string is invalid for error simulation
+  return Http::FilterHeadersStatus::Continue;
 }
 
 StreamInfo::ResponseFlag TestReadFilter::mapErrorToResponseFlag(uint64_t errorCode) {

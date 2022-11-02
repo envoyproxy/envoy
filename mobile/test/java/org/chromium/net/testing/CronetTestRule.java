@@ -264,7 +264,7 @@ public final class CronetTestRule implements TestRule {
 
   private void tearDown() {
     if (mCronetTestFramework != null) {
-      mCronetTestFramework.mCronetEngine.shutdown();
+      mCronetTestFramework.shutdownEngine();
       mCronetTestFramework = null;
     }
 
