@@ -1,4 +1,4 @@
-#include "source/common/upstream/original_dst_cluster.h"
+#include "source/extensions/clusters/original_dst/original_dst_cluster.h"
 
 #include <chrono>
 #include <list>
