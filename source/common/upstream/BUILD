@@ -521,7 +521,6 @@ envoy_cc_library(
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":logical_dns_cluster_lib",
         ":static_cluster_lib",
-        ":strict_dns_cluster_lib",
         ":upstream_includes",
         ":transport_socket_match_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -573,19 +572,6 @@ envoy_cc_library(
     name = "static_cluster_lib",
     srcs = ["static_cluster.cc"],
     hdrs = ["static_cluster.h"],
-    deps = [
-        ":cluster_factory_includes",
-        ":upstream_includes",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
-    name = "strict_dns_cluster_lib",
-    srcs = ["strict_dns_cluster.cc"],
-    hdrs = ["strict_dns_cluster.h"],
     deps = [
         ":cluster_factory_includes",
         ":upstream_includes",

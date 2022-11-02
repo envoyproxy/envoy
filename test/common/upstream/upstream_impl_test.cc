@@ -23,7 +23,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/static_cluster.h"
-#include "source/common/upstream/strict_dns_cluster.h"
+#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"

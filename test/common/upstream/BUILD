@@ -73,6 +73,7 @@ envoy_cc_test(
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
@@ -663,7 +664,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/common/upstream:static_cluster_lib",
-        "//source/common/upstream:strict_dns_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http:config",
