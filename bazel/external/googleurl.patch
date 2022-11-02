@@ -117,13 +117,21 @@ index f881c04..4e4f7df 100644
  // for official builds.
  // TODO(crbug.com/1320670): Remove when issue is resolved.
 
-# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11220 lands
+# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11220 and https://quiche-review.googlesource.com/c/googleurl/+/11260 land
 
 diff --git a/base/BUILD b/base/BUILD
-index 60ca578..6a793a6 100644
+index 60ca578..c922b73 100644
 --- a/base/BUILD
 +++ b/base/BUILD
-@@ -55,6 +55,7 @@ cc_library(
+@@ -40,6 +40,7 @@ cc_library(
+         "numerics/clamped_math.h",
+         "numerics/clamped_math_impl.h",
+         "numerics/safe_conversions.h",
++        "numerics/safe_conversions_arm_impl.h",
+         "numerics/safe_conversions_impl.h",
+         "numerics/safe_math_clang_gcc_impl.h",
+         "numerics/safe_math_shared_impl.h",
+@@ -55,6 +56,7 @@ cc_library(
          "strings/string_number_conversions.h",
          "strings/utf_string_conversions.h",
          "strings/utf_string_conversion_utils.h",
