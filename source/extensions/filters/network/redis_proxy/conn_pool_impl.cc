@@ -430,6 +430,9 @@ void InstanceImpl::PendingRequest::onFailure() {
 void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
                                                  const std::string& host_address,
                                                  bool ask_redirection) {
+  // This request might go away, so keep a copy of host.
+  auto host = host_;
+
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
   // not important since there is no point in being able to cancel the request. The use of
   // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the
@@ -439,16 +442,16 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
       !parent_.makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
                                  null_client_callbacks)) {
     onResponse(std::move(value));
-    host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+    host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
   } else {
     request_handler_ =
         parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
     if (!request_handler_) {
       onResponse(std::move(value));
-      host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+      host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
     } else {
       parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
-      host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+      host->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
     }
   }
 }
