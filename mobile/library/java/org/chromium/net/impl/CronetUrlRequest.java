@@ -934,13 +934,13 @@ public final class CronetUrlRequest extends UrlRequestBase {
         return;
       }
 
-      NetError netError = mapEnvoyMobileErrorToNetError(finalStreamIntel.getResponseFlags());
+      NetError netError = mapEnvoyMobileErrorToNetError(finalStreamIntel);
       int javaError = mapNetErrorToCronetApiErrorCode(netError);
 
       if (isQuicException(javaError)) {
         enterErrorState(new QuicExceptionImpl("Exception in CronetUrlRequest: " + netError,
                                               javaError, netError.getErrorCode(),
-                                              /*nativeQuicError*/ 0));
+                                              Errors.QUIC_INTERNAL_ERROR));
         return;
       }
 

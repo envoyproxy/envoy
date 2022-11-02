@@ -2,6 +2,9 @@ package org.chromium.net.impl;
 
 import android.util.Log;
 import androidx.annotation.LongDef;
+import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
+import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
@@ -14,6 +17,8 @@ import org.chromium.net.NetworkException;
  * from Envoymobile error to Chromium neterror and finally to the public Network Exception.
  */
 public class Errors {
+  // This represents a nativeQuicError since we don't expose individual quic errors yet.
+  public static final int QUIC_INTERNAL_ERROR = 1;
   private static final Map<Long, NetError> ENVOYMOBILE_ERROR_TO_NET_ERROR = buildErrorMap();
 
   /**Subset of errors defined in
@@ -67,13 +72,20 @@ public class Errors {
    * @param responseFlag envoymobile's finalStreamIntel responseFlag
    * @return the NetError that the EnvoyMobileError maps to
    */
-  public static NetError mapEnvoyMobileErrorToNetError(long responseFlag) {
-    /* Todo(https://github.com/envoyproxy/envoy-mobile/issues/1594):
-     * if (EnvoyMobileError.DNS_RESOLUTION_FAILED || EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE)
-     * && NetworkChangeNotifier.isOffline return NetError.ERR_INTERNET_DISCONNECTED
-     *
-     * if negotiated_protocol is quic return QUIC_PROTOCOL_FAILED
-     */
+  public static NetError mapEnvoyMobileErrorToNetError(EnvoyFinalStreamIntel finalStreamIntel) {
+    // if connection fails to be established, check if user is offline
+    long responseFlag = finalStreamIntel.getResponseFlags();
+    if ((responseFlag == EnvoyMobileError.DNS_RESOLUTION_FAILED ||
+         responseFlag == EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE) &&
+        !AndroidNetworkMonitor.getInstance().isOnline()) {
+      return NetError.ERR_INTERNET_DISCONNECTED;
+    }
+
+    // Check if negotiated_protocol is quic
+    if (finalStreamIntel.getUpstreamProtocol() == UpstreamHttpProtocol.HTTP3) {
+      return NetError.ERR_QUIC_PROTOCOL_ERROR;
+    }
+
     return ENVOYMOBILE_ERROR_TO_NET_ERROR.getOrDefault(responseFlag, NetError.ERR_OTHER);
   }
 

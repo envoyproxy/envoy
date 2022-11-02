@@ -653,13 +653,13 @@ public final class CronetBidirectionalStream
       mResponseInfo.setReceivedByteCount(finalStreamIntel.getReceivedByteCount());
     }
 
-    NetError netError = mapEnvoyMobileErrorToNetError(finalStreamIntel.getResponseFlags());
+    NetError netError = mapEnvoyMobileErrorToNetError(finalStreamIntel);
     int javaError = mapNetErrorToCronetApiErrorCode(netError);
 
     if (isQuicException(javaError)) {
       mException.set(new QuicExceptionImpl("Exception in BidirectionalStream: " + netError,
                                            javaError, netError.getErrorCode(),
-                                           /*nativeQuicError*/ 0));
+                                           Errors.QUIC_INTERNAL_ERROR));
     } else {
       mException.set(new BidirectionalStreamNetworkException(
           "Exception in BidirectionalStream: " + netError, javaError, netError.getErrorCode()));

@@ -16,6 +16,7 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.NetworkRequest;
 import android.os.Build;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 
 import java.util.Collections;
@@ -104,10 +105,19 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
     }
   }
 
+  /** @returns The singleton instance of {@link AndroidNetworkMonitor}. */
+  public static AndroidNetworkMonitor getInstance() {
+    assert instance != null;
+    return instance;
+  }
+
   @Override
   public void onReceive(Context context, Intent intent) {
     handleNetworkChange();
   }
+
+  /** @returns True if there is connectivity */
+  public boolean isOnline() { return previousNetworkType != -1; }
 
   private void handleNetworkChange() {
     NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
@@ -127,5 +137,11 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
     default:
       envoyEngine.setPreferredNetwork(EnvoyNetworkType.ENVOY_NETWORK_TYPE_GENERIC);
     }
+  }
+
+  /** Expose connectivityManager only for testing */
+  @VisibleForTesting
+  public ConnectivityManager getConnectivityManager() {
+    return connectivityManager;
   }
 }
