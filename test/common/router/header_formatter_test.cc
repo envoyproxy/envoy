@@ -38,7 +38,6 @@ using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
-using ::testing::UnorderedElementsAre;
 
 static envoy::config::route::v3::Route parseRouteFromV3Yaml(const std::string& yaml) {
   envoy::config::route::v3::Route route;
@@ -1914,34 +1913,6 @@ response_headers_to_add:
                             "Both append and append_action are set and it's not allowed");
 }
 
-// Test verifies that multiple OVERWRITE_IF_EXISTS_OR_ADD for the same header are rejected.
-TEST(HeaderParserTest, MultipleOverwriteActions) {
-  const std::string yaml = R"EOF(
-match: { prefix: "/new_endpoint" }
-route:
-  cluster: www2
-response_headers_to_add:
-  - header:
-      key: "x-foo-header"
-      value: "foo"
-    append_action: OVERWRITE_IF_EXISTS_OR_ADD
-  - header:
-      key: "x-foo-header-1"
-      value: "foo"
-    append_action: OVERWRITE_IF_EXISTS_OR_ADD
-  - header:
-      key: "x-foo-header"
-      value: "foo"
-    append_action: OVERWRITE_IF_EXISTS_OR_ADD
-)EOF";
-
-  const auto route = parseRouteFromV3Yaml(yaml);
-
-  EXPECT_THROW_WITH_MESSAGE(
-      HeaderParser::configure(route.response_headers_to_add()), EnvoyException,
-      "Multiple OVERWRITE_IF_EXISTS_OR_ADD actions for header x-foo-header are not allowed");
-}
-
 TEST(HeaderParserTest, EvaluateResponseHeadersRemoveBeforeAdd) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
@@ -2002,10 +1973,9 @@ response_headers_to_remove: ["x-baz-header"]
   auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
   EXPECT_THAT(transforms.headers_to_append_or_add,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(
-      transforms.headers_to_overwrite_or_add,
-      UnorderedElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
-                           Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
+  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                          Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 
@@ -2049,9 +2019,9 @@ response_headers_to_remove: ["x-baz-header"]
   EXPECT_THAT(transforms.headers_to_append_or_add,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
   EXPECT_THAT(transforms.headers_to_overwrite_or_add,
-              UnorderedElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
-                                   Pair(Http::LowerCaseString("x-per-request-header"),
-                                        "%PER_REQUEST_STATE(testing)%")));
+              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                          Pair(Http::LowerCaseString("x-per-request-header"),
+                               "%PER_REQUEST_STATE(testing)%")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 

@@ -251,7 +251,6 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
 HeaderParserPtr
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
-  absl::flat_hash_set<absl::string_view> headers_to_overwrite;
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -268,18 +267,6 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
                           : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
     } else {
       append_action = header_value_option.append_action();
-    }
-
-    // There should be only one OVERWRITE_IF_EXISTS_OR_ADD per each header.
-    if (append_action == HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD) {
-      if (headers_to_overwrite.find(header_value_option.header().key()) !=
-          headers_to_overwrite.end()) {
-        throw EnvoyException(
-            fmt::format("Multiple OVERWRITE_IF_EXISTS_OR_ADD actions for header {} are not allowed",
-                        header_value_option.header().key()));
-      } else {
-        headers_to_overwrite.emplace(header_value_option.header().key());
-      }
     }
 
     HttpHeaderFormatterPtr header_formatter;
@@ -359,6 +346,11 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   // to execute all formatters using the original received headers.
   // Only after all the formatters produced the new values of the headers, the headers are set.
   // absl::InlinedVector is optimized for 4 headers. After that it behaves as normal std::vector.
+  // It is assumed that most of the use cases will add or modify fairly small number of headers
+  // (<=4). If this assumption changes, the number of inlined capacity should be increased.
+  // header_formatter_speed_test.cc provides micro-benchmark for evaluating speed of adding and
+  // replacing headers and should be used when modifying the code below to access the performance
+  // impact of code changes.
   absl::InlinedVector<std::pair<const Http::LowerCaseString&, const std::string>, 4> headers_to_add,
       headers_to_overwrite;
   std::string value_buffer;

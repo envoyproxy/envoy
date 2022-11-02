@@ -15,7 +15,7 @@ static void bmEvaluateHeaders(benchmark::State& state) {
   request_header->addCopy(Http::LowerCaseString("foo"), 1);
   request_header->addCopy(Http::LowerCaseString("test1"), "to_overwrite");
 
-  MockTimeSystem time_system;
+  Event::SimulatedTimeSystem time_system;
   // Allocate empty stream_info. It is not really used, but HeaderParser::evaluateHeaders
   // does not invoke formatter when pointer to stream_info is null.
   const auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_system);
