@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -37,8 +37,7 @@ class RedirectPolicy : public Policy, public Logger::Loggable<Logger::Id::filter
 
 public:
   explicit RedirectPolicy(
-      const envoy::extensions::filters::http::custom_response::v3::CustomResponse::RedirectPolicy&
-          config,
+      const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
       Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context);
 
   Envoy::Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,

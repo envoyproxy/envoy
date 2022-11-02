@@ -4,8 +4,8 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/custom_response/policies/redirect_policy.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
-#include "source/extensions/filters/http/custom_response/redirect_policy.h"
 
 #include "test/integration/filters/common.h"
 
@@ -36,7 +36,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
               name: local_response
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.LocalResponsePolicy
+                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
                 status_code: 499
                 body:
                   inline_string: "not allowed"
@@ -80,7 +80,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
               name: redirect_response
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
+                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
                 status_code: 299
                 host: "https://foo.example"
                 path: "/gateway_error"
@@ -88,7 +88,6 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                 - header:
                     key: "foo2"
                     value: "x-bar2"
-                  append: false
       - predicate:
           single_predicate:
             input:
@@ -104,7 +103,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
               name: redirect_response2
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
+                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
                 status_code: 292
                 host: "https://some.other.host"
                 path: "/internal_server_error"
@@ -131,7 +130,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
               name: redirect_response2
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
+                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
                 host: "https://global/storage"
                 path: "/internal_server_error"
                 response_headers_to_add:

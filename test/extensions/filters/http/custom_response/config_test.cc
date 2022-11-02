@@ -1,5 +1,7 @@
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.validate.h"
 
 #include "source/extensions/filters/http/custom_response/config.h"
 #include "source/extensions/filters/http/custom_response/factory.h"

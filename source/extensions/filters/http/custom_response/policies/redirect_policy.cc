@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/custom_response/redirect_policy.h"
+#include "source/extensions/filters/http/custom_response/policies/redirect_policy.h"
 
 #include "envoy/stream_info/filter_state.h"
 
@@ -27,8 +27,7 @@ namespace HttpFilters {
 namespace CustomResponse {
 
 RedirectPolicy::RedirectPolicy(
-    const envoy::extensions::filters::http::custom_response::v3::CustomResponse::RedirectPolicy&
-        config,
+    const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
       stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),

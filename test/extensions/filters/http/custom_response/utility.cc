@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace CustomResponse {
 
 constexpr char LocalReplyDuringEncodeIfNotCER::name[];
-constexpr char LocalReplyDuringEncodeIfNotCER::name[];
+constexpr char LocalReplyDuringDecodeIfNotCER::name[];
 
 } // namespace CustomResponse
 } // namespace HttpFilters

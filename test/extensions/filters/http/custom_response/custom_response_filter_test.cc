@@ -1,4 +1,5 @@
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
 
 #include "source/extensions/filters/http/custom_response/config.h"
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
@@ -113,7 +114,7 @@ TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
           "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
           name: local_response
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.LocalResponsePolicy
+            "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
             body:
               inline_string: "not allowed"
 )EOF");

@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/custom_response/local_response_policy.h"
+#include "source/extensions/filters/http/custom_response/policies/local_response_policy.h"
 
 #include "envoy/stream_info/filter_state.h"
 
@@ -16,9 +16,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
-LocalResponsePolicy::LocalResponsePolicy(const envoy::extensions::filters::http::custom_response::
-                                             v3::CustomResponse::LocalResponsePolicy& config,
-                                         Server::Configuration::CommonFactoryContext& context)
+LocalResponsePolicy::LocalResponsePolicy(
+    const envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy& config,
+    Server::Configuration::CommonFactoryContext& context)
     : formatter_(config.has_body_format()
                      ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                            config.body_format(), context)

@@ -1,6 +1,6 @@
-#include "source/extensions/filters/http/custom_response/local_response_factory.h"
+#include "source/extensions/filters/http/custom_response/policies/local_response_factory.h"
 
-#include "source/extensions/filters/http/custom_response/local_response_policy.h"
+#include "source/extensions/filters/http/custom_response/policies/local_response_policy.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace CustomResponse {
 
 using LocalResponsePolicyProto =
-    envoy::extensions::filters::http::custom_response::v3::CustomResponse::LocalResponsePolicy;
+    envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy;
 
 ProtobufTypes::MessagePtr LocalResponseFactory::createEmptyConfigProto() {
   return std::make_unique<LocalResponsePolicyProto>();

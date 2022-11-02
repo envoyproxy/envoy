@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.validate.h"
 
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
@@ -16,9 +16,9 @@ class CustomResponseFilter;
 class LocalResponsePolicy : public Policy, public Logger::Loggable<Logger::Id::filter> {
 
 public:
-  LocalResponsePolicy(const envoy::extensions::filters::http::custom_response::v3::CustomResponse::
-                          LocalResponsePolicy& config,
-                      Server::Configuration::CommonFactoryContext& context);
+  LocalResponsePolicy(
+      const envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy& config,
+      Server::Configuration::CommonFactoryContext& context);
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
                                           CustomResponseFilter&) const override;
