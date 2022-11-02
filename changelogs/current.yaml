@@ -8,6 +8,9 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
+- area: oauth2
+  change: |
+    Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -17,38 +20,44 @@ bug_fixes:
 - area: router
   change: |
     fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
+- area: oauth2
+  change: |
+    fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-  - area: eds
-    change: |
-      removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
-  - area: listener
-    change: |
-      removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
-      removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
-      removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
-  - area: http
-    change: |
-      removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
+- area: eds
+  change: |
+    removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
+- area: listener
+  change: |
+    removed ``envoy.reloadable_features.strict_check_on_ipv4_compat`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.deprecate_global_ints`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_adding_content_type_in_local_replies`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_upstream_inline_write`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.append_or_truncate`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_new_codec_wrapper`` and legacy code paths.
+    removed ``envoy.reloadable_features.append_to_accept_content_encoding_only_once`` and legacy code paths.
+    removed ``envoy.reloadable_features.http1_lazy_read_disable`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http_100_continue_case_insensitive`` and legacy code paths.
+    removed ``envoy.reloadable_features.override_request_timeout_by_gateway_timeout`` and legacy code paths.
 
 new_features:
+- area: build
+  change: |
+    added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
@@ -65,5 +74,8 @@ new_features:
 - area: generic_proxy
   change: |
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
+- area: udp_proxy
+  change: |
+    added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
 
 deprecated:

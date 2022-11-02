@@ -86,6 +86,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/matcher/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
