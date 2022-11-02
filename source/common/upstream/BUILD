@@ -365,27 +365,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "original_dst_cluster_lib",
-    srcs = ["original_dst_cluster.cc"],
-    hdrs = ["original_dst_cluster.h"],
-    deps = [
-        ":cluster_factory_lib",
-        ":upstream_includes",
-        "//envoy/secret:secret_manager_interface",
-        "//envoy/upstream:cluster_factory_interface",
-        "//source/common/common:empty_string",
-        "//source/common/network:address_lib",
-        "//source/common/network:filter_state_dst_address_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
     name = "outlier_detection_lib",
     srcs = ["outlier_detection_impl.cc"],
     hdrs = ["outlier_detection_impl.h"],
@@ -541,7 +520,6 @@ envoy_cc_library(
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":logical_dns_cluster_lib",
-        ":original_dst_cluster_lib",
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
