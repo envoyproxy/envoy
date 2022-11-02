@@ -349,7 +349,6 @@ int Decoder::HeaderHandler::processXEnvoyOriginIngress(absl::string_view& header
     return 0;
   }
 
-  // todo error checks
   auto worker_thread_id = header.substr(thread_start, thread_end - thread_start);
   auto downstream_conn_id =
       header.substr(downstream_conn_start, downstream_conn_end - downstream_conn_start);
