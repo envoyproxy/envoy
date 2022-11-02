@@ -68,10 +68,12 @@ if __name__ == "__main__":
     # Fetch the current version commit information from GitHub.
     commit_info_request = urllib.request.Request(
         "https://api.github.com/repos/envoyproxy/envoy/commits/v" + current_version)
-    github_token = os.environ.get(args.github_api_token_env_name)
-    if github_token != None:
+    if github_token := os.environ.get(args.github_api_token_env_name):
+        # Reference: https://github.com/octokit/auth-token.js/blob/902a172693d08de998250bf4d8acb1fdb22377a4/src/with-authorization-prefix.ts#L6-L12.
+        authorization_header_prefix = "bearer" if len(github_token.split(".")) == 3 else "token"
         # To avoid rate-limited API calls.
-        commit_info_request.add_header("Authorization", f"Bearer {github_token}")
+        commit_info_request.add_header(
+            "Authorization", f"{authorization_header_prefix} {github_token}")
     with urllib.request.urlopen(commit_info_request) as response:
         commit_info = json.loads(response.read())
         source_version_file = project_root_dir.joinpath("SOURCE_VERSION")
