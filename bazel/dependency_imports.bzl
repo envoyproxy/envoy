@@ -15,10 +15,10 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "regis
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 
 # go version for rules_go
-GO_VERSION = "1.17.5"
+GO_VERSION = "1.19.2"
 
 JQ_VERSION = "1.6"
-YQ_VERSION = "4.24.4"
+YQ_VERSION = "4.25.2"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):
     # TODO: allow building of tools for easier onboarding
@@ -64,66 +64,66 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         name = "org_golang_google_grpc",
         build_file_proto_mode = "disable",
         importpath = "google.golang.org/grpc",
-        sum = "h1:raiipEjMOIC/TO2AvyTxP25XFdLxNIBwzDh3FM3XztI=",
-        version = "v1.34.0",
+        sum = "h1:WTLtQzmQori5FUH25Pq4WT22oCsv8USpQ+F6rqtsmxw=",
+        version = "v1.49.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/google.golang.org/grpc",
-        # last_update = "2020-12-02"
+        # last_update = "2022-08-23"
         # use_category = ["api"],
         # cpe = "cpe:2.3:a:grpc:grpc:*",
     )
     go_repository(
         name = "org_golang_x_net",
         importpath = "golang.org/x/net",
-        sum = "h1:0mm1VjtFUOIlE1SbDlwjYaDxZVDP2S5ou6y0gSgXHu8=",
-        version = "v0.0.0-20200226121028-0de0cce0169b",
+        sum = "h1:tvrvnPFcdzp294diPnrdZZZ8XUt2Tyj7svb7X52iDuU=",
+        version = "v0.0.0-20221014081412-f15817d10f9b",
         build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/net",
-        # last_update = "2020-02-26"
+        # last_update = "2022-10-14"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L129-L134"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L129-L134"
     )
     go_repository(
         name = "org_golang_x_text",
         importpath = "golang.org/x/text",
-        sum = "h1:cokOdA+Jmi5PJGXLlLllQSgYigAEfHXJAERHVMaCc2k=",
-        version = "v0.3.3",
+        sum = "h1:BrVqGRd7+k1DiOgtnFvAkoQEWQvBc25ouMJM6429SFg=",
+        version = "v0.4.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/golang.org/x/text",
-        # last_update = "2021-06-16"
+        # last_update = "2022-10-14"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L148-L153"
     )
     go_repository(
         name = "com_github_spf13_afero",
         importpath = "github.com/spf13/afero",
-        sum = "h1:8q6vk3hthlpb2SouZcnBVKboxWQWMDNF38bwholZrJc=",
-        version = "v1.3.4",
+        sum = "h1:j49Hj62F0n+DaZ1dDCvhABaPNSGNkt32oRFxI33IEMw=",
+        version = "v1.9.2",
         build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/spf13/afero",
-        # last_update = "2021-03-20"
+        # last_update = "2022-07-19"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L60-L65"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L60-L65"
     )
     go_repository(
         name = "com_github_lyft_protoc_gen_star",
         importpath = "github.com/lyft/protoc-gen-star",
-        sum = "h1:xOpFu4vwmIoUeUrRuAtdCrZZymT/6AkW/bsUWA506Fo=",
-        version = "v0.6.0",
+        sum = "h1:erE0rdztuaDq3bpGifD95wfoPrSZc95nGA6tbiNYh6M=",
+        version = "v0.6.1",
         build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/lyft/protoc-gen-star",
-        # last_update = "2022-03-04"
+        # last_update = "2021-11-11"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L35-L40"
     )
     go_repository(
         name = "com_github_iancoleman_strcase",
         importpath = "github.com/iancoleman/strcase",
-        sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
-        version = "v0.0.0-20180726023541-3605ed457bf7",
+        sum = "h1:05I4QRnGpI0m37iZQRuskXh+w77mr6Z41lwQzuHLwW0=",
+        version = "v0.2.0",
         build_external = "external",
         # project_url = "https://pkg.go.dev/github.com/iancoleman/strcase",
-        # last_update = "2020-11-22"
+        # last_update = "2021-06-12"
         # use_category = ["api"],
-        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
+        # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.7/dependencies.bzl#L23-L28"
     )
