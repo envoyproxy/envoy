@@ -13,7 +13,7 @@ routing PRs, questions, etc. to the right place.
   * xDS APIs, configuration and control plane.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
-    connections, etc.).
+    connections, etc.), Envoy Mobile.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
@@ -29,7 +29,7 @@ routing PRs, questions, etc. to the right place.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
   * Docs, tooling, CI, containers and sandbox examples
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
-  * HTTP/3, upstream connection management.
+  * HTTP/3, upstream connection management, Envoy Mobile.
 
 # Maintainers
 
@@ -50,6 +50,17 @@ routing PRs, questions, etc. to the right place.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
 
+# Envoy mobile maintainers
+
+The following Envoy maintainers have final say over any changes only affecting /mobile
+
+* JP Simard ([jpsim](https://github.com/jpsim)) (jp@lyft.com)
+  * iOS (swift/objective-c) platform bindings.
+* Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
+  * iOS (swift/objective-c) platform bindings.
+* Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
+  * xDS, C++ integration tests.
+
 # Senior extension maintainers
 
 The following extension maintainers have final say over the extensions mentioned below. Once they
@@ -60,10 +71,6 @@ without further review.
   * Wasm
 * Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
   * Thrift
-* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
-  * HTTP/3
-* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
-  * Dubbo
 
 # Envoy security team
 
