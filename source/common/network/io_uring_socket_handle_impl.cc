@@ -206,20 +206,34 @@ Api::SysCallIntResult IoUringSocketHandleImpl::listen(int backlog) {
 }
 
 IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
-  if (!is_accept_added_) {
+  if (!accepted_socket_param_.has_value()) {
     return nullptr;
   }
 
-  ASSERT(SOCKET_VALID(connection_fd_));
-
-  is_accept_added_ = false;
-  *addr = remote_addr_;
-  *addrlen = remote_addr_len_;
+  ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket");
+  *addr = accepted_socket_param_->remote_addr_;
+  *addrlen = accepted_socket_param_->remote_addr_len_;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
-                                                             connection_fd_);
-  SET_SOCKET_INVALID(connection_fd_);
+                                                             accepted_socket_param_->fd_);
   io_handle->addReadRequest();
+  accepted_socket_param_ = absl::nullopt;
+
   return io_handle;
+
+  // if (!is_accept_added_) {
+  //   return nullptr;
+  // }
+
+  // ASSERT(SOCKET_VALID(connection_fd_));
+
+  // is_accept_added_ = false;
+  // *addr = remote_addr_;
+  // *addrlen = remote_addr_len_;
+  // auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
+  //                                                            connection_fd_);
+  // SET_SOCKET_INVALID(connection_fd_);
+  // io_handle->addReadRequest();
+  // return io_handle;
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -309,8 +323,9 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   io_uring_worker_.ref().start(dispatcher);
 
   if (is_listen_socket_) {
-    addAcceptRequest();
-    io_uring_factory_.get().ref().submit();
+    //addAcceptRequest();
+    //io_uring_factory_.get().ref().submit();
+    io_uring_worker_.ref().addAcceptSocket(fd_, *this);
   }
 
   cb_ = std::move(cb);
@@ -417,10 +432,24 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
   return selected_interface_name;
 }
 
+void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
+  accepted_socket_param_ = param;
+  cb_(Event::FileReadyType::Read);
+
+  // After accept the socet, the accepted_socket_param expected to be cleanup.
+  ASSERT(accepted_socket_param_ == absl::nullopt);
+}
+
 void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
                                                   int32_t result) {
   if (result < 0) {
     ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
+  }
+
+  // This is hacky fix, we should check the req is valid or not.
+  if (fd_ == -1) {
+    ENVOY_LOG_MISC(debug, "the uring's fd already closed");
+    return;
   }
 
   switch (req.type_) {

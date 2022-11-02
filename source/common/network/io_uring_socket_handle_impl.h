@@ -72,6 +72,7 @@ public:
   absl::optional<std::string> interfaceName() override;
 
   // IoUringHandler
+  void onAcceptSocket(Io::AcceptedSocketParam& param) override;
   void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
@@ -99,6 +100,8 @@ private:
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
   bool is_accept_added_{false};
   os_fd_t connection_fd_{INVALID_SOCKET};
+
+  OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
 
   bool is_listen_socket_{false};
 };

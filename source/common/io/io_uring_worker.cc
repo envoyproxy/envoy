@@ -1,4 +1,5 @@
 #include "source/common/io/io_uring_worker.h"
+#include "io_uring.h"
 
 namespace Envoy {
 namespace Io {
@@ -11,12 +12,49 @@ void IoUringWorkerImpl::onFileEvent() {
       ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
     }
 
+    // temp log and temp fix for the old path, remove then when I fix the thing.
+    switch(req->type_) {
+      case RequestType::Accept:
+        ENVOY_LOG(debug, "receive accept request completion");
+        break;
+      case RequestType::Connect:
+        ENVOY_LOG(debug, "receive connect request completion");
+        break;
+      case RequestType::Read:
+        ENVOY_LOG(debug, "receive Read request completion");
+        break;
+      case RequestType::Write:
+        ENVOY_LOG(debug, "receive write request completion");
+        break;
+      case RequestType::Close:
+        ENVOY_LOG(debug, "receive close request completion");
+        break;
+      case RequestType::Cancel:
+        ENVOY_LOG(debug, "receive cancel request completion");
+        // Return is temp fix.
+        if (!req->io_uring_socket_.has_value()) {
+          return;
+        }
+        break;
+      case RequestType::Unknown:
+        ENVOY_LOG(debug, "receive unknown request completion");
+        break;
+    }
+    // temp fix for the old path
+    if (!req->io_uring_socket_.has_value() && result == -ECANCELED) {
+      ENVOY_LOG(debug, "the request is cancel, then return directly.");
+      return;
+    }
+  
+    if (req->io_uring_socket_.has_value()) {
+      req->io_uring_socket_->get().onRequestCompeltion(*req, result);
     // For close, there is no iohandle value, but need to fix
-    if (!req->io_uring_handler_.has_value()) {
+    } else if (req->io_uring_handler_.has_value()) {
+      req->io_uring_handler_->get().onRequestCompletion(*req, result);
+    } else {
       ENVOY_LOG(debug, "no iohandle");
       return;
     }
-    req->io_uring_handler_->get().onRequestCompletion(*req, result);
 
     delete req;
   });

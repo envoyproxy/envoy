@@ -130,18 +130,10 @@ public:
   virtual bool currentThreadRegistered() PURE;
 };
 
-class IoUringWorker : public ThreadLocal::ThreadLocalObject {
-public:
-  virtual ~IoUringWorker() = default;
-
-  virtual void start(Event::Dispatcher& dispatcher) PURE;
-  virtual void reset() PURE;
-  virtual IoUring& get() PURE;
-};
+enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
 
 class IoUringHandler;
-
-enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
+class IoUringSocket;
 
 struct Request {
   absl::optional<std::reference_wrapper<IoUringHandler>> io_uring_handler_{absl::nullopt};
@@ -149,11 +141,43 @@ struct Request {
   struct iovec* iov_{nullptr};
   os_fd_t fd_{-1};
   std::unique_ptr<uint8_t[]> buf_{};
+  absl::optional<std::reference_wrapper<IoUringSocket>> io_uring_socket_{absl::nullopt};
+};
+
+struct AcceptedSocketParam {
+  os_fd_t fd_;
+  struct sockaddr& remote_addr_;
+  socklen_t remote_addr_len_;
+};
+
+class IoUringSocket {
+public:
+  virtual ~IoUringSocket() = default;
+
+  virtual os_fd_t fd() const PURE;
+  virtual void start() PURE;
+
+  virtual void onRequestCompeltion(const Request& req, int32_t result) PURE;
+};
+
+class IoUringWorker : public ThreadLocal::ThreadLocalObject {
+public:
+  virtual ~IoUringWorker() = default;
+
+  virtual void start(Event::Dispatcher& dispatcher) PURE;
+  virtual void reset() PURE;
+
+  virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+
+  virtual IoUring& get() PURE;
 };
 
 class IoUringHandler {
 public:
   virtual ~IoUringHandler() = default;
+
+  virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
+
   virtual void onRequestCompletion(const Request& req, int32_t result) PURE;
 };
 
