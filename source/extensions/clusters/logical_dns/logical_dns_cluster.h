@@ -13,7 +13,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/clusters/logical_dns/logical_host.h"
+#include "source/extensions/clusters/common/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {
