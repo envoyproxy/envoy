@@ -4,7 +4,6 @@
 
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
-#include "source/extensions/http/cache/file_system_http_cache/cache_entry_file.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header.pb.h"
 

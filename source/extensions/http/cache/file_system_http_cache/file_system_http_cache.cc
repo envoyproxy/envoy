@@ -1,6 +1,5 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
-#include "source/extensions/http/cache/file_system_http_cache/cache_entry_file.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"

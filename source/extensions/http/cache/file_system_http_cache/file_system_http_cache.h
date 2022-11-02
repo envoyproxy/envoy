@@ -20,8 +20,6 @@ namespace FileSystemHttpCache {
 using ConfigProto =
     envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
-class CacheEntryFile;
-
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,
                             public Logger::Loggable<Logger::Id::cache_filter> {
