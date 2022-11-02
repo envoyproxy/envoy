@@ -28,3 +28,4 @@ EXTENSIONS = {
     "envoy_mobile.cert_validator.platform_bridge_cert_validator": "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
 }
 WINDOWS_EXTENSIONS = {}
+LEGACY_ALWAYSLINK = 1
