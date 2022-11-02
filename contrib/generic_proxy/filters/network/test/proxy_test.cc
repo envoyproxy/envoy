@@ -580,6 +580,36 @@ TEST_F(FilterTest, ActiveStreamAddFilters) {
   EXPECT_EQ(0, active_stream->nextEncoderFilterIndexForTest());
 }
 
+TEST_F(FilterTest, ActiveStreamAddFiltersOrder) {
+  auto filter_0 = std::make_shared<NiceMock<MockStreamFilter>>();
+  auto filter_1 = std::make_shared<NiceMock<MockStreamFilter>>();
+  auto filter_2 = std::make_shared<NiceMock<MockStreamFilter>>();
+
+  mock_stream_filters_ = {{"fake_test_filter_name_0", filter_0},
+                          {"fake_test_filter_name_1", filter_1},
+                          {"fake_test_filter_name_2", filter_2}};
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  filter_->newDownstreamRequest(std::move(request));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_EQ(3, active_stream->decoderFiltersForTest().size());
+  EXPECT_EQ(3, active_stream->encoderFiltersForTest().size());
+
+  EXPECT_EQ(filter_0.get(), active_stream->decoderFiltersForTest()[0]->filter_.get());
+  EXPECT_EQ(filter_1.get(), active_stream->decoderFiltersForTest()[1]->filter_.get());
+  EXPECT_EQ(filter_2.get(), active_stream->decoderFiltersForTest()[2]->filter_.get());
+
+  EXPECT_EQ(filter_2.get(), active_stream->encoderFiltersForTest()[0]->filter_.get());
+  EXPECT_EQ(filter_1.get(), active_stream->encoderFiltersForTest()[1]->filter_.get());
+  EXPECT_EQ(filter_0.get(), active_stream->encoderFiltersForTest()[2]->filter_.get());
+}
+
 TEST_F(FilterTest, ActiveStreamFiltersContinueDecoding) {
   auto mock_stream_filter_0 = std::make_shared<NiceMock<MockStreamFilter>>();
   auto mock_stream_filter_1 = std::make_shared<NiceMock<MockStreamFilter>>();

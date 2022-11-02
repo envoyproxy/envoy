@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: build
+  change: |
+    moved the original_dst cluster to extensions. If you use this cluster and override extensions_build_config.bzl you will now need to include it explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -23,6 +26,9 @@ bug_fixes:
 - area: oauth2
   change: |
     fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
+- area: generic_proxy
+  change: |
+    fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -93,6 +99,9 @@ new_features:
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+- area: thrift_proxy
+  change: |
+    added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.

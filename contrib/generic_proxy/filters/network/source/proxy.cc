@@ -164,6 +164,13 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connec
   parent_.connection().write(buffer, close_connection);
 }
 
+void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
+  factory.createFilterChain(*this);
+  // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
+  // chain.
+  std::reverse(encoder_filters_.begin(), encoder_filters_.end());
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
@@ -189,8 +196,8 @@ void Filter::newDownstreamRequest(RequestPtr request) {
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
-  config_->createFilterChain(*raw_stream);
-
+  // Initialize filter chian.
+  raw_stream->initializeFilterChain(*config_);
   // Start request.
   raw_stream->continueDecoding();
 }
