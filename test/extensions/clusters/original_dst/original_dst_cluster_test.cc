@@ -12,8 +12,8 @@
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/original_dst_cluster.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/original_dst/original_dst_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"

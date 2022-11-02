@@ -278,6 +278,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
