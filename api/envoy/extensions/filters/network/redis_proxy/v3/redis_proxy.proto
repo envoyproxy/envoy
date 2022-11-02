@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.redis_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
@@ -321,6 +322,11 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
+
+  // The DNS cache configuration that the filter will attach to and that will be used to resolve
+  // hostnames that are returned with MOVED and ASK responses. If not provided, no DNS lookups
+  // will be performed (and thus the MOVED/ASK errors will be propagated to the user).
+  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 10;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in

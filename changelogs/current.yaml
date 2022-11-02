@@ -89,5 +89,8 @@ new_features:
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: redis
+  change: |
+    added support for DNS resolving endponts returned by MOVED/ASK responses.
 
 deprecated:

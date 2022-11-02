@@ -19,12 +19,15 @@ namespace RedisProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-    Api::Api& api)
+    Api::Api& api,
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(
-          Config::DataSource::read(config.downstream_auth_username(), true, api)) {
+          Config::DataSource::read(config.downstream_auth_username(), true, api)),
+      port_(static_cast<uint16_t>(6379)), dns_cache_manager_(cache_manager_factory.get()),
+      dns_cache_(getCache(config)) {
 
   auto downstream_auth_password =
       Config::DataSource::read(config.downstream_auth_password(), true, api);
@@ -42,6 +45,16 @@ ProxyFilterConfig::ProxyFilterConfig(
       }
     }
   }
+}
+
+Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::getCache(
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config) {
+  // No DNS cache/lookups if config wasn't provided.
+  if (config.has_dns_cache_config()) {
+    return dns_cache_manager_->getCache(config.dns_cache_config());
+  }
+
+  return nullptr;
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
