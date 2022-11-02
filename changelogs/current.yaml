@@ -83,5 +83,8 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: mobile
+  change: |
+    started merging the Envoy mobile library into the main Envoy repo.
 
 deprecated:
