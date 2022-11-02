@@ -4,6 +4,10 @@ load(
     "envoy_package",
     "envoy_select_enable_http3",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -358,6 +362,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -378,6 +383,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -481,6 +487,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -595,6 +602,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -607,6 +615,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(

@@ -667,6 +667,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
+  stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
+
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
     return;

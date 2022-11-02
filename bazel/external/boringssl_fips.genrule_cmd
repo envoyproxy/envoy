@@ -12,31 +12,32 @@ if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
 fi
 
 # Bazel magic.
-ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
-pushd $$ROOT
+# ROOT=$(dirname $(rootpath boringssl/BUILDING.md))/..
+ROOT=./external/boringssl_fips
+pushd "$ROOT"
 
 # Build tools requirements:
 # - Clang compiler version 7.0.1 (https://releases.llvm.org/download.html)
 # - Go programming language version 1.12.7 (https://golang.org/dl/)
 # - Ninja build system version 1.9.0 (https://github.com/ninja-build/ninja/releases)
 
-# Override $$PATH for build tools, to avoid picking up anything else.
-export PATH="$$(dirname `which cmake`):/usr/bin:/bin"
+# Override $PATH for build tools, to avoid picking up anything else.
+export PATH="$(dirname `which cmake`):/usr/bin:/bin"
 
 # Clang 7.0.1
 VERSION=7.0.1
 SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
 PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
 
-curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
-  && echo "$$SHA256" clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz | sha256sum --check
-tar xf clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz
+curl -sLO https://releases.llvm.org/"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz \
+  && echo "$SHA256" clang+llvm-"$VERSION"-"$PLATFORM".tar.xz | sha256sum --check
+tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
 
-export HOME="$$PWD"
-printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > $${HOME}/toolchain
-export PATH="$$PWD/clang+llvm-$$VERSION-$$PLATFORM/bin:$$PATH"
+export HOME="$PWD"
+printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > ${HOME}/toolchain
+export PATH="$PWD/clang+llvm-$VERSION-$PLATFORM/bin:$PATH"
 
-if [[ `clang --version | head -1 | awk '{print $$3}'` != "$$VERSION" ]]; then
+if [[ `clang --version | head -1 | awk '{print $3}'` != "$VERSION" ]]; then
   echo "ERROR: Clang version doesn't match."
   exit 1
 fi
@@ -46,15 +47,15 @@ VERSION=1.12.7
 SHA256=66d83bfb5a9ede000e33c6579a91a29e6b101829ad41fffb5c5bb6c900e109d9
 PLATFORM="linux-amd64"
 
-curl -sLO https://dl.google.com/go/go"$$VERSION"."$$PLATFORM".tar.gz \
-  && echo "$$SHA256" go"$$VERSION"."$$PLATFORM".tar.gz | sha256sum --check
-tar xf go"$$VERSION"."$$PLATFORM".tar.gz
+curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
+  && echo "$SHA256" go"$VERSION"."$PLATFORM".tar.gz | sha256sum --check
+tar xf go"$VERSION"."$PLATFORM".tar.gz
 
-export GOPATH="$$PWD/gopath"
-export GOROOT="$$PWD/go"
-export PATH="$$GOPATH/bin:$$GOROOT/bin:$$PATH"
+export GOPATH="$PWD/gopath"
+export GOROOT="$PWD/go"
+export PATH="$GOPATH/bin:$GOROOT/bin:$PATH"
 
-if [[ `go version | awk '{print $$3}'` != "go$$VERSION" ]]; then
+if [[ `go version | awk '{print $3}'` != "go$VERSION" ]]; then
   echo "ERROR: Go version doesn't match."
   exit 1
 fi
@@ -64,13 +65,13 @@ VERSION=1.9.0
 SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
 PLATFORM="linux"
 
-curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
-  && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
-unzip -o ninja-"$$PLATFORM".zip
+curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$VERSION"/ninja-"$PLATFORM".zip \
+  && echo "$SHA256" ninja-"$PLATFORM".zip | sha256sum --check
+unzip -o ninja-"$PLATFORM".zip
 
-export PATH="$$PWD:$$PATH"
+export PATH="$PWD:$PATH"
 
-if [[ `ninja --version` != "$$VERSION" ]]; then
+if [[ `ninja --version` != "$VERSION" ]]; then
   echo "ERROR: Ninja version doesn't match."
   exit 1
 fi
@@ -80,7 +81,7 @@ rm -rf boringssl/build
 
 # Build BoringSSL.
 cd boringssl
-mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=$${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
+mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
 ninja run_tests
 
@@ -92,5 +93,5 @@ fi
 
 # Move compiled libraries to the expected destinations.
 popd
-mv $$ROOT/boringssl/build/crypto/libcrypto.a $(execpath crypto/libcrypto.a)
-mv $$ROOT/boringssl/build/ssl/libssl.a $(execpath ssl/libssl.a)
+mv $ROOT/boringssl/build/crypto/libcrypto.a $1
+mv $ROOT/boringssl/build/ssl/libssl.a $2
