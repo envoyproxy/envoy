@@ -2478,6 +2478,54 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
+// Verify the removal when disable active health check for a host works.
+TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
+  setupNoServiceValidationHC();
+
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_disable_active_health_check(false);
+  auto enable_host = std::make_shared<HostImpl>(
+      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
+      simTime());
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {enable_host};
+  health_checker_->start();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  health_check_config.set_disable_active_health_check(true);
+  auto disable_host = std::make_shared<HostImpl>(
+      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
+      simTime());
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  cluster_->prioritySet().runUpdateCallbacks(0, {disable_host}, {enable_host});
+}
+
+// Verify a session in health checker is not created when disable health check.
+TEST_F(HttpHealthCheckerImplTest, AddDisableHC) {
+  setupNoServiceValidationHC();
+
+  TestSessionPtr new_test_session(new TestSession());
+  test_sessions_.emplace_back(std::move(new_test_session));
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).Times(0);
+  EXPECT_CALL(*health_checker_, createCodecClient_(_)).Times(0);
+
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_disable_active_health_check(true);
+  auto disable_host = std::make_shared<HostImpl>(
+      cluster_->info_, "test_host", Network::Utility::resolveUrl("tcp://127.0.0.1:80"), nullptr, 1,
+      envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
+      simTime());
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
+  health_checker_->start();
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(0);
+}
+
 TEST_F(HttpHealthCheckerImplTest, ConnectionClose) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));

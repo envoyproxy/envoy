@@ -61,8 +61,9 @@ public:
   void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
                     uint32_t degraded_endpoints, bool remaining_unhealthy = true,
                     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
-                    bool await_update = true) {
+                    bool await_update = true, uint32_t disable_active_hc_endpoints = 0) {
     ASSERT(total_endpoints >= healthy_endpoints + degraded_endpoints);
+    ASSERT(total_endpoints >= disable_active_hc_endpoints);
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
     if (overprovisioning_factor.has_value()) {
@@ -81,6 +82,11 @@ public:
       } else if (i >= healthy_endpoints + degraded_endpoints) {
         endpoint->set_health_status(remaining_unhealthy ? envoy::config::core::v3::UNHEALTHY
                                                         : envoy::config::core::v3::UNKNOWN);
+      }
+      if (i < disable_active_hc_endpoints) {
+        endpoint->mutable_endpoint()
+            ->mutable_health_check_config()
+            ->set_disable_active_health_check(true);
       }
     }
 
@@ -217,6 +223,42 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   result = fake_upstream_connection->waitForDisconnect();
   RELEASE_ASSERT(result, result.message());
   fake_upstream_connection.reset();
+}
+
+TEST_P(EdsIntegrationTest, EndpointDisableActiveHCFlag) {
+  initializeTest(true);
+
+  // Total 1 endpoints with all active health check enabled.
+  setEndpoints(1, 0, 0, false, absl::nullopt, true, 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Disable Active Healthy Check for the host. EDS Unknown is considered as healthy
+  setEndpoints(1, 0, 0, false, absl::nullopt, true, 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Set the host as unhealthy through EDS.
+  setEndpoints(1, 0, 0, true, absl::nullopt, true, 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Set host as healthy through EDS.
+  setEndpoints(1, 1, 0, false, absl::nullopt, true, 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Clear out the host and verify the host is gone.
+  setEndpoints(0, 0, 0);
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
 // Verify that a host stabilized via active health checking which is first removed from EDS and

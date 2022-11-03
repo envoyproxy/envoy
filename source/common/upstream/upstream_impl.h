@@ -266,11 +266,17 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
+        disable_active_health_check_(health_check_config.disable_active_health_check()),
         health_status_(health_status) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
+  }
+
+  bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
+  void setDisableActiveHealthCheck(bool disable_active_health_check) override {
+    disable_active_health_check_ = disable_active_health_check;
   }
 
   // Upstream::Host
@@ -359,6 +365,7 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  bool disable_active_health_check_;
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.

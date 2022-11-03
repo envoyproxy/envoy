@@ -160,6 +160,9 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
@@ -171,6 +174,9 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
     // This deletion can happen inline in response to a host failure, so we deferred delete.

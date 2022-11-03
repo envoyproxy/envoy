@@ -242,6 +242,16 @@ public:
    * connection pools no longer need this host.
    */
   virtual HostHandlePtr acquireHandle() const PURE;
+
+  /**
+   * @return true if active health check is disabled.
+   */
+  virtual bool disableActiveHealthCheck() const PURE;
+
+  /**
+   * Set true to disable active health check for the host.
+   */
+  virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
