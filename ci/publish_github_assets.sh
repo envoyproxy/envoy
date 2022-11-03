@@ -10,6 +10,7 @@ MAINTAINER_GPG_KEY_PASSPHRASE="${MAINTAINER_GPG_KEY_PASSPHRASE:-}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 if [[ -z "$GITHUB_TOKEN" ]]; then
+    # shellcheck disable=SC2016
     echo 'env var `GITHUB_TOKEN` must be set'
     exit 1
 fi
@@ -84,7 +85,8 @@ upload_assets () {
 
     release_id="$(get_release_id "${1}")"
     if [[ "$release_id" == null ]]; then
-        echo 'Failed querying github API - `GITHUB_TOKEN` may not be valid or the release ('${release_id}') was not found'
+        # shellcheck disable=SC2016
+        echo 'Failed querying github API - `GITHUB_TOKEN` may not be valid or the release ('"${release_id}"') was not found'
         return 1
     fi
     upload_url="$(get_upload_url "$release_id")"
