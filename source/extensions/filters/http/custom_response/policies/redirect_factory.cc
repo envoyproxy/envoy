@@ -29,7 +29,7 @@ std::string RedirectFactory::name() const {
   return "envoy.extensions.filters.http.custom_response.redirect_policy";
 }
 
-REGISTER_FACTORY(RedirectFactory, PolicyFactory);
+REGISTER_CUSTOM_RESPONSE_POLICY_FACTORY(RedirectFactory);
 
 } // namespace CustomResponse
 } // namespace HttpFilters

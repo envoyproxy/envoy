@@ -33,21 +33,18 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: action
             typed_config:
-              "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: local_response
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
-                status_code: 499
-                body:
-                  inline_string: "not allowed"
-                body_format:
-                  json_format:
-                    status: "%RESPONSE_CODE%"
-                    message: "%LOCAL_REPLY_BODY%"
-                response_headers_to_add:
-                - header:
-                    key: "foo"
-                    value: "x-bar"
+              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
+              status_code: 499
+              body:
+                inline_string: "not allowed"
+              body_format:
+                json_format:
+                  status: "%RESPONSE_CODE%"
+                  message: "%LOCAL_REPLY_BODY%"
+              response_headers_to_add:
+              - header:
+                  key: "foo"
+                  value: "x-bar"
         # Redirect to different upstream if the status code is one of 502, 503 or 504.
       - predicate:
           or_matcher:
@@ -77,17 +74,14 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: action
             typed_config:
-              "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_response
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
-                status_code: 299
-                host: "https://foo.example"
-                path: "/gateway_error"
-                response_headers_to_add:
-                - header:
-                    key: "foo2"
-                    value: "x-bar2"
+              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              status_code: 299
+              host: "https://foo.example"
+              path: "/gateway_error"
+              response_headers_to_add:
+              - header:
+                  key: "foo2"
+                  value: "x-bar2"
       - predicate:
           single_predicate:
             input:
@@ -100,21 +94,18 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: action
             typed_config:
-              "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_response2
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
-                status_code: 292
-                host: "https://some.other.host"
-                path: "/internal_server_error"
-                response_headers_to_add:
-                - header:
-                    key: "foo3"
-                    value: "x-bar3"
-                request_headers_to_add:
-                - header:
-                    key: "cer-only"
-                  keep_empty_value: true
+              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              status_code: 292
+              host: "https://some.other.host"
+              path: "/internal_server_error"
+              response_headers_to_add:
+              - header:
+                  key: "foo3"
+                  value: "x-bar3"
+              request_headers_to_add:
+              - header:
+                  key: "cer-only"
+                keep_empty_value: true
       - predicate:
           single_predicate:
             input:
@@ -127,20 +118,17 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: action
             typed_config:
-              "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-              name: redirect_response2
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
-                host: "https://global/storage"
-                path: "/internal_server_error"
-                response_headers_to_add:
-                - header:
-                    key: "foo3"
-                    value: "x-bar3"
-##              modify_request_headers_action:
-##                name: modify-request-headers-action
-##                typed_config:
-##                  "@type": type.googleapis.com/google.protobuf.Struct
+              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              host: "https://global/storage"
+              path: "/internal_server_error"
+              response_headers_to_add:
+              - header:
+                  key: "foo3"
+                  value: "x-bar3"
+##            modify_request_headers_action:
+##              name: modify-request-headers-action
+##              typed_config:
+##                "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
 // Simulate filters that send local reply during either encode or decode based

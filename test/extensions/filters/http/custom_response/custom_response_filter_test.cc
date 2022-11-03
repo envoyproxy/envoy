@@ -111,12 +111,9 @@ TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
       action:
         name: action
         typed_config:
-          "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
-          name: local_response
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
-            body:
-              inline_string: "not allowed"
+          "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
+          body:
+            inline_string: "not allowed"
 )EOF");
   setupFilterAndCallback();
 

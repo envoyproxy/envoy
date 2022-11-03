@@ -7,6 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
+#include "source/common/matcher/matcher.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,16 +31,42 @@ protected:
 
 using PolicySharedPtr = std::shared_ptr<Policy>;
 
-class PolicyFactory : public Config::TypedFactory {
+struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {
+  explicit CustomResponseMatchAction(PolicySharedPtr policy) : policy_(policy) {}
+  const PolicySharedPtr policy_;
+};
+
+struct CustomResponseActionFactoryContext {
+  Server::Configuration::ServerFactoryContext& server_;
+  Stats::StatName stats_prefix_;
+};
+
+template <typename PolicyConfig>
+class PolicyMatchActionFactory : public Matcher::ActionFactory<CustomResponseActionFactoryContext>,
+                                 Logger::Loggable<Logger::Id::config> {
 public:
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
+                                                 CustomResponseActionFactoryContext& context,
+                                                 ProtobufMessage::ValidationVisitor&) override {
+    return [policy = createPolicy(config, context.server_, context.stats_prefix_)] {
+      return std::make_unique<CustomResponseMatchAction>(policy);
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<PolicyConfig>();
+  }
+
+protected:
   virtual PolicySharedPtr createPolicy(const Protobuf::Message& config,
                                        Envoy::Server::Configuration::ServerFactoryContext& context,
                                        Stats::StatName stats_prefix) PURE;
-
-  std::string category() const override {
-    return "envoy.extensions.http.filters.custom_response.policy";
-  }
 };
+
+// Macro used to register factories for custom response policies
+#define REGISTER_CUSTOM_RESPONSE_POLICY_FACTORY(factory)                                           \
+  REGISTER_FACTORY(factory, Matcher::ActionFactory<CustomResponseActionFactoryContext>)
+
 } // namespace CustomResponse
 } // namespace HttpFilters
 } // namespace Extensions

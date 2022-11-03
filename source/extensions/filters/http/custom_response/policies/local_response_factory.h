@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
 
 namespace Envoy {
@@ -7,7 +8,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-class LocalResponseFactory : public PolicyFactory {
+class LocalResponseFactory
+    : public PolicyMatchActionFactory<
+          envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy> {
 public:
   ~LocalResponseFactory() override;
 

@@ -10,51 +10,12 @@
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
-// using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
 namespace {
-
-struct CustomResponseMatchAction
-    : public Matcher::ActionBase<envoy::config::core::v3::TypedExtensionConfig> {
-  explicit CustomResponseMatchAction(PolicySharedPtr policy) : policy_(policy) {}
-  const PolicySharedPtr policy_;
-};
-
-struct CustomResponseActionFactoryContext {
-  Server::Configuration::ServerFactoryContext& server_;
-  Stats::StatName stats_prefix_;
-};
-
-class PolicyMatchActionFactory : public Matcher::ActionFactory<CustomResponseActionFactoryContext>,
-                                 Logger::Loggable<Logger::Id::config> {
-public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        CustomResponseActionFactoryContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    auto& message =
-        MessageUtil::downcastAndValidate<const envoy::config::core::v3::TypedExtensionConfig&>(
-            config, validation_visitor);
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<PolicyFactory>(message);
-    auto policy_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        message.typed_config(), validation_visitor, factory);
-    return [policy = factory.createPolicy(*policy_config, context.server_, context.stats_prefix_)] {
-      return std::make_unique<CustomResponseMatchAction>(policy);
-    };
-  }
-  std::string name() const override { return "custom_response_name"; }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
-  }
-};
-
-REGISTER_FACTORY(PolicyMatchActionFactory,
-                 Matcher::ActionFactory<CustomResponseActionFactoryContext>);
 
 class CustomResponseMatchActionValidationVisitor
     : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
@@ -94,11 +55,7 @@ PolicySharedPtr FilterConfig::getPolicy(Http::ResponseHeaderMap& headers,
   if (!match.result_) {
     return PolicySharedPtr{};
   }
-
-  const auto result = match.result_();
-  ASSERT(result->typeUrl() == CustomResponseMatchAction::staticTypeUrl());
-  ASSERT(dynamic_cast<CustomResponseMatchAction*>(result.get()));
-  return static_cast<const CustomResponseMatchAction*>(result.get())->policy_;
+  return match.result_()->getTyped<CustomResponseMatchAction>().policy_;
 }
 
 } // namespace CustomResponse

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
 
 namespace Envoy {
@@ -7,7 +8,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-class RedirectFactory : public PolicyFactory {
+class RedirectFactory : public PolicyMatchActionFactory<
+                            envoy::extensions::filters::http::custom_response::v3::RedirectPolicy> {
 public:
   ~RedirectFactory() override;
 
