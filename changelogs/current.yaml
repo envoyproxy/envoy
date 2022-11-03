@@ -73,7 +73,7 @@ new_features:
     added support for quit command to the redis proxy.
 - area: custom response http filter
   change: |
-    added :ref:`custom response http filter <config_http_filters_custom_response>`.
+    added :ref:`custom response http filter <config_http_filters_custom_response>` which adds the ability to customize responses sent to downstreams using local or remote sources.
 - area: tcp_proxy
   change: |
     added support for propagating the response headers in :ref:`TunnelingConfig

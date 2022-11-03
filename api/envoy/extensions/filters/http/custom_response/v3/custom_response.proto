@@ -50,7 +50,7 @@ message CustomResponse {
   //             "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
   //             name: local_response
   //             typed_config:
-  //               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.LocalResponsePolicy
+  //               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
   //               status_code: 499
   //               body:
   //                 inline_string: "not allowed"
@@ -94,7 +94,7 @@ message CustomResponse {
   //             "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
   //             name: redirect_response
   //             typed_config:
-  //               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse.RedirectPolicy
+  //               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
   //               status_code: 299
   //               uri: "https://foo.example/gateway_error"
   //               response_headers_to_add:
