@@ -10,6 +10,12 @@ void IoUringAcceptSocket::onAccept(int32_t result) {
     return;
   }
 
+  if (is_disabled_) {
+    ENVOY_LOG(debug, "accept new socket but disabled");
+    is_pending_accept_ = true;
+    return;
+  }
+
   ENVOY_LOG(debug, "New socket accepted");
   connection_fd_ = result;
   AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
@@ -31,7 +37,12 @@ void IoUringAcceptSocket::onCancel(int32_t) {
 void IoUringAcceptSocket::onClose(int32_t) {
   close_req_ = nullptr;
   ENVOY_LOG(debug, "close request done");
-  if (cancel_req_ == nullptr) {
+  if (cancel_req_ == nullptr && !is_disabled_) {
+    if (is_pending_accept_) {
+      is_pending_accept_ = false;
+      // Close the accepted socket directly when there is pending one.
+      ::close(connection_fd_);
+    }
     ENVOY_LOG(debug, "the socket {} is ready to end");
     std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
     parent_.dispatcher().deferredDelete(std::move(self));
@@ -50,6 +61,23 @@ void IoUringAcceptSocket::close() {
 
   ENVOY_LOG(debug, "submit close request for the accept");
   close_req_ = parent_.submitCloseRequest(*this);
+  is_disabled_ = true;
+}
+
+void IoUringAcceptSocket::enable() {
+  is_disabled_ = false;
+  if (is_pending_accept_) {
+    is_pending_accept_ = false;
+    onAccept(0);
+  }
+}
+
+void IoUringAcceptSocket::disable() {
+  if (accept_req_ != nullptr) {
+    ENVOY_LOG(debug, "submit cancel request for the accept");
+    cancel_req_ = parent_.submitCancelRequest(*this, accept_req_);
+  }
+  is_disabled_ = true;
 }
 
 void IoUringWorkerImpl::onFileEvent() {

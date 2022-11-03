@@ -332,6 +332,10 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
 }
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
+  if (is_listen_socket_) {
+    io_uring_worker_.ref().enableSocket(fd_);
+    return;
+  }
   if (events & Event::FileReadyType::Read) {
     is_read_enabled_ = true;
     addReadRequest();
@@ -342,8 +346,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
-  // This isn't right, we should reset the whole file event.
-  io_uring_worker_.ref().reset();
+  io_uring_worker_.ref().disableSocket(fd_);
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {

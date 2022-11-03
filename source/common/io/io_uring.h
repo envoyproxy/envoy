@@ -157,6 +157,8 @@ public:
   virtual os_fd_t fd() const PURE;
   virtual void start() PURE;
   virtual void close() PURE;
+  virtual void enable() PURE;
+  virtual void disable() PURE;
 
   virtual void onAccept(int32_t) { PANIC("not implemented"); };
   virtual void onClose(int32_t) { PANIC("not implemented"); };
@@ -171,8 +173,9 @@ public:
   virtual ~IoUringWorker() = default;
 
   virtual void start(Event::Dispatcher& dispatcher) PURE;
-  virtual void reset() PURE;
 
+  virtual void enableSocket(os_fd_t fd) PURE;
+  virtual void disableSocket(os_fd_t fd) PURE;
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;

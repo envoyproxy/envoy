@@ -18,6 +18,8 @@ public:
   os_fd_t fd() const override { return fd_; }
   void start() override;
   void close() override;
+  void enable() override;
+  void disable() override;
 
   void onAccept(int32_t result) override;
   void onClose(int32_t result) override;
@@ -35,6 +37,9 @@ private:
   Request* accept_req_;
   Request* cancel_req_;
   Request* close_req_;
+
+  bool is_disabled_{false};
+  bool is_pending_accept_{false};
 };
 
 
@@ -44,7 +49,16 @@ public:
 
   // IoUringWorker
   void start(Event::Dispatcher& dispatcher) override;
-  void reset() override { file_event_.reset(); }
+  void enableSocket(os_fd_t fd) override {
+    auto socket_iter = sockets_.find(fd);
+    ASSERT(socket_iter != sockets_.end());
+    socket_iter->second->enable();
+  }
+  void disableSocket(os_fd_t fd) override {
+    auto socket_iter = sockets_.find(fd);
+    ASSERT(socket_iter != sockets_.end());
+    socket_iter->second->disable();
+  }
   void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
   void closeSocket(os_fd_t fd) override;
   Event::Dispatcher& dispatcher() override;
