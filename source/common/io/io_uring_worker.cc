@@ -23,6 +23,7 @@ void IoUringAcceptSocket::onRequestCompeltion(const Request& req, int32_t result
     if (close_req_ == nullptr) {
       ENVOY_LOG(debug, "the socket {} is ready to end");
       std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+      parent_.dispatcher().deferredDelete(std::move(self));
     }
   } else if (req.type_ == RequestType::Close) {
     close_req_ = nullptr;
@@ -30,6 +31,7 @@ void IoUringAcceptSocket::onRequestCompeltion(const Request& req, int32_t result
     if (cancel_req_ == nullptr) {
       ENVOY_LOG(debug, "the socket {} is ready to end");
       std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+      parent_.dispatcher().deferredDelete(std::move(self));
     }
   } else {
     ASSERT(false);
@@ -146,6 +148,8 @@ void IoUringWorkerImpl::start(Event::Dispatcher& dispatcher) {
     return;
   }
 
+  dispatcher_ = dispatcher;
+
   const os_fd_t event_fd = io_uring_impl_.registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
@@ -176,6 +180,10 @@ std::unique_ptr<IoUringSocket> IoUringWorkerImpl::removeSocket(os_fd_t fd) {
   auto socket = std::move(socket_iter->second);
   sockets_.erase(socket_iter);
   return socket;
+}
+
+Event::Dispatcher& IoUringWorkerImpl::dispatcher() {
+  return dispatcher_.ref();
 }
 
 } // namespace Io

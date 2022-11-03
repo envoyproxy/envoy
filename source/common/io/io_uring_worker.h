@@ -47,6 +47,7 @@ public:
   void reset() override { file_event_.reset(); }
   void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
   void closeSocket(os_fd_t fd) override;
+  Event::Dispatcher& dispatcher() override;
 
   std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) override;
   IoUring& get() override;
@@ -56,6 +57,7 @@ private:
 
   IoUringImpl io_uring_impl_;
   Event::FileEventPtr file_event_{nullptr};
+  OptRef<Event::Dispatcher> dispatcher_;
 
   absl::flat_hash_map<os_fd_t, std::unique_ptr<IoUringSocket>> sockets_;
 };

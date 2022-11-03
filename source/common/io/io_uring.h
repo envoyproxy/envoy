@@ -150,7 +150,7 @@ struct AcceptedSocketParam {
   socklen_t remote_addr_len_;
 };
 
-class IoUringSocket {
+class IoUringSocket : public Event::DeferredDeletable {
 public:
   virtual ~IoUringSocket() = default;
 
@@ -171,6 +171,7 @@ public:
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
+  virtual Event::Dispatcher& dispatcher() PURE;
 
   virtual IoUring& get() PURE;
 };
