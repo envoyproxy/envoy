@@ -7,13 +7,15 @@ namespace Network {
 
 HappyEyeballsConnectionProvider::HappyEyeballsConnectionProvider(
     Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Upstream::AddressSelectFn source_address_fn, UpstreamTransportSocketFactory& socket_factory,
+    const std::shared_ptr<Upstream::UpstreamLocalAddressSelector>& upstream_local_address_selector,
+    UpstreamTransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const Upstream::HostDescriptionConstSharedPtr& host,
     const ConnectionSocket::OptionsSharedPtr options)
     : dispatcher_(dispatcher), address_list_(sortAddresses(address_list)),
-      source_address_fn_(source_address_fn), socket_factory_(socket_factory),
-      transport_socket_options_(transport_socket_options), host_(host), options_(options) {}
+      upstream_local_address_selector_(upstream_local_address_selector),
+      socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
+      host_(host), options_(options) {}
 
 bool HappyEyeballsConnectionProvider::hasNextConnection() {
   return next_address_ < address_list_.size();
@@ -24,10 +26,13 @@ ClientConnectionPtr HappyEyeballsConnectionProvider::createNextConnection(const 
   ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "C[{}] address={}", id,
                   address_list_[next_address_]->asStringView());
   auto& address = address_list_[next_address_++];
+  auto upstream_local_address =
+      upstream_local_address_selector_->getUpstreamLocalAddress(address, options_);
+
   return dispatcher_.createClientConnection(
-      address, source_address_fn_ ? source_address_fn_(address) : nullptr,
-      socket_factory_.createTransportSocket(transport_socket_options_, host_), options_,
-      transport_socket_options_);
+      address, upstream_local_address.address_,
+      socket_factory_.createTransportSocket(transport_socket_options_, host_),
+      upstream_local_address.socket_options_, transport_socket_options_);
 }
 
 size_t HappyEyeballsConnectionProvider::nextConnection() { return next_address_; }

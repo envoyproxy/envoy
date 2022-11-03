@@ -60,6 +60,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
 
     #
+    # Extensions for generic proxy
+    #
+    "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
+    "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
+
+    #
     # xDS delegates
     #
 
