@@ -269,7 +269,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnecti
   EXPECT_EQ(0, response->body().size());
 }
 
-TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestOfLuaPerRoute) {
+TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
   initializeFilterWithRds(fmt::format(filter_config_, true), "basic_routes", initial_route_config_);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
