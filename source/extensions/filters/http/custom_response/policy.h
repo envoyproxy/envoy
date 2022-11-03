@@ -5,10 +5,11 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stream_info/stream_info.h"
+
 #include "source/common/matcher/matcher.h"
-#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Extensions {

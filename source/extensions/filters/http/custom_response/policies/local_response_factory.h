@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
+
 #include "source/extensions/filters/http/custom_response/policy.h"
 
 namespace Envoy {
