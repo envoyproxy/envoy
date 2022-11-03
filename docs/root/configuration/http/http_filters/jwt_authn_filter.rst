@@ -123,10 +123,10 @@ Another config example using inline JWKS:
       forward: true
       forward_payload_header: x-jwt-payload
       claim_to_header:
-      - name: x-jwt-claim-sub
-        claim: sub
-      - name: x-jwt-claim-nested-key
-        claim: nested.claim.key
+      - header_name: x-jwt-claim-sub
+        claim_name: sub
+      - header_name: x-jwt-claim-nested-key
+        claim_name: nested.claim.key
 
 Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as::
 

@@ -731,10 +731,11 @@ message PerRouteConfig {
 
 // This message specifies a combination of header name and claim name.
 message JwtClaimToHeader {
-  // The HTTP header name.
-  string name = 1
+  // The HTTP header name to copy the claim to.
+  string header_name = 1
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-  // JWT Claim
-  string claim = 2 [(validate.rules).string = {min_len: 1}];
+  // JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
+  // String separated with "." in case of nested claims or a single value.
+  string claim_name = 2 [(validate.rules).string = {min_len: 1}];
 }

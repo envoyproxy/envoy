@@ -151,6 +151,8 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
 
   EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "test@example.com");
   EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
+  EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
+  EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
 }
 
 // This test verifies when wrong claim is passed in claim_to_header

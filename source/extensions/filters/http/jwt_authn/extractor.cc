@@ -222,8 +222,8 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
     forward_payload_headers_.emplace_back(provider.forward_payload_header());
   }
 
-  for (const auto& header : provider.claim_to_header()) {
-    claim_to_headers_.emplace_back(header.name());
+  for (const auto& headerAndClaim : provider.claim_to_header()) {
+    claim_to_headers_.emplace_back(headerAndClaim.header_name());
   }
 }
 

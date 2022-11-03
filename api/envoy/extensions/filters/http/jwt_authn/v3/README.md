@@ -37,10 +37,10 @@ If a JWT is valid, you can add any claim of type (string, integer, boolean) and 
 
 ```yaml
     claim_to_header:
-    - name: x-jwt-claim-sub
-      claim: sub
-    - name: x-jwt-claim-nested-key
-      claim: nested.claim.key
+    - header_name: x-jwt-claim-sub
+      claim_name: sub
+    - haeder_name: x-jwt-claim-nested-key
+      claim_name: nested.claim.key
 ```
 
 ## Further header options

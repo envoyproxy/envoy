@@ -151,8 +151,8 @@ providers:
         cluster: pubkey_cluster
     forward_payload_header: sec-istio-auth-userinfo
     claim_to_header:
-    - name: x-jwt-claim-aud
-      claim: aud
+    - header_name: x-jwt-claim-aud
+      claim_name: aud
     from_params:
     - jwta
     - jwtb

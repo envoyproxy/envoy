@@ -85,12 +85,16 @@ providers:
         seconds: 600
     forward_payload_header: sec-istio-auth-userinfo
     claim_to_header:
-    - name: "x-jwt-claim-sub"
-      claim: "sub"
-    - name: "x-jwt-claim-nested"
-      claim: "nested.key-1"
-    - name: "x-jwt-claim-nested-wrong"
-      claim: "nested.wrong.claim"
+    - header_name: "x-jwt-claim-sub"
+      claim_name: "sub"
+    - header_name: "x-jwt-claim-nested"
+      claim_name: "nested.key-1"
+    - header_name: "x-jwt-claim-nested-wrong"
+      claim_name: "nested.wrong.claim"
+    - header_name: "x-jwt-bool-claim"
+      claim_name: "nested.nested-2.key-3"
+    - header_name: "x-jwt-int-claim"
+      claim_name: "nested.nested-2.key-4"
 rules:
 - match:
     path: "/"
