@@ -1328,6 +1328,17 @@ TEST_F(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
   EXPECT_EQ(access_log_data_, "test_transport_failure");
 }
 
+// Test that call to tcp_proxy filter's startUpstreamSecureTransport results
+// in upstream's startUpstreamSecureTransport call.
+TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+  EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport);
+  filter_->startUpstreamSecureTransport();
+}
+
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

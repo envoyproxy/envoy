@@ -104,8 +104,8 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_, "xds.", last_filter_config, getFilterType(),
-        getMatcher());
+        config_source, name, factory_context_.getServerFactoryContext(), factory_context_, "xds.",
+        last_filter_config, getFilterType(), getMatcher());
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -458,7 +458,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
       "type.googleapis.com/test.integration.filters.Bogus");
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
-          config_source, "foo", config_discovery_test.factory_context_, "xds.", true,
+          config_source, "foo", config_discovery_test.factory_context_.getServerFactoryContext(),
+          config_discovery_test.factory_context_, "xds.", true,
           config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "

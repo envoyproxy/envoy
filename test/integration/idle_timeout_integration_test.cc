@@ -252,6 +252,37 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));
 }
 
+// Per-stream idle timeout after having sent downstream headers.
+TEST_P(IdleTimeoutIntegrationTest, IdleStreamTimeoutWithRouteReselect) {
+  enable_per_stream_idle_timeout_ = true;
+  config_helper_.prependFilter(R"EOF(
+    name: set-route-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetRouteFilterConfig
+      cluster_override: cluster_0
+      idle_timeout_override:
+        seconds: 5
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  // Sleep past the default timeout.
+  sleep();
+  sleep();
+  sleep();
+
+  EXPECT_FALSE(response->complete());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Per-stream idle timeout with reads disabled.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutWithLargeBuffer) {
   config_helper_.prependFilter(R"EOF(
@@ -442,7 +473,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response);
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
@@ -455,7 +486,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 

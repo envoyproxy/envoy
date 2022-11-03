@@ -36,7 +36,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     TracerPtr tracer = std::make_unique<Tracer>(
         std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr),
         factory_context.timeSource(), factory_context.api().randomGenerator(),
-        factory_context.runtime(), dispatcher, tracing_stats_);
+        factory_context.runtime(), dispatcher, tracing_stats_, opentelemetry_config.service_name());
 
     return std::make_shared<TlsTracer>(std::move(tracer));
   });

@@ -27,6 +27,7 @@ envoy_cc_test(
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
@@ -34,10 +35,12 @@ envoy_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
 

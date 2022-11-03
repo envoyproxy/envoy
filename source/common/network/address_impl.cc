@@ -13,6 +13,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -46,6 +47,14 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
 
 } // namespace
 
+bool forceV6() {
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
+#else
+  return false;
+#endif
+}
+
 void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockaddr_in* sin) {
 #if defined(__APPLE__)
   *sin = {{}, AF_INET, sin6->sin6_port, {sin6->sin6_addr.__u6_addr.__u6_addr32[3]}, {}};
@@ -61,6 +70,9 @@ void ipv6ToIpv4CompatibleAddress(const struct sockaddr_in6* sin6, struct sockadd
 StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
                                                               socklen_t ss_len, bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) >= sizeof(sa_family_t), "");
+  if (forceV6()) {
+    v6only = false;
+  }
   switch (ss.ss_family) {
   case AF_INET: {
     RELEASE_ASSERT(ss_len == 0 || static_cast<unsigned int>(ss_len) == sizeof(sockaddr_in), "");
@@ -404,10 +416,11 @@ absl::Status PipeInstance::initHelper(const sockaddr_un* address, mode_t mode) {
 }
 
 EnvoyInternalInstance::EnvoyInternalInstance(const std::string& address_id,
+                                             const std::string& endpoint_id,
                                              const SocketInterface* sock_interface)
     : InstanceBase(Type::EnvoyInternal, sockInterfaceOrDefault(sock_interface)),
-      internal_address_(address_id) {
-  friendly_name_ = absl::StrCat("envoy://", address_id);
+      internal_address_(address_id, endpoint_id) {
+  friendly_name_ = absl::StrCat("envoy://", address_id, "/", endpoint_id);
 }
 
 bool EnvoyInternalInstance::operator==(const Instance& rhs) const {

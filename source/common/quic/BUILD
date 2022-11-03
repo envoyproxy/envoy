@@ -3,6 +3,10 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -58,7 +62,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_clock_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
-        "@com_github_google_quiche//:quic_core_crypto_random_lib",
+        "@com_github_google_quiche//:quiche_common_random_lib",
     ],
 )
 
@@ -131,6 +135,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
+        ":quic_ssl_connection_info_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
     ],
 )
@@ -380,8 +385,10 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto",
     ],
@@ -428,6 +435,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 # Create a single target that contains all the libraries that register factories.
@@ -509,5 +517,16 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//source/server:connection_handler_lib",
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "envoy_quic_connection_id_generator_factory_interface",
+    hdrs = ["envoy_quic_connection_id_generator_factory.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "@com_github_google_quiche//:quic_core_connection_id_generator_interface_lib",
+        "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
     ],
 )

@@ -42,7 +42,10 @@ public:
   HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.FetchEndpoints")),
-        timer_(new Event::MockTimer()), http_request_(&cm_.thread_local_cluster_.async_client_) {
+        timer_(new Event::MockTimer()), http_request_(&cm_.thread_local_cluster_.async_client_),
+        resource_decoder_(
+            std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
@@ -199,8 +202,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;

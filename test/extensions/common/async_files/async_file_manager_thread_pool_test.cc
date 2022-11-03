@@ -110,7 +110,7 @@ public:
 
 private:
   absl::Mutex blocking_mutex_;
-  BlockerState stage_ GUARDED_BY(blocking_mutex_) = BlockerState::Start;
+  BlockerState stage_ ABSL_GUARDED_BY(blocking_mutex_) = BlockerState::Start;
   std::atomic<BlockerState>& state_out_;
 };
 

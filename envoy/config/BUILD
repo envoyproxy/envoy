@@ -104,3 +104,16 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "xds_resources_delegate_interface",
+    hdrs = ["xds_resources_delegate.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":subscription_interface",
+        ":typed_config_interface",
+        "//envoy/api:api_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)

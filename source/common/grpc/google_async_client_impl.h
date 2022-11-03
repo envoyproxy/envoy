@@ -185,6 +185,7 @@ public:
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
                            const Http::AsyncClient::StreamOptions& options) override;
+  absl::string_view destination() override { return target_uri_; }
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
   uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }

@@ -16,11 +16,23 @@ This will set up the development support toolchain automatically. The toolchain
 uses git hooks extensively, copying them from `support/hooks` to the `.git`
 folder.
 
-The commit hook checks can be skipped using the `-n` / `--no-verify` flags, as
+The commit hook checks can be skipped using the `--no-verify` flags, as
 so:
 
 ```bash
 git commit --no-verify
+```
+
+You can also do this by adding `NO_VERIFY` to `.env`, for example:
+
+```console
+$ echo NO_VERIFY=1 >> .env
+```
+
+Or settting it in your environment:
+
+```console
+$ export NO_VERIFY=1
 ```
 
 ## Functionality

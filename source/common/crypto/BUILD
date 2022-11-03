@@ -28,4 +28,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
     ],
+    # for the singleton
+    alwayslink = 1,
 )

@@ -51,9 +51,8 @@ TEST_F(SchemaValidatorTest, LdsFailOnDeprecated) {
 
 // Unknown field.
 TEST_F(SchemaValidatorTest, LdsUnknownField) {
-  EXPECT_THROW_WITH_REGEX(
-      run("schema_validator_tool -c {} -t discovery_response", "lds_unknown.yaml"), EnvoyException,
-      "reason INVALID_ARGUMENT:foo: Cannot find field.");
+  EXPECT_THROW(run("schema_validator_tool -c {} -t discovery_response", "lds_unknown.yaml"),
+               EnvoyException);
 }
 
 // Invalid type struct URL cases.

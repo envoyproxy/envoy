@@ -19,6 +19,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -121,6 +122,21 @@ std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
   const auto value_it = map.find(key);
   return value_it != map.end() ? value_it->second : EMPTY_STRING;
 }
+
+AuthType
+getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType auth_type) {
+  switch (auth_type) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_BASIC_AUTH:
+    return AuthType::BasicAuth;
+  case envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+      OAuth2Config_AuthType_URL_ENCODED_BODY:
+  default:
+    return AuthType::UrlEncodedBody;
+  }
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -139,7 +155,8 @@ FilterConfig::FilterConfig(
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
-      cookie_names_(proto_config.credentials().cookie_names()) {
+      cookie_names_(proto_config.credentials().cookie_names()),
+      auth_type_(getAuthType(proto_config.auth_type())) {
   if (!cluster_manager.clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -205,12 +222,25 @@ const std::string& OAuth2Filter::bearerPrefix() const {
 
 /**
  * primary cases:
- * 1) user is signing out
- * 2) /_oauth redirect
- * 3) user is authorized
- * 4) user is unauthorized
+ * 1) pass through header is matching
+ * 2) user is signing out
+ * 3) /_oauth redirect
+ * 4) user is authorized
+ * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Skip Filter and continue chain if a Passthrough header is matching
+  // Must be done before the sanitation of the authorization header,
+  // otherwise the authorization header might be altered or removed
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
+    for (const auto& matcher : config_->passThroughMatchers()) {
+      if (matcher.matchesHeaders(headers)) {
+        config_->stats().oauth_passthrough_.inc();
+        return Http::FilterHeadersStatus::Continue;
+      }
+    }
+  }
+
   // Sanitize the Authorization header, since we have no way to validate its content. Also,
   // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
   // before forwarding the request upstream.
@@ -341,7 +371,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
                                              *Http::ResponseTrailerMapImpl::create(),
                                              decoder_callbacks_->streamInfo(), "");
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri);
+                                     redirect_uri, config_->authType());
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -360,13 +390,13 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     }
     return true;
   }
-
-  for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher.matchesHeaders(headers)) {
-      return true;
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
+    for (const auto& matcher : config_->passThroughMatchers()) {
+      if (matcher.matchesHeaders(headers)) {
+        return true;
+      }
     }
   }
-
   return false;
 }
 

@@ -4,6 +4,10 @@ load(
     "envoy_package",
     "envoy_select_enable_http3",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -79,6 +83,7 @@ envoy_cc_library(
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
     deps = [
+        "//source/extensions/filters/network/http_connection_manager:config",
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
@@ -87,6 +92,7 @@ envoy_cc_library(
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//envoy/api:api_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
@@ -355,24 +361,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_library(
-    name = "original_dst_cluster_lib",
-    srcs = ["original_dst_cluster.cc"],
-    hdrs = ["original_dst_cluster.h"],
-    deps = [
-        ":cluster_factory_lib",
-        ":upstream_includes",
-        "//envoy/secret:secret_manager_interface",
-        "//envoy/upstream:cluster_factory_interface",
-        "//source/common/common:empty_string",
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -476,6 +465,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -530,7 +520,6 @@ envoy_cc_library(
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":logical_dns_cluster_lib",
-        ":original_dst_cluster_lib",
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
         ":upstream_includes",
@@ -538,6 +527,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
@@ -589,6 +579,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -601,6 +592,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -639,6 +631,7 @@ envoy_cc_library(
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

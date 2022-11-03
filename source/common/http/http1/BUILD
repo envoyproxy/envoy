@@ -32,6 +32,7 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
+        ":balsa_parser_lib",
         ":codec_stats_lib",
         ":header_formatter_lib",
         ":legacy_parser_lib",

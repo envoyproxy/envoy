@@ -34,9 +34,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Listener :ref:`configuration overview <config_listeners>`
 
 // The additional address the listener is listening on.
-// [#not-implemented-hide:]
 message AdditionalAddress {
   core.v3.Address address = 1;
+
+  // [#not-implemented-hide:]
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  // in the listener. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  core.v3.SocketOptionsOverride socket_options = 2;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
@@ -104,7 +113,6 @@ message Listener {
   }
 
   // Configuration for envoy internal listener. All the future internal listener features should be added here.
-  // [#not-implemented-hide:]
   message InternalListenerConfig {
   }
 
@@ -124,7 +132,6 @@ message Listener {
   // The additional addresses the listener should listen on. The addresses must be unique across all
   // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
   // all addresses use the same protocol, and multiple internal addresses are not supported.
-  // [#not-implemented-hide:]
   repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
@@ -335,24 +342,21 @@ message Listener {
   google.protobuf.BoolValue bind_to_port = 26;
 
   // The exclusive listener type and the corresponding config.
-  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
-  // Will create and add TcpListenerConfig. Will add UdpListenerConfig and ApiListener.
-  // [#not-implemented-hide:]
   oneof listener_specifier {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
-    // The internal listener acts as a tcp listener. It supports listener filters and network filter chains.
-    // The internal listener require :ref:`address <envoy_v3_api_field_config.listener.v3.Listener.address>` has
-    // field `envoy_internal_address`.
+    // The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
+    // Upstream clusters refer to the internal listeners by their :ref:`name
+    // <envoy_v3_api_field_config.listener.v3.Listener.name>`. :ref:`Address
+    // <envoy_v3_api_field_config.listener.v3.Listener.address>` must not be set on the internal listeners.
     //
-    // There are some limitations are derived from the implementation. The known limitations include
+    // There are some limitations that are derived from the implementation. The known limitations include:
     //
     // * :ref:`ConnectionBalanceConfig <envoy_v3_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>` is not
-    //   allowed because both cluster connection and listener connection must be owned by the same dispatcher.
+    //   allowed because both the cluster connection and the listener connection must be owned by the same dispatcher.
     // * :ref:`tcp_backlog_size <envoy_v3_api_field_config.listener.v3.Listener.tcp_backlog_size>`
     // * :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`
     // * :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`
-    // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
 

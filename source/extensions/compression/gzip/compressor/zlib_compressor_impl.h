@@ -15,7 +15,7 @@ namespace Compressor {
 /**
  * Implementation of compressor's interface.
  */
-class ZlibCompressorImpl : public Zlib::Base, public Envoy::Compression::Compressor::Compressor {
+class ZlibCompressorImpl : public Common::Base, public Envoy::Compression::Compressor::Compressor {
 public:
   ZlibCompressorImpl();
 

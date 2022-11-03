@@ -11,6 +11,8 @@ REGISTER_FACTORY(NetworkTrieMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Network::MatchingData>);
 REGISTER_FACTORY(UdpNetworkTrieMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Network::UdpMatchingData>);
+REGISTER_FACTORY(HttpTrieMatcherFactory,
+                 ::Envoy::Matcher::CustomMatcherFactory<Http::HttpMatchingData>);
 
 } // namespace Matcher
 } // namespace Common

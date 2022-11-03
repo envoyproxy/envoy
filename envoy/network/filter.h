@@ -161,6 +161,14 @@ public:
    * Set the currently selected upstream host for the connection.
    */
   virtual void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Signal to the filter manager to enable secure transport mode in upstream connection.
+   * This is done when upstream connection's transport socket is of startTLS type. At the moment
+   * it is the only transport socket type which can be programmatically converted from non-secure
+   * mode to secure mode.
+   */
+  virtual bool startUpstreamSecureTransport() PURE;
 };
 
 /**
@@ -199,6 +207,13 @@ public:
    * @param callbacks supplies the callbacks.
    */
   virtual void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Method is called by the filter manager to convert upstream's connection transport socket
+   * from non-secure mode to secure mode. Only terminal filters are aware of upstream connection and
+   * non-terminal filters should not implement startUpstreamSecureTransport.
+   */
+  virtual bool startUpstreamSecureTransport() { return false; }
 };
 
 using ReadFilterSharedPtr = std::shared_ptr<ReadFilter>;
@@ -272,20 +287,6 @@ public:
   virtual ConnectionSocket& socket() PURE;
 
   /**
-   * @return the Dispatcher for issuing events.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * If a filter stopped filter iteration by returning FilterStatus::StopIteration,
-   * the filter should call continueFilterChain(true) when complete to continue the filter chain,
-   * or continueFilterChain(false) if the filter execution failed and the connection must be
-   * closed.
-   * @param success boolean telling whether the filter execution was successful or not.
-   */
-  virtual void continueFilterChain(bool success) PURE;
-
-  /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value the struct to set on the namespace. A merge will be performed with new values for
@@ -326,15 +327,21 @@ public:
 
   /**
    * Called when a new connection is accepted, but before a Connection is created.
-   * Filter chain iteration can be stopped if needed.
+   * Filter chain iteration can be stopped if need more data from the connection
+   * by returning `FilterStatus::StopIteration`, or continue the filter chain iteration
+   * by returning `FilterStatus::ContinueIteration`. Reject the connection by closing
+   * the socket and returning `FilterStatus::StopIteration`.
    * @param cb the callbacks the filter instance can use to communicate with the filter chain.
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
 
   /**
-   * Called when data read from the connection. If the filter chain doesn't get
-   * enough data, the filter chain can be stopped, then waiting for more data.
+   * Called when data is read from the connection. If the filter doesn't get
+   * enough data, filter chain iteration can be stopped if needed by returning
+   * `FilterStatus::StopIteration`. Or continue the filter chain iteration by returning
+   * `FilterStatus::ContinueIteration` if the filter get enough data. Reject the connection
+   * by closing the socket and returning `FilterStatus::StopIteration`.
    * @param buffer the buffer of data.
    * @return status used by the filter manager to manage further filter iteration.
    */

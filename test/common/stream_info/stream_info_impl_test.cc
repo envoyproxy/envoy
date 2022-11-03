@@ -79,6 +79,10 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastDownstreamTxByteSent());
 
+  EXPECT_FALSE(timing.downstreamHandshakeComplete());
+  info.downstreamTiming().onDownstreamHandshakeComplete(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.downstreamHandshakeComplete());
+
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
@@ -228,7 +232,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 #ifdef __clang__
 #if defined(__linux__)
 #if defined(__has_feature) && !(__has_feature(thread_sanitizer))
-  ASSERT_TRUE(sizeof(s1) == 760 || sizeof(s1) == 776 || sizeof(s1) == 800)
+  ASSERT_TRUE(sizeof(s1) == 784 || sizeof(s1) == 800 || sizeof(s1) == 808 || sizeof(s1) == 824)
       << "If adding fields to StreamInfoImpl, please check to see if you "
          "need to add them to setFromForRecreateStream! Current size "
       << sizeof(s1);

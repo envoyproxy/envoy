@@ -39,6 +39,10 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello"));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString("/hello?hello%26"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
@@ -48,9 +52,19 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello="));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26="));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26="));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello=&"));
+
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26=&"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
@@ -71,6 +85,11 @@ TEST(HttpUtility, parseQueryString) {
             Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
             Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseAndDecodeQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
 
   // A sample of request path with query strings by Prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.

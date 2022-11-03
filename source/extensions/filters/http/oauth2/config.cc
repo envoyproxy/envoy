@@ -26,10 +26,11 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory) {
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Init::Manager& init_manager) {
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory);
+                                                            transport_socket_factory, init_manager);
   } else {
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
@@ -52,13 +53,13 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
   auto& cluster_manager = context.clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_token_secret =
-      secretsProvider(token_secret, secret_manager, transport_socket_factory);
+  auto secret_provider_token_secret = secretsProvider(
+      token_secret, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_token_secret == nullptr) {
     throw EnvoyException("invalid token secret configuration");
   }
   auto secret_provider_hmac_secret =
-      secretsProvider(hmac_secret, secret_manager, transport_socket_factory);
+      secretsProvider(hmac_secret, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_hmac_secret == nullptr) {
     throw EnvoyException("invalid HMAC secret configuration");
   }

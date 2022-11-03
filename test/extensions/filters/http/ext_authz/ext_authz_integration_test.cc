@@ -453,13 +453,6 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
   }
 
-  // By default, HTTP Service uses case sensitive string matcher.
-  void disableCaseSensitiveStringMatcher() {
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
-        "false");
-  }
-
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));

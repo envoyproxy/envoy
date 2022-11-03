@@ -43,6 +43,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/http1/codec_stats.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
@@ -62,6 +63,40 @@
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * An implementation of UpstreamLocalAddressSelector.
+ */
+class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
+public:
+  UpstreamLocalAddressSelectorImpl(
+      const envoy::config::cluster::v3::Cluster& config,
+      const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+
+  // UpstreamLocalAddressSelector
+  UpstreamLocalAddress getUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const override;
+
+private:
+  const Network::ConnectionSocket::OptionsSharedPtr
+  buildBaseSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                         const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+  const Network::ConnectionSocket::OptionsSharedPtr
+  buildClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
+                            const envoy::config::core::v3::BindConfig bind_config);
+  void parseBindConfig(const std::string cluster_name,
+                       const envoy::config::core::v3::BindConfig& bind_config,
+                       const Network::ConnectionSocket::OptionsSharedPtr& base_socket_options,
+                       const Network::ConnectionSocket::OptionsSharedPtr& cluster_socket_options);
+  Network::ConnectionSocket::OptionsSharedPtr combineConnectionSocketOptions(
+      const Network::ConnectionSocket::OptionsSharedPtr& local_address_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options) const;
+
+  Network::ConnectionSocket::OptionsSharedPtr base_socket_options_;
+  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
+  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+};
 
 /**
  * Null implementation of HealthCheckHostMonitor.
@@ -231,7 +266,9 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
-        used_(true) {
+        health_status_(health_status) {
+    // This EDS flags setting is still necessary for stats, configuration dump, canonical
+    // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
   }
@@ -264,7 +301,24 @@ public:
     setOutlierDetectorImpl(std::move(outlier_detector));
   }
 
-  Host::Health health() const override {
+  Host::HealthStatus healthStatus() const override {
+    // Evaluate active health status first.
+
+    // Active unhealthy.
+    if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
+        healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK)) {
+      return HealthStatus::UNHEALTHY;
+    }
+    // Active degraded.
+    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC)) {
+      return HealthStatus::DEGRADED;
+    }
+
+    // Use EDS status if no any active status.
+    return health_status_;
+  }
+
+  Host::Health coarseHealth() const override {
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
@@ -285,8 +339,10 @@ public:
 
   uint32_t weight() const override { return weight_; }
   void weight(uint32_t new_weight) override;
-  bool used() const override { return used_; }
-  void used(bool new_used) override { used_ = new_used; }
+  bool used() const override { return handle_count_ > 0; }
+  HostHandlePtr acquireHandle() const override {
+    return std::make_unique<HostHandleImpl>(shared_from_this());
+  }
 
 protected:
   static CreateConnectionData
@@ -303,7 +359,24 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
-  std::atomic<bool> used_;
+  // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
+  // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
+  // future.
+  HealthStatus health_status_{};
+
+  struct HostHandleImpl : HostHandle {
+    HostHandleImpl(const std::shared_ptr<const HostImpl>& parent) : parent_(parent) {
+      parent->handle_count_++;
+    }
+    ~HostHandleImpl() override {
+      if (const auto host = parent_.lock()) {
+        ASSERT(host->handle_count_ > 0);
+        host->handle_count_--;
+      }
+    }
+    const std::weak_ptr<const HostImpl> parent_;
+  };
+  mutable std::atomic<uint32_t> handle_count_{};
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -596,6 +669,25 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
+class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
+public:
+  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
+                                 Init::Manager& init_manager, Stats::Scope& scope)
+      : server_context_(context), init_manager_(init_manager), scope_(scope) {}
+
+  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
+    return server_context_;
+  }
+
+  Init::Manager& initManager() override { return init_manager_; }
+  Stats::Scope& scope() override { return scope_; }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+  Init::Manager& init_manager_;
+  Stats::Scope& scope_;
+};
+
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -605,7 +697,8 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(const envoy::config::cluster::v3::Cluster& config,
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
+                  const envoy::config::cluster::v3::Cluster& config,
                   const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
@@ -625,8 +718,7 @@ public:
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
-  const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&
-  loadBalancingPolicy() const override {
+  const ProtobufTypes::MessagePtr& loadBalancingPolicy() const override {
     return load_balancing_policy_;
   }
   TypedLoadBalancerFactory* loadBalancerFactory() const override { return load_balancer_factory_; }
@@ -658,7 +750,8 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
-  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config);
+  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
+                           Server::Configuration::ServerFactoryContext& context);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
@@ -721,16 +814,12 @@ public:
     return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  };
+  std::shared_ptr<UpstreamLocalAddressSelector> getUpstreamLocalAddressSelector() const override {
+    return upstream_local_address_selector_;
+  }
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
-
-  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
-    return cluster_socket_options_;
-  };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
@@ -755,6 +844,16 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   std::vector<Http::Protocol>
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
+
+  // Http::FilterChainFactory
+  void createFilterChain(Http::FilterChainManager& manager) const override {
+    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+  }
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainManager&) const override {
+    // Upgrade filter chains not yet supported for upstream filters.
+    return false;
+  }
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -813,7 +912,7 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
@@ -826,10 +925,9 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<ClusterTypedMetadataFactory> typed_metadata_;
-  envoy::config::cluster::v3::LoadBalancingPolicy_Policy load_balancing_policy_;
+  ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool connection_pool_per_downstream_connection_;
   const bool warm_hosts_;
@@ -840,9 +938,11 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  UpstreamHttpFactoryContextImpl upstream_context_;
 };
 
 /**
@@ -916,7 +1016,8 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
+  ClusterImplBase(Server::Configuration::ServerFactoryContext& server_context,
+                  const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                   Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api, TimeSource& time_source);
 
@@ -1074,11 +1175,11 @@ void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSh
                                           Network::ConnectionEvent event);
 
 /**
- * Utility function to combine the given socket options with the socket options in cluster.
+ * Utility function to resolve health check address.
  */
-Network::ConnectionSocket::OptionsSharedPtr
-combineConnectionSocketOptions(const ClusterInfo& cluster,
-                               const Network::ConnectionSocket::OptionsSharedPtr& options);
+Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
+    const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+    Network::Address::InstanceConstSharedPtr host_address);
 
 } // namespace Upstream
 } // namespace Envoy

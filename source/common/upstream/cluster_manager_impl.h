@@ -16,6 +16,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/context.h"
@@ -49,24 +50,25 @@ namespace Upstream {
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-      Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
-      const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
-      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
-      const Server::Options& options, Quic::QuicStatNames& quic_stat_names,
-      CertificateProvider::CertificateProviderManager& certificate_provider_manager,
+      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
+      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
+      Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
+      Singleton::Manager& singleton_manager, const Server::Options& options,
+      Quic::QuicStatNames& quic_stat_names, CertificateProvider::CertificateProviderManager& certificate_provider_manager,
       const Server::Instance& server)
-      : context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
+      : server_context_(server_context),
+        context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
         tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         certificate_provider_manager_(certificate_provider_manager),
-        singleton_manager_(singleton_manager), quic_stat_names_(quic_stat_names),
+        quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
         alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
         server_(server) {}
@@ -96,12 +98,13 @@ public:
                       const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
   CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
     return certificate_provider_manager_;
   }
+  Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
 
 protected:
+  Server::Configuration::ServerFactoryContext& server_context_;
   Server::FactoryContextBaseImpl context_;
   ProtobufMessage::ValidationContext& validation_context_;
   Http::Context& http_context_;
@@ -116,7 +119,6 @@ protected:
   Secret::SecretManager& secret_manager_;
   AccessLog::AccessLogManager& log_manager_;
   CertificateProvider::CertificateProviderManager& certificate_provider_manager_;
-  Singleton::Manager& singleton_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
   Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
@@ -324,7 +326,7 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
-  Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
+  Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -439,13 +441,15 @@ private:
                                          public ClusterLifecycleCallbackHandler {
     struct ConnPoolsContainer {
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
-          : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
+          : host_handle_(host->acquireHandle()), pools_{std::make_shared<ConnPools>(dispatcher,
+                                                                                    host)} {}
 
       using ConnPools = PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool draining_{false};
 
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
@@ -453,10 +457,13 @@ private:
     };
 
     struct TcpConnPoolsContainer {
+      TcpConnPoolsContainer(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
       ConnPools pools_;
-      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -483,8 +490,14 @@ private:
       HostConstSharedPtr host_;
       Network::ClientConnection& connection_;
     };
-    using TcpConnectionsMap =
-        absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>;
+    struct TcpConnectionsMap {
+      TcpConnectionsMap(HostHandlePtr&& host_handle) : host_handle_(std::move(host_handle)) {}
+
+      // Destroyed after pools.
+      const HostHandlePtr host_handle_;
+      absl::node_hash_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
+          connections_;
+    };
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
@@ -512,12 +525,15 @@ private:
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
-      // Drains any connection pools associated with the removed hosts.
+      // Drains any connection pools associated with the removed hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
-      // Drains idle clients in connection pools for all hosts.
+      // Drains any connection pools associated with the all hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools();
-      // Drain all clients in connection pools for all hosts.
-      void drainAllConnPools(DrainConnectionsHostPredicate predicate);
+      // Drain any connection pools associated with the hosts filtered by the predicate.
+      void drainConnPools(DrainConnectionsHostPredicate predicate,
+                          ConnectionPool::DrainBehavior behavior);
 
     private:
       Http::ConnectionPool::Instance*
@@ -553,15 +569,12 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
-    // TODO(junr03): clean up drainConnPools vs drainAllConnPools once ConnPoolImplBase::startDrain
-    // and
-    // ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the
-    // code in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very
-    // similar and can be merged in a similar fashion to the ConnPoolImplBase case.
-    void drainConnPools(const HostVector& hosts);
-    void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(TcpConnPoolsContainer& container);
-    void drainAllConnPoolsWorker(const HostSharedPtr& host);
+
+    // Drain or close connections of host. If no drain behavior is provided then closing will
+    // be immediate.
+    void drainOrCloseConnPools(const HostSharedPtr& host,
+                               absl::optional<ConnectionPool::DrainBehavior> drain_behavior);
+
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
@@ -763,8 +776,10 @@ private:
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
-  Config::SubscriptionFactoryImpl subscription_factory_;
+  std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
   ClusterSet primary_clusters_;
+
+  std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;
 };
 
 } // namespace Upstream

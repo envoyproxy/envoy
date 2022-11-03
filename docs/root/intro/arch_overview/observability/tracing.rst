@@ -20,9 +20,9 @@ sources of latency. Envoy supports three features related to system wide tracing
 * **External trace service integration**: Envoy supports pluggable external trace visualization
   providers, that are divided into two subgroups:
 
-  - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
-    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_),
-    `Datadog <https://datadoghq.com>`_, `SkyWalking <http://skywalking.apache.org/>`_ and
+  - External tracers which are part of the Envoy code base, like `Zipkin <https://zipkin.io/>`_,
+    `Jaeger <https://github.com/jaegertracing/>`_,
+    `Datadog <https://datadoghq.com>`_, `SkyWalking <http://skywalking.apache.org/>`_, and
     `AWS X-Ray <https://docs.aws.amazon.com/xray/latest/devguide/xray-gettingstarted.html>`_.
   - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
 

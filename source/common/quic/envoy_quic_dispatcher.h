@@ -16,6 +16,12 @@
 namespace Envoy {
 namespace Quic {
 
+#define QUIC_DISPATCHER_STATS(COUNTER) COUNTER(stateless_reset_packets_sent)
+
+struct QuicDispatcherStats {
+  QUIC_DISPATCHER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 // Dummy implementation only used by Google Quic.
 class EnvoyQuicCryptoServerStreamHelper : public quic::QuicCryptoServerStreamBase::Helper {
 public:
@@ -30,6 +36,22 @@ public:
   }
 };
 
+class EnvoyQuicTimeWaitListManager : public quic::QuicTimeWaitListManager {
+public:
+  EnvoyQuicTimeWaitListManager(quic::QuicPacketWriter* writer, Visitor* visitor,
+                               const quic::QuicClock* clock, quic::QuicAlarmFactory* alarm_factory,
+                               QuicDispatcherStats& stats);
+
+  void SendPublicReset(const quic::QuicSocketAddress& self_address,
+                       const quic::QuicSocketAddress& peer_address,
+                       quic::QuicConnectionId connection_id, bool ietf_quic,
+                       size_t received_packet_length,
+                       std::unique_ptr<quic::QuicPerPacketContext> packet_context) override;
+
+private:
+  QuicDispatcherStats& stats_;
+};
+
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 public:
   EnvoyQuicDispatcher(
@@ -41,11 +63,15 @@ public:
       Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
       Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
       Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
-      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      quic::ConnectionIdGeneratorInterface& generator);
 
+  // quic::QuicDispatcher
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
                           quic::ConnectionCloseSource source) override;
+  quic::QuicTimeWaitListManager* CreateQuicTimeWaitListManager() override;
+
   void closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain);
 
   void updateListenerConfig(Network::ListenerConfig& new_listener_config);
@@ -56,12 +82,6 @@ protected:
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
-  // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
-  // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
-  quic::QuicConnectionId
-  ReplaceLongServerConnectionId(const quic::ParsedQuicVersion& version,
-                                const quic::QuicConnectionId& server_connection_id,
-                                uint8_t expected_server_connection_id_length) const override;
 
 private:
   Network::ConnectionHandler& connection_handler_;
@@ -73,6 +93,7 @@ private:
   QuicStatNames& quic_stat_names_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   FilterChainToConnectionMap connections_by_filter_chain_;
+  QuicDispatcherStats quic_stats_;
 };
 
 } // namespace Quic

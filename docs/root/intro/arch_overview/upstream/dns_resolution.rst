@@ -23,6 +23,18 @@ Envoy provides DNS resolution through extensions, and contains 3 built-in extens
 
 For an example of a built-in DNS typed configuration see the :ref:`HTTP filter configuration documentation <config_http_filters_dynamic_forward_proxy>`.
 
+The c-ares based DNS Resolver emits the following stats rooted in the ``dns.cares`` stats tree:
+
+  .. csv-table::
+    :header: Name, Type, Description
+    :widths: 1, 1, 2
+
+    resolve_total, Count, Number of DNS queries
+    pending_resolutions, Gauge, Number of pending DNS queries
+    not_found, Counter, Number of DNS queries that returned NXDOMAIN or NODATA response
+    timeout, Counter, Number of DNS queries that resulted in timeout
+    get_addr_failure, Counter, Number of general failures during DNS quries
+
 The Apple-based DNS Resolver emits the following stats rooted in the ``dns.apple`` stats tree:
 
   .. csv-table::

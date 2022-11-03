@@ -85,6 +85,7 @@ private:
 #define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
   COUNTER(oauth_unauthorized_rq)                                                                   \
   COUNTER(oauth_failure)                                                                           \
+  COUNTER(oauth_passthrough)                                                                       \
   COUNTER(oauth_success)
 
 /**
@@ -144,6 +145,7 @@ public:
   const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
+  const AuthType& authType() const { return auth_type_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -161,6 +163,7 @@ private:
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const CookieNames cookie_names_;
+  const AuthType auth_type_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

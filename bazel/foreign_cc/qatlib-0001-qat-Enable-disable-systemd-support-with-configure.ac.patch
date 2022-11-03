@@ -1,0 +1,65 @@
+From e24551323d067c107a8a50fb448c1a0c0950dc50 Mon Sep 17 00:00:00 2001
+From: Patrik Flykt <patrik.flykt@intel.com>
+Date: Thu, 23 Sep 2021 11:13:42 +0300
+Subject: [PATCH 1/3] qat: Enable/disable systemd support with configure.ac
+
+Add a new configure option to enable systemd support.
+
+Signed-off-by: Patrik Flykt <patrik.flykt@intel.com>
+---
+ configure.ac | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 677d4cf..844ec8f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -76,24 +76,40 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+ CFLAGS="$saved_cflags"
+ AC_SUBST(NO_UNUSED_CMDLINE_ARG_CFLAGS)
+ 
++# Check location of systemd unit files
++PKG_PROG_PKG_CONFIG
++
+ # Check for systemd.
+ AS_IF([test "x$PKGCONFIG" = "x"],
+     [AC_MSG_ERROR(pkg-config not found.)],
+     [AC_MSG_CHECKING(for systemd)
+      AS_IF([$PKGCONFIG --exists systemd],
+-        [AC_MSG_RESULT(yes)],
+-        [AC_MSG_RESULT(no); AC_MSG_ERROR(systemd not found.)]
++        [AC_MSG_RESULT(yes); have_systemd="yes"],
++        [AC_MSG_RESULT(no);  have_systemd="no"]
+     )]
+ )
+ 
++AC_ARG_ENABLE(systemd,
++        AC_HELP_STRING([--enable-systemd], [Enable systemd support]),
++	[enable_systemd=${enableval}], [enable_systemd="yes"])
++if (test "${have_systemd}" = "no"); then
++    if (test "${enable_systemd}" != "no" ); then
++        AC_MSG_ERROR(systemd not found)
++    fi
++else
++    AC_MSG_CHECKING(whether to use systemd)
++    AC_MSG_RESULT(${enable_systemd})
++fi
++AM_CONDITIONAL(HAVE_SYSTEMD, test "${enable_systemd}" != "no")
+ 
+-# Check location of systemd unit files
+-PKG_PROG_PKG_CONFIG
+ AC_ARG_WITH([systemdsystemunitdir],
+         AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Directory for systemd service files]),
+         [], [with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)])
+ AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+-AM_CONDITIONAL(HAVE_SYSTEMD, [test -n "$with_systemdsystemunitdir"])
++
++AS_IF([test "${enable_systemd}" != "no"],
++	    [AC_MSG_CHECKING(systemd unit directory); AC_MSG_RESULT(${systemdsystemunitdir})],
++	    [])
+ 
+ 
+ # SAMPLES
+-- 
+2.36.1
+

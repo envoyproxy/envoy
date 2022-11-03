@@ -116,7 +116,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");
@@ -179,7 +179,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");
@@ -239,7 +239,7 @@ values:
         - key: k8s.pod.createtimestamp
           value:
             int_value: 1655429509
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");

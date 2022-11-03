@@ -123,8 +123,13 @@ if __name__ == "__main__":
             sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
         offset = find_address_offset(rununder.pid)
         decode_stacktrace_log(sys.argv[1], ignore_decoding_errors(rununder.stdout), offset)
-        rununder.wait()
-        sys.exit(rununder.returncode)  # Pass back test pass/fail result
+        returncode = rununder.wait()
+        # negative return code means process terminated by signal
+        # if so, add 128 to signal value to follow convention.
+        # sys.exit casts to unsigned int so a negative value leads
+        # to unexpected exit code.
+        exitcode = returncode if returncode >= 0 else 128 + abs(returncode)
+        sys.exit(exitcode)  # Pass back test pass/fail result
     else:
         print("Usage (execute subprocess): stack_decode.py executable_file [additional args]")
         print("Usage (read from stdin): stack_decode.py -s executable_file")

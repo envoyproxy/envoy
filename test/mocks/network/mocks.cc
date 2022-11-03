@@ -36,7 +36,6 @@ MockListenerConfig::MockListenerConfig()
     : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
   socket_factories_.emplace_back(std::make_unique<MockListenSocketFactory>());
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
-  ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(*socket_factories_[0].get()));
   ON_CALL(*this, listenSocketFactories()).WillByDefault(ReturnRef(socket_factories_));
   ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), localAddress())
       .WillByDefault(ReturnRef(socket_->connectionInfoProvider().localAddress()));

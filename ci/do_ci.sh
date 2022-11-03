@@ -8,7 +8,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "format" || "$1" == "fix_proto_format" || "$1" == "check_proto_format" || "$1" == "docs" ||  \
           "$1" == "bazel.clang_tidy" || "$1" == "bazel.distribution" \
-          || "$1" == "deps" || "$1" == "verify_examples" \
+          || "$1" == "deps" || "$1" == "verify_examples" || "$1" == "publish" \
           || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
@@ -208,7 +208,7 @@ else
   elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests" "//mobile/test/...")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -286,7 +286,10 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
 elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
+  # Make sure that there are no regressions to building Envoy with autolink disabled.
+  EXTRA_OPTIONS=(
+    "--define" "library_autolink=disabled")
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}"  "${EXTRA_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
 
   echo "bazel debug build with tests..."
   bazel_envoy_binary_build debug
@@ -502,7 +505,8 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   export TODAY_DATE
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
         --action_env=TODAY_DATE \
-        -- -v warn
+        -- -v warn \
+           -c cves release_dates releases
 
   # Run pip requirements tests
   echo "check pip..."
@@ -519,6 +523,9 @@ elif [[ "$CI_TARGET" == "verify_distro" ]]; then
         PACKAGE_BUILD=/build/bazel.distribution.arm64/packages.arm64.tar.gz
     fi
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" //distribution:verify_packages "$PACKAGE_BUILD"
+    exit 0
+elif [[ "$CI_TARGET" == "publish" ]]; then
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/project:publish
     exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

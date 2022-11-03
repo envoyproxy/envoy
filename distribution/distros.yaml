@@ -1,20 +1,11 @@
-
-debian_buster:
-  image: debian:buster-slim
-  ext: buster.changes
-
 debian_bullseye:
   image: debian:bullseye-slim
   ext: bullseye.changes
-
-ubuntu_bionic:
-  image: ubuntu:18.04
-  ext: bionic.changes
 
 ubuntu_focal:
   image: ubuntu:20.04
   ext: focal.changes
 
-ubuntu_impish:
-  image: ubuntu:21.10
-  ext: impish.changes
+ubuntu_jammy:
+  image: ubuntu:22.04
+  ext: jammy.changes

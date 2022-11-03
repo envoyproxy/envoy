@@ -33,6 +33,10 @@ public:
     FakeStreamPtr host_stream_;
     FakeHttpConnectionPtr host_fake_connection_;
     FakeRawConnectionPtr host_fake_raw_connection_;
+    FakeUpstreamPtr external_host_upstream_;
+    FakeStreamPtr external_host_stream_;
+    FakeHttpConnectionPtr external_host_fake_connection_;
+    FakeRawConnectionPtr external_host_fake_raw_connection_;
 
     ClusterData(const std::string name) : name_(name) {}
   };
@@ -79,6 +83,7 @@ public:
       auto config = upstreamConfig();
       config.upstream_protocol_ = upstream_protocol_;
       cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
+      cluster.external_host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
           Network::Test::getLoopbackAddressString(ip_version_));
@@ -768,6 +773,104 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+class ExternalHealthCheckIntegrationTest
+    : public Event::TestUsingSimulatedTime,
+      public testing::TestWithParam<Network::Address::IpVersion>,
+      public HealthCheckIntegrationTestBase {
+public:
+  ExternalHealthCheckIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
+
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
+
+  // Adds a EXTERNAL active health check specifier to the given cluster, and waits for the first
+  // health check probe to be received.
+  void initExternalHealthCheck(uint32_t cluster_idx) {
+    auto& cluster_data = clusters_[cluster_idx];
+    auto& cluster = cluster_data.cluster_;
+    auto health_check = addHealthCheck(cluster_data.cluster_);
+    auto* socket_address = cluster.mutable_load_assignment()
+                               ->mutable_endpoints(0)
+                               ->mutable_lb_endpoints(0)
+                               ->mutable_endpoint()
+                               ->mutable_health_check_config()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+
+    health_check->mutable_tcp_health_check()->mutable_send()->set_text("50696E67"); // "Ping"
+    health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
+
+    socket_address->set_address(Network::Test::getLoopbackAddressString(ip_version_));
+    socket_address->set_port_value(
+        cluster_data.external_host_upstream_->localAddress()->ip()->port());
+
+    // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+
+    // Wait for upstream to receive EXTERNAL HC request.
+    ASSERT_TRUE(cluster_data.external_host_upstream_->waitForRawConnection(
+        cluster_data.external_host_fake_raw_connection_));
+    ASSERT_TRUE(cluster_data.external_host_fake_raw_connection_->waitForData(
+        FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ExternalHealthCheckIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Tests that a healthy endpoint returns a valid EXTERNAL health check response.
+TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointHealthyExternal) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initExternalHealthCheck(cluster_idx);
+
+  AssertionResult result = clusters_[cluster_idx].external_host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that an invalid response fails the health check.
+TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointWrongResponseExternal) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initExternalHealthCheck(cluster_idx);
+
+  // Send the wrong reply ("Pong" is expected).
+  AssertionResult result =
+      clusters_[cluster_idx].external_host_fake_raw_connection_->write("Poong");
+  RELEASE_ASSERT(result, result.message());
+
+  // Envoy will wait until timeout occurs because no correct reply was received.
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
+
+  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+}
+
+// Tests that no EXTERNAL health check response results in timeout and unhealthy endpoint.
+TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointTimeoutExternal) {
+  const uint32_t cluster_idx = 0;
+  initialize();
+  initExternalHealthCheck(cluster_idx);
+
+  // Increase time until timeout (30s).
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());

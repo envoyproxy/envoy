@@ -445,7 +445,8 @@ Utility::QueryParams Utility::parseParameters(absl::string_view data, size_t sta
       params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name,
                      decode_params ? PercentEncoding::decode(param_value) : param_value);
     } else {
-      params.emplace(StringUtil::subspan(data, start, end), "");
+      const auto param_name = StringUtil::subspan(data, start, end);
+      params.emplace(decode_params ? PercentEncoding::decode(param_name) : param_name, "");
     }
 
     start = end + 1;
@@ -626,16 +627,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     // If the content-type is not set, set it.
     // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
     // set a content type header, set the content type to be based on the changed body.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
-      if (response_headers->ContentType() == nullptr ||
-          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
-        response_headers->setReferenceContentType(content_type);
-      }
-    } else {
-      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-        response_headers->setReferenceContentType(content_type);
-      }
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
     }
   } else {
     response_headers->removeContentLength();
@@ -1028,19 +1022,21 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     if (ch == '%' && i + 2 < encoded.size()) {
       const char& hi = encoded[i + 1];
       const char& lo = encoded[i + 2];
-      if (absl::ascii_isdigit(hi)) {
-        ch = hi - '0';
-      } else {
-        ch = absl::ascii_toupper(hi) - 'A' + 10;
-      }
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
 
-      ch *= 16;
-      if (absl::ascii_isdigit(lo)) {
-        ch += lo - '0';
-      } else {
-        ch += absl::ascii_toupper(lo) - 'A' + 10;
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        i += 2;
       }
-      i += 2;
     }
     decoded.push_back(ch);
   }
@@ -1139,13 +1135,10 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
 }
 
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
-  return remote_decode_complete &&
-                 Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
-             ? Http::Code::GatewayTimeout
-             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
-             // connection any more.
-             : Http::Code::RequestTimeout;
+  return remote_decode_complete ? Http::Code::GatewayTimeout
+                                // Http::Code::RequestTimeout is more expensive because HTTP1 client
+                                // cannot use the connection any more.
+                                : Http::Code::RequestTimeout;
 }
 
 } // namespace Http

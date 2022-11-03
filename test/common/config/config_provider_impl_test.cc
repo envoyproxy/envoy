@@ -506,8 +506,8 @@ dynamic_dummy_configs:
 // subscriptions.
 TEST_F(ConfigProviderImplTest, LocalInfoNotDefined) {
   initialize();
-  server_factory_context_.local_info_.node_.set_cluster("");
-  server_factory_context_.local_info_.node_.set_id("");
+  server_factory_context_.local_info_.node_.clear_cluster();
+  server_factory_context_.local_info_.node_.clear_id();
 
   envoy::config::core::v3::ApiConfigSource config_source_proto;
   config_source_proto.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);

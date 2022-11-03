@@ -10,45 +10,13 @@
 
 #include "source/common/common/assert.h"
 
+#include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_flags.h"
 
-class QuicheFlagSaverImpl {
-public:
-  QuicheFlagSaverImpl() {
-    // Save the current value of each flag.
-#define QUIC_PROTOCOL_FLAG(type, flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
-#include "quiche/quic/core/quic_protocol_flags_list.h"
-#undef QUIC_PROTOCOL_FLAG
-
-#define QUIC_FLAG(flag, ...) saved_##flag##_ = GetQuicheFlagImpl(FLAGS_##flag);
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
-  }
-
-  ~QuicheFlagSaverImpl() {
-    // Restore the saved value of each flag.
-#define QUIC_PROTOCOL_FLAG(type, flag, ...) SetQuicheFlagImpl(FLAGS_##flag, saved_##flag##_);
-#include "quiche/quic/core/quic_protocol_flags_list.h"
-#undef QUIC_PROTOCOL_FLAG
-
-#define QUIC_FLAG(flag, ...) SetQuicheFlagImpl(FLAGS_##flag, saved_##flag##_);
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
-  }
-
-private:
-  // Local variable will hold the value of each flag when the saver is constructed.
-#define QUIC_PROTOCOL_FLAG(type, flag, ...) type saved_##flag##_;
-#include "quiche/quic/core/quic_protocol_flags_list.h"
-#undef QUIC_PROTOCOL_FLAG
-
-#define QUIC_FLAG(flag, ...) bool saved_##flag##_;
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
-};
+using QuicheFlagSaverImpl = absl::FlagSaver;
 
 // No special setup needed for tests to use threads.
 class ScopedEnvironmentForThreadsImpl {};

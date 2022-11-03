@@ -14,6 +14,12 @@ MockAsyncClient::MockAsyncClient() {
         send_count_++;
         return async_request_.get();
       }));
+
+  // Because this method is used in debug logs, coverage and non-coverage builds have different
+  // expectations, so add this to prevent failures due to "uninteresting mock function call".
+  EXPECT_CALL(*this, destination())
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(Return(absl::string_view("unspecified_mock_destination")));
 }
 MockAsyncClient::~MockAsyncClient() = default;
 

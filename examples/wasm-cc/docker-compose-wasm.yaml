@@ -2,19 +2,37 @@ version: "3.8"
 
 services:
   wasm_compile_update:
-    image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
-    command: |
-      bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy-build
+    command: >
+      bash -c "
+      bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm
+      && cp -a bazel-bin/examples/wasm-cc/*updated*.wasm /output"
+    entrypoint: /source/examples/wasm-cc/build-entrypoint.sh
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}
     working_dir: /source
     volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
     - ../..:/source
-    - ./lib:/build
+    - ./lib:/output
 
   wasm_compile:
-    image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
-    command: |
-      bash -c "bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm && cp -a bazel-bin/examples/wasm-cc/* /build"
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy-build
+    command: >
+      bash -c "
+      bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm
+      && cp -a bazel-bin/examples/wasm-cc/* /output"
+    entrypoint: /source/examples/wasm-cc/build-entrypoint.sh
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}
     working_dir: /source
     volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
     - ../..:/source
-    - ./lib:/build
+    - ./lib:/output

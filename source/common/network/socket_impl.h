@@ -63,7 +63,6 @@ public:
   }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
-    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
   absl::string_view ja3Hash() const override { return ja3_hash_; }

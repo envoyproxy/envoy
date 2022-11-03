@@ -196,6 +196,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  testing::NiceMock<MockOptions> options_;
 };
 
 } // namespace Configuration

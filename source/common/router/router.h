@@ -206,9 +206,10 @@ public:
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
       : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
-        runtime_(runtime), random_(random), stats_(router_context_.statNames(), scope, stat_prefix),
-        emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers),
+        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
+        async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
+        random_(random), emit_dynamic_stats_(emit_dynamic_stats),
+        start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
@@ -246,8 +247,9 @@ public:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
+  FilterStats default_stats_;
+  FilterStats async_stats_;
   Random::RandomGenerator& random_;
-  FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
@@ -319,8 +321,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
-  Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
+  Filter(FilterConfig& config, FilterStats& stats)
+      : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false) {}
 
@@ -382,7 +384,7 @@ public:
     return nullptr;
   }
   const Network::Connection* downstreamConnection() const override {
-    return callbacks_->connection();
+    return callbacks_->connection().ptr();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
@@ -405,7 +407,6 @@ public:
     if (!is_retry_) {
       return original_priority_load;
     }
-
     return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
                                               priority_mapping_func);
   }
@@ -414,7 +415,6 @@ public:
     if (!is_retry_) {
       return 1;
     }
-
     return retry_state_->hostSelectionMaxAttempts();
   }
 
@@ -431,7 +431,6 @@ public:
     if (is_retry_) {
       return {};
     }
-
     return callbacks_->upstreamOverrideHost();
   }
 
@@ -496,6 +495,8 @@ public:
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return final_upstream_request_; }
   TimeSource& timeSource() override { return config_.timeSource(); }
+
+  const FilterStats& stats() { return stats_; }
 
 protected:
   void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
@@ -581,9 +582,10 @@ private:
   FilterUtility::HedgingParams hedging_params_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   std::list<UpstreamRequestPtr> upstream_requests_;
+  FilterStats stats_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
-  UpstreamRequest* final_upstream_request_;
+  UpstreamRequest* final_upstream_request_ = nullptr;
   bool grpc_request_{};
   bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
@@ -593,6 +595,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
+  std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
   absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers

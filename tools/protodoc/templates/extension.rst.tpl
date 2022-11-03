@@ -1,6 +1,7 @@
 .. _extension_{{extension}}:
 
 This extension has the qualified name ``{{extension}}``
+
 {{contrib}}
 .. note::
   {{status | indent(2) }}
@@ -22,6 +23,6 @@ This extension has the qualified name ``{{extension}}``
   - :ref:`type.googleapis.com/{{type_url}} <envoy_v3_api_msg_{{type_url[6:]}}>`
 {% else %}
   - ``type.googleapis.com/{{type_url}}``
-{% endif %}
-{% endfor %}
-{% endif %}
+{% endif -%}
+{% endfor -%}
+{% endif -%}

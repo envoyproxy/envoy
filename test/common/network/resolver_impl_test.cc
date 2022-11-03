@@ -67,7 +67,7 @@ TEST(ResolverTest, InternalListenerNameFromProtoAddress) {
   envoy::config::core::v3::Address internal_listener_address;
   internal_listener_address.mutable_envoy_internal_address()->set_server_listener_name(
       "internal_listener_foo");
-  EXPECT_EQ("envoy://internal_listener_foo",
+  EXPECT_EQ("envoy://internal_listener_foo/",
             resolveProtoAddress(internal_listener_address)->asString());
 }
 

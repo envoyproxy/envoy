@@ -1,0 +1,53 @@
+version: "3.8"
+services:
+
+  kafka-client:
+    build:
+      context: .
+      dockerfile: Dockerfile-kafka
+    restart: "no"
+    deploy:
+      replicas: 0
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_ADMIN:-8001}:8001"
+
+  kafka-server:
+    build:
+      context: .
+      dockerfile: Dockerfile-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # This Kafka server instance sets up two listener sockets:
+      # - external one for client traffic (this traffic will go through Envoy proxy),
+      # - internal one for cluster traffic (if we add more brokers).
+      KAFKA_LISTENERS: INTERNAL://kafka-server:9092,EXTERNAL://kafka-server:10000
+      # Advertised listener value needs to be equal to Envoy's listener
+      # (will make clients discovering this broker talk to it through Envoy).
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-server:9092,EXTERNAL://proxy:10000
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  zookeeper:
+    build:
+      context: .
+      dockerfile: Dockerfile-zookeeper
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo ruok | nc 127.0.0.1 2181 || exit -1"]
+      interval: 5s
+      timeout: 60s
+      retries: 120
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_OPTS: "-Dzookeeper.4lw.commands.whitelist=ruok"

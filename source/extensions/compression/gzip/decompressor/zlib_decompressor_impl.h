@@ -36,12 +36,10 @@ struct ZlibDecompressorStats {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Zlib::Base,
+class ZlibDecompressorImpl : public Common::Base,
                              public Envoy::Compression::Decompressor::Decompressor,
                              public Logger::Loggable<Logger::Id::decompression> {
 public:
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix);
-
   /**
    * Constructor that allows setting the size of decompressor's output buffer. It
    * should be called whenever a buffer size different than the 4096 bytes, normally set by the
@@ -50,7 +48,8 @@ public:
    * 256K bytes. @see http://zlib.net/zlib_how.html
    * @param chunk_size amount of memory reserved for the decompressor output.
    */
-  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, uint64_t chunk_size);
+  ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix, uint64_t chunk_size,
+                       uint64_t max_inflate_ratio);
 
   /**
    * Init must be called in order to initialize the decompressor. Once decompressor is initialized,
@@ -81,6 +80,7 @@ private:
   void chargeErrorStats(const int result);
 
   const ZlibDecompressorStats stats_;
+  const uint64_t max_inflate_ratio_;
 };
 
 } // namespace Decompressor

@@ -27,4 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // As the Dlb connection balancer provides assistance from dedicated Dlb hardware, it can be used for a proxy with a large number of connections
 // (e.g., a gateway).
 message Dlb {
+  // The ID of the Dlb hardware, start from 0.
+  // If not specified, use the first available device as default.
+  uint32 id = 1;
 }
