@@ -68,30 +68,11 @@ new_features:
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
-- area: upstream
-  change: |
-    added support for quit command to the redis proxy.
 - area: custom response http filter
   change: |
     added :ref:`custom response http filter <config_http_filters_custom_response>` which adds the ability to customize responses sent to downstreams using local or remote sources.
-- area: tcp_proxy
+- area: upstream
   change: |
-    added support for propagating the response headers in :ref:`TunnelingConfig
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers>` to
-    the downstream info filter state.
-- area: access_log
-  change: |
-    log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the grpc access log
-    and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls forward proxy.
-- area: grpc_json_transcoder
-  change: |
-    added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
-- area: grpc_json_transcoder
-  change: |
-    added support for newline-delimited streams in :ref:`stream_newline_delimited <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
-- area: grpc_stats
-  change: |
-    added support for replacing dots of gRPC service name with underscores in the gRPC stats by the config :ref:`replace_dots_in_grpc_service_name <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.replace_dots_in_grpc_service_name>`.
     added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
 - area: thrift
   change: |

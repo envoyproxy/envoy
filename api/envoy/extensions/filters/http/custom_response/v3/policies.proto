@@ -23,7 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Custom Response Policies]
 // [#extension: envoy.filters.http.custom_response]
 
-// Custom response policy to redirect the original response to a different
+// Custom response policy to internally redirect the original response to a different
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
@@ -47,7 +47,7 @@ message RedirectPolicy {
   string path = 2 [(validate.rules).string = {min_len: 1}];
 
   // The new response status code if specified. This is used to override the
-  // status code of the redirect response if it is not an error status.
+  // status code of the response from the new upstream if it is not an error status.
   google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // HTTP headers to add to the response. This allows the
@@ -59,7 +59,7 @@ message RedirectPolicy {
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
       [(validate.rules).repeated = {max_items: 1000}];
 
-  // HTTP headers to add to the request before it is redirected.
+  // HTTP headers to add to the request before it is internally redirected.
   repeated config.core.v3.HeaderValueOption request_headers_to_add = 5
       [(validate.rules).repeated = {max_items: 1000}];
 
