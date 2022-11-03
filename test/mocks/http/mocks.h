@@ -108,7 +108,7 @@ public:
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
   MOCK_METHOD(void, onLocalReply, (Code code));
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
 
@@ -248,7 +248,7 @@ public:
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
@@ -344,7 +344,7 @@ public:
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(Tracing::Span&, activeSpan, ());
-  MOCK_METHOD(Tracing::Config&, tracingConfig, ());
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
   MOCK_METHOD(const ScopeTrackedObject&, scope, ());
   MOCK_METHOD(void, onEncoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onEncoderFilterBelowWriteBufferLowWatermark, ());
