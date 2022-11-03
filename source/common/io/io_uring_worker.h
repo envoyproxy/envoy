@@ -11,8 +11,8 @@ namespace Io {
 
 class IoUringAcceptSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringAcceptSocket(os_fd_t fd, IoUringImpl& io_uring_impl, IoUringHandler& io_uring_handler, IoUringWorker& parent) :
-    fd_(fd), io_uring_impl_(io_uring_impl), io_uring_handler_(io_uring_handler), parent_(parent) {}
+  IoUringAcceptSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent) :
+    fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent) {}
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
@@ -24,7 +24,7 @@ public:
   void onCancel(int32_t result) override;
 private:
   os_fd_t fd_;
-  IoUringImpl& io_uring_impl_;
+
   IoUringHandler& io_uring_handler_;
   IoUringWorker& parent_;
 
@@ -53,8 +53,9 @@ public:
   IoUring& get() override;
 
   Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
-                                         socklen_t* remote_addr_len) override;
-
+                               socklen_t* remote_addr_len) override;
+  Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
+  Request* submitCloseRequest(IoUringSocket& socket) override;
 private:
   void onFileEvent();
 

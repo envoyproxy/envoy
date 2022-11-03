@@ -45,30 +45,11 @@ void IoUringAcceptSocket::start() {
 void IoUringAcceptSocket::close() {
   if (accept_req_ != nullptr) {
     ENVOY_LOG(debug, "submit cancel request for the accept");
-    cancel_req_ = new Request();
-    cancel_req_->io_uring_socket_ = *this;
-    cancel_req_->type_ = RequestType::Cancel;
-    auto res = io_uring_impl_.prepareCancel(accept_req_, cancel_req_);
-    if (res == Io::IoUringResult::Failed) {
-      // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-      io_uring_impl_.submit();
-      res = io_uring_impl_.prepareCancel(accept_req_, cancel_req_);
-      RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
-    }
+    cancel_req_ = parent_.submitCancelRequest(*this, accept_req_);
   }
 
   ENVOY_LOG(debug, "submit close request for the accept");
-  close_req_ = new Request();
-  close_req_->io_uring_socket_ = *this;
-  close_req_->type_ = RequestType::Close;
-  auto res = io_uring_impl_.prepareClose(fd_, close_req_);
-  if (res == Io::IoUringResult::Failed) {
-     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    io_uring_impl_.submit();
-    res = io_uring_impl_.prepareClose(fd_, close_req_);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
-  }
-  io_uring_impl_.submit();
+  close_req_ = parent_.submitCloseRequest(*this);
 }
 
 void IoUringWorkerImpl::onFileEvent() {
@@ -141,7 +122,6 @@ void IoUringWorkerImpl::onFileEvent() {
       }
     // For close, there is no iohandle value, but need to fix
     } else if (req->io_uring_handler_.has_value()) {
-      
       req->io_uring_handler_->get().onRequestCompletion(*req, result);
     } else {
       ENVOY_LOG(debug, "no iohandle");
@@ -175,7 +155,7 @@ IoUring& IoUringWorkerImpl::get() {
 }
 
 void IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
-  std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(fd, io_uring_impl_, handler, *this);
+  std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(fd, handler, *this);
   socket->start();
   sockets_.insert({fd, std::move(socket)});
   io_uring_impl_.submit();
@@ -212,6 +192,35 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct so
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
   ENVOY_LOG(debug, "Submit new accept request");
+  io_uring_impl_.submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
+  Request* req = new Request();
+  req->io_uring_socket_ = socket;
+  req->type_ = RequestType::Cancel;
+  auto res = io_uring_impl_.prepareCancel(request_to_cancel, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareCancel(request_to_cancel, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
+  }
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
+  Request* req = new Request();
+  req->io_uring_socket_ = socket;
+  req->type_ = RequestType::Close;
+  auto res = io_uring_impl_.prepareClose(socket.fd(), req);
+  if (res == Io::IoUringResult::Failed) {
+     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareClose(socket.fd(), req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
+  }
   io_uring_impl_.submit();
   return req;
 }

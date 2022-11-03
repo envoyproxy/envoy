@@ -243,6 +243,58 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerMultiAddressesIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
+TEST_P(ListenerIntegrationTest, RemoveListener) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  setDrainTime(std::chrono::seconds(30));
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({listener_name_});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Remove the active listener.
+  sendLdsResponse(std::vector<std::string>{}, "2");
+  test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+    // All the listen socket are closed. include the sockets in the active listener and
+  // the sockets in the filter chain draining listener. The new connection should be reset.
+  auto codec1 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  // The socket are closed asynchronously, so waiting the connection closed here.
+  ASSERT_TRUE(codec1->waitForDisconnect());
+
+  // Test the connection again to ensure the socket is closed.
+  auto codec2 =
+      makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);
+  EXPECT_FALSE(codec2->connected());
+  EXPECT_THAT(codec2->connection()->transportFailureReason(), StartsWith("delayed connect error"));
+}
+
 // Tests that an update with an unknown filter config proto is rejected.
 TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
   on_server_init_function_ = [&]() {

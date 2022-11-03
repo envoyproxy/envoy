@@ -180,6 +180,8 @@ public:
 
   virtual Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len) PURE;
+  virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
+  virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
 
   virtual IoUring& get() PURE;
 };
