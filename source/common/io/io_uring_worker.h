@@ -46,6 +46,11 @@ private:
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
+  ~IoUringWorkerImpl() {
+    if (dispatcher_.has_value()) {
+      dispatcher_->clearDeferredDeleteList();
+    }
+  }
 
   // IoUringWorker
   void start(Event::Dispatcher& dispatcher) override;
