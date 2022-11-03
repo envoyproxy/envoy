@@ -167,28 +167,7 @@ void PlatformBridgeFilter::onDestroy() {
   ENVOY_LOG(trace, "PlatformBridgeFilter({})::onDestroy", filter_name_);
   alive_ = false;
 
-  auto& info = decoder_callbacks_->streamInfo();
-  if (response_filter_base_->state_.stream_complete_ && platform_filter_.on_error &&
-      StreamInfo::isStreamIdleTimeout(info)) {
-    // If the stream info has a response code details with a stream idle timeout, treat as error.
-    ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_error", filter_name_);
-    envoy_data error_message = Data::Utility::copyToBridgeData("Stream idle timeout");
-    auto& info = decoder_callbacks_->streamInfo();
-    int32_t attempts = static_cast<int32_t>(info.attemptCount().value_or(0));
-
-    auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-        config_->stats().on_error_callback_latency_, timeSource());
-
-    platform_filter_.on_error({ENVOY_REQUEST_TIMEOUT, error_message, attempts}, streamIntel(),
-                              finalStreamIntel(), platform_filter_.instance_context);
-
-    callback_time_ms->complete();
-    auto elapsed = callback_time_ms->elapsed();
-    if (elapsed > SlowCallbackWarningThreshold) {
-      ENVOY_LOG_EVENT(warn, "slow_on_error_cb",
-                      filter_name_ + "|" + std::to_string(elapsed.count()) + "ms");
-    }
-  } else if (!response_filter_base_->state_.stream_complete_ && platform_filter_.on_cancel) {
+  if (!response_filter_base_->state_.stream_complete_ && platform_filter_.on_cancel) {
     // If the filter chain is destroyed before a response is received, treat as cancellation.
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
 
