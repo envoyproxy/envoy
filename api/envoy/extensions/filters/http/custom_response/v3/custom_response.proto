@@ -6,7 +6,6 @@ import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.custom_response.v3";
 option java_outer_classname = "CustomResponseProto";
