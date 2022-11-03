@@ -23,8 +23,6 @@ public:
   void onClose(int32_t result) override;
   void onCancel(int32_t result) override;
 private:
-  void submitRequest();
-
   os_fd_t fd_;
   IoUringImpl& io_uring_impl_;
   IoUringHandler& io_uring_handler_;
@@ -53,6 +51,9 @@ public:
 
   std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) override;
   IoUring& get() override;
+
+  Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+                                         socklen_t* remote_addr_len) override;
 
 private:
   void onFileEvent();

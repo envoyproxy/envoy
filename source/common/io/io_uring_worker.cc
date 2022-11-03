@@ -15,7 +15,7 @@ void IoUringAcceptSocket::onAccept(int32_t result) {
   AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
   io_uring_handler_.onAcceptSocket(param);
   accept_req_ = nullptr;
-  submitRequest();
+  accept_req_ = parent_.submitAcceptRequest(*this, &remote_addr_, &remote_addr_len_);
 }
 
 void IoUringAcceptSocket::onCancel(int32_t) {
@@ -39,7 +39,7 @@ void IoUringAcceptSocket::onClose(int32_t) {
 }
 
 void IoUringAcceptSocket::start() {
-  submitRequest();
+  accept_req_ = parent_.submitAcceptRequest(*this, &remote_addr_, &remote_addr_len_);
 }
 
 void IoUringAcceptSocket::close() {
@@ -68,21 +68,6 @@ void IoUringAcceptSocket::close() {
     res = io_uring_impl_.prepareClose(fd_, close_req_);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
   }
-  io_uring_impl_.submit();
-}
-
-void IoUringAcceptSocket::submitRequest() {
-  accept_req_ = new Request();
-  accept_req_->type_ = RequestType::Accept;
-  accept_req_->io_uring_socket_ = *this;
-  auto res = io_uring_impl_.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, accept_req_);
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    io_uring_impl_.submit();
-    res = io_uring_impl_.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, accept_req_);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
-  }
-  ENVOY_LOG(debug, "Submit new accept request");
   io_uring_impl_.submit();
 }
 
@@ -212,6 +197,23 @@ std::unique_ptr<IoUringSocket> IoUringWorkerImpl::removeSocket(os_fd_t fd) {
 
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() {
   return dispatcher_.ref();
+}
+
+Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+                                         socklen_t* remote_addr_len) {
+  Request* req = new Request();
+  req->type_ = RequestType::Accept;
+  req->io_uring_socket_ = socket;
+  auto res = io_uring_impl_.prepareAccept(socket.fd(), remote_addr, remote_addr_len, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareAccept(socket.fd(), remote_addr, remote_addr_len, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
+  }
+  ENVOY_LOG(debug, "Submit new accept request");
+  io_uring_impl_.submit();
+  return req;
 }
 
 } // namespace Io

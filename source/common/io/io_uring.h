@@ -178,6 +178,9 @@ public:
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
 
+  virtual Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+                                         socklen_t* remote_addr_len) PURE;
+
   virtual IoUring& get() PURE;
 };
 
