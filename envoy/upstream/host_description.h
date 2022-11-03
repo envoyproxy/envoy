@@ -201,6 +201,12 @@ public:
    * @return timestamp in milliseconds of when host was created.
    */
   virtual MonotonicTime creationTime() const PURE;
+
+  /**
+   * @return timestamp in milliseconds of when host has transitioned from unhealthy to
+   *         healthy state via an active healthchecking.
+   */
+  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

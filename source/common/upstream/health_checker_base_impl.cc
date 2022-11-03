@@ -233,7 +233,8 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     HealthCheckerImplBase& parent, HostSharedPtr host)
     : host_(host), parent_(parent),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
-      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
+      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })),
+      time_source_(parent.dispatcher_.timeSource()) {
 
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
@@ -274,6 +275,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   num_unhealthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
+  if (first_check_ || host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+    host_->setLastHcPassTime(time_source_.monotonicTime());
+  }
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability

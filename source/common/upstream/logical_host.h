@@ -121,6 +121,9 @@ public:
     return nullptr;
   }
   MonotonicTime creationTime() const override { return logical_host_->creationTime(); }
+  absl::optional<MonotonicTime> lastHcPassTime() const override {
+    return logical_host_->lastHcPassTime();
+  }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 
