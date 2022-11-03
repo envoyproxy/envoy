@@ -239,6 +239,8 @@ absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   return result;
 }
 
+uint32_t Ipv6Instance::Ipv6Helper::scopeId() const { return ntohs(address_.sin6_scope_id); }
+
 uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_port); }
 
 bool Ipv6Instance::Ipv6Helper::v6only() const { return v6only_; };
@@ -294,7 +296,8 @@ Ipv6Instance::Ipv6Instance(uint32_t port, const SocketInterface* sock_interface)
 bool Ipv6Instance::operator==(const Instance& rhs) const {
   const auto* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
   return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()) &&
-          (ip_.port() == rhs_casted->ip_.port()));
+          (ip_.port() == rhs_casted->ip_.port()) &&
+          (ip_.ipv6_.scopeId() == rhs_casted->ip_.ipv6_.scopeId()));
 }
 
 Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bool v6only,

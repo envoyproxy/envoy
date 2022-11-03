@@ -227,6 +227,8 @@ TEST(NetworkUtility, ParseInternetAddress) {
     EXPECT_EQ(
         absl::StrCat("[fe80::1]:0"),
         Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index))->asString());
+    EXPECT_NE(*Utility::parseInternetAddressNoThrow("fe80::1"),
+              *Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index)));
   }
 }
 
