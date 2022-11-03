@@ -1514,7 +1514,6 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
                               host_set->localityWeights(), {}, {}, absl::nullopt);
-    ENVOY_LOG(debug, "Boteng prioritySet.updateHosts done.");
   }
 }
 
