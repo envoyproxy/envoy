@@ -70,9 +70,16 @@ private:
 class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& main_dispatcher,
                Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
-  ~FilterConfig() override = default;
+  ~FilterConfig() override {
+    if (!main_dispatcher_.isThreadSafe()) {
+      main_dispatcher_.post(
+          [limiter_wrapper = std::make_shared<
+               std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
+               std::move(rate_limiter_))]() { limiter_wrapper->reset(); });
+    }
+  }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   bool requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
@@ -115,6 +122,7 @@ private:
     return Http::Code::TooManyRequests;
   }
 
+  Event::Dispatcher& main_dispatcher_;
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
   const std::chrono::milliseconds fill_interval_;
@@ -124,7 +132,7 @@ private:
       envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
       descriptors_;
   const bool rate_limit_per_connection_;
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
+  std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
