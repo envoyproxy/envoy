@@ -15,8 +15,8 @@ namespace PostgresProxy {
 PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& config_options,
                                            Stats::Scope& scope)
     : enable_sql_parsing_(config_options.enable_sql_parsing_),
-      terminate_ssl_(config_options.terminate_ssl_), scope_{scope},
-      stats_{generateStats(config_options.stats_prefix_, scope)} {}
+      terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
+      scope_{scope}, stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -50,7 +50,12 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  return doDecode(backend_buffer_, false);
+  Network::FilterStatus result = doDecode(backend_buffer_, false);
+  if (result == Network::FilterStatus::StopIteration) {
+    ASSERT(backend_buffer_.length() == 0);
+    data.drain(data.length());
+  }
+  return result;
 }
 
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
@@ -225,6 +230,49 @@ bool PostgresFilter::onSSLRequest() {
   read_callbacks_->connection().write(buf, false);
 
   return false;
+}
+
+bool PostgresFilter::shouldEncryptUpstream() const {
+  if ((config_->upstream_ssl_ ==
+       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE) ||
+      (config_->upstream_ssl_ ==
+       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::PREFER)) {
+    return true;
+  }
+
+  return false;
+}
+
+void PostgresFilter::sendUpstream(Buffer::Instance& data) {
+  read_callbacks_->injectReadDataToFilterChain(data, false);
+}
+
+void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& data) {
+  ASSERT(config_->upstream_ssl_ !=
+         envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE);
+  if (!upstream_agreed) {
+    config_->stats_.sessions_upstream_ssl_failed_.inc();
+    if (config_->upstream_ssl_ ==
+        envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE) {
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      return;
+    }
+  } else {
+
+    // Try to switch to secure channel upstream.
+    if (read_callbacks_->startUpstreamSecureTransport()) {
+      config_->stats_.sessions_upstream_ssl_success_.inc();
+    } else {
+      config_->stats_.sessions_upstream_ssl_failed_.inc();
+      if (config_->upstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE) {
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+        return;
+      }
+    }
+  }
+
+  read_callbacks_->injectReadDataToFilterChain(data, false);
 }
 
 Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {

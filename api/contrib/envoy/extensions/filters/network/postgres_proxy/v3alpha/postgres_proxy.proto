@@ -39,4 +39,12 @@ message PostgresProxy {
   // Refer to official documentation for details
   // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
   bool terminate_ssl = 3;
+
+  enum SSLMode {
+    DISABLE = 0;
+    REQUIRE = 1;
+    PREFER = 2;
+  }
+
+  SSLMode upstream_ssl = 4;
 }
