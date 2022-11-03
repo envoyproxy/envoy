@@ -26,4 +26,3 @@ message FilterStateMatcher {
     StringMatcher string_match = 2;
   }
 }
-

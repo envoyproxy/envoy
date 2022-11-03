@@ -230,7 +230,7 @@ message Permission {
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
