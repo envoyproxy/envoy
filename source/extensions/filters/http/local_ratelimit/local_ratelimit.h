@@ -74,10 +74,10 @@ public:
                Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
   ~FilterConfig() override {
     if (!main_dispatcher_.isThreadSafe()) {
-      main_dispatcher_.post(
-          [limiter_wrapper = std::make_shared<
-               std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
-               std::move(rate_limiter_))]() { limiter_wrapper->reset(); });
+      auto shared_ptr_wrapper =
+          std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
+              std::move(rate_limiter_));
+      main_dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
     }
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
