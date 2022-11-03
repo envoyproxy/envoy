@@ -19,19 +19,20 @@ namespace Common {
 namespace Wasm {
 
 proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
-  static const absl::flat_hash_map<spdlog::level::level_enum, proxy_wasm::LogLevel> log_level_map =
-      {
-          {spdlog::level::trace, proxy_wasm::LogLevel::trace},
-          {spdlog::level::debug, proxy_wasm::LogLevel::debug},
-          {spdlog::level::info, proxy_wasm::LogLevel::info},
-          {spdlog::level::warn, proxy_wasm::LogLevel::warn},
-          {spdlog::level::err, proxy_wasm::LogLevel::error},
-      };
-  auto it = log_level_map.find(ENVOY_LOGGER().level());
-  if (it != log_level_map.end()) {
-    return it->second;
+  switch (ENVOY_LOGGER().level()) {
+  case spdlog::level::trace:
+    return proxy_wasm::LogLevel::trace;
+  case spdlog::level::debug:
+    return proxy_wasm::LogLevel::debug;
+  case spdlog::level::info:
+    return proxy_wasm::LogLevel::info;
+  case spdlog::level::warn:
+    return proxy_wasm::LogLevel::warn;
+  case spdlog::level::err:
+    return proxy_wasm::LogLevel::error;
+  default:
+    return proxy_wasm::LogLevel::critical;
   }
-  return proxy_wasm::LogLevel::critical;
 }
 
 void EnvoyWasmVmIntegration::error(std::string_view message) { ENVOY_LOG(error, message); }

@@ -91,12 +91,15 @@ inline StatResult parseStatResults(std::string_view data) {
         const uint32_t* stat_name = reinterpret_cast<const uint32_t*>(data.data() + stat_index);
         uint32_t name_len = *stat_name;
         stat_index += sizeof(uint32_t);
+
         auto& e = counters[i];
         e.name = {data.data() + stat_index, name_len};
         stat_index = align<uint64_t>(stat_index + name_len);
+
         const uint64_t* stat_vals = reinterpret_cast<const uint64_t*>(data.data() + stat_index);
         e.value = *stat_vals++;
         e.delta = *stat_vals++;
+
         stat_index += 2 * sizeof(uint64_t);
       }
       results.counters = counters;
@@ -107,17 +110,21 @@ inline StatResult parseStatResults(std::string_view data) {
         const uint32_t* stat_name = reinterpret_cast<const uint32_t*>(data.data() + stat_index);
         uint32_t name_len = *stat_name;
         stat_index += sizeof(uint32_t);
+
         auto& e = gauges[i];
         e.name = {data.data() + stat_index, name_len};
         stat_index = align<uint64_t>(stat_index + name_len);
+
         const uint64_t* stat_vals = reinterpret_cast<const uint64_t*>(data.data() + stat_index);
         e.value = *stat_vals++;
+
         stat_index += sizeof(uint64_t);
       }
       results.gauges = gauges;
     }
     data_len += block_size;
   }
+
   return results;
 }
 

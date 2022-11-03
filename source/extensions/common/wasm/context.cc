@@ -393,9 +393,11 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
     auto size = proxy_wasm::PairsUtil::pairsSize(pairs);
     // prevent string inlining which violates byte alignment
     result->resize(std::max(size, static_cast<size_t>(30)));
-    auto ok = proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size);
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
     result->resize(size);
-    return ok ? WasmResult::Ok : WasmResult::SerializationFailure;
+    return WasmResult::Ok;
   }
   case CelValue::Type::kList: {
     const auto& list = *value.ListOrDie();
@@ -411,8 +413,10 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
       result->reserve(30);
     }
     result->resize(size);
-    auto ok = proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size);
-    return ok ? WasmResult::Ok : WasmResult::SerializationFailure;
+    if (!proxy_wasm::PairsUtil::marshalPairs(pairs, result->data(), size)) {
+      return WasmResult::SerializationFailure;
+    }
+    return WasmResult::Ok;
   }
   default:
     break;
