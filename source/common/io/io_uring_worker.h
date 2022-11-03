@@ -18,8 +18,10 @@ public:
   os_fd_t fd() const override { return fd_; }
   void start() override;
   void close() override;
-  void onRequestCompeltion(const Request& req, int32_t result) override;
 
+  void onAccept(int32_t result) override;
+  void onClose(int32_t result) override;
+  void onCancel(int32_t result) override;
 private:
   void submitRequest();
 

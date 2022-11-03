@@ -4,37 +4,37 @@
 namespace Envoy {
 namespace Io {
 
-void IoUringAcceptSocket::onRequestCompeltion(const Request& req, int32_t result) {
-  if (req.type_ == RequestType::Accept) {
-    if (result < 0) {
-      ENVOY_LOG(debug, "Accept request failed");
-      return;
-    }
-  
-    ENVOY_LOG(debug, "New socket accepted");
-    connection_fd_ = result;
-    AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
-    io_uring_handler_.onAcceptSocket(param);
-    accept_req_ = nullptr;
-    submitRequest();
-  } else if (req.type_ == RequestType::Cancel) {
-    cancel_req_ = nullptr;
-    ENVOY_LOG(debug, "cancel request done");
-    if (close_req_ == nullptr) {
-      ENVOY_LOG(debug, "the socket {} is ready to end");
-      std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
-      parent_.dispatcher().deferredDelete(std::move(self));
-    }
-  } else if (req.type_ == RequestType::Close) {
-    close_req_ = nullptr;
-    ENVOY_LOG(debug, "close request done");
-    if (cancel_req_ == nullptr) {
-      ENVOY_LOG(debug, "the socket {} is ready to end");
-      std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
-      parent_.dispatcher().deferredDelete(std::move(self));
-    }
-  } else {
-    ASSERT(false);
+void IoUringAcceptSocket::onAccept(int32_t result) {
+  if (result < 0) {
+    ENVOY_LOG(debug, "Accept request failed");
+    return;
+  }
+
+  ENVOY_LOG(debug, "New socket accepted");
+  connection_fd_ = result;
+  AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
+  io_uring_handler_.onAcceptSocket(param);
+  accept_req_ = nullptr;
+  submitRequest();
+}
+
+void IoUringAcceptSocket::onCancel(int32_t) {
+  cancel_req_ = nullptr;
+  ENVOY_LOG(debug, "cancel request done");
+  if (close_req_ == nullptr) {
+    ENVOY_LOG(debug, "the socket {} is ready to end");
+    std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+    parent_.dispatcher().deferredDelete(std::move(self));
+  }
+}
+
+void IoUringAcceptSocket::onClose(int32_t) {
+  close_req_ = nullptr;
+  ENVOY_LOG(debug, "close request done");
+  if (cancel_req_ == nullptr) {
+    ENVOY_LOG(debug, "the socket {} is ready to end");
+    std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+    parent_.dispatcher().deferredDelete(std::move(self));
   }
 }
 
@@ -125,7 +125,35 @@ void IoUringWorkerImpl::onFileEvent() {
     }
 
     if (req->io_uring_socket_.has_value()) {
-      req->io_uring_socket_->get().onRequestCompeltion(*req, result);
+      switch(req->type_) {
+      case RequestType::Accept:
+        ENVOY_LOG(debug, "receive accept request completion");
+        req->io_uring_socket_->get().onAccept(result);
+        break;
+      case RequestType::Connect:
+        ENVOY_LOG(debug, "receive connect request completion");
+        req->io_uring_socket_->get().onConnect(result);
+        break;
+      case RequestType::Read:
+        ENVOY_LOG(debug, "receive Read request completion");
+        req->io_uring_socket_->get().onRead(result);
+        break;
+      case RequestType::Write:
+        ENVOY_LOG(debug, "receive write request completion");
+        req->io_uring_socket_->get().onWrite(result);
+        break;
+      case RequestType::Close:
+        ENVOY_LOG(debug, "receive close request completion");
+        req->io_uring_socket_->get().onClose(result);
+        break;
+      case RequestType::Cancel:
+        ENVOY_LOG(debug, "receive cancel request completion");
+        req->io_uring_socket_->get().onCancel(result);
+        break;
+      case RequestType::Unknown:
+        ENVOY_LOG(debug, "receive unknown request completion");
+        break;
+      }
     // For close, there is no iohandle value, but need to fix
     } else if (req->io_uring_handler_.has_value()) {
       

@@ -158,7 +158,12 @@ public:
   virtual void start() PURE;
   virtual void close() PURE;
 
-  virtual void onRequestCompeltion(const Request& req, int32_t result) PURE;
+  virtual void onAccept(int32_t) { PANIC("not implemented"); };
+  virtual void onClose(int32_t) { PANIC("not implemented"); };
+  virtual void onCancel(int32_t) { PANIC("not implemented"); };
+  virtual void onConnect(int32_t) { PANIC("not implemented"); };
+  virtual void onRead(int32_t) { PANIC("not implemented"); };
+  virtual void onWrite(int32_t) { PANIC("not implemented"); };
 };
 
 class IoUringWorker : public ThreadLocal::ThreadLocalObject {
