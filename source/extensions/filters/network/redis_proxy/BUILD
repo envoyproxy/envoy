@@ -129,7 +129,7 @@ envoy_cc_extension(
         ":proxy_filter_lib",
         ":router_lib",
         "//envoy/upstream:upstream_interface",
-	"//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
+        "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
