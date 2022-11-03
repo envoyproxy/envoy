@@ -29,6 +29,9 @@ bug_fixes:
 - area: generic_proxy
   change: |
     fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
+- area: http
+  change: |
+    fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -77,6 +80,9 @@ new_features:
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+- area: generic_proxy
+  change: |
+    added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
 - area: thrift_proxy
   change: |
     added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
@@ -86,5 +92,8 @@ new_features:
 - area: health_check
   change: |
     added an optional bool flag :ref:`disable_active_health_check <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check>` to disable the active health check for the endpoint.
+- area: mobile
+  change: |
+    started merging the Envoy mobile library into the main Envoy repo.
 
 deprecated:

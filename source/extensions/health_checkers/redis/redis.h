@@ -91,7 +91,7 @@ private:
     // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
-    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+    void onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
                        bool) override;
 
     // Network::ConnectionCallbacks
