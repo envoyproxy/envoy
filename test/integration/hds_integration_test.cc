@@ -128,6 +128,12 @@ public:
       result = host2_fake_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
+    if (host_fake_raw_connection_ != nullptr) {
+      AssertionResult result = host_fake_raw_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = host_fake_raw_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
   }
 
   // Creates a basic HealthCheckSpecifier message containing one endpoint and
