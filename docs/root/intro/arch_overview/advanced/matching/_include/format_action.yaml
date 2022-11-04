@@ -1,6 +1,0 @@
-action:
-  name: foo
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString
-    text_format_source:
-      inline_string: "%DYNAMIC_METADATA(com.test_filter:test_key)%"

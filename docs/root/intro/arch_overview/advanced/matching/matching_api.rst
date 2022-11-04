@@ -98,8 +98,15 @@ Network filter chain matching supports the following extensions:
 * :ref:`Format string action <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>` computes the filter chain name
   from the connection dynamic metadata and its filter state. Example:
 
-.. literalinclude:: _include/format_action.yaml
-    :language: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.common.matcher.v3.Matcher.OnMatch
+
+  action:
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(com.test_filter:test_key)%"
 
 Filter Integration
 ##################
