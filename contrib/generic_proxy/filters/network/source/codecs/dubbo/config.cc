@@ -34,9 +34,9 @@ absl::string_view responseStatusToStringView(Common::Dubbo::ResponseStatus statu
     ENUM_TO_STRING_VIEW(ServerError);
     ENUM_TO_STRING_VIEW(ClientError);
     ENUM_TO_STRING_VIEW(ServerThreadpoolExhaustedError);
-    default:
-      static constexpr char notFound[] = "Enum not found";                                              \
-      return notFound;
+  default:
+    static constexpr char notFound[] = "Enum not found";
+    return notFound;
   }
 }
 
