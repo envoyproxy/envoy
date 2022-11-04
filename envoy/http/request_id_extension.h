@@ -19,13 +19,6 @@ public:
   virtual ~RequestIDExtension() = default;
 
   /**
-   * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @return the unique id based on the request ID for stream info if the request ID is invalid.
-   */
-  virtual Envoy::StreamInfo::StreamIdProviderPtr
-  toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const PURE;
-
-  /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.
    * @param request_headers supplies the incoming request headers for setting a request ID.
@@ -60,6 +53,13 @@ public:
    * @return whether to use request_id based sampling policy or not.
    */
   virtual bool useRequestIdForTraceSampling() const PURE;
+
+  /**
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return the unique id based on the request ID for stream info if the request ID is invalid.
+   */
+  virtual Envoy::StreamInfo::StreamIdProviderPtr
+  toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 
 using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;
