@@ -285,8 +285,15 @@ public:
     moved_response->type(Common::Redis::RespType::Error);
     moved_response->asString() = "MOVE 1111 " + host_address;
     EXPECT_CALL(callbacks, onResponse_(Ref(moved_response)));
-    EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
-                                                                 host_address, false));
+    EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+    const auto expected = cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                              .counter("upstream_internal_redirect_failed_total")
+                              .value() +
+                          1;
+    client->client_callbacks_.back()->onRedirection(std::move(moved_response), host_address, false);
+    EXPECT_EQ(expected, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                            .counter("upstream_internal_redirect_failed_total")
+                            .value());
   }
 
   MOCK_METHOD(Common::Redis::Client::Client*, create_, (Upstream::HostConstSharedPtr host));
@@ -1085,9 +1092,13 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionSuccess) {
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
-  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
-                                                              "10.1.2.3:4000", false));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(moved_response), "10.1.2.3:4000",
+                                                  false);
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                     .counter("upstream_internal_redirect_succeeded_total")
+                     .value());
 
   respond(callbacks, client2);
 
@@ -1136,8 +1147,9 @@ TEST_F(RedisConnPoolImplTest, MovedRedirectionFailure) {
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request3), _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(moved_response3)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(moved_response3),
-                                                               "10.1.2.3:4000", false));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(moved_response3), "10.1.2.3:4000",
+                                                  false);
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
 
   EXPECT_CALL(*client, close());
@@ -1167,9 +1179,12 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionSuccess) {
   EXPECT_CALL(*client2, makeRequest_(Ref(Common::Redis::Utility::AskingRequest::instance()), _))
       .WillOnce(Return(&ask_request));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request_value), _)).WillOnce(Return(&active_request2));
-  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(ask_response),
-                                                              "10.1.2.3:4000", true));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(ask_response), "10.1.2.3:4000", true);
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                     .counter("upstream_internal_redirect_succeeded_total")
+                     .value());
 
   respond(callbacks, client2);
 
@@ -1198,9 +1213,12 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
   EXPECT_CALL(*client2, makeRequest_(Ref(Common::Redis::Utility::AskingRequest::instance()), _))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(ask_response3)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response3),
-                                                               "10.1.2.3:4000", true));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(ask_response3), "10.1.2.3:4000", true);
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                     .counter("upstream_internal_redirect_failed_total")
+                     .value());
 
   // Test an upstream error from trying to send the original request after the "asking" command is
   // sent successfully.
@@ -1214,8 +1232,11 @@ TEST_F(RedisConnPoolImplTest, AskRedirectionFailure) {
       .WillOnce(Return(&active_request5));
   EXPECT_CALL(*client2, makeRequest_(Ref(*request4), _)).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks, onResponse_(Ref(ask_response4)));
-  EXPECT_FALSE(client->client_callbacks_.back()->onRedirection(std::move(ask_response4),
-                                                               "10.1.2.3:4000", true));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(ask_response4), "10.1.2.3:4000", true);
+  EXPECT_EQ(2UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                     .counter("upstream_internal_redirect_failed_total")
+                     .value());
 
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();
@@ -1267,9 +1288,13 @@ TEST_F(RedisConnPoolImplTest, MakeRequestAndRedirectFollowedByDelete) {
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client2)));
   EXPECT_CALL(*client2, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request2));
-  EXPECT_TRUE(client->client_callbacks_.back()->onRedirection(std::move(moved_response),
-                                                              "10.1.2.3:4000", false));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, cluster());
+  client->client_callbacks_.back()->onRedirection(std::move(moved_response), "10.1.2.3:4000",
+                                                  false);
   EXPECT_EQ(host1->address()->asString(), "10.1.2.3:4000");
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.lb_.host_->cluster_.stats_store_
+                     .counter("upstream_internal_redirect_succeeded_total")
+                     .value());
   EXPECT_CALL(callbacks, onResponse_(_));
   client2->client_callbacks_.back()->onResponse(std::make_unique<Common::Redis::RespValue>());
 

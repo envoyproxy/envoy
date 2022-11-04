@@ -91,13 +91,15 @@ function cp_binary_for_image_build() {
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
   strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
-  # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
+  # only if BUILD_REASON exists (running in AZP)
+  if [[ "${BUILD_REASON}" ]]; then
+    # Copy for azp which doesn't preserve permissions
+    tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
 
-  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
-  [[ -z "${BUILD_REASON}" ]] || \
+    # Remove binaries to save space
     rm -rf "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}" "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}"_stripped "${FINAL_DELIVERY_DIR:?}"/envoy{,.dwp} \
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
+  fi
 }
 
 function bazel_binary_build() {
