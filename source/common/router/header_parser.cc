@@ -353,6 +353,13 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   // impact of code changes.
   absl::InlinedVector<std::pair<const Http::LowerCaseString&, const std::string>, 4> headers_to_add,
       headers_to_overwrite;
+  // value_buffer is used only when stream_info is a valid pointer and stores header value
+  // created by a formatter. It is declared outside of 'for' loop for performance reason to avoid
+  // stack allocation and unnecessary std::string's memory adjustments for each iteration. The
+  // actual value of the header is accessed via 'value' variable which is initialized differently
+  // depending whether stream_info and valid or nullptr. Based on performance tests implemented in
+  // header_formatter_speed_test.cc this approach strikes the best balance between performance and
+  // readability.
   std::string value_buffer;
   for (const auto& [key, entry] : headers_to_add_) {
     absl::string_view value;
