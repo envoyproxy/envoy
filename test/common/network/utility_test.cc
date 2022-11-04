@@ -6,7 +6,6 @@
 #include <iphlpapi.h>
 #endif
 
-#include <cstdlib>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -43,67 +42,23 @@ struct Interface {
 };
 
 // Helper function that returns any usable interface present while running the test.
-#ifndef WIN32
 StatusOr<Interface> getLocalNetworkInterface() {
-  struct ifaddrs* ifaddr;
-
-  if (getifaddrs(&ifaddr) == -1) {
-    return absl::FailedPreconditionError("getifaddrs failed");
+  if (!Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    return absl::FailedPreconditionError("getifaddrs not supported");
   }
-
-  // Find a viable interface to return for the test. Note that for the purpose of testing the
-  // parseInternetAddressNoThrow it enough to return any interface no matter from the IP assigned.
-  for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
+  ASSERT(rc.return_value_ == 0);
+  if (interface_addresses.size() > 0) {
+    for (const auto& ifc : interface_addresses) {
+      Interface interface;
+      interface.name = ifc.interface_name_;
+      interface.if_index = if_nametoindex(ifc.interface_name_.c_str());
+      return interface;
     }
-
-    Interface ifc;
-    ifc.name = std::string(ifa->ifa_name);
-    ifc.if_index = if_nametoindex(ifa->ifa_name);
-    freeifaddrs(ifaddr);
-    return ifc;
-  };
-  freeifaddrs(ifaddr);
+  }
   return absl::NotFoundError("no interface available");
 }
-#else
-// Helper function that returns any usable interface present on windows. Adapted the example from
-// https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses?redirectedfrom=MSDN
-StatusOr<Interface> getLocalNetworkInterface() {
-  unsigned long buffer_size = 15000;
-  // Set the flags to pass to GetAdaptersAddresses
-  unsigned long flags = GAA_FLAG_SKIP_DNS_SERVER;
-
-  // The address family of the addresses to retrieve.
-  unsigned long family = AF_UNSPEC;
-  PIP_ADAPTER_ADDRESSES ifaddr = (IP_ADAPTER_ADDRESSES*)malloc(buffer_size);
-  if (GetAdaptersAddresses(family, flags, nullptr, ifaddr, &buffer_size) != NO_ERROR) {
-    free(ifaddr);
-    return absl::FailedPreconditionError("GetAdaptersAddresses failed");
-  }
-  for (PIP_ADAPTER_ADDRESSES ifa = ifaddr; ifa != nullptr; ifa = ifa->Next) {
-    Interface ifc;
-    ifc.name = ifa->AdapterName;
-    switch (family) {
-    case AF_INET:
-      ifc.if_index = ifa->IfIndex;
-      break;
-    case AF_INET6:
-      ifc.if_index = ifa->Ipv6IfIndex;
-      break;
-    default:
-      // This should not really happen.
-      continue;
-    };
-
-    free(ifaddr);
-    return ifc;
-  }
-  free(ifaddr);
-  return absl::UnimplementedError("not available in windows");
-}
-#endif
 
 TEST(NetworkUtility, resolveUrl) {
   EXPECT_THROW(Utility::resolveUrl("foo"), EnvoyException);
@@ -222,10 +177,10 @@ TEST(NetworkUtility, ParseInternetAddress) {
   StatusOr<Interface> ifc = getLocalNetworkInterface();
   if (ifc.ok()) {
     EXPECT_EQ(
-        absl::StrCat("[fe80::1]:0"),
+        absl::StrCat("[fe80::1%", ifc->name, "]:0"),
         Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->name))->asString());
     EXPECT_EQ(
-        absl::StrCat("[fe80::1]:0"),
+        absl::StrCat("[fe80::1%", ifc->name, "]:0"),
         Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index))->asString());
     EXPECT_NE(*Utility::parseInternetAddressNoThrow("fe80::1"),
               *Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index)));

@@ -1,5 +1,13 @@
 #include "source/common/network/address_impl.h"
 
+#ifndef WIN32
+#include <net/if.h>
+
+#else
+#include <winsock2.h>
+#include <iphlpapi.h>
+#endif
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -234,7 +242,7 @@ void Ipv4Instance::initHelper(const sockaddr_in* address) {
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
-  static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
+  static_assert(sizeof(absl::uint128) == 16, "The size of absl::uint128 is not 16.");
   safeMemcpyUnsafeSrc(&result, &address_.sin6_addr.s6_addr[0]);
   return result;
 }
@@ -249,6 +257,13 @@ std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
   char str[INET6_ADDRSTRLEN];
   const char* ptr = inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN);
   ASSERT(str == ptr);
+  if (address_.sin6_scope_id != 0) {
+    char if_name[IF_NAMESIZE]{'\0'};
+    if (if_indextoname(address_.sin6_scope_id, if_name) != nullptr) {
+      return absl::StrCat(ptr, "%", if_name);
+    }
+    return absl::StrCat(ptr, "%", ntohl(address_.sin6_scope_id));
+  }
   return ptr;
 }
 
