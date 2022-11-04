@@ -12,6 +12,25 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+// Returns a Key with the vary header added to custom_fields.
+// It is an error to call this with headers that don't include vary.
+// Returns nullopt if the vary headers in the response are not
+// compatible with the VaryAllowList in the LookupRequest.
+absl::optional<Key> variedRequestKey(const LookupRequest& request,
+                                     const Http::ResponseHeaderMap& response_headers) {
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeaderUtils::getVaryValues(response_headers);
+  ASSERT(!vary_header_values.empty());
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+      request.varyAllowList(), vary_header_values, request.requestHeaders());
+  if (!vary_identifier.has_value()) {
+    return absl::nullopt;
+  }
+  Key varied_request_key = request.key();
+  varied_request_key.add_custom_fields(vary_identifier.value());
+  return varied_request_key;
+}
+
 class SimpleLookupContext : public LookupContext {
 public:
   SimpleLookupContext(SimpleHttpCache& cache, LookupRequest&& request)
@@ -228,24 +247,6 @@ bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& respon
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
                                      std::move(body), std::move(trailers)};
   return true;
-}
-
-absl::optional<Key>
-SimpleHttpCache::variedRequestKey(const LookupRequest& request,
-                                  const Http::ResponseHeaderMap& response_headers) const {
-  absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeaderUtils::getVaryValues(response_headers);
-  ASSERT(!vary_header_values.empty());
-  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
-      request.varyAllowList(), vary_header_values, request.requestHeaders());
-  if (!vary_identifier.has_value()) {
-    // The vary allow list has changed and has made the vary header of this
-    // cached value not cacheable.
-    return absl::nullopt;
-  }
-  Key varied_request_key = request.key();
-  varied_request_key.add_custom_fields(vary_identifier.value());
-  return varied_request_key;
 }
 
 SimpleHttpCache::Entry
