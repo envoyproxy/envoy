@@ -58,6 +58,31 @@ public:
   DecodedOctet normalizeAndDecodeOctet(std::string::iterator iter, std::string::iterator end) const;
 
 private:
+  /*
+   * Normalization pass: normalize percent-encoded octets to UPPERCASE and decode valid octets.
+   */
+  PathNormalizationResult decodePass(std::string& path) const;
+  /*
+   * Normalization pass: merge duplicate slashes.
+   */
+  PathNormalizationResult mergeSlashesPass(std::string& path) const;
+  /*
+   * Normalization pass: collapse dot and dot-dot segements.
+   */
+  PathNormalizationResult collapseDotSegmentsPass(std::string& path) const;
+  /*
+   * Split the scheme/authority and path components. The return value is a 2-item tuple:
+   * (scheme_and_authority, path).
+   */
+  std::tuple<absl::string_view, absl::string_view>
+  splitAuthorityAndPath(absl::string_view uri) const;
+  /*
+   * Split the path and query parameters / fragment components. The return value is a 2-item tuple:
+   * (path, query_params).
+   */
+  std::tuple<absl::string_view, absl::string_view>
+  splitPathAndQueryParams(absl::string_view pathAndQueryParams) const;
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
 };

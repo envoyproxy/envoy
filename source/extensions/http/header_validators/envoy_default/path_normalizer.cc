@@ -1,6 +1,5 @@
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
-#include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
@@ -159,6 +158,8 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // authority-form = uri-host ":" port
   // asterisk-form  = "*"
   const auto original_uri = header_map.path();
+  // Split the scheme and authority components from the path.
+  auto [scheme_and_authority, original_path] = splitAuthorityAndPath(original_uri);
   if (original_uri == "*") {
     // Asterisk form
     return PathNormalizationResult::success();
@@ -166,35 +167,27 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   const bool is_connect_method =
       header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
-  ::Envoy::Http::Utility::Url url;
-  const bool is_origin_form = !url.initialize(original_uri, is_connect_method);
+  const bool is_origin_form = scheme_and_authority.empty();
   // If is_origin_form==true, then the original_uri is treated as origin-form and must begin with
   // a "/" character.
-  if (!is_origin_form && url.pathAndQueryParams().empty() && is_connect_method) {
+  if (!is_origin_form && original_path.empty() && is_connect_method) {
     // CONNECT requests must be in authority-form with no path specified.
     return PathNormalizationResult::success();
   }
 
+  // Split the path and the query parameters / fragment component.
+  auto [path_view, query] = splitPathAndQueryParams(original_path);
   // Make a copy of the original path and then create a readonly string_view to it. The string_view
   // is used for optimized sub-strings and the path is modified in place.
-  absl::string_view original_path = is_origin_form ? original_uri : url.pathAndQueryParams();
-  std::string path{original_path.data(), original_path.length()};
-  absl::string_view path_view{path};
+  std::string path{path_view.data(), path_view.length()};
 
   // Start normalizing the path.
-  const auto begin = path.begin();
-  auto read = path.begin();
-  auto write = path.begin();
-  auto end = path.end();
   bool redirect = false;
 
-  if (read == end || *read != '/') {
+  if (path.empty() || path.at(0) != '/') {
     // Reject empty or relative paths
     return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
-
-  ++read;
-  ++write;
 
   // Path normalization is based on RFC 3986:
   // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
@@ -218,12 +211,70 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   //
   // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
   // SPELLCHECKER(on)
-  while (read != end) {
-    char ch = *read;
-    char prev = *std::prev(write);
+  {
+    auto result = decodePass(path);
+    if (result.action() == PathNormalizationResult::Action::Reject) {
+      return result;
+    }
 
-    switch (ch) {
-    case '%': {
+    redirect |= result.action() == PathNormalizationResult::Action::Redirect;
+  }
+
+  if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
+    auto result = mergeSlashesPass(path);
+    if (result.action() == PathNormalizationResult::Action::Reject) {
+      return result;
+    }
+
+    redirect |= result.action() == PathNormalizationResult::Action::Redirect;
+  }
+
+  {
+    auto result = collapseDotSegmentsPass(path);
+    if (result.action() == PathNormalizationResult::Action::Reject) {
+      return result;
+    }
+
+    redirect |= result.action() == PathNormalizationResult::Action::Redirect;
+  }
+
+  absl::string_view normalized_path{path};
+  if (is_origin_form) {
+    // origin-form is the absolute path, set it
+    header_map.setPath(absl::StrCat(normalized_path, query));
+  } else {
+    // absolute and authority forms have a prefix that we need to keep
+    auto path_begin_index = original_uri.length() - original_path.length();
+    absl::string_view prefix;
+    if (original_uri.at(path_begin_index) == '/') {
+      // absolute-form
+      prefix = original_uri.substr(0, path_begin_index);
+    } else {
+      // The URL class sets the path to "/" if the path is empty for authority-form, which we
+      // detect if the first path character is not a "/". The authority-form is our entire prefix.
+      prefix = original_uri;
+    }
+
+    header_map.setPath(absl::StrCat(prefix, normalized_path, query));
+  }
+
+  if (redirect) {
+    return {PathNormalizationResult::Action::Redirect,
+            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+  }
+
+  return PathNormalizationResult::success();
+}
+
+PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& path) const {
+  auto begin = path.begin();
+  auto read = std::next(begin);
+  auto write = std::next(begin);
+  auto end = path.end();
+  bool redirect = false;
+
+  while (read != end) {
+    if (*read == '%') {
       auto decode_result = normalizeAndDecodeOctet(read, end);
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
@@ -252,10 +303,56 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
         std::advance(read, 2);
         *read = decode_result.octet();
       }
-      break;
+    } else {
+      *write++ = *read++;
     }
+  }
 
-    case '.': {
+  path.resize(std::distance(begin, write));
+  if (redirect) {
+    return {PathNormalizationResult::Action::Redirect,
+            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
+  }
+
+  return PathNormalizationResult::success();
+}
+
+PathNormalizer::PathNormalizationResult PathNormalizer::mergeSlashesPass(std::string& path) const {
+  auto begin = path.begin();
+  auto read = std::next(begin);
+  auto write = std::next(begin);
+  auto end = path.end();
+
+  while (read != end) {
+    if (*read == '/') {
+      char prev = *std::prev(write);
+      if (prev == '/') {
+        // Duplicate slash, merge it
+        ++read;
+      } else {
+        // Not a duplicate slash or we aren't configured to merge slashes, copy it
+        *write++ = *read++;
+      }
+    } else {
+      *write++ = *read++;
+    }
+  }
+
+  path.resize(std::distance(begin, write));
+  return PathNormalizationResult::success();
+}
+
+PathNormalizer::PathNormalizationResult
+PathNormalizer::collapseDotSegmentsPass(std::string& path) const {
+  auto begin = path.begin();
+  auto read = std::next(begin);
+  auto write = std::next(begin);
+  auto end = path.end();
+  absl::string_view path_view{path};
+
+  while (read != end) {
+    if (*read == '.') {
+      char prev = *std::prev(write);
       if (prev == '/') {
         // attempt to read ahead 2 characters to see if we are in a "./" or "../" segment.
         const auto dot_segment = path_view.substr(std::distance(begin, read), 3);
@@ -286,59 +383,49 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
       } else {
         *write++ = *read++;
       }
-
-      break;
-    }
-
-    case '/': {
-      if (prev == '/' && !config_.uri_path_normalization_options().skip_merging_slashes()) {
-        // Duplicate slash, merge it
-        ++read;
-      } else {
-        // Not a duplicate slash or we aren't configured to merge slashes, copy it
-        *write++ = *read++;
-      }
-      break;
-    }
-
-    default: {
-      if (testChar(kPathHeaderCharTable, ch)) {
-        // valid path character, copy it
-        *write++ = *read++;
-      } else {
-        // invalid path character
-        return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
-      }
-    }
-    }
-  }
-
-  absl::string_view normalized_path = path_view.substr(0, std::distance(begin, write));
-  if (is_origin_form) {
-    // origin-form is the absolute path, set it
-    header_map.setPath(normalized_path);
-  } else {
-    // absolute and authority forms have a prefix that we need to keep
-    auto path_begin_index = original_uri.length() - original_path.length();
-    absl::string_view prefix;
-    if (original_uri.at(path_begin_index) == '/') {
-      // absolute-form
-      prefix = original_uri.substr(0, path_begin_index);
     } else {
-      // The URL class sets the path to "/" if the path is empty for authority-form, which we
-      // detect if the first path character is not a "/". The authority-form is our entire prefix.
-      prefix = original_uri;
+      *write++ = *read++;
     }
-
-    header_map.setPath(absl::StrCat(prefix, normalized_path));
   }
 
-  if (redirect) {
-    return {PathNormalizationResult::Action::Redirect,
-            PathNormalizerResponseCodeDetail::get().RedirectNormalized};
-  }
-
+  path.resize(std::distance(begin, write));
   return PathNormalizationResult::success();
+}
+
+std::tuple<absl::string_view, absl::string_view>
+PathNormalizer::splitPathAndQueryParams(absl::string_view pathAndQueryParams) const {
+  auto delim = pathAndQueryParams.find_first_of("?#");
+  if (delim == absl::string_view::npos) {
+    return std::make_tuple(pathAndQueryParams, "");
+  }
+
+  return std::make_tuple(pathAndQueryParams.substr(0, delim), pathAndQueryParams.substr(delim));
+}
+
+std::tuple<absl::string_view, absl::string_view>
+PathNormalizer::splitAuthorityAndPath(absl::string_view uri) const {
+  if (absl::StartsWith(uri, "//")) {
+    // absolute-uri without scheme, next slash is the beginning of the path
+    auto path_start = uri.find('/', 2);
+    return std::make_tuple(uri.substr(0, path_start),
+                           path_start != absl::string_view::npos ? uri.substr(path_start) : "");
+  }
+
+  if (absl::StartsWith(uri, "/")) {
+    // origin-form, entire value is the path
+    return std::make_tuple("", uri);
+  }
+
+  auto scheme_delim = uri.find("://");
+  if (scheme_delim != absl::string_view::npos) {
+    auto path_start = uri.find('/', scheme_delim + 3);
+    // We assume that the root is "/" if not specified in the URI.
+    return std::make_tuple(uri.substr(0, path_start),
+                           path_start != absl::string_view::npos ? uri.substr(path_start) : "/");
+  }
+
+  // The URL is either in authority-form or invalid.
+  return std::make_tuple(uri, "");
 }
 
 } // namespace EnvoyDefault

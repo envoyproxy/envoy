@@ -213,7 +213,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotInSegments) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriMergeSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "////root///child//"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root///child//"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
@@ -243,22 +243,22 @@ TEST_F(PathNormalizerTest, NormalizePathUriPercentDecoded) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "///root//child//"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root//child//"}};
 
   auto normalizer = create(skip_merging_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "///root//child//");
+  EXPECT_EQ(headers.path(), "/root//child//");
   EXPECT_TRUE(result.ok());
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashesWithDecodeSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "///root%2f/child/%2f"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root%2f/child/%2f"}};
 
   auto normalizer = create(skip_merging_slashes_with_decode_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "///root//child//");
+  EXPECT_EQ(headers.path(), "/root//child//");
   EXPECT_TRUE(result.ok());
 }
 
@@ -335,16 +335,6 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidBeyondRoot) {
 
 TEST_F(PathNormalizerTest, NormalizePathUriInvalidRelative) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "./"}};
-
-  auto normalizer = create(empty_config);
-  auto result = normalizer->normalizePathUri(headers);
-
-  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
-  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
-}
-
-TEST_F(PathNormalizerTest, NormalizePathUriInvalidCharacter) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1\x7f"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
