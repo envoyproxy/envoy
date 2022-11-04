@@ -46,6 +46,7 @@ envoy_cc_library(
         ":metadata_interface",
         ":protocol_interface",
         ":stream_reset_handler_interface",
+        "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",

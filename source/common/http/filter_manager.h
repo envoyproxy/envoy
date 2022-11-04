@@ -668,6 +668,8 @@ public:
     }
   }
 
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+
   void onStreamComplete() {
     for (auto& filter : decoder_filters_) {
       filter->handle_->onStreamComplete();

@@ -225,6 +225,9 @@ public:
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+    return access_log_handlers_;
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -259,6 +262,7 @@ private:
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
 };

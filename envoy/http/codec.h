@@ -14,6 +14,7 @@
 #include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/access_log/access_log.h"
 
 #include "source/common/http/status.h"
 
@@ -227,6 +228,11 @@ public:
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return List of shared pointers to access loggers for this stream.
+   */
+  virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
 };
 
 /**
