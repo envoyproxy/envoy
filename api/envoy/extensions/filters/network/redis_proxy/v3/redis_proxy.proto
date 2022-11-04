@@ -91,7 +91,7 @@ message RedisProxy {
     // connection pool will use to resolve hostnames that are returned with MOVED and ASK responses.
     // If no configuration is provided, DNS lookups will not be performed (and thus the MOVED/ASK errors
     // will be propagated verbatim to the user).
-    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 10;
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 9;
 
     // Maximum size of encoded request buffer before flush is triggered and encoded requests
     // are sent upstream. If this is unset, the buffer flushes whenever it receives data
