@@ -20,13 +20,6 @@ public:
   CacheFileFixedBlock();
   void populateFromStringView(absl::string_view s);
   static size_t size() { return sizeof(contents_); }
-  // The expected first four bytes of the header - if fileId() doesn't match expectedFileId()
-  // then the file is not a cache file and should be removed from the cache.
-  static const uint32_t expectedFileId;
-  // The expected next four bytes of the header - if cacheVersionId() doesn't match
-  // expectedCacheVersionId() then the file is from an incompatible cache version and should
-  // be removed from the cache.
-  static const uint32_t expectedCacheVersionId;
   // fileId is a fixed value used to identify that this is a cache file.
   uint32_t fileId() const { return getUint32(contents_.file_id_); }
   // cacheVersionId is a value that should be consistent between versions of the file
@@ -48,9 +41,9 @@ public:
   size_t offsetToBody() const { return offsetToHeaders() + headerSize(); }
   size_t offsetToTrailers() const { return offsetToBody() + bodySize(); }
   absl::string_view stringView() const { return {contents_.as_str_, size()}; }
-  bool isValid() const {
-    return fileId() == expectedFileId && cacheVersionId() == expectedCacheVersionId;
-  }
+  // Returns true if the fileId and cacheVersionId match the compile-time constants from
+  // cache_file_fixed_block.cc
+  bool isValid() const;
 
 private:
   union {

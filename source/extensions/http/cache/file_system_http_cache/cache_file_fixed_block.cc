@@ -33,19 +33,25 @@ uint32_t ntohl32(uint32_t n) {
   return n;
 }
 uint64_t htonl32(uint32_t n) { return ntohl32(n); }
-} // namespace
 
+// The expected first four bytes of the header - if fileId() doesn't match expectedFileId
+// then the file is not a cache file and should be removed from the cache.
 // Beginning of file should be "CACH".
-const uint32_t CacheFileFixedBlock::expectedFileId =
-    (static_cast<uint32_t>('C') << 24) + (static_cast<uint32_t>('A') << 16) +
-    (static_cast<uint32_t>('C') << 8) + static_cast<uint32_t>('H');
+constexpr uint32_t expectedFileId = (static_cast<uint32_t>('C') << 24) +
+                                    (static_cast<uint32_t>('A') << 16) +
+                                    (static_cast<uint32_t>('C') << 8) + static_cast<uint32_t>('H');
 
+// The expected next four bytes of the header - if cacheVersionId() doesn't match
+// expectedCacheVersionId then the file is from an incompatible cache version and should
+// be removed from the cache.
 // Next 4 bytes of file should be "0000".
 // Increment this to invalidate old cache files if the format changes.
 // Formatted string-style rather than as an actual int to make it easily human-readable.
-const uint32_t CacheFileFixedBlock::expectedCacheVersionId =
+constexpr uint32_t expectedCacheVersionId =
     (static_cast<uint32_t>('0') << 24) + (static_cast<uint32_t>('0') << 16) +
     (static_cast<uint32_t>('0') << 8) + static_cast<uint32_t>('0');
+
+} // namespace
 
 CacheFileFixedBlock::CacheFileFixedBlock() {
   setFileId(expectedFileId);
@@ -64,6 +70,10 @@ uint32_t CacheFileFixedBlock::getUint32(const uint32_t& t) const { return ntohl3
 uint64_t CacheFileFixedBlock::getUint64(const uint64_t& t) const { return ntohl64(t); }
 void CacheFileFixedBlock::setUint32(uint32_t& t, uint32_t v) { t = htonl32(v); }
 void CacheFileFixedBlock::setUint64(uint64_t& t, uint64_t v) { t = htonl64(v); }
+
+bool CacheFileFixedBlock::isValid() const {
+  return fileId() == expectedFileId && cacheVersionId() == expectedCacheVersionId;
+}
 
 } // namespace FileSystemHttpCache
 } // namespace Cache
