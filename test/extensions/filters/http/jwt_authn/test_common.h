@@ -220,10 +220,21 @@ const char OtherGoodToken[] =
     "buwXk5M6d-"
     "drRvLcvlT5gB4adOIOlmhm8xtXgYpvqrXfmMJCHbP9no7JATFaTEAkmA3OOxDsaOju4BFgMtRZtDM8p12QQG0rFl_FE-"
     "2FqYX9qA4q41HJ4vxTSxgObeLGA";
-    
-// {"iss": "https://example.com","sub": "test@example.com","aud": "example_service","exp":
-// 2001001001,"nested":{"key-1": "value1","nested-2": {"key-2": "value2","key-3": true,"key-4":
-// 9999}}}
+
+//{
+//  "iss": "https://example.com",
+//  "sub": "test@example.com",
+//  "aud": "example_service",
+//  "exp": 2001001001,
+//  "nested": {
+//    "key-1": "value1",
+//    "nested-2": {
+//      "key-2": "value2",
+//      "key-3": true,
+//      "key-4": 9999
+//  }
+// }
+//}
 const char NestedGoodToken[] =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2"

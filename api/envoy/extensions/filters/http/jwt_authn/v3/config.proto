@@ -736,6 +736,7 @@ message JwtClaimToHeader {
       [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
-  // String separated with "." in case of nested claims or a single value.
+  // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
+  // the JSON name path.
   string claim_name = 2 [(validate.rules).string = {min_len: 1}];
 }

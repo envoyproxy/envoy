@@ -293,19 +293,23 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     for (const auto& header_and_claim : provider.claim_to_headers()) {
       if (!header_and_claim.claim_name().empty() && !header_and_claim.header_name().empty()) {
         StructUtils payload_getter(jwt_->payload_pb_);
-        std::string string_claim_value;
-        uint64_t int_claim_value = 0;
-        bool bool_claim_value;
-        if (payload_getter.GetString(header_and_claim.claim_name(), &string_claim_value) == 
-            StructUtils::OK) {
-              headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), string_claim_value);
-        } else if(payload_getter.GetUInt64(header_and_claim.claim_name(), &int_claim_value) == 
-                  StructUtils::OK) {
-                    headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), std::to_string(int_claim_value));
-        } else if(payload_getter.GetBoolean(header_and_claim.claim_name(), &bool_claim_value) 
-                  == StructUtils::OK) {
-                    headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), 
-                                      bool_and_claim ? "true" : "false");
+        const ::google::protobuf::Value* found;
+        google::jwt_verify::StructUtils::FindResult claim_value =
+            payload_getter.GetValue(header_and_claim.claim_name(),found);
+        if (claim_value == StructUtils::OK) {
+          if (found->kind_case() == google::protobuf::Value::kStringValue) {
+            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
+                              found->string_value());
+          } else if (found->kind_case() == google::protobuf::Value::kNumberValue) {
+            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
+                              std::to_string(static_cast<uint64_t>(found->number_value())));
+          } else if (found->kind_case() == google::protobuf::Value::kBoolValue) {
+            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
+                              found->bool_value() ? "true" : "false");
+          } else {
+            ENVOY_LOG(debug, "--------claim : {} is not of type string, int or bool -----------",
+                      header_and_claim.claim_name());
+          }
         } else {
           ENVOY_LOG(debug, "--------claim : {} is not correct -----------",
                     header_and_claim.claim_name());
