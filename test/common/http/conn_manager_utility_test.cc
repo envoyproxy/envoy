@@ -2056,5 +2056,35 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
 }
 
+TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(false));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("", headers.getForwardedPortValue());
+}
+
+TEST_F(ConnectionManagerUtilityTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "8081"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8081", headers.getForwardedPortValue());
+}
+
 } // namespace Http
 } // namespace Envoy
