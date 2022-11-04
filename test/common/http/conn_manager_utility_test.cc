@@ -50,9 +50,9 @@ public:
                               const Http::RequestHeaderMap& request_headers) {
           return real_->setInResponse(response_headers, request_headers);
         });
-    ON_CALL(*this, toInteger(_))
+    ON_CALL(*this, toStreamIdProvider(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
-          return real_->toInteger(request_headers);
+          return real_->toStreamIdProvider(request_headers);
         });
     ON_CALL(*this, getTraceReason(_))
         .WillByDefault([this](const Http::RequestHeaderMap& request_headers) {
@@ -68,7 +68,8 @@ public:
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(absl::optional<uint64_t>, toInteger, (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(StreamInfo::StreamIdProviderPtr, toStreamIdProvider, (const Http::RequestHeaderMap&),
+              (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
   MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));

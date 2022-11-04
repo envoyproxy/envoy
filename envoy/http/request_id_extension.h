@@ -5,35 +5,26 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/stream_info/stream_id_provider.h"
 #include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
 namespace Http {
 
 /**
- * Request ID functionality available via stream info.
- */
-class RequestIdStreamInfoProvider {
-public:
-  virtual ~RequestIdStreamInfoProvider() = default;
-
-  /**
-   * Convert the request ID to a 64-bit integer representation for using in modulo, etc.
-   * calculations.
-   * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @return the integer or nullopt if the request ID is invalid.
-   */
-  virtual absl::optional<uint64_t>
-  toInteger(const Http::RequestHeaderMap& request_headers) const PURE;
-};
-
-using RequestIdStreamInfoProviderSharedPtr = std::shared_ptr<RequestIdStreamInfoProvider>;
-
-/**
  * Abstract request id utilities for getting/setting the request IDs and tracing status of requests
  */
-class RequestIDExtension : public RequestIdStreamInfoProvider {
+class RequestIDExtension {
 public:
+  virtual ~RequestIDExtension() = default;
+
+  /**
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return the unique id based on the request ID for stream info if the request ID is invalid.
+   */
+  virtual Envoy::StreamInfo::StreamIdProviderPtr
+  toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const PURE;
+
   /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.

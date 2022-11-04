@@ -52,6 +52,7 @@ envoy_cc_test_library(
         "//source/common/common:random_generator_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

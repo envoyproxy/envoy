@@ -13,6 +13,7 @@
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_id_provider.h"
 #include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
@@ -680,15 +681,14 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param provider The requestID provider implementation this stream uses.
+   * @param provider The unique id implementation this stream uses.
    */
-  virtual void
-  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
+  virtual void setStreamIdProvider(StreamIdProviderPtr provider) PURE;
 
   /**
-   * @return the request ID provider for this stream if available.
+   * @return the unique id for this stream if available.
    */
-  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+  virtual OptRef<const StreamIdProvider> getStreamIdProvider() const PURE;
 
   /**
    * Set the trace reason for the stream.

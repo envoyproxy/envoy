@@ -5,6 +5,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/common/utility.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,22 +29,13 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
-absl::optional<uint64_t>
-UUIDRequestIDExtension::toInteger(const Http::RequestHeaderMap& request_headers) const {
+Envoy::StreamInfo::StreamIdProviderPtr
+UUIDRequestIDExtension::toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
-    return absl::nullopt;
+    return nullptr;
   }
-  const std::string uuid(request_headers.getRequestIdValue());
-  if (uuid.length() < 8) {
-    return absl::nullopt;
-  }
-
-  uint64_t value;
-  if (!StringUtil::atoull(uuid.substr(0, 8).c_str(), value, 16)) {
-    return absl::nullopt;
-  }
-
-  return value;
+  return std::make_unique<Envoy::StreamInfo::StreamIdProviderImpl>(
+      request_headers.getRequestIdValue());
 }
 
 Tracing::Reason

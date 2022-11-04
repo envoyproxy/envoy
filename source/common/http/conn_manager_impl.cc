@@ -676,9 +676,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     filter_manager_.addAccessLogHandler(access_log);
   }
 
-  filter_manager_.streamInfo().setRequestIDProvider(
-      connection_manager.config_.requestIDExtension());
-
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
@@ -1086,6 +1083,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
+  // Set stream unique id to stream info after the request id in the headers has been generated or
+  // overwritten.
+  filter_manager_.streamInfo().setStreamIdProvider(
+      connection_manager_.config_.requestIDExtension()->toStreamIdProvider(*request_headers_));
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
