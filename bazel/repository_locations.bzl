@@ -183,7 +183,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "liburing-liburing-{version}",
         urls = ["https://github.com/axboe/liburing/archive/liburing-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-11-02",
+        release_date = "2022-10-26",
         cpe = "N/A",
     ),
     # This dependency is built only when performance tracing is enabled with the
