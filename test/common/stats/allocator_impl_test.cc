@@ -152,7 +152,7 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
   size_t num_counters = 0;
   size_t num_iterations = 0;
   alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
-                        [&num_iterations, &stat_names](Stats::Counter& counter) {
+                        [&num_iterations, &stat_names](Counter& counter) {
                           EXPECT_EQ(stat_names.count(counter.statName()), 1);
                           ++num_iterations;
                         });
@@ -171,7 +171,7 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
   num_iterations = 0;
   num_counters = 0;
   alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
-                        [&num_iterations, &rejected_stat_name](Stats::Counter& counter) {
+                        [&num_iterations, &rejected_stat_name](Counter& counter) {
                           EXPECT_THAT(counter.statName(), ::testing::Ne(rejected_stat_name));
                           ++num_iterations;
                         });
@@ -185,7 +185,7 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
   counters.clear();
   num_iterations = 0;
   alloc_.forEachCounter([&num_counters](std::size_t size) { num_counters = size; },
-                        [&num_iterations](Stats::Counter&) { ++num_iterations; });
+                        [&num_iterations](Counter&) { ++num_iterations; });
   EXPECT_EQ(num_counters, 0);
   EXPECT_EQ(num_iterations, 0);
 }
@@ -205,7 +205,7 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   size_t num_gauges = 0;
   size_t num_iterations = 0;
   alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                      [&num_iterations, &stat_names](Stats::Gauge& gauge) {
+                      [&num_iterations, &stat_names](Gauge& gauge) {
                         EXPECT_EQ(stat_names.count(gauge.statName()), 1);
                         ++num_iterations;
                       });
@@ -224,7 +224,7 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   num_iterations = 0;
   num_gauges = 0;
   alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                      [&num_iterations, &rejected_stat_name](Stats::Gauge& gauge) {
+                      [&num_iterations, &rejected_stat_name](Gauge& gauge) {
                         EXPECT_THAT(gauge.statName(), ::testing::Ne(rejected_stat_name));
                         ++num_iterations;
                       });
@@ -238,7 +238,7 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
   gauges.clear();
   num_iterations = 0;
   alloc_.forEachGauge([&num_gauges](std::size_t size) { num_gauges = size; },
-                      [&num_iterations](Stats::Gauge&) { ++num_iterations; });
+                      [&num_iterations](Gauge&) { ++num_iterations; });
   EXPECT_EQ(num_gauges, 0);
   EXPECT_EQ(num_iterations, 0);
 }
@@ -258,7 +258,7 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
   size_t num_text_readouts = 0;
   size_t num_iterations = 0;
   alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
-                            [&num_iterations, &stat_names](Stats::TextReadout& text_readout) {
+                            [&num_iterations, &stat_names](TextReadout& text_readout) {
                               EXPECT_EQ(stat_names.count(text_readout.statName()), 1);
                               ++num_iterations;
                             });
@@ -276,12 +276,12 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
   // Verify that the rejected stat does not show up during iteration.
   num_iterations = 0;
   num_text_readouts = 0;
-  alloc_.forEachTextReadout(
-      [&num_text_readouts](std::size_t size) { num_text_readouts = size; },
-      [&num_iterations, &rejected_stat_name](Stats::TextReadout& text_readout) {
-        EXPECT_THAT(text_readout.statName(), ::testing::Ne(rejected_stat_name));
-        ++num_iterations;
-      });
+  alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
+                            [&num_iterations, &rejected_stat_name](TextReadout& text_readout) {
+                              EXPECT_THAT(text_readout.statName(),
+                                          ::testing::Ne(rejected_stat_name));
+                              ++num_iterations;
+                            });
   EXPECT_EQ(num_iterations, 10);
   EXPECT_EQ(num_text_readouts, 10);
 
@@ -292,7 +292,7 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
   text_readouts.clear();
   num_iterations = 0;
   alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
-                            [&num_iterations](Stats::TextReadout&) { ++num_iterations; });
+                            [&num_iterations](TextReadout&) { ++num_iterations; });
   EXPECT_EQ(num_text_readouts, 0);
   EXPECT_EQ(num_iterations, 0);
 }
@@ -312,7 +312,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
     counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
   }
   size_t num_iterations = 0;
-  alloc_.forEachCounter(nullptr, [&num_iterations](Stats::Counter& counter) {
+  alloc_.forEachCounter(nullptr, [&num_iterations](Counter& counter) {
     UNREFERENCED_PARAMETER(counter);
     ++num_iterations;
   });
@@ -324,7 +324,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
     gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
   }
   num_iterations = 0;
-  alloc_.forEachGauge(nullptr, [&num_iterations](Stats::Gauge& gauge) {
+  alloc_.forEachGauge(nullptr, [&num_iterations](Gauge& gauge) {
     UNREFERENCED_PARAMETER(gauge);
     ++num_iterations;
   });
@@ -336,7 +336,7 @@ TEST_F(AllocatorImplTest, ForEachWithNullSizeLambda) {
     text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
   }
   num_iterations = 0;
-  alloc_.forEachTextReadout(nullptr, [&num_iterations](Stats::TextReadout& text_readout) {
+  alloc_.forEachTextReadout(nullptr, [&num_iterations](TextReadout& text_readout) {
     UNREFERENCED_PARAMETER(text_readout);
     ++num_iterations;
   });
@@ -415,9 +415,9 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestUtil::TestSinkPredicates>();
+  TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<CounterSharedPtr> sinked_counters;
   std::vector<CounterSharedPtr> unsinked_counters;
 
@@ -443,7 +443,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
   size_t num_iterations = 0;
   alloc_.forEachSinkedCounter(
       [&num_sinked_counters](std::size_t size) { num_sinked_counters = size; },
-      [&num_iterations, sink_predicates](Stats::Counter& counter) {
+      [&num_iterations, sink_predicates](Counter& counter) {
         EXPECT_EQ(sink_predicates->sinkedStatNames().count(counter.statName()), 1);
         ++num_iterations;
       });
@@ -455,15 +455,15 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
   num_iterations = 0;
   alloc_.forEachSinkedCounter(
       [&num_sinked_counters](std::size_t size) { num_sinked_counters = size; },
-      [&num_iterations](Stats::Counter&) { ++num_iterations; });
+      [&num_iterations](Counter&) { ++num_iterations; });
   EXPECT_EQ(num_sinked_counters, 0);
   EXPECT_EQ(num_iterations, 0);
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestUtil::TestSinkPredicates>();
+  TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<GaugeSharedPtr> sinked_gauges;
   std::vector<GaugeSharedPtr> unsinked_gauges;
 
@@ -489,7 +489,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   size_t num_sinked_gauges = 0;
   size_t num_iterations = 0;
   alloc_.forEachSinkedGauge([&num_sinked_gauges](std::size_t size) { num_sinked_gauges = size; },
-                            [&num_iterations, sink_predicates](Stats::Gauge& gauge) {
+                            [&num_iterations, sink_predicates](Gauge& gauge) {
                               EXPECT_EQ(sink_predicates->sinkedStatNames().count(gauge.statName()),
                                         1);
                               ++num_iterations;
@@ -501,15 +501,15 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   sinked_gauges.clear();
   num_iterations = 0;
   alloc_.forEachSinkedGauge([&num_sinked_gauges](std::size_t size) { num_sinked_gauges = size; },
-                            [&num_iterations](Stats::Gauge&) { ++num_iterations; });
+                            [&num_iterations](Gauge&) { ++num_iterations; });
   EXPECT_EQ(num_sinked_gauges, 0);
   EXPECT_EQ(num_iterations, 0);
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
-  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
-      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
-  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<TestUtil::TestSinkPredicates>();
+  TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<TextReadoutSharedPtr> sinked_text_readouts;
   std::vector<TextReadoutSharedPtr> unsinked_text_readouts;
 
@@ -534,7 +534,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   size_t num_iterations = 0;
   alloc_.forEachSinkedTextReadout(
       [&num_sinked_text_readouts](std::size_t size) { num_sinked_text_readouts = size; },
-      [&num_iterations, sink_predicates](Stats::TextReadout& text_readout) {
+      [&num_iterations, sink_predicates](TextReadout& text_readout) {
         EXPECT_EQ(sink_predicates->sinkedStatNames().count(text_readout.statName()), 1);
         ++num_iterations;
       });
@@ -546,7 +546,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   num_iterations = 0;
   alloc_.forEachSinkedTextReadout(
       [&num_sinked_text_readouts](std::size_t size) { num_sinked_text_readouts = size; },
-      [&num_iterations](Stats::TextReadout&) { ++num_iterations; });
+      [&num_iterations](TextReadout&) { ++num_iterations; });
   EXPECT_EQ(num_sinked_text_readouts, 0);
   EXPECT_EQ(num_iterations, 0);
 }

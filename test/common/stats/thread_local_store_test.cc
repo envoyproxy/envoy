@@ -1963,13 +1963,13 @@ enum class EnableIncludeHistograms { No = 0, Yes };
 class HistogramParameterisedTest : public HistogramTest,
                                    public ::testing::WithParamInterface<EnableIncludeHistograms> {
 public:
-  HistogramParameterisedTest() : api_(Api::createApiForTest(*store_)) {
-    local_info_.node_.set_cluster("");
-  }
+  HistogramParameterisedTest() { local_info_.node_.set_cluster(""); }
 
 protected:
   void SetUp() override {
     HistogramTest::SetUp();
+
+    api_ = Api::createApiForTest(*store_);
     ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(
         GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
     envoy.reloadable_features.enable_include_histograms: true
