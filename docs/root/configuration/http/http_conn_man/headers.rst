@@ -403,11 +403,11 @@ x-forwarded-port
 ----------------
 
 Usually, the ``x-forwarded-port`` header comes with the ``x-forwarded-proto`` header for service to
-know the originating destination port of the connection which is the listener port of Envoy.
+know the originating destination port of the connection, which is the listener port in Envoy's side.
 
 Envoy will append the ``x-forwarded-port`` header if :ref:`append_x_forwarded_port
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>`
-is set to true.
+is set to true and the header has not been set.
 
 x-forwarded-proto
 -----------------
