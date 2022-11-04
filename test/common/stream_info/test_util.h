@@ -22,7 +22,7 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
-    stream_id_provider_ = std::make_unique<Envoy::StreamInfo::StreamIdProviderImpl>(random_.uuid());
+    stream_id_provider_ = std::make_shared<Envoy::StreamInfo::StreamIdProviderImpl>(random_.uuid());
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
     end_time_ = now + std::chrono::milliseconds(3);
@@ -46,7 +46,7 @@ public:
     return duration(end_time_);
   }
 
-  void setStreamIdProvider(Envoy::StreamInfo::StreamIdProviderPtr provider) override {
+  void setStreamIdProvider(Envoy::StreamInfo::StreamIdProviderSharedPtr provider) override {
     ASSERT(provider != nullptr);
     stream_id_provider_ = std::move(provider);
   }
@@ -67,7 +67,7 @@ public:
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Envoy::Event::SimulatedTimeSystem test_time_;
-  Envoy::StreamInfo::StreamIdProviderPtr stream_id_provider_;
+  Envoy::StreamInfo::StreamIdProviderSharedPtr stream_id_provider_;
 };
 
 } // namespace Envoy

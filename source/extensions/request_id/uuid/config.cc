@@ -29,12 +29,12 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
-Envoy::StreamInfo::StreamIdProviderPtr
+Envoy::StreamInfo::StreamIdProviderSharedPtr
 UUIDRequestIDExtension::toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
     return nullptr;
   }
-  return std::make_unique<Envoy::StreamInfo::StreamIdProviderImpl>(
+  return std::make_shared<Envoy::StreamInfo::StreamIdProviderImpl>(
       request_headers.getRequestIdValue());
 }
 

@@ -58,7 +58,7 @@ public:
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
    * @return the unique id based on the request ID for stream info if the request ID is invalid.
    */
-  virtual Envoy::StreamInfo::StreamIdProviderPtr
+  virtual Envoy::StreamInfo::StreamIdProviderSharedPtr
   toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const PURE;
 };
 

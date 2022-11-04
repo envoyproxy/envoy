@@ -683,7 +683,7 @@ public:
   /**
    * @param provider The unique id implementation this stream uses.
    */
-  virtual void setStreamIdProvider(StreamIdProviderPtr provider) PURE;
+  virtual void setStreamIdProvider(StreamIdProviderSharedPtr provider) PURE;
 
   /**
    * @return the unique id for this stream if available.

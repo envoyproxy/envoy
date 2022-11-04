@@ -30,7 +30,7 @@ public:
    */
   virtual absl::optional<uint64_t> toInteger() const PURE;
 };
-using StreamIdProviderPtr = std::unique_ptr<StreamIdProvider>;
+using StreamIdProviderSharedPtr = std::shared_ptr<StreamIdProvider>;
 
 } // namespace StreamInfo
 } // namespace Envoy

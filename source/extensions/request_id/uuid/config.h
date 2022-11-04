@@ -31,7 +31,7 @@ public:
   void set(Http::RequestHeaderMap& request_headers, bool force) override;
   void setInResponse(Http::ResponseHeaderMap& response_headers,
                      const Http::RequestHeaderMap& request_headers) override;
-  Envoy::StreamInfo::StreamIdProviderPtr
+  Envoy::StreamInfo::StreamIdProviderSharedPtr
   toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const override;
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap& request_headers) override;
   void setTraceReason(Http::RequestHeaderMap& request_headers, Tracing::Reason status) override;

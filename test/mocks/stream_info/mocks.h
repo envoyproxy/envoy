@@ -120,7 +120,7 @@ public:
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
   MOCK_METHOD(OptRef<const StreamIdProvider>, getStreamIdProvider, (), (const));
-  MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderPtr provider));
+  MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));

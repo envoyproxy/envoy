@@ -68,8 +68,8 @@ public:
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
   MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(StreamInfo::StreamIdProviderPtr, toStreamIdProvider, (const Http::RequestHeaderMap&),
-              (const));
+  MOCK_METHOD(StreamInfo::StreamIdProviderSharedPtr, toStreamIdProvider,
+              (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
   MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));

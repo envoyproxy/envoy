@@ -312,7 +312,7 @@ TEST_F(StreamInfoImplTest, DefaultStreamIdProvider) {
 TEST_F(StreamInfoImplTest, StreamIdProvider) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   stream_info.setStreamIdProvider(
-      std::make_unique<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
+      std::make_shared<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
 
   EXPECT_EQ(true, stream_info.getStreamIdProvider().has_value());
   EXPECT_EQ("a121e9e1-feae-4136-9e0e-6fac343d56c9",
