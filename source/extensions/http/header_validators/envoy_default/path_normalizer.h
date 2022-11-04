@@ -75,17 +75,11 @@ private:
    */
   PathNormalizationResult collapseDotSegmentsPass(std::string& path) const;
   /*
-   * Split the scheme/authority and path components. The return value is a 2-item tuple:
-   * (scheme_and_authority, path).
-   */
-  std::tuple<absl::string_view, absl::string_view>
-  splitAuthorityAndPath(absl::string_view uri) const;
-  /*
    * Split the path and query parameters / fragment components. The return value is a 2-item tuple:
    * (path, query_params).
    */
   std::tuple<absl::string_view, absl::string_view>
-  splitPathAndQueryParams(absl::string_view pathAndQueryParams) const;
+  splitPathAndQueryParams(absl::string_view path_and_query_params) const;
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

@@ -157,22 +157,27 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // absolute-form  = absolute-URI
   // authority-form = uri-host ":" port
   // asterisk-form  = "*"
-  const auto original_uri = header_map.path();
-  // Split the scheme and authority components from the path.
-  auto [scheme_and_authority, original_path] = splitAuthorityAndPath(original_uri);
-  if (original_uri == "*") {
-    // Asterisk form
+  const bool is_connect_method =
+      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
+  const bool is_options_method =
+      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Options;
+  const auto original_path = header_map.path();
+  if (original_path == "*" && is_options_method) {
+    // asterisk-form, only valid for OPTIONS request
     return PathNormalizationResult::success();
   }
 
-  const bool is_connect_method =
-      header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
-  const bool is_origin_form = scheme_and_authority.empty();
-  // If is_origin_form==true, then the original_uri is treated as origin-form and must begin with
-  // a "/" character.
-  if (!is_origin_form && original_path.empty() && is_connect_method) {
-    // CONNECT requests must be in authority-form with no path specified.
-    return PathNormalizationResult::success();
+  if (is_connect_method) {
+    // The :path can only be empty for CONNECT methods, where the request-target is in
+    // authority-form, which Envoy will have already moved :path to :authority.
+    if (original_path.empty()) {
+      return PathNormalizationResult::success();
+    }
+    return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
+  }
+
+  if (original_path.empty() || original_path.at(0) != '/') {
+    return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
   }
 
   // Split the path and the query parameters / fragment component.
@@ -183,11 +188,6 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   // Start normalizing the path.
   bool redirect = false;
-
-  if (path.empty() || path.at(0) != '/') {
-    // Reject empty or relative paths
-    return {PathNormalizationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidUrl};
-  }
 
   // Path normalization is based on RFC 3986:
   // https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
@@ -242,25 +242,9 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   absl::string_view normalized_path{path};
-  // Update the :path header. We need to honor the original schema, authority, query, and fragment
-  // components and only set the path component.
-  if (is_origin_form) {
-    // origin-form is the absolute path with no scheme/authority.
-    header_map.setPath(absl::StrCat(normalized_path, query));
-  } else {
-    // absolute and authority forms have a prefix (scheme/authority) that we need to keep
-    auto path_begin_index = original_uri.length() - original_path.length();
-    absl::string_view prefix;
-    if (original_uri.at(path_begin_index) == '/') {
-      // absolute-form
-      prefix = original_uri.substr(0, path_begin_index);
-    } else {
-      // authority-form, the prefix is the entire authority
-      prefix = original_uri;
-    }
-
-    header_map.setPath(absl::StrCat(prefix, normalized_path, query));
-  }
+  // Update the :path header. We need to honor the normalized path and the original query/fragment
+  // components.
+  header_map.setPath(absl::StrCat(normalized_path, query));
 
   if (redirect) {
     return {PathNormalizationResult::Action::Redirect,
@@ -397,46 +381,16 @@ PathNormalizer::collapseDotSegmentsPass(std::string& path) const {
 }
 
 std::tuple<absl::string_view, absl::string_view>
-PathNormalizer::splitPathAndQueryParams(absl::string_view pathAndQueryParams) const {
+PathNormalizer::splitPathAndQueryParams(absl::string_view path_and_query_params) const {
   // Split on the query (?) or fragment (#) delimiter, whichever one is first.
-  auto delim = pathAndQueryParams.find_first_of("?#");
+  auto delim = path_and_query_params.find_first_of("?#");
   if (delim == absl::string_view::npos) {
     // no query/fragment component
-    return std::make_tuple(pathAndQueryParams, "");
+    return std::make_tuple(path_and_query_params, "");
   }
 
-  return std::make_tuple(pathAndQueryParams.substr(0, delim), pathAndQueryParams.substr(delim));
-}
-
-std::tuple<absl::string_view, absl::string_view>
-PathNormalizer::splitAuthorityAndPath(absl::string_view uri) const {
-  // We have to make an efficient best guess for the URL form here. The URL and path will be
-  // validated further on in the UHV stack, so we don't need to be precise, just enough to split
-  // the path component and everything before it.
-  if (absl::StartsWith(uri, "//")) {
-    // absolute-uri without scheme, next slash is the beginning of the path
-    auto path_start = uri.find('/', 2);
-    return std::make_tuple(uri.substr(0, path_start),
-                           path_start != absl::string_view::npos ? uri.substr(path_start) : "");
-  }
-
-  if (absl::StartsWith(uri, "/")) {
-    // origin-form, entire value is the path
-    return std::make_tuple("", uri);
-  }
-
-  auto scheme_delim = uri.find("://");
-  if (scheme_delim != absl::string_view::npos) {
-    // URI contains a scheme (we think). Find the start of the path
-    auto path_start = uri.find('/', scheme_delim + 3);
-    // We assume that the root is "/" if it is not specified in the absolute-form URI. For example,
-    // a URI of "https://envoy.com" would have an inferred path of "/".
-    absl::string_view path = path_start != absl::string_view::npos ? uri.substr(path_start) : "/";
-    return std::make_tuple(uri.substr(0, path_start), path);
-  }
-
-  // The URL is either in authority-form or invalid.
-  return std::make_tuple(uri, "");
+  return std::make_tuple(path_and_query_params.substr(0, delim),
+                         path_and_query_params.substr(delim));
 }
 
 } // namespace EnvoyDefault

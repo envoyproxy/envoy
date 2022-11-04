@@ -162,46 +162,23 @@ TEST_F(PathNormalizerTest, NormalizePathUriRoot) {
   EXPECT_TRUE(result.ok());
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriPreserveSchemeAndAuthority) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443/root/child"}};
-
-  auto normalizer = create(empty_config);
-  auto result = normalizer->normalizePathUri(headers);
-
-  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child");
-  EXPECT_TRUE(result.ok());
-}
-
 TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveQueryFragment) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":path", "https://envoy.com:443/root/child?x=1#anchor"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root/child?x=1#anchor"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child?x=1#anchor");
+  EXPECT_EQ(headers.path(), "/root/child?x=1#anchor");
   EXPECT_TRUE(result.ok());
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveFragment) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":path", "https://envoy.com:443/root/child#anchor"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root/child#anchor"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child#anchor");
-  EXPECT_TRUE(result.ok());
-}
-
-TEST_F(PathNormalizerTest, NormalizePathUriSchemelessAbsoluteForm) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{
-      {":path", "//envoy.com:443/root/child?x=1#anchor"}};
-
-  auto normalizer = create(empty_config);
-  auto result = normalizer->normalizePathUri(headers);
-
-  EXPECT_EQ(headers.path(), "//envoy.com:443/root/child?x=1#anchor");
+  EXPECT_EQ(headers.path(), "/root/child#anchor");
   EXPECT_TRUE(result.ok());
 }
 
@@ -266,7 +243,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriDotInSegments) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriMergeSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root///child//"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "///root///child//"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
@@ -296,12 +273,12 @@ TEST_F(PathNormalizerTest, NormalizePathUriPercentDecoded) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriSkipMergingSlashes) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/root//child//"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "//root//child//"}};
 
   auto normalizer = create(skip_merging_slashes_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(headers.path(), "/root//child//");
+  EXPECT_EQ(headers.path(), "//root//child//");
   EXPECT_TRUE(result.ok());
 }
 
@@ -407,18 +384,19 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidEncoding) {
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "envoy.com:443"},
-                                                  {":method", "CONNECT"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", ""}, {":authority", "envoy.com"}, {":method", "CONNECT"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "envoy.com:443");
+  EXPECT_EQ(headers.path(), "");
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriOriginFormNotConnect) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "envoy.com:443"}, {":method", "GET"}};
+TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormWithPathConnect) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {":authority", "envoy.com"}, {":method", "CONNECT"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
@@ -427,24 +405,37 @@ TEST_F(PathNormalizerTest, NormalizePathUriOriginFormNotConnect) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriAbsoluteForm) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443/some/../root"}};
+TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormNotConnect) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", ""}, {":authority", "envoy.com"}, {":method", "GET"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
-  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "https://envoy.com:443/root");
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriAbsoluteFormRootless) {
-  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443"}};
+TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormOptions) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "*"}, {":authority", "envoy.com"}, {":method", "OPTIONS"}};
 
   auto normalizer = create(empty_config);
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
-  EXPECT_EQ(headers.path(), "https://envoy.com:443/");
+  EXPECT_EQ(headers.path(), "*");
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriAsteriskFormNotOptions) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "*"}, {":authority", "envoy.com"}, {":method", "GET"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 } // namespace EnvoyDefault
