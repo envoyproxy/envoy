@@ -381,7 +381,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
                                : nullptr),
-      header_validator_factory_(createHeaderValidatorFactory(config, context)) {
+      header_validator_factory_(createHeaderValidatorFactory(config, context)),
+      append_x_forwarded_port_(config.append_x_forwarded_port()) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {

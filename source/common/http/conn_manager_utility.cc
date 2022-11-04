@@ -183,6 +183,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
                                                                 : Headers::get().SchemeValues.Http);
   }
 
+  // Usually, the x-forwarded-port header comes with x-forwarded-proto header. Only set the
+  // x-forwarded-port header if users request and it is not set.
+  if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
+    request_headers.setForwardedPort(
+        connection.streamInfo().downstreamAddressProvider().localAddress()->ip()->port());
+  }
+
   if (config.schemeToSet().has_value()) {
     request_headers.setScheme(config.schemeToSet().value());
     request_headers.setForwardedProto(config.schemeToSet().value());

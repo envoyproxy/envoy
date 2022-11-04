@@ -213,6 +213,7 @@ public:
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
 private:
   friend class AdminTestingPeer;

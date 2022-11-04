@@ -249,7 +249,8 @@ private:
 
 #define INLINE_REQ_RESP_NUMERIC_HEADERS(HEADER_FUNC)                                               \
   HEADER_FUNC(ContentLength)                                                                       \
-  HEADER_FUNC(EnvoyAttemptCount)
+  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
+  HEADER_FUNC(ForwardedPort)
 
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
   INLINE_REQ_RESP_STRING_HEADERS(HEADER_FUNC)                                                      \
