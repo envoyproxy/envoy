@@ -27,7 +27,6 @@ envoy_cc_library(
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
-        "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
@@ -48,6 +47,7 @@ envoy_cc_library(
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 
