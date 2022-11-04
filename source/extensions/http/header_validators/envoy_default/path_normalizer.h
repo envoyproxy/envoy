@@ -17,6 +17,10 @@ public:
 
   using PathNormalizationResult = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult;
 
+  /*
+   * Normalize the path component of the :path header and update the header value. This method does
+   * not perform any validation of the normalized :path such as validating the character set.
+   */
   PathNormalizationResult normalizePathUri(::Envoy::Http::RequestHeaderMap& header_map) const;
 
   /*
