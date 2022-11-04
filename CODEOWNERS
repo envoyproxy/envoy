@@ -128,6 +128,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/resource_monitors/downstream_connections @antoniovicente @nezdolik @mattklein123
 /*/extensions/retry/priority @snowp @alyssawilk
 /*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
 /*/extensions/retry/host @snowp @alyssawilk
@@ -278,10 +279,15 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
+
+# mobile
+/mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

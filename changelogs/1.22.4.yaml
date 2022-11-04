@@ -4,4 +4,3 @@ bug_fixes:
 - area: repo
   change: |
     fix version to resolve release issue.
-

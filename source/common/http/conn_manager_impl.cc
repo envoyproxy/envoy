@@ -648,6 +648,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
     : connection_manager_(connection_manager),
+      connection_manager_tracing_config_(connection_manager_.config_.tracingConfig() == nullptr
+                                             ? absl::nullopt
+                                             : makeOptRef<const TracingConnectionManagerConfig>(
+                                                   *connection_manager_.config_.tracingConfig())),
       stream_id_(connection_manager.random_generator_.random()),
       filter_manager_(*this, connection_manager_.read_callbacks_->connection().dispatcher(),
                       connection_manager_.read_callbacks_->connection(), stream_id_,
@@ -770,37 +774,10 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
 
-  // See below for more information on this early return block.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")) {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
-                   "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    return;
-  }
-
-  // There are 2 issues in the blow code. First, `responseHeaders().has_value()` is not the best
-  // predicate. `remoteDecodeComplete()` is preferable. Second, `sendLocalReply()` smartly ends the
-  // stream if any response was pushed to decoder and explicitly `endStream()` is not required.
-  //
-  // The above code is expected to resolve both. The original code here before it is fully verified.
-  //
-  // TODO(lambdai): delete the block below along with the removal of
-  // `override_request_timeout_by_gateway_timeout`.
-
-  // If headers have not been sent to the user, send a 408.
-  if (responseHeaders().has_value()) {
-    // TODO(htuch): We could send trailers here with an x-envoy timeout header
-    // or gRPC status code, and/or set H2 RST_STREAM error.
-    filter_manager_.streamInfo().setResponseCodeDetails(
-        StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-    connection_manager_.doEndStream(*this);
-  } else {
-    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
-    sendLocalReply(Http::Code::RequestTimeout, "stream timeout", nullptr, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
-  }
+  filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  sendLocalReply(Http::Utility::maybeRequestTimeoutCode(filter_manager_.remoteDecodeComplete()),
+                 "stream timeout", nullptr, absl::nullopt,
+                 StreamInfo::ResponseCodeDetails::get().StreamIdleTimeout);
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
@@ -975,19 +952,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
-  // This lambda should be erased when
-  // `envoy.reloadable_features.http_100_continue_case_insensitive` is removed.
-  auto is100Continue = [](absl::string_view request_expect) {
-    return request_expect == Headers::get().ExpectValues._100Continue ||
-           (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.http_100_continue_case_insensitive") &&
-            // The Expect field-value is case-insensitive.
-            // https://tools.ietf.org/html/rfc7231#section-5.1.1
-            absl::EqualsIgnoreCase(request_expect, Headers::get().ExpectValues._100Continue));
-  };
-
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
-      is100Continue(request_headers_->Expect()->value().getStringView())) {
+      // The Expect field-value is case-insensitive.
+      // https://tools.ietf.org/html/rfc7231#section-5.1.1
+      absl::EqualsIgnoreCase((request_headers_->Expect()->value().getStringView()),
+                             Headers::get().ExpectValues._100Continue)) {
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());
@@ -1138,8 +1107,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
-  // Check if tracing is enabled at all.
-  if (connection_manager_.config_.tracingConfig()) {
+  // Check if tracing is enabled.
+  if (connection_manager_tracing_config_.has_value()) {
     traceRequest();
   }
 
@@ -1179,8 +1148,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     }
   }
 
-  if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-      Tracing::OperationName::Egress) {
+  if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Egress) {
     // For egress (outbound) requests, pass the decorator's operation name (if defined and
     // propagation enabled) as a request header to enable the receiving service to use it in its
     // server span.
@@ -1369,11 +1337,10 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  if (!connection_manager_.config_.tracingConfig()) {
+  if (!connection_manager_tracing_config_.has_value()) {
     return;
   }
-  const Tracing::CustomTagMap& conn_manager_tags =
-      connection_manager_.config_.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap& conn_manager_tags = connection_manager_tracing_config_->custom_tags_;
   const Tracing::CustomTagMap* route_tags = nullptr;
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
@@ -1519,9 +1486,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  if (connection_manager_.config_.tracingConfig()) {
-    if (connection_manager_.config_.tracingConfig()->operation_name_ ==
-        Tracing::OperationName::Ingress) {
+  if (connection_manager_tracing_config_.has_value()) {
+    if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Ingress) {
       // For ingress (inbound) responses, if the request headers do not include a
       // decorator operation (override), and the decorated operation should be
       // propagated, then pass the decorator's operation name (if defined)
@@ -1529,7 +1495,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
       if (decorated_operation_ && state_.decorated_propagate_) {
         headers.setEnvoyDecoratorOperation(*decorated_operation_);
       }
-    } else if (connection_manager_.config_.tracingConfig()->operation_name_ ==
+    } else if (connection_manager_tracing_config_->operation_name_ ==
                Tracing::OperationName::Egress) {
       const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
 
@@ -1636,10 +1602,8 @@ void ConnectionManagerImpl::ActiveStream::onBelowWriteBufferLowWatermark() {
 }
 
 Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() const {
-  if (!connection_manager_.config_.tracingConfig()) {
-    return Tracing::OperationName::Egress;
-  }
-  return connection_manager_.config_.tracingConfig()->operation_name_;
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->operation_name_;
 }
 
 const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
@@ -1647,15 +1611,13 @@ const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() c
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
-  return connection_manager_.config_.tracingConfig() &&
-         connection_manager_.config_.tracingConfig()->verbose_;
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->verbose_;
 }
 
 uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
-  if (!connection_manager_.config_.tracingConfig()) {
-    return Tracing::DefaultMaxPathTagLength;
-  }
-  return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
+  ASSERT(connection_manager_tracing_config_.has_value());
+  return connection_manager_tracing_config_->max_path_tag_length_;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
@@ -1676,7 +1638,12 @@ Tracing::Span& ConnectionManagerImpl::ActiveStream::activeSpan() {
   }
 }
 
-Tracing::Config& ConnectionManagerImpl::ActiveStream::tracingConfig() { return *this; }
+OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig() const {
+  if (connection_manager_tracing_config_.has_value()) {
+    return makeOptRef<const Tracing::Config>(*this);
+  }
+  return {};
+}
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
