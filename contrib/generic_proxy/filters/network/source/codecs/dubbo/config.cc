@@ -34,6 +34,9 @@ absl::string_view responseStatusToStringView(Common::Dubbo::ResponseStatus statu
     ENUM_TO_STRING_VIEW(ServerError);
     ENUM_TO_STRING_VIEW(ClientError);
     ENUM_TO_STRING_VIEW(ServerThreadpoolExhaustedError);
+    default:
+      static constexpr char notFound[] = "Enum not found";                                              \
+      return notFound;
   }
 }
 
@@ -67,6 +70,8 @@ StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
     return StatusCode::kUnavailable;
   case Common::Dubbo::ResponseStatus::ServerThreadpoolExhaustedError:
     return StatusCode::kResourceExhausted;
+  default:
+    return StatusCode::kUnavailable;
   }
 }
 
