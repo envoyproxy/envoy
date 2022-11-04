@@ -50,14 +50,15 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
-                                   Envoy::Server::Configuration::FactoryContext& context)
+                                   Envoy::Server::Configuration::ServerFactoryContext& context,
+                                   bool)
     : name_(route_config.name()) {
 
   RouteActionValidationVisitor validation_visitor;
-  RouteActionContext action_context{context.getServerFactoryContext()};
+  RouteActionContext action_context{context};
 
-  Matcher::MatchTreeFactory<Request, RouteActionContext> factory(
-      action_context, context.getServerFactoryContext(), validation_visitor);
+  Matcher::MatchTreeFactory<Request, RouteActionContext> factory(action_context, context,
+                                                                 validation_visitor);
 
   matcher_ = factory.create(route_config.routes())();
 

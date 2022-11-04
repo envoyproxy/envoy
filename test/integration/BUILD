@@ -1063,6 +1063,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1675,13 +1676,6 @@ envoy_cc_test_library(
 envoy_cc_fuzz_test(
     name = "h2_capture_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
-    corpus = "h2_corpus",
-    deps = [":h2_fuzz_lib"],
-)
-
-envoy_cc_fuzz_test(
-    name = "h2_wrapped_capture_fuzz_test",
-    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
     corpus = "h2_corpus",
     deps = [":h2_fuzz_lib"],
 )
