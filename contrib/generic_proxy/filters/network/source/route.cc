@@ -78,7 +78,7 @@ RouteEntryConstSharedPtr RouteMatcherImpl::routeEntry(const Request& request) co
     // is the RouteMatchAction, so this must be true.
     ASSERT(action->typeUrl() == RouteMatchAction::staticTypeUrl());
     ASSERT(dynamic_cast<RouteMatchAction*>(action.get()));
-    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*action);
+    const RouteMatchAction& route_action = dynamic_cast<const RouteMatchAction&>(*action);
 
     return route_action.route();
   }
