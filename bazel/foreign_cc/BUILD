@@ -112,9 +112,6 @@ configure_make(
 )
 
 configure_make(
-<<<<<<< HEAD
-    name = "ragel",
-=======
     name = "colm",
     autogen = True,
     configure_in_place = True,
@@ -146,7 +143,6 @@ configure_make(
         "--enable-static",
         "--with-colm=$EXT_BUILD_DEPS/colm",
     ],
->>>>>>> 835dc5021a (deps: update Ragel (#22635))
     # Workaround for the issue with statically linked libstdc++
     # using -l:libstdc++.a.
     env = {
