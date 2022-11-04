@@ -84,6 +84,7 @@ public:
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
+  void continueFilterChain(bool success) override;
 
   void startFilterChain() { continueFilterChain(true); }
 
@@ -100,15 +101,6 @@ public:
   bool isEndFilterIteration() const { return iter_ == accept_filters_.end(); }
 
 private:
-  /**
-   * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
-   * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
-   * should be called if the filter returned `FilterStatus::StopIteration` and closed
-   * the socket.
-   * @param success boolean telling whether the filter execution was successful or not.
-   */
-  void continueFilterChain(bool success);
-
   void createListenerFilterBuffer();
 
   // The owner of this ActiveTcpSocket.
