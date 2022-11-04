@@ -10,31 +10,25 @@ namespace Cache {
 namespace FileSystemHttpCache {
 
 namespace {
-// in-place byte order swap for a uint64.
-// Optimization in clang or gcc can recognize this as a single `bswap` instruction.
-void flip64(uint64_t& n) {
+uint64_t ntohl64(uint64_t n) {
+#if defined(ABSL_IS_LITTLE_ENDIAN)
+  // in-place byte order swap for a uint64.
+  // Optimization in clang or gcc can recognize this as a single `bswap` instruction.
   n = ((n & 0xFF00000000000000u) >> 56u) | ((n & 0x00FF000000000000u) >> 40u) |
       ((n & 0x0000FF0000000000u) >> 24u) | ((n & 0x000000FF00000000u) >> 8u) |
       ((n & 0x00000000FF000000u) << 8u) | ((n & 0x0000000000FF0000u) << 24u) |
       ((n & 0x000000000000FF00u) << 40u) | ((n & 0x00000000000000FFu) << 56u);
-}
-uint64_t ntohl64(uint64_t n) {
-#if defined(ABSL_IS_LITTLE_ENDIAN)
-  flip64(n);
 #endif
   return n;
 }
 uint64_t htonl64(uint64_t n) { return ntohl64(n); }
 
-// in-place byte order swap for a uint32.
-// Optimization in clang or gcc can recognize this as a single `bswap` instruction.
-void flip32(uint32_t& n) {
-  n = ((n & 0xFF000000u) >> 24u) | ((n & 0x00FF0000u) >> 8u) | ((n & 0x0000FF00u) << 8u) |
-      ((n & 0x000000FFu) << 24u);
-}
 uint32_t ntohl32(uint32_t n) {
 #if defined(ABSL_IS_LITTLE_ENDIAN)
-  flip32(n);
+  // in-place byte order swap for a uint32.
+  // Optimization in clang or gcc can recognize this as a single `bswap` instruction.
+  n = ((n & 0xFF000000u) >> 24u) | ((n & 0x00FF0000u) >> 8u) | ((n & 0x0000FF00u) << 8u) |
+      ((n & 0x000000FFu) << 24u);
 #endif
   return n;
 }
