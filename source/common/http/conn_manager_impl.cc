@@ -1083,8 +1083,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   }
 
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
-  // Set stream unique id to stream info after the request id in the headers has been generated or
-  // overwritten.
+  // Set stream unique id to stream info after the request header has been generated or
+  // overwritten (in the mutateRequestHeaders).
   filter_manager_.streamInfo().setStreamIdProvider(
       connection_manager_.config_.requestIDExtension()->toStreamIdProvider(*request_headers_));
 
