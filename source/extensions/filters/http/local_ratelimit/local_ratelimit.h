@@ -70,15 +70,15 @@ private:
 class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& main_dispatcher,
+               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
   ~FilterConfig() override {
-    if (!main_dispatcher_.isThreadSafe()) {
-      auto shared_ptr_wrapper =
-          std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
-              std::move(rate_limiter_));
-      main_dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
-    }
+    // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
+    // timer is created and running.
+    auto shared_ptr_wrapper =
+        std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
+            std::move(rate_limiter_));
+    dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -122,7 +122,7 @@ private:
     return Http::Code::TooManyRequests;
   }
 
-  Event::Dispatcher& main_dispatcher_;
+  Event::Dispatcher& dispatcher_;
   const Http::Code status_;
   mutable LocalRateLimitStats stats_;
   const std::chrono::milliseconds fill_interval_;

@@ -23,9 +23,9 @@ const std::string& PerConnectionRateLimiter::key() {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& main_dispatcher, Stats::Scope& scope,
+    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher, Stats::Scope& scope,
     Runtime::Loader& runtime, const bool per_route)
-    : main_dispatcher_(main_dispatcher), status_(toErrorCode(config.status().code())),
+    : dispatcher_(dispatcher), status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
       fill_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0))),
@@ -34,7 +34,7 @@ FilterConfig::FilterConfig(
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
       rate_limiter_(new Filters::Common::LocalRateLimit::LocalRateLimiterImpl(
-          fill_interval_, max_tokens_, tokens_per_fill_, main_dispatcher, descriptors_)),
+          fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_)),
       local_info_(local_info), runtime_(runtime),
       filter_enabled_(
           config.has_filter_enabled()
