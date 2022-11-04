@@ -152,13 +152,16 @@ public:
             connection_id_generator_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
-        envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
-                            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
-                            &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
-                            quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_),
+        envoy_quic_session_(
+            quic_config_, quic_version_,
+            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
+            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
+            *dispatcher_,
+            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5, quic_stat_names_,
+            listener_config_.listenerScope(), crypto_stream_factory_,
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher_->timeSource(),
+                quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr())),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {

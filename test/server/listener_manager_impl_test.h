@@ -19,6 +19,7 @@
 #include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -225,8 +226,10 @@ protected:
           Network::Utility::parseInternetAddress(direct_source_address, source_port);
     }
     socket_->connection_info_provider_->setDirectRemoteAddressForTest(direct_remote_address_);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
-    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
+    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_,
+                                                                                   stream_info);
   }
 
   /**
