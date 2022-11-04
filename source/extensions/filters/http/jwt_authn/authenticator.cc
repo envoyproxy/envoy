@@ -13,8 +13,8 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
-#include "jwt_verify_lib/verify.h"
 #include "jwt_verify_lib/struct_utils.h"
+#include "jwt_verify_lib/verify.h"
 
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
@@ -289,21 +289,26 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   }
 
   // Copy JWT Claim to Header
-  if (provider.claim_to_header_size() != 0) {
-    for (const auto& headerAndClaim : provider.claim_to_header()) {
-      if (!headerAndClaim.claim_name().empty() && !headerAndClaim.header_name().empty()) {
+  if (provider.claim_to_headers_size() != 0) {
+    for (const auto& header_and_claim : provider.claim_to_headers()) {
+      if (!header_and_claim.claim_name().empty() && !header_and_claim.header_name().empty()) {
         StructUtils payload_getter(jwt_->payload_pb_);
-        std::string stringClaimValue;
-        uint64_t intClaimValue = 0;
-        bool boolClaimValue;
-        if (payload_getter.GetString(headerAndClaim.claim_name(), &stringClaimValue) == StructUtils::OK) {
-          headers_->addCopy(Http::LowerCaseString(headerAndClaim.header_name()), stringClaimValue);
-        } else if(payload_getter.GetUInt64(headerAndClaim.claim_name(), &intClaimValue) == StructUtils::OK) {
-          headers_->addCopy(Http::LowerCaseString(headerAndClaim.header_name()), std::to_string(intClaimValue));
-        } else if(payload_getter.GetBoolean(headerAndClaim.claim_name(), &boolClaimValue) == StructUtils::OK) {
-          headers_->addCopy(Http::LowerCaseString(headerAndClaim.header_name()), boolClaimValue ? "true" : "false");
+        std::string string_claim_value;
+        uint64_t int_claim_value = 0;
+        bool bool_claim_value;
+        if (payload_getter.GetString(header_and_claim.claim_name(), &string_claim_value) == 
+            StructUtils::OK) {
+              headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), string_claim_value);
+        } else if(payload_getter.GetUInt64(header_and_claim.claim_name(), &int_claim_value) == 
+                  StructUtils::OK) {
+                    headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), std::to_string(int_claim_value));
+        } else if(payload_getter.GetBoolean(header_and_claim.claim_name(), &bool_claim_value) 
+                  == StructUtils::OK) {
+                    headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()), 
+                                      bool_and_claim ? "true" : "false");
         } else {
-          ENVOY_LOG(debug, "--------claim : {} is not correct -----------", headerAndClaim.claim_name());
+          ENVOY_LOG(debug, "--------claim : {} is not correct -----------",
+                    header_and_claim.claim_name());
         }
       }
     }

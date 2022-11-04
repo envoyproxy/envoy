@@ -30,13 +30,13 @@ If a custom location is desired, `from_headers` or `from_params` can be used to 
 
 If a JWT is valid, its payload will be passed to the backend in a new HTTP header specified in `forward_payload_header` field. Its value is base64url-encoded JWT payload in JSON.
 
-## Copy Validated JWT Claims to HTTP Header
+## Copy Validated JWT Claims to HTTP Request Headers
 
-If a JWT is valid, you can add any claim of type (string, integer, boolean) and a new HTTP header specified in
-`claim_to_header` field. Nested claims are also supported.
+If a JWT is valid, you can add some of its claims of type (string, integer, boolean) to a new HTTP header to pass to the upstream.You can specify claims and headers in
+`claim_to_headers` field. Nested claims are also supported.
 
 ```yaml
-    claim_to_header:
+    claim_to_headers:
     - header_name: x-jwt-claim-sub
       claim_name: sub
     - haeder_name: x-jwt-claim-nested-key

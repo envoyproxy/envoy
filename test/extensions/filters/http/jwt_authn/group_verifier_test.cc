@@ -150,7 +150,7 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: sec-istio-auth-userinfo
-    claim_to_header:
+    claim_to_headers:
     - header_name: x-jwt-claim-aud
       claim_name: aud
     from_params:

@@ -748,18 +748,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "jwt_verify_lib",
         project_desc = "JWT verification library for C++",
         project_url = "https://github.com/google/jwt_verify_lib",
-<<<<<<< HEAD
-        version = "fd3d4d61835f7c35274cb8e6aba923542ae52f0b",
-        sha256 = "87a6ad666b4160becd1f839483e00a6ea3c46cb0fa9d8e6566a5fc9f315201be",
-=======
         version = "a666a0ac66da4d265351b4fa641f649a46fe15d7",
         sha256 = "7632f1096e52c8a3c967d692bd18afbafa3d9ff6bb74073852749f5c42d3f826",
->>>>>>> 9680f007ae (updated proto and claim to header logic)
         strip_prefix = "jwt_verify_lib-{version}",
         urls = ["https://github.com/google/jwt_verify_lib/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.jwt_authn", "envoy.filters.http.gcp_authn"],
-        release_date = "2022-10-28",
+        release_date = "2022-11-03",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/google/jwt_verify_lib/blob/{version}/LICENSE",

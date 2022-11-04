@@ -70,7 +70,6 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
       {"sec-istio-auth-userinfo", ""},
       {"x-jwt-claim-sub", ""},
       {"x-jwt-claim-nested", ""},
-
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -145,8 +144,8 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
 
-  auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", ""},
-                                                {"x-jwt-claim-sub", ""}, {"x-jwt-claim-nested", ""}};
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"sec-istio-auth-userinfo", ""}, {"x-jwt-claim-sub", ""}, {"x-jwt-claim-nested", ""}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
@@ -169,13 +168,13 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
-    claim_to_header:
+    claim_to_headers:
     - header_name: x-jwt-claim-sub
       claim_name: sub
   other_provider:
     issuer: other_issuer
     forward_payload_header: other-auth-userinfo
-    claim_to_header:
+    claim_to_headers:
     - header_name: x-jwt-claim-issuer
       claim_name: iss
 rules:

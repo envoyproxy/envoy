@@ -155,7 +155,7 @@ TEST_F(AuthenticatorTest, TestClaimToHeader) {
   EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
 }
 
-// This test verifies when wrong claim is passed in claim_to_header
+// This test verifies when wrong claim is passed in claim_to_headers
 TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
   createAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
