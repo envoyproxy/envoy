@@ -201,6 +201,9 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
+    std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() override {
+      return filter_manager_.streamInfoSharedPtr();
+    }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }

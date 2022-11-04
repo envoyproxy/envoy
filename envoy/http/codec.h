@@ -4,6 +4,7 @@
 #include <limits>
 #include <memory>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
@@ -14,7 +15,6 @@
 #include "envoy/http/stream_reset_handler.h"
 #include "envoy/network/address.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/access_log/access_log.h"
 
 #include "source/common/http/status.h"
 
@@ -228,6 +228,11 @@ public:
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Shared pointer to the stream_info for this stream.
+   */
+  virtual std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() PURE;
 
   /**
    * @return List of shared pointers to access loggers for this stream.
