@@ -100,34 +100,25 @@ StatusOr<sockaddr_in> parseV4Address(const std::string& ip_address, uint16_t por
 }
 
 StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t port) {
-  sockaddr_in6 sa6;
-  memset(&sa6, 0, sizeof(sa6));
-  const auto scope_pos = ip_address.rfind('%');
-  if (scope_pos == std::string::npos) {
-    // Parse IPv6 with no scope.
-    if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) != 1) {
-      return absl::FailedPreconditionError("failed parsing ipv6 with no scope");
-    }
-    sa6.sin6_family = AF_INET6;
-  } else {
-    // Parse IPv6 with scope using getaddrinfo().
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    struct addrinfo* res = nullptr;
-    // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
-    // a name resolution service.
-    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-    hints.ai_family = AF_INET6;
-    // Hint that getaddrinfo() need not return a linked list of answers.
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    if (getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res) != 0) {
-      return absl::FailedPreconditionError("failed parsing ipv6 with scope");
-    }
-    sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-    freeaddrinfo(res);
+  // Parse IPv6 with optional scope using getaddrinfo().
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+  struct addrinfo* res = nullptr;
+  // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
+  // a name resolution service.
+  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+  hints.ai_family = AF_INET6;
+  // Hint that getaddrinfo() need not return a linked list of answers.
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_protocol = IPPROTO_UDP;
+  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
+      ip_address.c_str(), /*service=*/nullptr, &hints, &res);
+  if (rc.return_value_ != 0) {
+    return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
   }
+  sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
   sa6.sin6_port = htons(port);
+  freeaddrinfo(res);
   return sa6;
 }
 
@@ -176,15 +167,12 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       return nullptr;
     }
-    sockaddr_in6 sa6;
-    memset(&sa6, 0, sizeof(sa6));
-    if (ip_str.empty() || inet_pton(AF_INET6, ip_str.c_str(), &sa6.sin6_addr) != 1) {
-      return nullptr;
+    StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_str, port64);
+    if (sa6.ok()) {
+      return instanceOrNull(
+          Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
     }
-    sa6.sin6_family = AF_INET6;
-    sa6.sin6_port = htons(port64);
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only));
+    return nullptr;
   }
   // Treat it as an IPv4 address followed by a port.
   const auto pos = ip_address.rfind(':');
@@ -197,14 +185,12 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
     return nullptr;
   }
-  sockaddr_in sa4;
-  memset(&sa4, 0, sizeof(sa4));
-  if (ip_str.empty() || inet_pton(AF_INET, ip_str.c_str(), &sa4.sin_addr) != 1) {
-    return nullptr;
+  StatusOr<sockaddr_in> sa4 = parseV4Address(ip_str, port64);
+  if (sa4.ok()) {
+    return instanceOrNull(
+        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4.value()));
   }
-  sa4.sin_family = AF_INET;
-  sa4.sin_port = htons(port64);
-  return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4));
+  return nullptr;
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
