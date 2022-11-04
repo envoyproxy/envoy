@@ -162,6 +162,49 @@ TEST_F(PathNormalizerTest, NormalizePathUriRoot) {
   EXPECT_TRUE(result.ok());
 }
 
+TEST_F(PathNormalizerTest, NormalizePathUriPreserveSchemeAndAuthority) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "https://envoy.com:443/root/child"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child");
+  EXPECT_TRUE(result.ok());
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveQueryFragment) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "https://envoy.com:443/root/child?x=1#anchor"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child?x=1#anchor");
+  EXPECT_TRUE(result.ok());
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriRootPreserveFragment) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "https://envoy.com:443/root/child#anchor"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(headers.path(), "https://envoy.com:443/root/child#anchor");
+  EXPECT_TRUE(result.ok());
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriSchemelessAbsoluteForm) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":path", "//envoy.com:443/root/child?x=1#anchor"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(headers.path(), "//envoy.com:443/root/child?x=1#anchor");
+  EXPECT_TRUE(result.ok());
+}
+
 TEST_F(PathNormalizerTest, NormalizePathUriDotDot) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1/../dir2"}};
 
@@ -189,6 +232,16 @@ TEST_F(PathNormalizerTest, NormalizePathUriTrailingDotDot) {
   auto result = normalizer->normalizePathUri(headers);
 
   EXPECT_EQ(headers.path(), "/");
+  EXPECT_TRUE(result.ok());
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriEncodedDotDot) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "/dir1/%2e./dir2"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(headers.path(), "/dir2");
   EXPECT_TRUE(result.ok());
 }
 
@@ -353,7 +406,7 @@ TEST_F(PathNormalizerTest, NormalizePathUriInvalidEncoding) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
-TEST_F(PathNormalizerTest, NormalizePathUriOriginForm) {
+TEST_F(PathNormalizerTest, NormalizePathUriAuthorityFormConnect) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "envoy.com:443"},
                                                   {":method", "CONNECT"}};
 
@@ -362,6 +415,16 @@ TEST_F(PathNormalizerTest, NormalizePathUriOriginForm) {
 
   EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Accept);
   EXPECT_EQ(headers.path(), "envoy.com:443");
+}
+
+TEST_F(PathNormalizerTest, NormalizePathUriOriginFormNotConnect) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":path", "envoy.com:443"}, {":method", "GET"}};
+
+  auto normalizer = create(empty_config);
+  auto result = normalizer->normalizePathUri(headers);
+
+  EXPECT_EQ(result.action(), PathNormalizer::PathNormalizationResult::Action::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 TEST_F(PathNormalizerTest, NormalizePathUriAbsoluteForm) {
