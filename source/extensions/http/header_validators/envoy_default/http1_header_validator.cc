@@ -301,35 +301,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     path = header_map.path();
   }
 
-  if (!is_connect_method && !path_is_asterisk && path.at(0) != '/') {
-    // The path is most likely in absolute-form, which we need to verify and then use the authority
-    // component as the Host/:authority header. From RFC 9112,
-    // https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.2:
-    //
-    // When a proxy receives a request with an absolute-form of request-target, the
-    // proxy MUST ignore the received Host header field (if any) and instead replace
-    // it with the host information of the request-target. A proxy that forwards
-    // such a request MUST generate a new Host field-value based on the received
-    // request-target rather than forward the received Host field-value.
-    // ...
-    // If the target URI includes an authority component, then a client MUST send a
-    // field-value for Host that is identical to that authority component,
-    // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
-    ::Envoy::Http::Utility::Url url;
-    if (url.initialize(path, false)) {
-      auto uri_host = url.hostAndPort();
-      auto userinfo_delim = uri_host.find('@');
-      if (userinfo_delim != absl::string_view::npos) {
-        uri_host = uri_host.substr(userinfo_delim + 1);
-      }
-
-      if (!uri_host.empty()) {
-        header_map.setHost(uri_host);
-        host = uri_host;
-      }
-    }
-  }
-
   // Step 4: Verify each request header
   std::string reject_details;
   std::vector<absl::string_view> drop_headers;
