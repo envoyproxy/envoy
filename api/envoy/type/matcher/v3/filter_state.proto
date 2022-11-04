@@ -21,6 +21,8 @@ message FilterStateMatcher {
   string key = 1 [(validate.rules).string = {min_len: 1}];
 
   oneof matcher {
+    option (validate.required) = true;
+
     // Matches the filter state object as a string value.
     StringMatcher string_match = 2;
   }
