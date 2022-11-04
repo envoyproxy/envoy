@@ -365,7 +365,8 @@ public:
 
   std::string redisHostnameAndPort(FakeUpstreamPtr& upstream) {
     std::stringstream result;
-    result << "localhost" << ":" << upstream->localAddress()->ip()->port();
+    result << "localhost"
+           << ":" << upstream->localAddress()->ip()->port();
     return result.str();
   }
 
@@ -448,7 +449,7 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_REDIRECTION, 2) {}
 
   RedisProxyWithRedirectionIntegrationTest(const std::string& config, int num_upstreams)
-    : RedisProxyIntegrationTest(config, num_upstreams) {}
+      : RedisProxyIntegrationTest(config, num_upstreams) {}
 
   /**
    * Simple bi-directional test with a fake Redis client and 2 fake Redis servers.
@@ -464,10 +465,14 @@ public:
                          const std::string& asking_response = "+OK\r\n");
 };
 
-class RedisProxyWithRedirectionAndDNSIntegrationTest : public RedisProxyWithRedirectionIntegrationTest {
+class RedisProxyWithRedirectionAndDNSIntegrationTest
+    : public RedisProxyWithRedirectionIntegrationTest {
 public:
   RedisProxyWithRedirectionAndDNSIntegrationTest()
-      : RedisProxyWithRedirectionIntegrationTest(fmt::format(CONFIG_WITH_REDIRECTION_DNS, Network::Test::ipVersionToDnsFamily(GetParam())), 2) {}
+      : RedisProxyWithRedirectionIntegrationTest(
+            fmt::format(CONFIG_WITH_REDIRECTION_DNS,
+                        Network::Test::ipVersionToDnsFamily(GetParam())),
+            2) {}
 };
 
 class RedisProxyWithBatchingIntegrationTest : public RedisProxyIntegrationTest {
