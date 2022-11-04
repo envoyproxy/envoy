@@ -67,7 +67,7 @@ private:
    */
   PathNormalizationResult mergeSlashesPass(std::string& path) const;
   /*
-   * Normalization pass: collapse dot and dot-dot segements.
+   * Normalization pass: collapse dot and dot-dot segments.
    */
   PathNormalizationResult collapseDotSegmentsPass(std::string& path) const;
   /*

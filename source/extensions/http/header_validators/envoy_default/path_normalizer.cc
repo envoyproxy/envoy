@@ -212,6 +212,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
   // SPELLCHECKER(on)
   {
+    // pass 1: normalize and decode percent-encoded octets
     auto result = decodePass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
@@ -221,6 +222,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
+    // pass 2: merge duplicate slashes (if configured to do so)
     auto result = mergeSlashesPass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
@@ -230,6 +232,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   {
+    // pass 3: collapse dot and dot-dot segments
     auto result = collapseDotSegmentsPass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
@@ -239,19 +242,20 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   }
 
   absl::string_view normalized_path{path};
+  // Update the :path header. We need to honor the original schema, authority, query, and fragment
+  // components and only set the path component.
   if (is_origin_form) {
-    // origin-form is the absolute path, set it
+    // origin-form is the absolute path with no scheme/authority.
     header_map.setPath(absl::StrCat(normalized_path, query));
   } else {
-    // absolute and authority forms have a prefix that we need to keep
+    // absolute and authority forms have a prefix (scheme/authority) that we need to keep
     auto path_begin_index = original_uri.length() - original_path.length();
     absl::string_view prefix;
     if (original_uri.at(path_begin_index) == '/') {
       // absolute-form
       prefix = original_uri.substr(0, path_begin_index);
     } else {
-      // The URL class sets the path to "/" if the path is empty for authority-form, which we
-      // detect if the first path character is not a "/". The authority-form is our entire prefix.
+      // authority-form, the prefix is the entire authority
       prefix = original_uri;
     }
 
@@ -394,8 +398,10 @@ PathNormalizer::collapseDotSegmentsPass(std::string& path) const {
 
 std::tuple<absl::string_view, absl::string_view>
 PathNormalizer::splitPathAndQueryParams(absl::string_view pathAndQueryParams) const {
+  // Split on the query (?) or fragment (#) delimiter, whichever one is first.
   auto delim = pathAndQueryParams.find_first_of("?#");
   if (delim == absl::string_view::npos) {
+    // no query/fragment component
     return std::make_tuple(pathAndQueryParams, "");
   }
 
@@ -404,6 +410,9 @@ PathNormalizer::splitPathAndQueryParams(absl::string_view pathAndQueryParams) co
 
 std::tuple<absl::string_view, absl::string_view>
 PathNormalizer::splitAuthorityAndPath(absl::string_view uri) const {
+  // We have to make an efficient best guess for the URL form here. The URL and path will be
+  // validated further on in the UHV stack, so we don't need to be precise, just enough to split
+  // the path component and everything before it.
   if (absl::StartsWith(uri, "//")) {
     // absolute-uri without scheme, next slash is the beginning of the path
     auto path_start = uri.find('/', 2);
@@ -418,10 +427,12 @@ PathNormalizer::splitAuthorityAndPath(absl::string_view uri) const {
 
   auto scheme_delim = uri.find("://");
   if (scheme_delim != absl::string_view::npos) {
+    // URI contains a scheme (we think). Find the start of the path
     auto path_start = uri.find('/', scheme_delim + 3);
-    // We assume that the root is "/" if not specified in the URI.
-    return std::make_tuple(uri.substr(0, path_start),
-                           path_start != absl::string_view::npos ? uri.substr(path_start) : "/");
+    // We assume that the root is "/" if it is not specified in the absolute-form URI. For example,
+    // a URI of "https://envoy.com" would have an inferred path of "/".
+    absl::string_view path = path_start != absl::string_view::npos ? uri.substr(path_start) : "/";
+    return std::make_tuple(uri.substr(0, path_start), path);
   }
 
   // The URL is either in authority-form or invalid.
