@@ -50,8 +50,8 @@ ProxyFilterConfig::ProxyFilterConfig(
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::getCache(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config) {
   // No DNS cache/lookups if config wasn't provided.
-  if (config.has_dns_cache_config()) {
-    return dns_cache_manager_->getCache(config.dns_cache_config());
+  if (config.settings().has_dns_cache_config()) {
+    return dns_cache_manager_->getCache(config.settings().dns_cache_config());
   }
 
   return nullptr;

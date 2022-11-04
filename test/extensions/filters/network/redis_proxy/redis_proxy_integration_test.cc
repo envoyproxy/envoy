@@ -80,10 +80,10 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
 
 // This is a configuration with moved/ask redirection support and DNS lookups enabled.
 const std::string CONFIG_WITH_REDIRECTION_DNS = CONFIG_WITH_REDIRECTION + R"EOF(
-          dns_cache_config:
-            name: foo
-            dns_lookup_family: {}
-            max_hosts: 100
+            dns_cache_config:
+              name: foo
+              dns_lookup_family: {}
+              max_hosts: 100
 )EOF";
 
 // This is a configuration with batching enabled.

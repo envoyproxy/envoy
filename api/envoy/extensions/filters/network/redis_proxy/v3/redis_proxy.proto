@@ -25,13 +25,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 11]
+// [#next-free-field: 10]
 message RedisProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -86,6 +86,12 @@ message RedisProxy {
     // need to be known to the cluster manager. If the command cannot be redirected, then the
     // original error is passed downstream unchanged. By default, this support is not enabled.
     bool enable_redirection = 3;
+
+    // If ``enable_redirection`` is set to true this option configures the DNS cache that the
+    // connection pool will use to resolve hostnames that are returned with MOVED and ASK responses.
+    // If no configuration is provided, DNS lookups will not be performed (and thus the MOVED/ASK errors
+    // will be propagated verbatim to the user).
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 10;
 
     // Maximum size of encoded request buffer before flush is triggered and encoded requests
     // are sent upstream. If this is unset, the buffer flushes whenever it receives data
@@ -322,11 +328,6 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
-
-  // The DNS cache configuration that the filter will attach to and that will be used to resolve
-  // hostnames that are returned with MOVED and ASK responses. If not provided, no DNS lookups
-  // will be performed (and thus the MOVED/ASK errors will be propagated to the user).
-  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 10;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
