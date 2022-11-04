@@ -96,7 +96,10 @@ Network filter chain matching supports the following extensions:
 .. _extension_envoy.matching.actions.format_string:
 
 * :ref:`Format string action <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>` computes the filter chain name
-  from the connection dynamic metadata and its filter state.
+  from the connection dynamic metadata and its filter state. Example:
+
+.. literalinclude:: _include/format_action.yaml
+    :language: yaml
 
 Filter Integration
 ##################

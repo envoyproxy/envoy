@@ -95,5 +95,8 @@ new_features:
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: matching
+  change: |
+    support filter chain selection based on the dynamic metadata and the filter state using :ref:`formatter action <extension_envoy.matching.actions.format_string>`.
 
 deprecated:
