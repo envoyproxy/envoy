@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
@@ -19,7 +19,7 @@ wasm_rust_binary(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "speed_cpp_plugin",
     srcs = [
         "speed_cpp.cc",
@@ -35,7 +35,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "start_cpp_plugin",
     srcs = [
         "start_cpp.cc",
@@ -51,7 +51,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "stats_cpp_plugin",
     srcs = [
         "stats_cpp.cc",

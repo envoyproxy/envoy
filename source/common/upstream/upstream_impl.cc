@@ -48,10 +48,10 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/eds.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
-#include "source/common/upstream/original_dst_cluster.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -1037,7 +1037,7 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
   if (config.has_load_balancing_policy()) {
-    configureLbPolicies(config);
+    configureLbPolicies(config, server_context);
   } else {
     switch (config.lb_policy()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
@@ -1069,7 +1069,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_type_ = LoadBalancerType::ClusterProvided;
       break;
     case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-      configureLbPolicies(config);
+      configureLbPolicies(config, server_context);
       break;
     }
     }
@@ -1110,7 +1110,7 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   // TODO(htuch): Remove this temporary workaround when we have
-  // https://github.com/envoyproxy/protoc-gen-validate/issues/97 resolved. This just provides
+  // https://github.com/bufbuild/protoc-gen-validate/issues/97 resolved. This just provides
   // early validation of sanity of fields that we should catch at config ingestion.
   DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 
@@ -1158,7 +1158,8 @@ ClusterInfoImpl::ClusterInfoImpl(
 }
 
 // Configures the load balancer based on config.load_balancing_policy
-void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config) {
+void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
+                                          Server::Configuration::ServerFactoryContext& context) {
   if (config.has_lb_subset_config()) {
     throw EnvoyException(
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
@@ -1182,7 +1183,12 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
         Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
-      load_balancing_policy_ = policy;
+      // Load and validate the configuration.
+      load_balancing_policy_ = factory->createEmptyConfigProto();
+      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
+                                             context.messageValidationVisitor(),
+                                             *load_balancing_policy_);
+
       load_balancer_factory_ = factory;
       break;
     }
@@ -1870,14 +1876,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         (health_checker_ != nullptr && existing_host_found &&
          *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
     bool locality_changed = false;
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints")) {
-      locality_changed =
-          (existing_host_found &&
-           (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
-      if (locality_changed) {
-        hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
-      }
+    locality_changed = (existing_host_found &&
+                        (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+    if (locality_changed) {
+      hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
     }
 
     const bool skip_inplace_host_update = health_check_address_changed || locality_changed;

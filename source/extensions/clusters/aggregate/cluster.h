@@ -147,6 +147,7 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);
   }
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
   const Cluster& cluster_;
 };
