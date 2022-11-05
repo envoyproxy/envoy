@@ -1907,8 +1907,9 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
-    return absl::nullopt;
+  StreamInfo::StreamIdProviderSharedPtr
+  toStreamIdProvider(const Http::RequestHeaderMap&) const override {
+    return nullptr;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;
