@@ -106,7 +106,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
   if (!stat_merger_) {
     stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
-    hot_restart_generation_stat_name_ = hotRestartGeneration(stats_store).statName();
+    hot_restart_generation_stat_name_ = hotRestartGeneration(*stats_store.rootScope()).statName();
   }
 
   // Convert the protobuf for serialized dynamic spans into the structure

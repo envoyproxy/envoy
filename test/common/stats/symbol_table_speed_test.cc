@@ -66,6 +66,7 @@ BENCHMARK(bmCreateRace)->Unit(::benchmark::kMillisecond);
 static void bmJoinStatNames(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
+  Envoy::Stats::Scope& scope = *store.rootScope();
   Envoy::Stats::StatNamePool pool(symbol_table);
   Envoy::Stats::StatName a = pool.add("a");
   Envoy::Stats::StatName b = pool.add("b");
@@ -74,7 +75,7 @@ static void bmJoinStatNames(benchmark::State& state) {
   Envoy::Stats::StatName e = pool.add("e");
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    Envoy::Stats::Utility::counterFromStatNames(store, Envoy::Stats::makeStatNames(a, b, c, d, e));
+    Envoy::Stats::Utility::counterFromStatNames(scope, Envoy::Stats::makeStatNames(a, b, c, d, e));
   }
 }
 BENCHMARK(bmJoinStatNames);
@@ -83,6 +84,7 @@ BENCHMARK(bmJoinStatNames);
 static void bmJoinElements(benchmark::State& state) {
   Envoy::Stats::SymbolTableImpl symbol_table;
   Envoy::Stats::IsolatedStoreImpl store(symbol_table);
+  Envoy::Stats::Scope& scope = *store.rootScope();
   Envoy::Stats::StatNamePool pool(symbol_table);
   Envoy::Stats::StatName a = pool.add("a");
   Envoy::Stats::StatName b = pool.add("b");
@@ -91,7 +93,7 @@ static void bmJoinElements(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     Envoy::Stats::Utility::counterFromElements(
-        store, Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
+        scope, Envoy::Stats::makeElements(a, b, c, Envoy::Stats::DynamicName("d"), e));
   }
 }
 BENCHMARK(bmJoinElements);

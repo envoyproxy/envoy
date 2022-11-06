@@ -101,6 +101,11 @@ public:
    */
   virtual Gauge& nullGauge() PURE;
   virtual Counter& nullCounter() PURE;
+
+  virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
+  virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
+  virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
+  virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

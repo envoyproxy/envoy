@@ -200,6 +200,10 @@ public:
   NullCounterImpl& nullCounter() override { return *null_counter_; }
   NullGaugeImpl& nullGauge() override { return *null_gauge_; }
 
+  bool iterate(const IterateFn<Counter>& fn) const override { return default_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return default_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return default_scope_->iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return default_scope_->iterate(fn); }
  protected:
   void setDefaultScope(const Stats::ScopeSharedPtr& scope);
 

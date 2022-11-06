@@ -193,10 +193,6 @@ public:
   GaugeOptConstRef findGauge(StatName name) const override;
   HistogramOptConstRef findHistogram(StatName name) const override;
   TextReadoutOptConstRef findTextReadout(StatName name) const override;
-  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 #endif
 
   // Stats::Store
@@ -206,6 +202,11 @@ public:
   ConstScopeSharedPtr constRootScope() const override { return default_scope_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+
+  bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
