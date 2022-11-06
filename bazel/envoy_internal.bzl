@@ -197,3 +197,23 @@ def _envoy_select_perfetto(xs):
         "@envoy//bazel:enable_perf_tracing": xs,
         "//conditions:default": [],
     })
+
+def envoy_exported_symbols_input():
+    return ["@envoy//bazel:exported_symbols.txt"]
+
+# Default symbols to be exported.
+# TODO(wbpcode): make this work correctly for apple/darwin.
+def _envoy_default_exported_symbols():
+    return select({
+        "@envoy//bazel:linux": [
+            "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
+        ],
+        "//conditions:default": [],
+    })
+
+# Select the given values if exporting is enabled in the current build.
+def envoy_select_exported_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_symbols": xs,
+        "//conditions:default": [],
+    }) + _envoy_default_exported_symbols()

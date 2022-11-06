@@ -76,8 +76,13 @@ function exclude_wasm_examples() {
   grep -v examples/wasm
 }
 
+# Exclude envoy mobile.
+function exclude_envoy_mobile() {
+  grep -v mobile/library | grep -v mobile/test
+}
+
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
+  exclude_envoy_mobile | exclude_check_format_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {

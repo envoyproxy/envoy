@@ -35,7 +35,6 @@ message GenericProxy {
   oneof route_specifier {
     option (validate.required) = true;
 
-    // [#not-implemented-hide:]
     // The generic proxies route table will be dynamically loaded via the meta RDS API.
     GenericRds generic_rds = 3;
 
@@ -50,7 +49,6 @@ message GenericProxy {
   repeated config.core.v3.TypedExtensionConfig filters = 5;
 }
 
-// [#not-implemented-hide:]
 message GenericRds {
   // Configuration source specifier for RDS.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

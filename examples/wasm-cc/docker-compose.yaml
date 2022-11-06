@@ -12,6 +12,6 @@ services:
 
   web_service:
     environment:
-      - PORT=9000
+    - PORT=9000
     build:
       context: ../shared/echo

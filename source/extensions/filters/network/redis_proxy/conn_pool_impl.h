@@ -106,13 +106,13 @@ private:
   struct PendingRequest : public Common::Redis::Client::ClientCallbacks,
                           public Common::Redis::Client::PoolRequest {
     PendingRequest(ThreadLocalPool& parent, RespVariant&& incoming_request,
-                   PoolCallbacks& pool_callbacks);
+                   PoolCallbacks& pool_callbacks, Upstream::HostConstSharedPtr& host);
     ~PendingRequest() override;
 
     // Common::Redis::Client::ClientCallbacks
     void onResponse(Common::Redis::RespValuePtr&& response) override;
     void onFailure() override;
-    bool onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
+    void onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
                        bool ask_redirection) override;
 
     // PoolRequest
@@ -122,6 +122,7 @@ private:
     const RespVariant incoming_request_;
     Common::Redis::Client::PoolRequest* request_handler_;
     PoolCallbacks& pool_callbacks_;
+    Upstream::HostConstSharedPtr host_;
   };
 
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,

@@ -26,6 +26,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/tcp_proxy:config",
