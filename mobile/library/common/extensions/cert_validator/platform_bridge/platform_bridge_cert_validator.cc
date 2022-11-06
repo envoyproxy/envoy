@@ -145,7 +145,7 @@ void PlatformBridgeCertValidator::PendingValidation::postVerifyResultAndCleanUp(
     if (weak_alive_indicator.expired()) {
       return;
     }
-    ENVOY_LOG(trace, "Get validation result for {} from platform", host_name_);
+    ENVOY_LOG(trace, "Got validation result for {} from platform", host_name_);
     parent_.validation_threads_[thread_id].join();
     parent_.validation_threads_.erase(thread_id);
     if (error_counter.has_value()) {
@@ -158,7 +158,9 @@ void PlatformBridgeCertValidator::PendingValidation::postVerifyResultAndCleanUp(
             "Finished platform cert validation for {}, post result callback to network thread",
             host_name_);
 
-  parent_.platform_validator_->release_validator();
+  if (parent_.platform_validator_->release_validator) {
+    parent_.platform_validator_->release_validator();
+  }
 }
 
 } // namespace Tls

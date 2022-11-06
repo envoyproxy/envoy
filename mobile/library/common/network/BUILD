@@ -76,3 +76,23 @@ envoy_cc_library(
         "@envoy//source/common/network:socket_interface_lib",
     ],
 )
+
+cc_library(
+    name = "apple_platform_cert_verifier",
+    srcs = select({
+        "@envoy//bazel:apple": ["apple_platform_cert_verifier.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "@envoy//bazel:apple": ["apple_platform_cert_verifier.h"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "@envoy//bazel:apple": [
+            "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+            "//library/common:envoy_main_interface_lib",
+            "@envoy//bazel:boringssl",
+        ],
+        "//conditions:default": [],
+    }),
+)

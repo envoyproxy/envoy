@@ -19,6 +19,7 @@
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
+              enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
                                         forceIPv6:(BOOL)forceIPv6
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -64,6 +65,7 @@
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
+  self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.forceIPv6 = forceIPv6;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -187,8 +189,10 @@
   [definitions
       appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
 
-  NSString *cert_validator_template =
-      [[NSString alloc] initWithUTF8String:default_cert_validation_context_template];
+  NSString *cert_validator_template = self.enablePlatformCertificateValidation
+                                          ? @(platform_cert_validation_context_template)
+                                          : @(default_cert_validation_context_template);
+
   [definitions appendFormat:@"%@\n", cert_validator_template];
 
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
