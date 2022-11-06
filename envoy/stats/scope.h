@@ -18,6 +18,7 @@ class Gauge;
 class Histogram;
 class NullGaugeImpl;
 class Scope;
+class Store;
 class TextReadout;
 
 using CounterOptConstRef = absl::optional<std::reference_wrapper<const Counter>>;
@@ -273,6 +274,8 @@ public:
    *     store.createScope("foo").createScope("bar").prefix() will be the StatName "foo.bar"
    */
   virtual StatName prefix() const PURE;
+
+  virtual Store& store() PURE;
 };
 
 } // namespace Stats

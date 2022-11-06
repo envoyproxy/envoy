@@ -254,7 +254,7 @@ envoy_cc_library(
         ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
-        ":scope_prefixer_lib",
+        # ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",

@@ -236,6 +236,8 @@ class TestScope : public IsolatedScopeImpl {
     return scope;
   }
 
+  TestStore& store() override { return store_; }
+
 private:
   TestStore& store_;
 };

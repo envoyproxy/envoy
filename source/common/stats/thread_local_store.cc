@@ -37,7 +37,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     well_known_tags_->rememberBuiltin(desc.name_);
   }
   StatNameManagedStorage empty("", alloc.symbolTable());
-  default_scope_ = ThreadLocalStoreImpl::scopeFromStatName(empty.statName());
+  default_scope_ = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()));
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -147,16 +147,21 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
   return scopeFromStatName(stat_name_storage.statName());
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
-  auto new_scope = std::make_shared<ScopeImpl>(*this, name);
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()));
+  parent_.addScope(new_scope);
+  return new_scope;
+}
+
+void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
   Thread::LockGuard lock(lock_);
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
-  return new_scope;
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
@@ -469,6 +474,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
+#if 0
 CounterOptConstRef ThreadLocalStoreImpl::findCounter(StatName name) const {
   CounterOptConstRef found_counter;
   iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
@@ -506,6 +512,7 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::findTextReadout(StatName name) cons
   });
   return found_text_readout;
 }
+#endif
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
@@ -595,18 +602,17 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
       tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
-                                                              uint64_t value) {
+void ThreadLocalStoreImpl::deliverHistogramToSinks(const Histogram& histogram, uint64_t value) {
   // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
   // This is because the sinks may end up trying to create new connections via the thread local
   // cluster manager which may already be destroyed (there is no way to sequence this because the
   // cluster manager destroying can create deliveries). We special case this explicitly to avoid
   // having to implement a shutdown() method (or similar) on every TLS object.
-  if (parent_.shutting_down_) {
+  if (shutting_down_) {
     return;
   }
 
-  for (Sink& sink : parent_.timer_sinks_) {
+  for (Sink& sink : timer_sinks_) {
     sink.onHistogramComplete(histogram, value);
   }
 }

@@ -300,6 +300,7 @@ public:
   }
 
   StatName prefix() const override { return prefix_.statName(); }
+  IsolatedStoreImpl& store() override { return store_; }
 
 
  protected:
