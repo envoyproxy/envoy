@@ -26,7 +26,7 @@ public:
                                            Histogram::Unit unit) override;
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override;
-  void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
+  //void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -53,7 +53,7 @@ public:
   const SymbolTable& constSymbolTable() const final { return scope_.constSymbolTable(); }
   SymbolTable& symbolTable() final { return scope_.symbolTable(); }
 
-  NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
+  //NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }

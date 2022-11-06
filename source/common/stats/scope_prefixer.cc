@@ -70,9 +70,9 @@ TextReadoutOptConstRef ScopePrefixer::findTextReadout(StatName name) const {
   return scope_.findTextReadout(name);
 }
 
-void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
+/*void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
   scope_.deliverHistogramToSinks(histograms, val);
-}
+  }*/
 
 } // namespace Stats
 } // namespace Envoy

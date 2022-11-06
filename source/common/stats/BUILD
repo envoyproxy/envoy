@@ -62,7 +62,6 @@ envoy_cc_library(
         ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
-        ":scope_prefixer_lib",
         ":stats_lib",
         ":store_impl_lib",
         ":tag_utility_lib",

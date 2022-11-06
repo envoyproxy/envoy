@@ -278,6 +278,15 @@ public:
   MockStore();
   ~MockStore() override;
 
+  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
+  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
+  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
+  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
+
+  MOCK_METHOD(NullCounterImpl&, nullCounter, ());
+  MOCK_METHOD(NullGaugeImpl&, nullGauge, ());
+
+#if 0
   ScopeSharedPtr createScope(const std::string& name) override {
     return ScopeSharedPtr(createScope_(name));
   }
@@ -290,17 +299,12 @@ public:
   MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
   MOCK_METHOD(Scope*, createScope_, (const std::string& name));
   MOCK_METHOD(Gauge&, gauge, (const std::string&, Gauge::ImportMode));
-  MOCK_METHOD(NullGaugeImpl&, nullGauge, (const std::string&));
   MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
   MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
-  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
-  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
-  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
-  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
@@ -326,6 +330,7 @@ public:
     // We always just respond with the mocked counter, so the tags don't matter.
     return textReadout(symbol_table_->toString(name));
   }
+#endif
 
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;

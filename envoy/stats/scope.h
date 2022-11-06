@@ -85,11 +85,6 @@ public:
   virtual ScopeSharedPtr scopeFromStatName(StatName name) PURE;
 
   /**
-   * Deliver an individual histogram value to all registered sinks.
-   */
-  virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
-
-  /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.
@@ -142,11 +137,6 @@ public:
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) PURE;
-
-  /**
-   * @return a null gauge within the scope's namespace.
-   */
-  virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
    * Creates a Histogram from the stat name. Tag extraction will be performed on the name.

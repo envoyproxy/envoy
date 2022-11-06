@@ -120,56 +120,31 @@ public:
 // and symbol strings as production.
 class TestStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
-  TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
+  TestStore();
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
-  explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
+  explicit TestStore(SymbolTable& symbol_table);
 
-  Counter& counter(const std::string& name) { return counterFromString(name); }
+  Counter& counter(const std::string& name) { return rootScope()->counterFromString(name); }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
-    return gaugeFromString(name, import_mode);
+    return rootScope()->gaugeFromString(name, import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) {
-    return histogramFromString(name, unit);
+    return rootScope()->histogramFromString(name, unit);
   }
-  TextReadout& textReadout(const std::string& name) { return textReadoutFromString(name); }
-
-  // Override the Stats::Store methods for name-based lookup of stats, to use
-  // and update the string-maps in this class. Note that IsolatedStoreImpl
-  // does not support deletion of stats, so we only have to track additions
-  // to keep the maps up-to-date.
-  //
-  // Stats::Scope
-  Counter& counterFromString(const std::string& name) override;
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override;
+  TextReadout& textReadout(const std::string& name) {
+    return rootScope()->textReadoutFromString(name);
+  }
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;
   GaugeOptConstRef findGaugeByString(const std::string& name) const;
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
+  std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
 
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    histogram_values_map_[histogram.name()].push_back(value);
-  }
+ private:
+  friend class TestScope;
 
-  std::vector<uint64_t> histogramValues(const std::string& name, bool clear) {
-    auto it = histogram_values_map_.find(name);
-    ASSERT(it != histogram_values_map_.end(), absl::StrCat("Couldn't find histogram ", name));
-    std::vector<uint64_t> copy = it->second;
-    if (clear) {
-      it->second.clear();
-    }
-    return copy;
-  }
-
-private:
   absl::flat_hash_map<std::string, Counter*> counter_map_;
   absl::flat_hash_map<std::string, Gauge*> gauge_map_;
   absl::flat_hash_map<std::string, Histogram*> histogram_map_;

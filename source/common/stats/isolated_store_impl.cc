@@ -6,7 +6,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/stats/histogram_impl.h"
-#include "source/common/stats/scope_prefixer.h"
 #include "source/common/stats/utility.h"
 
 namespace Envoy {
@@ -34,19 +33,26 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)),
-      default_scope_(std::make_shared<ScopePrefixer>("", *this)) {}
+      null_gauge_(new NullGaugeImpl(symbol_table)) {
+  setDefaultScope(std::make_shared<IsolatedScopeImpl>("", *this));
+}
+
+void IsolatedStoreImpl::setDefaultScope(const Stats::ScopeSharedPtr& scope) {
+  default_scope_ = scope;
+}
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
-ScopeSharedPtr IsolatedStoreImpl::createScope(const std::string& name) {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), alloc_.symbolTable());
-  return scopeFromStatName(stat_name_storage.statName());
+ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name) {
+  StatNameManagedStorage name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return scopeFromStatName(name_storage.statName());
 }
 
-ScopeSharedPtr IsolatedStoreImpl::scopeFromStatName(StatName name) {
-  ScopeSharedPtr scope = std::make_shared<ScopePrefixer>(name, *this);
-  scopes_.push_back(scope);
+ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
+  ScopeSharedPtr scope = std::make_shared<IsolatedScopeImpl>(
+      StatName(prefix_name_storage.get()), store_);
+  addScopeToStore(scope);
   return scope;
 }
 

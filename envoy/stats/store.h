@@ -29,8 +29,22 @@ class SinkPredicates;
 /**
  * A store for all known counters, gauges, and timers.
  */
-class Store : public Scope {
+class Store {
 public:
+  virtual ~Store() = default;
+
+  virtual ScopeSharedPtr rootScope() PURE;
+  virtual ConstScopeSharedPtr constRootScope() const PURE;
+  virtual const SymbolTable& constSymbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
+
+  ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+
+  /**
+   * Deliver an individual histogram value to all registered sinks.
+   */
+  virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
+
   /**
    * @return a list of all known counters.
    */
@@ -81,6 +95,12 @@ public:
   virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
+
+  /**
+   * @return a null gauge within the scope's namespace.
+   */
+  virtual Gauge& nullGauge() PURE;
+  virtual Counter& nullCounter() PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

@@ -111,6 +111,7 @@ public:
   }
 
 private:
+  friend class IsolatedScopeImpl;
   friend class IsolatedStoreImpl;
 
   BaseOptConstRef find(StatName name) const {
@@ -134,55 +135,13 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
   ~IsolatedStoreImpl() override;
 
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Counter& counter = counters_.get(joiner.nameWithTags());
-    return counter;
-  }
-  ScopeSharedPtr createScope(const std::string& name) override;
-  ScopeSharedPtr scopeFromStatName(StatName name) override;
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Gauge& gauge = gauges_.get(joiner.nameWithTags(), import_mode);
-    gauge.mergeImportMode(import_mode);
-    return gauge;
-  }
-  NullCounterImpl& nullCounter() { return *null_counter_; }
-  NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    Histogram& histogram = histograms_.get(joiner.nameWithTags(), unit);
-    return histogram;
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    TextReadout& text_readout =
-        text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
-    return text_readout;
-  }
-  CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
-  GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    return histograms_.find(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    return text_readouts_.find(name);
-  }
-
-  bool iterate(const IterateFn<Counter>& fn) const override { return counters_.iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return gauges_.iterate(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return histograms_.iterate(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override {
-    return text_readouts_.iterate(fn);
-  }
-
   // Stats::Store
+  const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+
+  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
+  ScopeSharedPtr rootScope() override { return default_scope_; }
+  ConstScopeSharedPtr constRootScope() const override { return default_scope_; }
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override {
     // TODO(jmarantz): should we filter out gauges where
@@ -197,23 +156,6 @@ public:
   }
   std::vector<TextReadoutSharedPtr> textReadouts() const override {
     return text_readouts_.toVector();
-  }
-
-  Counter& counterFromString(const std::string& name) override {
-    StatNameManagedStorage storage(name, symbolTable());
-    return counterFromStatName(storage.statName());
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    StatNameManagedStorage storage(name, symbolTable());
-    return gaugeFromStatName(storage.statName(), import_mode);
-  }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    StatNameManagedStorage storage(name, symbolTable());
-    return histogramFromStatName(storage.statName(), unit);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    StatNameManagedStorage storage(name, symbolTable());
-    return textReadoutFromStatName(storage.statName());
   }
 
   void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
@@ -243,8 +185,6 @@ public:
     }
   }
 
-  Stats::StatName prefix() const override { return StatName(); }
-
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
     forEachCounter(f_size, f_stat);
   }
@@ -257,7 +197,16 @@ public:
     forEachTextReadout(f_size, f_stat);
   }
 
+  NullCounterImpl& nullCounter() override { return *null_counter_; }
+  NullGaugeImpl& nullGauge() override { return *null_gauge_; }
+
+ protected:
+  void setDefaultScope(const Stats::ScopeSharedPtr& scope);
+
 private:
+  friend class IsolatedScopeImpl;
+
+
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
   SymbolTablePtr symbol_table_storage_;
@@ -270,6 +219,97 @@ private:
   RefcountPtr<NullGaugeImpl> null_gauge_;
   ScopeSharedPtr default_scope_;
   std::vector<ScopeSharedPtr> scopes_;
+};
+
+class IsolatedScopeImpl : public Scope {
+public:
+  IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
+      : prefix_(prefix, store.symbolTable()), store_(store) { }
+
+  IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
+      : prefix_(prefix, store.symbolTable()), store_(store) { }
+
+  ~IsolatedScopeImpl() {
+    prefix_.free(symbolTable());
+  }
+
+  // Stats::Scope
+  SymbolTable& symbolTable() override { return store_.symbolTable(); }
+  const SymbolTable& constSymbolTable() const override { return store_.symbolTable(); }
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
+    Counter& counter = store_.counters_.get(joiner.nameWithTags());
+    return counter;
+  }
+  ScopeSharedPtr createScope(const std::string& name) override;
+  ScopeSharedPtr scopeFromStatName(StatName name) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override {
+    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
+    Gauge& gauge = store_.gauges_.get(joiner.nameWithTags(), import_mode);
+    gauge.mergeImportMode(import_mode);
+    return gauge;
+  }
+  //NullCounterImpl& nullCounter(const std::string&) override { return store_.null_counter_; }
+  //NullGaugeImpl& nullGauge(const std::string&) override { return store_.null_gauge_; }
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override {
+    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
+    Histogram& histogram = store_.histograms_.get(joiner.nameWithTags(), unit);
+    return histogram;
+  }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef tags) override {
+    TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
+    TextReadout& text_readout =
+        store_.text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
+    return text_readout;
+  }
+  CounterOptConstRef findCounter(StatName name) const override { return store_.counters_.find(name); }
+  GaugeOptConstRef findGauge(StatName name) const override { return store_.gauges_.find(name); }
+  HistogramOptConstRef findHistogram(StatName name) const override {
+    return store_.histograms_.find(name);
+  }
+  TextReadoutOptConstRef findTextReadout(StatName name) const override {
+    return store_.text_readouts_.find(name);
+  }
+
+  bool iterate(const IterateFn<Counter>& fn) const override { return store_.counters_.iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.gauges_.iterate(fn); }
+  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.histograms_.iterate(fn); }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return store_.text_readouts_.iterate(fn);
+  }
+
+  Counter& counterFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return counterFromStatName(storage.statName());
+  }
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return gaugeFromStatName(storage.statName(), import_mode);
+  }
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return histogramFromStatName(storage.statName(), unit);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return textReadoutFromStatName(storage.statName());
+  }
+
+  StatName prefix() const override { return prefix_.statName(); }
+
+
+ protected:
+  void addScopeToStore(const ScopeSharedPtr& scope) {
+    store_.scopes_.push_back(scope);
+  }
+
+ private:
+  StatNameStorage prefix_;
+  IsolatedStoreImpl& store_;
 };
 
 } // namespace Stats

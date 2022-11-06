@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Stats {
 
-StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.createScope("")) {}
+StatMerger::StatMerger(Store& target_store) : temp_scope_(target_store.rootScope()) {}
 
 StatMerger::~StatMerger() {
   // By the time a parent exits, all its contributions to accumulated gauges
