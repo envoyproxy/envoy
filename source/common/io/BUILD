@@ -14,6 +14,7 @@ envoy_cc_library(
         "io_uring.h",
     ],
     deps = [
+        "//envoy/buffer:buffer_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/network:address_lib",
     ],
@@ -47,6 +48,7 @@ envoy_cc_library(
     deps = [
         ":io_uring_interface",
         ":io_uring_impl_lib",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 

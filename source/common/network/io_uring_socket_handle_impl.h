@@ -73,6 +73,7 @@ public:
 
   // IoUringHandler
   void onAcceptSocket(Io::AcceptedSocketParam& param) override;
+  void onRead(Io::ReadParam& param) override;
   void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
@@ -95,6 +96,7 @@ private:
   bool remote_closed_{false};
 
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
+  OptRef<Io::ReadParam> read_param_{absl::nullopt};
   bool is_listen_socket_{false};
 };
 

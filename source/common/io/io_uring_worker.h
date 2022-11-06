@@ -1,6 +1,7 @@
 #pragma once
 
 #include "io_uring.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
 #include "source/common/io/io_uring.h"
@@ -43,6 +44,133 @@ private:
   bool is_closing_{false};
 };
 
+class IoUringServerSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
+public:
+  IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
+                      IoUringWorker& parent, uint32_t read_buffer_size) :
+    fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent),
+    read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
+
+  // IoUringSocket
+  os_fd_t fd() const override { return fd_; }
+
+  void start() override {
+    submitRequest();
+  }
+
+  void onCancel(int32_t result) override {
+    cancel_req_ = nullptr;
+    ENVOY_LOG(debug, "cancel request done, result = {}, fd = {}", result, fd_);
+    if (is_closing_ && read_req_ == nullptr) {
+      close_req_ = parent_.submitCloseRequest(*this);
+    }
+  }
+
+  void onClose(int32_t result) override {
+    close_req_ = nullptr;
+    ENVOY_LOG(debug, "close request done {}, fd = {}", result, fd_);
+    std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+    parent_.dispatcher().deferredDelete(std::move(self));
+  }
+
+  void close() override {
+    if (read_req_ != nullptr) {
+      is_closing_ = true;
+      cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
+      return;
+    }
+
+    close_req_ = parent_.submitCloseRequest(*this);
+  };
+
+  void enable() override {
+    is_disabled_ = false;
+    if (pending_result_ != absl::nullopt) {
+      ENVOY_LOG(debug, "push the pending read result");
+      parent_.injectCompletion(*this, RequestType::Read, pending_result_.value());
+      pending_result_ = absl::nullopt;
+    }
+
+    submitRequest();
+  };
+
+  void disable() override {
+    is_disabled_ = true;
+  };
+
+  void onRead(int32_t result) override {
+    ENVOY_LOG(debug, "onRead with result {}, fd = {}", result, fd_);
+    read_req_ = nullptr;
+
+    if (result <= 0) {
+      ASSERT(pending_read_buf_.length() == 0);
+
+      if (result == -ECANCELED) {
+        ENVOY_LOG(debug, "read request canceled, fd = {}", fd_);
+        if (is_closing_ && cancel_req_ == nullptr) {
+          close_req_ = parent_.submitCloseRequest(*this);
+        }
+        return;
+      }
+
+      if (is_disabled_) {
+        pending_result_ = result;
+        return;
+      }
+
+      ReadParam param{pending_read_buf_, result};
+      io_uring_handler_.onRead(param);
+      return;
+    }
+
+    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+        iouring_read_buf_.release(), result,
+        [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete this_fragment;
+        });
+    ASSERT(iouring_read_buf_ == nullptr);
+    pending_read_buf_.addBufferFragment(*fragment);
+
+    if (is_disabled_) {
+      ENVOY_LOG(debug, "server socket disabled");
+      pending_result_ = result;
+      return;
+    }
+
+    ReadParam param{pending_read_buf_, result};
+    io_uring_handler_.onRead(param);
+    ASSERT(pending_read_buf_.length() == 0);
+    submitRequest();
+  }
+
+private:
+  void submitRequest() {
+    //ASSERT(iouring_read_buf_ == nullptr);
+    iouring_read_buf_ = std::make_unique<uint8_t[]>(read_buffer_size_);
+    iov_->iov_base = iouring_read_buf_.get();
+    iov_->iov_len = read_buffer_size_;
+    read_req_ = parent_.submitReadRequest(*this, iov_);
+  }
+
+  os_fd_t fd_;
+
+  IoUringHandler& io_uring_handler_;
+  IoUringWorker& parent_;
+
+  uint32_t read_buffer_size_;
+  std::unique_ptr<uint8_t[]> iouring_read_buf_{};
+  Buffer::OwnedImpl pending_read_buf_;
+  absl::optional<int32_t> pending_result_{absl::nullopt};
+  struct iovec* iov_{nullptr};
+
+  bool is_disabled_{false};
+  bool is_closing_{false};
+
+  Request* read_req_;
+  Request* cancel_req_;
+  Request* close_req_;
+};
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
@@ -77,6 +205,8 @@ public:
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
+
+  void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) override;
 private:
   void onFileEvent();
 

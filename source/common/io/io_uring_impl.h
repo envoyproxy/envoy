@@ -9,6 +9,12 @@ namespace Io {
 
 bool isIoUringSupported();
 
+struct InjectedCompletion {
+  InjectedCompletion(void* user_data, int32_t result) : user_data_(user_data), result_(result) {}
+  void* user_data_;
+  int32_t result_;
+};
+
 class IoUringImpl : public IoUring {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
@@ -18,6 +24,8 @@ public:
   void unregisterEventfd() override;
   bool isEventfdRegistered() const override;
   void forEveryCompletion(CompletionCb completion_cb) override;
+  void injectCompletion(void* user_data, int32_t result) override;
+
   IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
                               void* user_data) override;
   IoUringResult prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
@@ -35,6 +43,7 @@ private:
   struct io_uring ring_ {};
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
+  std::vector<InjectedCompletion> injected_completions_;
 };
 
 } // namespace Io

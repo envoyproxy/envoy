@@ -49,6 +49,11 @@ public:
   virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
 
   /**
+   * Inject complation entry in the completion queue.
+   */
+  virtual void injectCompletion(void* user_data, int32_t result) PURE;
+
+  /**
    * Prepares an accept system call and puts it into the submission queue.
    * Returns IoUringResult::Failed in case the submission queue is full already
    * and IoUringResult::Ok otherwise.
@@ -150,6 +155,11 @@ struct AcceptedSocketParam {
   socklen_t remote_addr_len_;
 };
 
+struct ReadParam {
+  Buffer::Instance& pending_read_buf_;
+  int32_t result_;
+};
+
 class IoUringSocket : public Event::DeferredDeletable {
 public:
   virtual ~IoUringSocket() = default;
@@ -187,6 +197,8 @@ public:
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
   virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
 
+  virtual void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) PURE;
+
   virtual IoUring& get() PURE;
 };
 
@@ -195,6 +207,7 @@ public:
   virtual ~IoUringHandler() = default;
 
   virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
+  virtual void onRead(ReadParam& param) PURE;
 
   virtual void onRequestCompletion(const Request& req, int32_t result) PURE;
 };

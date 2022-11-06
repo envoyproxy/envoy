@@ -4,6 +4,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
+#include "io_uring_socket_handle_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
@@ -432,6 +433,12 @@ void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
 
   // After accept the socet, the accepted_socket_param expected to be cleanup.
   ASSERT(accepted_socket_param_ == absl::nullopt);
+}
+
+void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
+  read_param_ = param;
+  cb_(Event::FileReadyType::Read);
+  read_param_ = absl::nullopt;
 }
 
 void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,

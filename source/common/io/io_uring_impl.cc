@@ -60,7 +60,17 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
     struct io_uring_cqe* cqe = cqes_[i];
     completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
   }
+
+  for (auto& completion : injected_completions_) {
+    completion_cb(completion.user_data_, completion.result_);
+  }
+  injected_completions_.clear();
+
   io_uring_cq_advance(&ring_, count);
+}
+
+void IoUringImpl::injectCompletion(void* user_data, int32_t result) {
+  injected_completions_.emplace_back(user_data, result);
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,

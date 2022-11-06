@@ -1,5 +1,6 @@
 #include "source/common/io/io_uring_worker.h"
 #include "io_uring.h"
+#include "io_uring_impl.h"
 
 namespace Envoy {
 namespace Io {
@@ -274,6 +275,13 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iove
   }
   io_uring_impl_.submit();
   return req;
+}
+
+void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) {
+  Request* req = new Request();
+  req->io_uring_socket_ = socket;
+  req->type_ = type;
+  io_uring_impl_.injectCompletion(req, result);
 }
 
 } // namespace Io
