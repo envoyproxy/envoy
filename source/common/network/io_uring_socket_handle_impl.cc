@@ -221,7 +221,8 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   *addr = accepted_socket_param_->remote_addr_;
   *addrlen = accepted_socket_param_->remote_addr_len_;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
-                                                             accepted_socket_param_->fd_);
+                                                             accepted_socket_param_->fd_, socket_v6only_,
+                                                             domain_);
   io_handle->addReadRequest();
   accepted_socket_param_ = absl::nullopt;
 
