@@ -371,6 +371,11 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # HTTP Early Header Mutation
+    #
+    "envoy.http.early_header_mutation.regex_mutation": "//source/extensions/http/early_header_mutation/regex_mutation:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
