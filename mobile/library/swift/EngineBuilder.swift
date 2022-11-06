@@ -27,6 +27,7 @@ open class EngineBuilder: NSObject {
   private var enableBrotli: Bool = false
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
+  private var enablePlatformCertificateValidation: Bool = true
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
@@ -239,6 +240,18 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enforceTrustChainVerification(_ enforceTrustChainVerification: Bool) -> Self {
     self.enforceTrustChainVerification = enforceTrustChainVerification
+    return self
+  }
+
+  /// Specify whether to use the platform certificate verifier.
+  ///
+  /// - parameter enablePlatformCertificateValidation: whether to use the platform verifier.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enablePlatformCertificateValidation(
+    _ enablePlatformCertificateValidation: Bool) -> Self {
+    self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
     return self
   }
 
@@ -519,6 +532,7 @@ open class EngineBuilder: NSObject {
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
+      enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
       forceIPv6: self.forceIPv6,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,

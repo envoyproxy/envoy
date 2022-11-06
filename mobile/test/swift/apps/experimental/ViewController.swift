@@ -25,6 +25,7 @@ final class ViewController: UITableViewController {
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
       .enableInterfaceBinding(true)
+      .enablePlatformCertificateValidation(true)
       .addNativeFilter(
         name: "envoy.filters.http.buffer",
         typedConfig: """
