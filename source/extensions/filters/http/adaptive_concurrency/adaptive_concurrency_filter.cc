@@ -16,6 +16,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
+namespace {
+Http::Code toErrorCode(uint64_t status) {
+  const auto code = static_cast<Http::Code>(status);
+  if (code >= Http::Code::BadRequest) {
+    return code;
+  }
+  return Http::Code::ServiceUnavailable;
+}
+} // namespace
+
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
         proto_config,

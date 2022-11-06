@@ -108,8 +108,8 @@ message AdaptiveConcurrency {
   config.core.v3.RuntimeFeatureFlag enabled = 2;
 
   // This field allows for a custom HTTP response status code to the downstream client when
-  // the concurrency limit has been exceeded
-  // Defaults to 503 (Service Unavailable)
+  // the concurrency limit has been exceeded.
+  // Defaults to 503 (Service Unavailable).
   //
   // .. note::
   //   If this is set to < 400, 503 will be used instead.

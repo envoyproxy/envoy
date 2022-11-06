@@ -370,6 +370,10 @@ TEST_F(AdaptiveConcurrencyFilterTest, DisregardHealthChecks) {
   filter_->encodeComplete();
 }
 
+/**
+ * Tests that if configured a custom status code is returned
+ * from the adaptive concurrency filter
+ */
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestBlockWithCustomStatus) {
   std::string yaml_config =
       R"EOF(
@@ -406,6 +410,10 @@ concurrency_limit_exceeded_status:
             filter_->decodeHeaders(request_headers, true));
 }
 
+/**
+ * Tests that if an invalid (<400) status code is configure then the
+ * Adaptive Concurrency Filter falls back to 503
+ */
 TEST_F(AdaptiveConcurrencyFilterTest,
        DecodeHeadersTestBlockWithServiceUnavailableForInvalidStatus) {
   std::string yaml_config =

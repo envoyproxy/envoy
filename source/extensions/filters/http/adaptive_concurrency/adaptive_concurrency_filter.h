@@ -37,14 +37,6 @@ public:
   Http::Code concurrencyLimitExceededStatus() const { return concurrency_limit_exceeded_status_; }
 
 private:
-  static Http::Code toErrorCode(uint64_t status) {
-    const auto code = static_cast<Http::Code>(status);
-    if (code >= Http::Code::BadRequest) {
-      return code;
-    }
-    return Http::Code::ServiceUnavailable;
-  }
-
   const std::string stats_prefix_;
   TimeSource& time_source_;
   Runtime::FeatureFlag adaptive_concurrency_feature_;
