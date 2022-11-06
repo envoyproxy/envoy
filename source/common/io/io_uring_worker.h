@@ -174,15 +174,13 @@ private:
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
+  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() {
-    if (dispatcher_.has_value()) {
-      dispatcher_->clearDeferredDeleteList();
-    }
+    dispatcher_.clearDeferredDeleteList();
   }
 
   // IoUringWorker
-  void start(Event::Dispatcher& dispatcher) override;
+  void start() override;
   void enableSocket(os_fd_t fd) override {
     auto socket_iter = sockets_.find(fd);
     ASSERT(socket_iter != sockets_.end());
@@ -212,7 +210,7 @@ private:
 
   IoUringImpl io_uring_impl_;
   Event::FileEventPtr file_event_{nullptr};
-  OptRef<Event::Dispatcher> dispatcher_;
+  Event::Dispatcher& dispatcher_;
 
   absl::flat_hash_map<os_fd_t, std::unique_ptr<IoUringSocket>> sockets_;
 };

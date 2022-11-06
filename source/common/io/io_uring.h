@@ -182,7 +182,7 @@ class IoUringWorker : public ThreadLocal::ThreadLocalObject {
 public:
   virtual ~IoUringWorker() = default;
 
-  virtual void start(Event::Dispatcher& dispatcher) PURE;
+  virtual void start() PURE;
 
   virtual void enableSocket(os_fd_t fd) PURE;
   virtual void disableSocket(os_fd_t fd) PURE;

@@ -308,11 +308,10 @@ Address::InstanceConstSharedPtr IoUringSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
-void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
+void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
                                                   Event::FileReadyCb cb,
                                                   Event::FileTriggerType, uint32_t) {
   io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
-  io_uring_worker_.ref().start(dispatcher);
 
   if (is_listen_socket_) {
     //addAcceptRequest();

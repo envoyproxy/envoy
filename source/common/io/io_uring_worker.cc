@@ -164,21 +164,19 @@ void IoUringWorkerImpl::onFileEvent() {
   io_uring_impl_.submit();
 }
 
-IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling) :
-    io_uring_impl_(io_uring_size, use_submission_queue_polling) { }
+IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, Event::Dispatcher& dispatcher) :
+    io_uring_impl_(io_uring_size, use_submission_queue_polling), dispatcher_(dispatcher) { }
 
-void IoUringWorkerImpl::start(Event::Dispatcher& dispatcher) {
+void IoUringWorkerImpl::start() {
   // This means already registered the file event.
   if (file_event_ != nullptr) {
     return;
   }
 
-  dispatcher_ = dispatcher;
-
   const os_fd_t event_fd = io_uring_impl_.registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
-  file_event_ = dispatcher.createFileEvent(
+  file_event_ = dispatcher_.createFileEvent(
       event_fd, [this](uint32_t) { onFileEvent(); }, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 }
 
@@ -208,7 +206,7 @@ std::unique_ptr<IoUringSocket> IoUringWorkerImpl::removeSocket(os_fd_t fd) {
 }
 
 Event::Dispatcher& IoUringWorkerImpl::dispatcher() {
-  return dispatcher_.ref();
+  return dispatcher_;
 }
 
 Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
