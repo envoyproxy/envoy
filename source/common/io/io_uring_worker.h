@@ -76,6 +76,7 @@ public:
                                socklen_t* remote_addr_len) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
+  Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
 private:
   void onFileEvent();
 

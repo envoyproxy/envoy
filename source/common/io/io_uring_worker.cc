@@ -259,5 +259,22 @@ Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
   return req;
 }
 
+Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iovec* iov) {
+  ENVOY_LOG(trace, "submit read request, fd = {}", socket.fd());
+  Request* req = new Request();
+  req->io_uring_socket_ = socket;
+  req->type_ = RequestType::Read;
+
+  auto res = io_uring_impl_.prepareReadv(socket.fd(), iov, 1, 0, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareReadv(socket.fd(), iov, 1, 0, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
+  }
+  io_uring_impl_.submit();
+  return req;
+}
+
 } // namespace Io
 } // namespace Envoy

@@ -185,6 +185,7 @@ public:
                                          socklen_t* remote_addr_len) PURE;
   virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
+  virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
 
   virtual IoUring& get() PURE;
 };
