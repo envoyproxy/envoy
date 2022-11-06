@@ -23,7 +23,8 @@ class IoUringSocketHandleImpl final : public IoHandle, public Io::IoUringHandler
 public:
   IoUringSocketHandleImpl(const uint32_t read_buffer_size, Io::IoUringFactory&,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                          absl::optional<int> domain = absl::nullopt);
+                          absl::optional<int> domain = absl::nullopt,
+                          bool is_server_socket = false);
   ~IoUringSocketHandleImpl() override;
 
   // Network::IoHandle
@@ -98,6 +99,7 @@ private:
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};
   bool is_listen_socket_{false};
+  bool is_server_socket_{false};
 };
 
 } // namespace Network

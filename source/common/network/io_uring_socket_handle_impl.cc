@@ -24,9 +24,15 @@ constexpr socklen_t udsAddressLength() { return sizeof(sa_family_t); }
 IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size,
                                                  Io::IoUringFactory& io_uring_factory,
                                                  os_fd_t fd, bool socket_v6only,
-                                                 absl::optional<int> domain)
+                                                 absl::optional<int> domain,
+                                                 bool is_server_socket)
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
-      socket_v6only_(socket_v6only), domain_(domain) {}
+      socket_v6only_(socket_v6only), domain_(domain), is_server_socket_(is_server_socket) {
+  if (is_server_socket_) {
+    io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
+    io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_, true);
+  }
+}
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
@@ -38,7 +44,7 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
-  if (is_listen_socket_) {
+  if (is_listen_socket_ || is_server_socket_) {
    io_uring_worker_.ref().closeSocket(fd_);
    SET_SOCKET_INVALID(fd_);
    return Api::ioCallUint64ResultNoError();
@@ -71,6 +77,36 @@ bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
+  if (is_server_socket_) {
+    if (read_param_ == absl::nullopt) {
+       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                  IoSocketError::deleteIoError)};
+    }
+
+    if (read_param_->result_ == 0) {
+      return Api::ioCallUint64ResultNoError();
+    }
+
+    if (read_param_->result_ == -EAGAIN) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
+  
+    if (read_param_->result_ < 0) {
+      return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+    }
+
+    if (read_param_->pending_read_buf_.length() == 0) {
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                 IoSocketError::deleteIoError)};
+    }
+
+    const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param_->result_));
+    uint64_t num_bytes_to_read = read_param_->pending_read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
+    read_param_->pending_read_buf_.drain(num_bytes_to_read);
+    return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  }
+
   if (remote_closed_) {
     return Api::ioCallUint64ResultNoError();
   }
@@ -220,10 +256,13 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket");
   *addr = accepted_socket_param_->remote_addr_;
   *addrlen = accepted_socket_param_->remote_addr_len_;
+  bool enable_server_socket = false;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
                                                              accepted_socket_param_->fd_, socket_v6only_,
-                                                             domain_);
-  io_handle->addReadRequest();
+                                                             domain_, enable_server_socket);
+  if (!enable_server_socket) {
+    io_handle->addReadRequest();
+  }
   accepted_socket_param_ = absl::nullopt;
 
   return io_handle;
@@ -320,12 +359,27 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
     io_uring_worker_.ref().addAcceptSocket(fd_, *this);
   }
 
+  if (is_server_socket_) {
+    io_uring_worker_.ref().enableSocket(fd_);
+  }
+
   cb_ = std::move(cb);
 }
 
 IoHandlePtr IoUringSocketHandleImpl::duplicate() { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
+  if ((is_listen_socket_ || is_server_socket_) && events & Event::FileReadyType::Read) {
+    if (events & Event::FileReadyType::Read) {
+      io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
+    }
+    if (events & Event::FileReadyType::Write) {
+      // go to the old path until server socket enable write.
+      //io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Write);
+    }
+  }
+
+  // old code path.
   if (events & Event::FileReadyType::Write) {
     addReadRequest();
     cb_(Event::FileReadyType::Write);
@@ -333,10 +387,12 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
 }
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
-  if (is_listen_socket_) {
+  if (is_listen_socket_ || is_server_socket_) {
     io_uring_worker_.ref().enableSocket(fd_);
     return;
   }
+
+  // old code path.
   if (events & Event::FileReadyType::Read) {
     is_read_enabled_ = true;
     addReadRequest();

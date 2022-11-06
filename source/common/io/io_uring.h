@@ -187,6 +187,7 @@ public:
   virtual void enableSocket(os_fd_t fd) PURE;
   virtual void disableSocket(os_fd_t fd) PURE;
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+  virtual void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size, bool is_disabled) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
@@ -197,6 +198,7 @@ public:
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
   virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
 
+  virtual void injectCompletion(os_fd_t, RequestType type, int32_t result) PURE;
   virtual void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) PURE;
 
   virtual IoUring& get() PURE;

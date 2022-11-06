@@ -191,6 +191,13 @@ void IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
   io_uring_impl_.submit();
 }
 
+void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size, bool is_disabled) {
+  std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(fd, handler, *this, read_buffer_size, is_disabled);
+  socket->start();
+  sockets_.insert({fd, std::move(socket)});
+  io_uring_impl_.submit();
+}
+
 void IoUringWorkerImpl::closeSocket(os_fd_t fd) {
   auto socket_iter = sockets_.find(fd);
   ASSERT(socket_iter != sockets_.end());
@@ -280,6 +287,12 @@ void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, RequestType type
   req->io_uring_socket_ = socket;
   req->type_ = type;
   io_uring_impl_.injectCompletion(req, result);
+}
+
+void IoUringWorkerImpl::injectCompletion(os_fd_t fd, RequestType type, int32_t result) {
+  auto socket_iter = sockets_.find(fd);
+  ASSERT(socket_iter != sockets_.end());
+  injectCompletion(*(socket_iter->second), type, result);
 }
 
 } // namespace Io

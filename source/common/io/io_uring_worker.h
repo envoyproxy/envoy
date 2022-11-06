@@ -47,15 +47,19 @@ private:
 class IoUringServerSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
-                      IoUringWorker& parent, uint32_t read_buffer_size) :
+                      IoUringWorker& parent, uint32_t read_buffer_size,
+                      bool is_disabled) :
     fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent),
-    read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
+    read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]),
+    is_disabled_(is_disabled) {}
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
 
   void start() override {
-    submitRequest();
+    if (!is_disabled_) {
+      submitRequest();
+    }
   }
 
   void onCancel(int32_t result) override {
@@ -111,6 +115,12 @@ public:
           close_req_ = parent_.submitCloseRequest(*this);
         }
         return;
+      }
+
+      if (result == -EAGAIN) {
+        if (pending_result_.has_value()) {
+          result = pending_result_.value();
+        }
       }
 
       if (is_disabled_) {
@@ -192,6 +202,7 @@ public:
     socket_iter->second->disable();
   }
   void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
+  void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size, bool is_disabled) override;
   void closeSocket(os_fd_t fd) override;
   Event::Dispatcher& dispatcher() override;
 
@@ -204,6 +215,7 @@ public:
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
 
+  void injectCompletion(os_fd_t, RequestType type, int32_t result) override;
   void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) override;
 private:
   void onFileEvent();
