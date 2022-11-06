@@ -547,9 +547,10 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 }; // namespace
 
 const Network::FilterChain*
-FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket,
+                                        const StreamInfo::StreamInfo& info) const {
   if (matcher_) {
-    return findFilterChainUsingMatcher(socket);
+    return findFilterChainUsingMatcher(socket, info);
   }
 
   const auto& address = socket.connectionInfoProvider().localAddress();
@@ -581,7 +582,8 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 }
 
 const Network::FilterChain*
-FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const {
+FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                    const StreamInfo::StreamInfo&) const {
   Network::Matching::MatchingDataImpl data(socket);
   const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
   ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
