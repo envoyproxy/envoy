@@ -124,31 +124,31 @@ void IoUringWorkerImpl::onFileEvent() {
     if (req->io_uring_socket_.has_value()) {
       switch(req->type_) {
       case RequestType::Accept:
-        ENVOY_LOG(debug, "receive accept request completion");
+        ENVOY_LOG(trace, "receive accept request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onAccept(result);
         break;
       case RequestType::Connect:
-        ENVOY_LOG(debug, "receive connect request completion");
+        ENVOY_LOG(trace, "receive connect request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onConnect(result);
         break;
       case RequestType::Read:
-        ENVOY_LOG(debug, "receive Read request completion");
+        ENVOY_LOG(trace, "receive Read request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onRead(result);
         break;
       case RequestType::Write:
-        ENVOY_LOG(debug, "receive write request completion");
+        ENVOY_LOG(trace, "receive write request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onWrite(result);
         break;
       case RequestType::Close:
-        ENVOY_LOG(debug, "receive close request completion");
+        ENVOY_LOG(trace, "receive close request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onClose(result);
         break;
       case RequestType::Cancel:
-        ENVOY_LOG(debug, "receive cancel request completion");
+        ENVOY_LOG(trace, "receive cancel request completion, fd = {}", req->io_uring_socket_->get().fd());
         req->io_uring_socket_->get().onCancel(result);
         break;
       case RequestType::Unknown:
-        ENVOY_LOG(debug, "receive unknown request completion");
+        ENVOY_LOG(trace, "receive unknown request completion, fd = {}", req->io_uring_socket_->get().fd());
         break;
       }
     // For close, there is no iohandle value, but need to fix
@@ -212,6 +212,7 @@ Event::Dispatcher& IoUringWorkerImpl::dispatcher() {
 
 Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len) {
+  ENVOY_LOG(trace, "submit accept request, fd = {}", socket.fd());
   Request* req = new Request();
   req->type_ = RequestType::Accept;
   req->io_uring_socket_ = socket;
@@ -228,6 +229,7 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct so
 }
 
 Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
+  ENVOY_LOG(trace, "submit cancel request, fd = {}", socket.fd());
   Request* req = new Request();
   req->io_uring_socket_ = socket;
   req->type_ = RequestType::Cancel;
@@ -242,6 +244,7 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
 }
 
 Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
+  ENVOY_LOG(trace, "submit close request, fd = {}", socket.fd());
   Request* req = new Request();
   req->io_uring_socket_ = socket;
   req->type_ = RequestType::Close;
