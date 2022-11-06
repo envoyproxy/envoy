@@ -7,6 +7,11 @@ namespace Io {
 void IoUringAcceptSocket::onAccept(int32_t result) {
   if (result < 0) {
     ENVOY_LOG(debug, "Accept request failed");
+
+    accept_req_ = nullptr;
+    if (is_closing_ && result == -ECANCELED && cancel_req_ == nullptr) {
+      close_req_ = parent_.submitCloseRequest(*this);
+    }
     return;
   }
 
@@ -27,26 +32,22 @@ void IoUringAcceptSocket::onAccept(int32_t result) {
 void IoUringAcceptSocket::onCancel(int32_t) {
   cancel_req_ = nullptr;
   ENVOY_LOG(debug, "cancel request done");
-  if (close_req_ == nullptr) {
-    ENVOY_LOG(debug, "the socket {} is ready to end");
-    std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
-    parent_.dispatcher().deferredDelete(std::move(self));
+  if (is_closing_ && accept_req_ == nullptr) {
+    close_req_ = parent_.submitCloseRequest(*this);
   }
 }
 
 void IoUringAcceptSocket::onClose(int32_t) {
   close_req_ = nullptr;
   ENVOY_LOG(debug, "close request done");
-  if (cancel_req_ == nullptr && !is_disabled_) {
-    if (is_pending_accept_) {
-      is_pending_accept_ = false;
-      // Close the accepted socket directly when there is pending one.
-      ::close(connection_fd_);
-    }
-    ENVOY_LOG(debug, "the socket {} is ready to end");
-    std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
-    parent_.dispatcher().deferredDelete(std::move(self));
+  if (is_pending_accept_) {
+    is_pending_accept_ = false;
+    // Close the accepted socket directly when there is pending one.
+    ::close(connection_fd_);
   }
+  ENVOY_LOG(debug, "the socket {} is ready to end");
+  std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+  parent_.dispatcher().deferredDelete(std::move(self));
 }
 
 void IoUringAcceptSocket::start() {
@@ -56,7 +57,9 @@ void IoUringAcceptSocket::start() {
 void IoUringAcceptSocket::close() {
   if (accept_req_ != nullptr) {
     ENVOY_LOG(debug, "submit cancel request for the accept");
+    is_closing_ = true;
     cancel_req_ = parent_.submitCancelRequest(*this, accept_req_);
+    return;
   }
 
   ENVOY_LOG(debug, "submit close request for the accept");

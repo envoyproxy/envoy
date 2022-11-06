@@ -40,6 +40,7 @@ private:
 
   bool is_disabled_{false};
   bool is_pending_accept_{false};
+  bool is_closing_{false};
 };
 
 
