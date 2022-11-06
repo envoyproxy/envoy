@@ -37,7 +37,9 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     well_known_tags_->rememberBuiltin(desc.name_);
   }
   StatNameManagedStorage empty("", alloc.symbolTable());
-  default_scope_ = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()));
+  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()));
+  addScope(new_scope);
+  default_scope_ = new_scope;
 }
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {

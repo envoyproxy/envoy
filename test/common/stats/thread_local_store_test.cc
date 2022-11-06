@@ -73,7 +73,11 @@ public:
     store_->addSink(sink_);
   }
 
-  ~StatsThreadLocalStoreTest() override { tls_.shutdownGlobalThreading(); }
+  ~StatsThreadLocalStoreTest() override {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+    tls_.shutdownThread();
+  }
 
   void resetStoreWithAlloc(Allocator& alloc) {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
@@ -355,7 +359,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
   StatNameManagedStorage c2_name("scope1.c2", symbol_table_);
-  auto found_counter2 = store_->rootScope()->findCounter(c2_name.statName());
+  auto found_counter2 = scope1->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
   EXPECT_EQ(&c2, &found_counter2->get());
 
@@ -368,7 +372,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
   StatNameManagedStorage g2_name("scope1.g2", symbol_table_);
-  auto found_gauge2 = store_->rootScope()->findGauge(g2_name.statName());
+  auto found_gauge2 = scope1->findGauge(g2_name.statName());
   ASSERT_TRUE(found_gauge2.has_value());
   EXPECT_EQ(&g2, &found_gauge2->get());
 
@@ -385,7 +389,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
   StatNameManagedStorage h2_name("scope1.h2", symbol_table_);
-  auto found_histogram2 = store_->rootScope()->findHistogram(h2_name.statName());
+  auto found_histogram2 = scope1->findHistogram(h2_name.statName());
   ASSERT_TRUE(found_histogram2.has_value());
   EXPECT_EQ(&h2, &found_histogram2->get());
 
@@ -591,7 +595,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   Counter& c1 = scope1->counterFromString("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
   StatNameManagedStorage c1_name("scope1.foo.bar", symbol_table_);
-  auto found_counter = store_->rootScope()->findCounter(c1_name.statName());
+  auto found_counter = scope1->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
 
@@ -600,7 +604,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   EXPECT_EQ(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
   StatNameManagedStorage c2_name("scope1.foo.bar", symbol_table_);
-  auto found_counter2 = store_->rootScope()->findCounter(c2_name.statName());
+  auto found_counter2 = scope2->findCounter(c2_name.statName());
   ASSERT_TRUE(found_counter2.has_value());
 
   // Different allocations point to the same referenced counted backing memory.
