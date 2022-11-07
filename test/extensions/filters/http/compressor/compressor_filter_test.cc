@@ -134,7 +134,7 @@ public:
   }
 
   void doResponse(Http::TestResponseHeaderMapImpl& headers, bool with_compression,
-                  bool with_trailers) {
+                  bool with_trailers = false) {
     uint64_t buffer_content_size;
     if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
       buffer_content_size = 1000;
@@ -183,8 +183,35 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-// Test if Runtime Feature is Disabled
-TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
+enum PerRouteConfig { kNone, kEmpty, kEnabled, kDisabled };
+
+struct EnablementParams {
+  bool runtime_enabled;
+  PerRouteConfig per_route_enabled;
+  bool expect_compression;
+};
+
+class CompresorFilterEnablementTest : public CompressorFilterTest,
+                                      public testing::WithParamInterface<EnablementParams> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    CompresorFilterEnablementTest, CompresorFilterEnablementTest,
+    testing::ValuesIn<EnablementParams>({// no per-route config, so runtime key controls
+                                         {true, kNone, true},
+                                         {false, kNone, false},
+                                         // enabled by empty per-route config
+                                         {true, kEmpty, true},
+                                         {false, kEmpty, true},
+                                         // enabled by per-route config
+                                         {true, kEnabled, true},
+                                         {false, kEnabled, true},
+                                         // disabled by per-route config
+                                         {true, kDisabled, false},
+                                         {false, kDisabled, false}}));
+
+// common_config.enabled should enable/disable compression, unless a CompressorPerRoute config
+// overrides it.
+TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
   setUpFilter(R"EOF(
 {
   "response_direction_config": {
@@ -204,13 +231,33 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
 }
 )EOF");
   response_stats_prefix_ = "response.";
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
-      .Times(2)
-      .WillRepeatedly(Return(false));
+  ON_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .WillByDefault(Return(GetParam().runtime_enabled));
+  envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route_proto;
+  bool use_per_route_proto = true;
+  switch (GetParam().per_route_enabled) {
+  case kNone:
+    use_per_route_proto = false;
+    break;
+  case kEmpty:
+    break;
+  case kEnabled:
+    per_route_proto.mutable_response_compression_enabled()->set_value(true);
+    break;
+  case kDisabled:
+    per_route_proto.mutable_response_compression_enabled()->set_value(false);
+    break;
+  }
+  if (use_per_route_proto) {
+    CompressorPerRouteFilterConfig per_route_config(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(&per_route_config));
+  }
+
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
-  doResponseNoCompression(headers);
-  EXPECT_FALSE(headers.has("vary"));
+  doResponse(headers, GetParam().expect_compression);
+  EXPECT_EQ(headers.has("vary"), GetParam().expect_compression);
 }
 
 // Default config values.

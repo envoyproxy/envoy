@@ -96,7 +96,8 @@ message Compressor {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Runtime flag that controls whether the filter is enabled or not. If set to false, the
-  // filter will operate as a pass-through filter. If not specified, defaults to enabled.
+  // filter will operate as a pass-through filter, unless overridden by
+  // CompresserPerRoute.response_compression_enabled. If not specified, defaults to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -127,4 +128,9 @@ message Compressor {
   // If true, chooses this compressor first to do compression when the q-values in `Accept-Encoding` are same.
   // The last compressor which enables choose_first will be chosen if multiple compressor filters in the chain have choose_first as true.
   bool choose_first = 9;
+}
+
+message CompressorPerRoute {
+  // Overrides Compressor.response_direction_config.enabled. Defaults to true.
+  google.protobuf.BoolValue response_compression_enabled = 1;
 }
