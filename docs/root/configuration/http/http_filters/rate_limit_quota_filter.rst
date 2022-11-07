@@ -7,24 +7,24 @@ Rate Limit Quota (Work-In-Progress)
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig>`
 
 This filter provides implementation of the global rate limit quota :ref:`protocol <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
-The rate limit quota service (RLQS) provides quota assignments to each Envoy instance connected to the service. In addition to enforcing rate limit quota assignments,
-this filter periodically reports request rates for each assignment to the RLQS, allowing it to rebalance quota assignments between Envoy instances depending on the
-individual load of each Envoy instance. When quota assignments change the RLQS proactively pushes them to Envoy.
+The rate limit quota service (RLQS) provides quota assignments to each Envoy instance connected to the RLQS service. In addition to enforcing rate limit quota assignments,
+this filter periodically reports request rates to the RLQS, allowing the RLQS server to rebalance quota assignments between Envoy instances based on the real-time
+individual load of each Envoy instance. When quota assignments change, the RLQS proactively pushes the new assignment to Envoy.
 
 The HTTP rate limit quota filter will call the rate limit quota service when it is configured in the HTTP connection manager filter chain. Filter configuration
-defines the RLQS service and definitions of request buckets that will receive quota assignments. Request buckets are defined by a set of matchers that determine
+defines the RLQS service and definitions of quota buckets that will receive quota assignments from server. Qouta buckets are defined by a set of matchers that determine
 if a request is subject to the rate limit quota assigned to that bucket. Each matcher can contain multiple buckets by the means of the
 :ref:`bucket_id_builder <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`. The bucket ID builder allows
-request buckets to be generated dynamically based on request attributes, such as request header value.
+quota buckets to be generated either dynamically based on request attributes, such as request header value or statically based on the configuration.
 
 If a request does not match any set of matchers then quota assignment for the "catch all" bucket configured by the ``on_no_match`` field of the
 :ref:`bucket_matchers <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>` is applied. If the ``on_no_match``
-configuration is not provided, all unmatched requests are not rate limited.
+configuration is not provided, all unmatched requests are not rate limited (i.e. fail-open).
 
 Bucket definitions can be overridden by the virtual host or route configurations. The more specific definition completely overrides the less specific definition.
 
-Initially all Envoy's quota assignments are empty. The rate limit quota filter requests quota assignment from RLQS when the request matches a bucket for the first time.
-The behavior of the filter while it waits for the initial assignment is determined by the ``no_assignment_behavior`` value. In this state requests can either all be
+Initially all Envoy's quota assignments are empty. The rate limit quota filter requests quota assignment from RLQS when the request matches to a bucket for the first time.
+The behavior of the filter while it waits for the initial assignment is determined by the ``no_assignment_behavior`` value. In this state, requests can either all be
 immediately allowed, denied or enqueued until quota assignment is received.
 
 A quota assignment may have associated :ref:`time to live <envoy_v3_api_field_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.QuotaAssignmentAction.assignment_time_to_live>`.
@@ -33,9 +33,9 @@ has expired, the filter can be configured to continue using the last quota assig
 :ref:`expired assignment configuration <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`.
 
 The rate limit quota filter reports the request load for each bucket to the RLQS with the configured ``reporting_interval``. The RLQS may rebalance quota assignments based on the request
-load that each Envoy receives and push new quota assignments to Envoys.
+load that each Envoy receives and push new quota assignments to Envoy instances.
 
-When connection to RLQS server fails the filter will fall back to either the
+When tge connection to RLQS server fails, the filter will fall back to either the
 :ref:`no assignment behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
 if it has not yet received rate limit quota or to the
 :ref:`expired assignment behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>` if
@@ -48,13 +48,13 @@ In this example HTTP connection manager has the following bucket definitions in 
 :ref:`configuration <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig>`. This
 configuration enables rate limit quota filter with 3 buckets. Note that bucket ID is a map of key-value pairs.
 
-1.  Bucket id ``name: prod-rate-limit-quota`` for all requests with the ``deployment: prod`` header present. Until RLQS assigns a quota
+1.  Bucket id ``name: prod-rate-limit-quota`` for all requests with the ``deployment: prod`` header present. Until RLQS assigns a quota,
     all requests are allowed.
 
-1.  Bucket id ``name: staging-rate-limit-quota`` for all requests with the ``deployment: staging`` header present. Until RLQS assigns a quota
+2.  Bucket id ``name: staging-rate-limit-quota`` for all requests with the ``deployment: staging`` header present. Until RLQS assigns a quota,
     all requests are denied.
 
-1.  Bucket id ``name: default-rate-limit-quota`` for all other requests. Until RLQS assigns a quota 1K RPS quota is applied.
+3.  Bucket id ``name: default-rate-limit-quota`` for all other requests. Until RLQS assigns a quota, 1K RPS quota is applied.
 
 .. code-block:: yaml
 
@@ -153,7 +153,7 @@ are emitted to the normal cluster :ref:`dynamic HTTP statistics <config_cluster_
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  buckets, Counter, Total number of request buckets created
+  buckets, Counter, Total number of quota buckets created
   assignments, Counter, Total rate limit assignments received from the rate limit quota service
   error, Counter, Total errors contacting the rate limit quota service
   over_limit, Counter, Total requests that exceeded assigned rate limit
@@ -161,8 +161,3 @@ are emitted to the normal cluster :ref:`dynamic HTTP statistics <config_cluster_
   :ref:`no_assigment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`"
   expired_assigment, Counter, "Total requests that were applied the
   :ref:`expired_assignment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`"
-
-Dynamic Metadata
-----------------
-
-TODO
