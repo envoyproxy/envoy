@@ -14,6 +14,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":filter_state_interface",
+        ":stream_id_provider_interface",
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
