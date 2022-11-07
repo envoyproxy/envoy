@@ -45,7 +45,7 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
   ASSERT(callbacks_ != nullptr);
-  callbacks_->onReceive(response.get());
+  callbacks_->onQuotaResponse(*response);
 }
 
 void RateLimitClientImpl::closeStream() {

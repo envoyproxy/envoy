@@ -99,8 +99,8 @@ TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   client_->rateLimit(callbacks_);
 
-  // `onReceive` callback is expected to be called.
-  EXPECT_CALL(callbacks_, onReceive);
+  // `onQuotaResponse` callback is expected to be called.
+  EXPECT_CALL(callbacks_, onQuotaResponse);
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
   auto response_buf = Grpc::Common::serializeMessage(resp);
   EXPECT_TRUE(stream_callbacks_->onReceiveMessageRaw(std::move(response_buf)));

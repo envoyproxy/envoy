@@ -104,7 +104,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // RateLimitQuota::RateLimitQuotaCallbacks
-  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
+  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
 
   // Perform request matching. It returns the generated bucket ids if the matching succeeded and
   // returns the error status otherwise.
