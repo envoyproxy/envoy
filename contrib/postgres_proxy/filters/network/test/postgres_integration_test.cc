@@ -6,6 +6,7 @@
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
+#include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -16,14 +17,19 @@ namespace PostgresProxy {
 
 class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
+public:
+  using UpstreamSSLConfig = std::tuple<const absl::string_view, const absl::string_view>;
 
-  std::string postgresConfig(bool terminate_ssl, bool add_start_tls_transport_socket) {
+  std::string postgresConfig(bool terminate_ssl, bool add_start_tls_transport_socket,
+                             UpstreamSSLConfig upstream_ssl_config) {
     std::string main_config = fmt::format(
         TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml")),
         Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
         Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getAnyAddressString(GetParam()), terminate_ssl ? "true" : "false");
+        std::get<1>(upstream_ssl_config), // upstream SSL transport socket
+        Network::Test::getAnyAddressString(GetParam()), terminate_ssl ? "true" : "false",
+        std::get<0>(upstream_ssl_config)); // postgres filter's upstream_ssl option.
 
     if (add_start_tls_transport_socket) {
       main_config +=
@@ -48,21 +54,24 @@ class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Addre
     return main_config;
   }
 
-public:
-  PostgresBaseIntegrationTest(bool terminate_ssl, bool add_starttls_transport_socket)
-      : BaseIntegrationTest(GetParam(),
-                            postgresConfig(terminate_ssl, add_starttls_transport_socket)) {
+  PostgresBaseIntegrationTest(bool terminate_ssl, bool add_starttls_transport_socket,
+                              UpstreamSSLConfig upstream_ssl_config)
+      : BaseIntegrationTest(GetParam(), postgresConfig(terminate_ssl, add_starttls_transport_socket,
+                                                       upstream_ssl_config)) {
     skip_tag_extraction_rule_check_ = true;
   };
 
   void SetUp() override { BaseIntegrationTest::initialize(); }
+
+  static constexpr absl::string_view empty_config_string_{""};
+  static constexpr UpstreamSSLConfig NoUpstreamSSL{empty_config_string_, empty_config_string_};
 };
 
 // Base class for tests with `terminate_ssl` disabled and without
 // `starttls` transport socket.
 class BasicPostgresIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  BasicPostgresIntegrationTest() : PostgresBaseIntegrationTest(false, false) {}
+  BasicPostgresIntegrationTest() : PostgresBaseIntegrationTest(false, false, NoUpstreamSSL) {}
 };
 
 // Test that the filter is properly chained and reacts to successful login
@@ -114,7 +123,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, BasicPostgresIntegrationTest,
 // Base class for tests with `terminate_ssl` enabled and `starttls` transport socket added.
 class SSLPostgresIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  SSLPostgresIntegrationTest() : PostgresBaseIntegrationTest(true, true) {}
+  SSLPostgresIntegrationTest() : PostgresBaseIntegrationTest(true, true, NoUpstreamSSL) {}
 };
 
 // Test verifies that Postgres filter replies with correct code upon
@@ -152,7 +161,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SSLPostgresIntegrationTest,
 
 class SSLWrongConfigPostgresIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  SSLWrongConfigPostgresIntegrationTest() : PostgresBaseIntegrationTest(true, false) {}
+  SSLWrongConfigPostgresIntegrationTest()
+      : PostgresBaseIntegrationTest(true, false, NoUpstreamSSL) {}
 };
 
 // Test verifies that Postgres filter closes connection when it is configured to
@@ -183,11 +193,48 @@ TEST_P(SSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSoc
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  // Make sure that the successful login bumped up the number of sessions.
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SSLWrongConfigPostgresIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+// Upstream SSL integration tests.
+
+// Base class for tests with disabled upstream SSL. It should behave exactly
+// as without any upstream configuration specified and pass
+// messages in clear-text.
+class UpstreamSSLDisabledPostgresIntegrationTest : public PostgresBaseIntegrationTest {
+public:
+  // Disable downstream SSL and upstream SSL.
+  UpstreamSSLDisabledPostgresIntegrationTest()
+      : PostgresBaseIntegrationTest(false, false, std::make_tuple("upstream_ssl: DISABLE", "")) {}
+};
+
+// Verify that postgres filter does not send any additional messages when
+// upstream SSL is disabled.
+TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send the startup message.
+  Buffer::OwnedImpl data;
+  std::string rcvd;
+  createInitialPostgresRequest(data);
+  ASSERT_TRUE(tcp_client->write(data.toString()));
+  // Make sure that upstream receives startup message in clear-text (no SSL negotiation takes place).
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.toString().length(), &rcvd));
+  data.drain(data.length());
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
+  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 } // namespace PostgresProxy

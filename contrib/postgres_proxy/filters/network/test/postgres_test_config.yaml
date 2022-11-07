@@ -21,6 +21,7 @@ static_resources:
               socket_address:
                 address: "{}"
                 port_value: 0
+      {}
   listeners:
     name: listener_0
     address:
@@ -34,6 +35,7 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
           stat_prefix: postgres_stats
           terminate_ssl: {}
+          {}
       - name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy

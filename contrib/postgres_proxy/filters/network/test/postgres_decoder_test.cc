@@ -38,8 +38,6 @@ public:
     decoder_->state(DecoderImpl::State::InSyncState);
   }
 
-  void createInitialPostgresRequest();
-
 protected:
   ::testing::NiceMock<DecoderCallbacksMock> callbacks_;
   std::unique_ptr<DecoderImpl> decoder_;
@@ -644,33 +642,11 @@ class PostgresProxyUpstreamSSLTest
     : public PostgresProxyDecoderTestBase,
       public ::testing::TestWithParam<std::tuple<std::string, bool, DecoderImpl::State>> {};
 
-void PostgresProxyDecoderTestBase::createInitialPostgresRequest() {
-  buf_[0] = '\0';
-  // Startup message has the following structure:
-  // Length (4 bytes) - payload and length field
-  // version (4 bytes)
-  // Attributes: key/value pairs separated by '\0'
-  data_.writeBEInt<uint32_t>(37);
-  // Add version code
-  data_.writeBEInt<uint32_t>(0x00030000);
-  // user-postgres key-pair
-  data_.add("user"); // 4 bytes
-  data_.add(buf_, 1);
-  data_.add("postgres"); // 8 bytes
-  data_.add(buf_, 1);
-  // database-test-db key-pair
-  // Some other attribute
-  data_.add("attribute"); // 9 bytes
-  data_.add(buf_, 1);
-  data_.add("blah"); // 4 bytes
-  data_.add(buf_, 1);
-}
-
 TEST_F(PostgresProxyDecoderTest, UpstreamSSLDisabled) {
   // Set decoder to wait for initial message.
   decoder_->state(DecoderImpl::State::InitState);
 
-  createInitialPostgresRequest();
+  createInitialPostgresRequest(data_);
 
   EXPECT_CALL(callbacks_, shouldEncryptUpstream).WillOnce(testing::Return(false));
   EXPECT_CALL(callbacks_, encryptUpstream(testing::_, testing::_)).Times(0);
@@ -683,7 +659,7 @@ TEST_P(PostgresProxyUpstreamSSLTest, UpstreamSSLEnabled) {
   decoder_->state(DecoderImpl::State::InitState);
 
   // Create initial message
-  createInitialPostgresRequest();
+  createInitialPostgresRequest(data_);
 
   EXPECT_CALL(callbacks_, shouldEncryptUpstream).WillOnce(testing::Return(true));
   EXPECT_CALL(callbacks_, sendUpstream);

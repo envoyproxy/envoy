@@ -64,6 +64,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        ":postgres_test_utils_lib",
         "//contrib/postgres_proxy/filters/network/source:config",
         "//contrib/postgres_proxy/filters/network/source:filter",
         "//source/common/tcp_proxy",
