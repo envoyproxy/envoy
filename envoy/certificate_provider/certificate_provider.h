@@ -40,14 +40,14 @@ public:
 
 class CertificateProvider {
 public:
-  struct Capabilites {
+  struct Capabilities {
     /* whether or not a provider supports generating identity certificates on demand */
     bool provide_on_demand_identity_certs = false;
   };
 
   virtual ~CertificateProvider() = default;
 
-  virtual Capabilites capabilities() const PURE;
+  virtual Capabilities capabilities() const PURE;
 
   /**
    * @return CA certificate used for validation
@@ -64,6 +64,15 @@ public:
   tlsCertificates(const std::string& cert_name) const PURE;
 
   /**
+   * Add certificate update callback into certificate provider for asychronous usage.
+   *
+   * @param callback callback that is executed by certificate provider.
+   * @return CallbackHandle the handle which can remove that update callback.
+   */
+  virtual Common::CallbackHandlePtr addUpdateCallback(const std::string& cert_name,
+                                                      std::function<void()> callback) PURE;
+
+  /**
    * Add on-demand callback into certificate provider, this function might be invoked from worker
    * thread during runtime
    *
@@ -75,16 +84,7 @@ public:
    */
   virtual Common::CallbackHandlePtr addOnDemandUpdateCallback(
       const std::string cert_name, Envoy::CertificateProvider::MetadataPtr metadata,
-      Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callbacks) PURE;
-
-  /**
-   * Add certificate update callback into certificate provider for asychronous usage.
-   *
-   * @param callback callback that is executed by certificate provider.
-   * @return CallbackHandle the handle which can remove that update callback.
-   */
-  virtual Common::CallbackHandlePtr addUpdateCallback(const std::string& cert_name,
-                                                      std::function<void()> callback) PURE;
+      Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callbacks);
 };
 
 using CertificateProviderSharedPtr = std::shared_ptr<CertificateProvider>;
