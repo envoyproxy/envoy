@@ -9,7 +9,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
