@@ -92,7 +92,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  const Tracing::Config& tracingConfig() override;
+  OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
@@ -504,7 +504,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * Returns the tracked scope to use for this stream.
