@@ -26,8 +26,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
-      port_(static_cast<uint16_t>(6379)), dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(getCache(config)) {
+      dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)) {
 
   auto downstream_auth_password =
       Config::DataSource::read(config.downstream_auth_password(), true, api);

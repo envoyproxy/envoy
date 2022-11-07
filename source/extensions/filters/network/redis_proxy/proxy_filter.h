@@ -63,7 +63,6 @@ public:
   std::vector<std::string> downstream_auth_passwords_;
 
   // DNS cache used for ASK/MOVED responses.
-  const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
 

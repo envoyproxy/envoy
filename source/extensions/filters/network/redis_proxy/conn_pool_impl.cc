@@ -33,6 +33,8 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
     return *(absl::get<Common::Redis::RespValueConstSharedPtr>(request));
   }
 }
+
+static uint16_t default_port = 6379;
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -88,7 +90,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
-      dns_cache_(dns_cache), default_port_(static_cast<uint16_t>(6379)),
+      dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
@@ -434,40 +436,44 @@ void InstanceImpl::PendingRequest::onFailure() {
 void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
                                                  const std::string& host_address,
                                                  bool ask_redirection) {
-  if (parent_.dns_cache_) {
-    resp_value_ = std::move(value);
-    ask_redirection_ = ask_redirection;
-    auto result =
-        parent_.dns_cache_->loadDnsCacheEntry(host_address, parent_.default_port_, false, *this);
+  if (!parent_.dns_cache_) {
+    doRedirection(std::move(value), host_address, ask_redirection);
+    return;
+  }
 
-    cache_load_handle_ = std::move(result.handle_);
-    switch (result.status_) {
-    case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache: {
-      ASSERT(cache_load_handle_ == nullptr);
-      if (!result.host_info_.has_value() || !result.host_info_.value()->address()) {
-        auto host = host_;
-        onResponse(std::move(resp_value_));
-        host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
-      } else {
-        doRedirection(std::move(resp_value_),
-                      formatAddress(*result.host_info_.value()->address()->ip()), ask_redirection_);
-      }
-      return;
-    }
-    case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
-      ASSERT(cache_load_handle_ != nullptr);
-      return;
-    case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
-      ASSERT(cache_load_handle_ == nullptr);
+  resp_value_ = std::move(value);
+  ask_redirection_ = ask_redirection;
+  auto result = parent_.dns_cache_->loadDnsCacheEntry(host_address, default_port, false, *this);
+  cache_load_handle_ = std::move(result.handle_);
+
+  switch (result.status_) {
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache: {
+    ASSERT(cache_load_handle_ == nullptr);
+    if (!result.host_info_.has_value() || !result.host_info_.value()->address()) {
+      ENVOY_LOG(debug, "DNS entry for '{}' was in cache but did not contain an address",
+                host_address);
       auto host = host_;
       onResponse(std::move(resp_value_));
       host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
-      return;
+    } else {
+      doRedirection(std::move(resp_value_),
+                    formatAddress(*result.host_info_.value()->address()->ip()), ask_redirection_);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+    return;
   }
-
-  doRedirection(std::move(value), host_address, ask_redirection);
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
+    ASSERT(cache_load_handle_ != nullptr);
+    return;
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
+    ASSERT(cache_load_handle_ == nullptr);
+    ENVOY_LOG(debug, "DNS lookup for '{}' was not performed due to an overflow in the cache",
+              host_address);
+    auto host = host_;
+    onResponse(std::move(resp_value_));
+    host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+    return;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 std::string InstanceImpl::PendingRequest::formatAddress(const Envoy::Network::Address::Ip& ip) {
@@ -478,6 +484,7 @@ void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
   cache_load_handle_.reset();
 
   if (!host_info || !host_info->address()) {
+    ENVOY_LOG(debug, "DNS lookup failed");
     auto host = host_;
     onResponse(std::move(resp_value_));
     host->cluster().stats().upstream_internal_redirect_failed_total_.inc();

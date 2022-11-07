@@ -108,7 +108,8 @@ private:
   struct PendingRequest
       : public Common::Redis::Client::ClientCallbacks,
         public Common::Redis::Client::PoolRequest,
-        public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+        public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
+        public Logger::Loggable<Logger::Id::redis> {
     PendingRequest(ThreadLocalPool& parent, RespVariant&& incoming_request,
                    PoolCallbacks& pool_callbacks, Upstream::HostConstSharedPtr& host);
     ~PendingRequest() override;
@@ -173,7 +174,6 @@ private:
     Event::Dispatcher& dispatcher_;
     const std::string cluster_name_;
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
-    uint16_t default_port_;
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};
     absl::node_hash_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
