@@ -6,7 +6,7 @@ on:
 jobs:
   pr_notifier:
     name: PR Notifier
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
