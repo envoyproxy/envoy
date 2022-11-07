@@ -20,8 +20,7 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
       filter_config);
   return
       [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-            config, context, createRateLimitClient(context, config->rlqs_server())));
+        callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(config, context));
       };
 }
 

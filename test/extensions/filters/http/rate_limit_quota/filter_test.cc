@@ -152,7 +152,7 @@ public:
     }
 
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, nullptr);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
