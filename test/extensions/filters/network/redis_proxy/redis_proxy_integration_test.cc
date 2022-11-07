@@ -810,7 +810,6 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
 // error that specifies the hostname as its target.
 // The target server responds to a possibly transformed request, and its response
 // is received unchanged by the fake Redis client.
-
 TEST_P(RedisProxyWithRedirectionAndDNSIntegrationTest, RedirectUsingHostname) {
   std::string request = makeBulkStringArray({"get", "foo"});
   initialize();
