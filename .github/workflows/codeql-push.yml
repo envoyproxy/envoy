@@ -11,7 +11,8 @@ jobs:
       fail-fast: false
 
     # CodeQL runs on ubuntu-latest and windows-latest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Checkout repository
