@@ -1,7 +1,7 @@
 .. _config_http_filters_rate_limit_quota:
 
-Rate Limit Quota
-================
+Rate Limit Quota (Work-In-Progress)
+===================================
 
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig>`
