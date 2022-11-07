@@ -291,7 +291,6 @@ envoy_cc_library(
     srcs = envoy_select_hot_restart(["hot_restarting_base.cc"]),
     hdrs = envoy_select_hot_restart(["hot_restarting_base.h"]),
     deps = [
-        ":hot_restart_cc_proto",
         "//envoy/api:os_sys_calls_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
@@ -306,7 +305,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:utility_lib",
-    ],
+    ] + envoy_select_hot_restart([":hot_restart_cc_proto"]),
 )
 
 envoy_cc_library(

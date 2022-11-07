@@ -109,7 +109,6 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/thread:thread_interface",
-        "//source/server:hot_restart_cc_proto",
     ],
 )
 

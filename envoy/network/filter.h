@@ -438,10 +438,13 @@ public:
   /**
    * Find filter chain that's matching metadata from the new connection.
    * @param socket supplies connection metadata that's going to be used for the filter chain lookup.
+   * @param info supplies the dynamic metadata and the filter state populated by the listener
+   * filters.
    * @return const FilterChain* filter chain to be used by the new connection,
    *         nullptr if no matching filter chain was found.
    */
-  virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
+  virtual const FilterChain* findFilterChain(const ConnectionSocket& socket,
+                                             const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**
