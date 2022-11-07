@@ -450,7 +450,7 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
         host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
       } else {
         doRedirection(std::move(resp_value_),
-                      formatAddress(result.host_info_.value()->address()->ip()), ask_redirection_);
+                      formatAddress(*result.host_info_.value()->address()->ip()), ask_redirection_);
       }
       return;
     }
@@ -470,12 +470,8 @@ void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
   doRedirection(std::move(value), host_address, ask_redirection);
 }
 
-std::string InstanceImpl::PendingRequest::formatAddress(const Envoy::Network::Address::Ip* ip) {
-  if (!ip) {
-    return "";
-  }
-
-  return fmt::format("{}:{}", ip->addressAsString(), ip->port());
+std::string InstanceImpl::PendingRequest::formatAddress(const Envoy::Network::Address::Ip& ip) {
+  return fmt::format("{}:{}", ip.addressAsString(), ip.port());
 }
 void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
@@ -486,7 +482,7 @@ void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
     onResponse(std::move(resp_value_));
     host->cluster().stats().upstream_internal_redirect_failed_total_.inc();
   } else {
-    doRedirection(std::move(resp_value_), formatAddress(host_info->address()->ip()),
+    doRedirection(std::move(resp_value_), formatAddress(*host_info->address()->ip()),
                   ask_redirection_);
   }
 }

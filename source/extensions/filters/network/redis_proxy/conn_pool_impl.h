@@ -126,7 +126,7 @@ private:
     void onLoadDnsCacheComplete(
         const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
-    std::string formatAddress(const Envoy::Network::Address::Ip* ip);
+    std::string formatAddress(const Envoy::Network::Address::Ip& ip);
     void doRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
                        bool ask_redirection);
 
