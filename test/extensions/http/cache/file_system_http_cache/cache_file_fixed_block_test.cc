@@ -7,17 +7,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
+
+class CacheFileFixedBlockTest : public ::testing::Test {
+public:
+  // Wrappers for private test-only functions.
+  void setFileId(CacheFileFixedBlock& block, uint32_t id) { block.setFileId(id); }
+  void setCacheVersionId(CacheFileFixedBlock& block, uint32_t id) { block.setCacheVersionId(id); }
+};
+
 namespace {
 
-TEST(CacheFileFixedBlock, InitializesToValid) {
+TEST_F(CacheFileFixedBlockTest, InitializesToValid) {
   CacheFileFixedBlock default_block;
   EXPECT_TRUE(default_block.isValid());
 }
 
-TEST(CacheFileFixedBlock, GettersRecoverValuesThatWereSet) {
+TEST_F(CacheFileFixedBlockTest, GettersRecoverValuesThatWereSet) {
   CacheFileFixedBlock block;
-  block.setFileId(98765);
-  block.setCacheVersionId(56789);
+  setFileId(block, 98765);
+  setCacheVersionId(block, 56789);
   block.setBodySize(999999);
   block.setHeadersSize(1234);
   block.setTrailersSize(4321);
@@ -28,19 +36,19 @@ TEST(CacheFileFixedBlock, GettersRecoverValuesThatWereSet) {
   EXPECT_EQ(block.trailerSize(), 4321);
 }
 
-TEST(CacheFileFixedBlock, IsValidReturnsFalseOnBadFileId) {
+TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadFileId) {
   CacheFileFixedBlock block;
-  block.setFileId(98765);
+  setFileId(block, 98765);
   EXPECT_FALSE(block.isValid());
 }
 
-TEST(CacheFileFixedBlock, IsValidReturnsFalseOnBadCacheVersionId) {
+TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadCacheVersionId) {
   CacheFileFixedBlock block;
-  block.setCacheVersionId(98765);
+  setCacheVersionId(block, 98765);
   EXPECT_FALSE(block.isValid());
 }
 
-TEST(CacheFileFixedBlock, IsValidReturnsTrueOnBlockWithNonDefaultValues) {
+TEST_F(CacheFileFixedBlockTest, IsValidReturnsTrueOnBlockWithNonDefaultValues) {
   CacheFileFixedBlock block;
   block.setHeadersSize(1234);
   block.setBodySize(999999);
@@ -48,7 +56,7 @@ TEST(CacheFileFixedBlock, IsValidReturnsTrueOnBlockWithNonDefaultValues) {
   EXPECT_TRUE(block.isValid());
 }
 
-TEST(CacheFileFixedBlock, ReturnsCorrectOffsets) {
+TEST_F(CacheFileFixedBlockTest, ReturnsCorrectOffsets) {
   CacheFileFixedBlock block;
   block.setHeadersSize(100);
   block.setBodySize(1000);
@@ -58,7 +66,7 @@ TEST(CacheFileFixedBlock, ReturnsCorrectOffsets) {
   EXPECT_EQ(block.offsetToTrailers(), CacheFileFixedBlock::size() + 1100);
 }
 
-TEST(CacheFileFixedBlock, CopiesCorrectlyViaStringView) {
+TEST_F(CacheFileFixedBlockTest, CopiesCorrectlyViaStringView) {
   CacheFileFixedBlock block;
   block.setHeadersSize(100);
   block.setBodySize(1000);
@@ -71,7 +79,7 @@ TEST(CacheFileFixedBlock, CopiesCorrectlyViaStringView) {
   EXPECT_TRUE(block2.isValid());
 }
 
-TEST(CacheFileFixedBlock, NumbersAreInNetworkByteOrder) {
+TEST_F(CacheFileFixedBlockTest, NumbersAreInNetworkByteOrder) {
   CacheFileFixedBlock block;
   block.setHeadersSize(0xfaaf);
   EXPECT_EQ(static_cast<unsigned char>(block.stringView()[8]), 0);
