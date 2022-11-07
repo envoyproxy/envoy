@@ -52,8 +52,8 @@ public:
 class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
-      : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
-        dispatcher_(api_->allocateDispatcher("test_thread")), scope_(stats_store_),
+      : api_(Api::createApiForTest(stats_store_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), scope_(stats_store_.rootScope()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         stat_names_(scope_->symbolTable()) {
 
@@ -75,7 +75,7 @@ public:
 
   envoy::config::core::v3::GrpcService config_;
   DangerousDeprecatedTestTime test_time_;
-  Stats::IsolatedStoreImpl* stats_store_; // Ownership transferred to scope_.
+  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Stats::ScopeSharedPtr scope_;

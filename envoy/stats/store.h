@@ -106,6 +106,24 @@ public:
   virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  operator Scope&() { return *rootScope(); }
+
+  Counter& counterFromString(const std::string& name) {
+    return rootScope()->counterFromString(name);
+  }
+
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
+    return rootScope()->gaugeFromString(name, import_mode);
+  }
+
+  TextReadout& textReadoutFromString(const std::string& name) {
+    return rootScope()->textReadoutFromString(name);
+  }
+
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) {
+    return rootScope()->histogramFromString(name, unit);
+  }
 };
 
 using StorePtr = std::unique_ptr<Store>;

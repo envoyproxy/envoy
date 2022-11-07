@@ -453,11 +453,11 @@ scope_key_builder:
       rds_subscription_by_config_subscription_;
   absl::flat_hash_map<std::string, Envoy::Config::SubscriptionCallbacks*> rds_subscription_by_name_;
 
-  Envoy::Stats::Gauge& all_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& all_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.all_scopes", Stats::Gauge::ImportMode::Accumulate)};
-  Envoy::Stats::Gauge& active_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& active_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.active_scopes", Stats::Gauge::ImportMode::Accumulate)};
-  Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.on_demand_scopes", Stats::Gauge::ImportMode::Accumulate)};
 };
 
@@ -542,7 +542,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
   pushRdsConfig({"foo_routes"}, "111");
@@ -554,7 +554,7 @@ key:
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "123"));
   ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
 }
 
@@ -619,7 +619,7 @@ key:
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(2UL, active_scopes_.value());
@@ -657,9 +657,9 @@ key:
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
-  EXPECT_TRUE(server_factory_context_.scope_.findGaugeByString(
+  EXPECT_TRUE(server_factory_context_.store_.findGaugeByString(
       "foo.scoped_rds.foo_scoped_routes.config_reload_time_ms"));
 
   // now scope key "x-bar-key" points to nowhere.
@@ -699,7 +699,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -738,7 +738,7 @@ key:
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
@@ -779,7 +779,7 @@ key:
       ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
@@ -787,7 +787,7 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -820,7 +820,7 @@ key:
       ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
@@ -828,7 +828,7 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -857,7 +857,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
@@ -869,9 +869,9 @@ key:
                   ->name(),
               "");
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             1UL);
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.bar_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.bar_routes.config_reload").value(),
             1UL);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
@@ -892,7 +892,7 @@ key:
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_2, resource_3});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2"));
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // foo_scope is deleted, and foo_scope2 is added.
   EXPECT_EQ(all_scopes_.value(), 2UL);
@@ -934,7 +934,7 @@ key:
   // Delete foo_scope2, and push a new foo_scope4 with the same scope key but different route-table.
   const auto decoded_resources_4 = TestUtility::decodeResources({resource_3, resource_4});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_4.refvec_, "4"));
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value(),
             3UL);
   EXPECT_EQ(2UL, all_scopes_.value());
@@ -995,7 +995,7 @@ key:
       "found");
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
@@ -1003,7 +1003,7 @@ key:
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -1258,7 +1258,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1281,7 +1281,7 @@ key:
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_3, resource_4});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, {}, "2"));
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 }
@@ -1311,7 +1311,7 @@ key:
   context_init_manager_.initialize(init_watcher_);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1334,7 +1334,7 @@ key:
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_3, resource_4});
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2"));
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 }
@@ -1366,7 +1366,7 @@ key:
 
   srdsUpdateWithYaml({lazy_resource, eager_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1424,7 +1424,7 @@ key:
 
   srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1491,7 +1491,7 @@ key:
 
   srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
