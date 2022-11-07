@@ -258,7 +258,6 @@ struct StreamInfoImpl : public StreamInfo {
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
   void setStreamIdProvider(StreamIdProviderSharedPtr provider) override {
-    ASSERT(provider != nullptr);
     stream_id_provider_ = std::move(provider);
   }
   OptRef<const StreamIdProvider> getStreamIdProvider() const override {
