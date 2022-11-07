@@ -784,7 +784,8 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                                      TimeSource& time_source)
     : ContextImpl(scope, config, time_source), session_ticket_keys_(config.sessionTicketKeys()),
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
-  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates) {
+  if (config.tlsCertificates().empty() && !config.capabilities().provides_certificates &&
+      !config.certProviderCaps().provide_on_demand_identity_certs) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 

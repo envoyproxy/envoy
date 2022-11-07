@@ -239,7 +239,7 @@ ContextConfigImpl::ContextConfigImpl(
   } else if (tls_certificates_hybrid_provider_ != nullptr) {
     for (auto& tls_certificate :
          tls_certificates_hybrid_provider_->tlsCertificates(tls_certificate_name_)) {
-      tls_certificate_configs_.emplace_back(*tls_certificate, factory_context, api_);
+      tls_certificate_configs_.emplace_back(tls_certificate.get(), factory_context, api_);
     }
   }
 
@@ -326,7 +326,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
           tls_certificate_configs_.clear();
           for (auto& tls_certificate :
                tls_certificates_hybrid_provider_->tlsCertificates(tls_certificate_name_)) {
-            tls_certificate_configs_.emplace_back(*tls_certificate, factory_context_, api_);
+            tls_certificate_configs_.emplace_back(tls_certificate.get(), factory_context_, api_);
           }
           callback();
         }));

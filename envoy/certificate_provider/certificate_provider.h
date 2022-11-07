@@ -4,6 +4,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/ssl/connection.h"
 
@@ -14,14 +15,28 @@
 namespace Envoy {
 namespace CertificateProvider {
 
-class OnDemandUpdateMetadata {
+class Metadata {
 public:
-  virtual ~OnDemandUpdateMetadata() = default;
-
-  virtual Envoy::Ssl::ConnectionInfoConstSharedPtr connectionInfo() const PURE;
+  virtual ~Metadata() = default;
 };
 
-using OnDemandUpdateMetadataPtr = std::unique_ptr<OnDemandUpdateMetadata>;
+using MetadataPtr = std::unique_ptr<Metadata>;
+
+class OnDemandUpdateCallbacks {
+public:
+  virtual ~OnDemandUpdateCallbacks() = default;
+
+  /**
+   * Called when cert is already in cache.
+   * @param cert_name supplies the name used to look for cert.
+   */
+  virtual void onCacheHit(const std::string cert_name) const PURE;
+  /**
+   * Called when cert cache is missed.
+   * @param cert_name supplies name used to look for cert.
+   */
+  virtual void onCacheMiss(const std::string cert_name) const PURE;
+};
 
 class CertificateProvider {
 public:
@@ -44,19 +59,23 @@ public:
    * should provide at least one tls certificate.
    * @return Identity certificates used for handshake
    */
-  virtual std::vector<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate*>
+  virtual std::vector<std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
   tlsCertificates(const std::string& cert_name) const PURE;
 
   /**
    * Add on-demand callback into certificate provider, this function might be invoked from worker
    * thread during runtime
    *
-   * @param metadata is passed to provider for certs fetching/refreshing
+   * @param cert_name is certificate provider name in commontlscontext configuration.
+   * @param metadata is passed to provider for certs fetching/refreshing.
+   * @param thread_local_dispatcher is the dispatcher from callee's thread.
+   * @param callbacks registers callback to be executed for on demand update.
    * @return CallbackHandle the handle which can remove that update callback.
    */
-  virtual Common::CallbackHandlePtr
-  addOnDemandUpdateCallback(const std::string& cert_name, OnDemandUpdateMetadataPtr metadata,
-                            std::function<void()> thread_local_callback) PURE;
+  virtual Common::CallbackHandlePtr addOnDemandUpdateCallback(
+      const std::string cert_name, Envoy::CertificateProvider::MetadataPtr metadata,
+      Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callbacks) PURE;
+
 
   /**
    * Add certificate update callback into certificate provider for asychronous usage.
