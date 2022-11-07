@@ -58,7 +58,8 @@ public:
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
       Router::Context& router_context, AccessLog::AccessLogManager& log_manager,
       Singleton::Manager& singleton_manager, const Server::Options& options,
-      Quic::QuicStatNames& quic_stat_names, CertificateProvider::CertificateProviderManager& certificate_provider_manager,
+      Quic::QuicStatNames& quic_stat_names,
+      CertificateProvider::CertificateProviderManager& certificate_provider_manager,
       const Server::Instance& server)
       : server_context_(server_context),
         context_(options, main_thread_dispatcher, api, local_info, admin, runtime,
