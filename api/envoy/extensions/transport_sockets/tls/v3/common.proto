@@ -488,7 +488,6 @@ message CertificateValidationContext {
   // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
   bool only_verify_leaf_cert_crl = 14;
 
-
   // Defines maximum depth of a certificate chain accepted in verification. This number does not include the leaf, so a depth of 1 allows the leaf and one CA certificate.
   // If a trusted issuer appears in the chain, but in a depth larger than configured, the certificate validation will fail.
   // See `BoringSSL SSL_CTX_set_verify_depth <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#SSL_CTX_set_verify_depth>`

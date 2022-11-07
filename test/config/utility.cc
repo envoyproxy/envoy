@@ -1422,7 +1422,8 @@ void ConfigHelper::initializeTls(
       }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
       if (options.max_verify_depth_.has_value()) {
-        validation_context->mutable_max_verify_depth()->set_value(options.max_verify_depth_.value());
+        validation_context->mutable_max_verify_depth()->set_value(
+            options.max_verify_depth_.value());
       }
     } else {
       validation_context->mutable_trusted_ca()->set_filename(

@@ -105,11 +105,11 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRoo
   codec->close();
 }
 
-
 // Test Config:
 //   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
 //   trust ca certificate chain: root
-// With only root trusted, certificate validation succeeds because root ca is in depth 3 and max depth is 3
+// With only root trusted, certificate validation succeeds because root ca is in depth 3 and max
+// depth is 3
 TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
@@ -129,7 +129,8 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootO
 // Test Config:
 //   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
 //   trust ca certificate chain: root
-// With only root ca trusted, certificate validation is expected to fail because root ca is in depth 3 while max depth is 2
+// With only root ca trusted, certificate validation is expected to fail because root ca is in depth
+// 3 while max depth is 2
 TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
@@ -142,7 +143,6 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
   IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
   test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
   ASSERT_TRUE(codec->waitForDisconnect());
-
 }
 } // namespace Ssl
 } // namespace Envoy
