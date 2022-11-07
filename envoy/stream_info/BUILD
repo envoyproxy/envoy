@@ -20,6 +20,7 @@ envoy_cc_library(
         "//envoy/http:protocol_interface",
         "//envoy/network:socket_interface",
         "//envoy/ssl:connection_interface",
+        "//envoy/tracing:trace_reason_interface",
         "//envoy/upstream:host_description_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
