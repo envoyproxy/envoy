@@ -30,7 +30,6 @@ using ::testing::NiceMock;
 constexpr char ValidMatcherConfig[] = R"EOF(
   matcher_list:
     matchers:
-      # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
       predicate:
         single_predicate:
           input:
@@ -64,14 +63,79 @@ constexpr char ValidMatcherConfig[] = R"EOF(
   )EOF";
 
 constexpr char OnNoMatchConfig[] = R"EOF(
-  action:
-    typed_config:
-      '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-      no_assignment_behavior:
-        fallback_rate_limit:
-          blanket_rule: DENY_ALL
-      reporting_interval: 60s
+  matcher_list:
+    matchers:
+      predicate:
+        single_predicate:
+          input:
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      # Here is on_match field that will not be matched by the request header.
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "NO_MATCHED_NAME":
+                    string_value: "NO_MATCHED"
+            reporting_interval: 60s
+  on_no_match:
+    action:
+      name: rate_limit_quota
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+        bucket_id_builder:
+          bucket_id_builder:
+            "on_no_match_name":
+                string_value: "on_no_match_value"
+            "on_no_match_name_2":
+                string_value: "on_no_match_value_2"
+            # TODO(tyxia) The config below will hit the error "No matched result from custom value config."
+            # because we don't have on_no_match action support.
+            #"environment":
+            #    custom_value:
+            #      name: "test_1"
+            #      typed_config:
+            #        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            #        header_name: environment
+        deny_response_settings:
+          grpc_status:
+            code: 8
+        expired_assignment_behavior:
+          fallback_rate_limit:
+            blanket_rule: ALLOW_ALL
+        reporting_interval: 5s
 )EOF";
+
+// constexpr char OnNoMatchConfig[] = R"EOF(
+//   action:
+//     name: rate_limit_quota
+//     typed_config:
+//       "@type":
+//       type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+//       bucket_id_builder:
+//         bucket_id_builder:
+//           "name":
+//               string_value: "prod"
+//           "environment":
+//               custom_value:
+//                 name: "test_1"
+//                 typed_config:
+//                   "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+//                   header_name: environment
+//       deny_response_settings:
+//         grpc_status:
+//           code: 8
+//       expired_assignment_behavior:
+//         fallback_rate_limit:
+//           blanket_rule: ALLOW_ALL
+//       reporting_interval: 5s
+// )EOF";
 
 const std::string GoogleGrpcConfig = R"EOF(
   rlqs_server:
@@ -135,13 +199,13 @@ public:
       break;
     }
     case MatcherConfigType::IncludeOnNoMatchConfig: {
-      xds::type::matcher::v3::Matcher::OnMatch on_no_matcher;
-      TestUtility::loadFromYaml(OnNoMatchConfig, on_no_matcher);
-
+      // TODO(tyxia) Remove
+      // xds::type::matcher::v3::Matcher::OnMatch on_no_matcher;
+      // TestUtility::loadFromYaml(OnNoMatchConfig, on_no_matcher);
+      // matcher.mutable_on_no_match()->MergeFrom(on_no_matcher);
       xds::type::matcher::v3::Matcher matcher;
-      TestUtility::loadFromYaml(ValidMatcherConfig, matcher);
+      TestUtility::loadFromYaml(OnNoMatchConfig, matcher);
 
-      matcher.mutable_on_no_match()->MergeFrom(on_no_matcher);
       config_.mutable_bucket_matchers()->MergeFrom(matcher);
       break;
     }
@@ -180,10 +244,11 @@ public:
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Invalid);
-  auto match = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match.status().message(), "Matcher has not been initialized yet");
+  // auto match = filter_->requestMatching(default_headers_);
+  auto match_result = filter_->requestMatching2(default_headers_);
+  EXPECT_FALSE(match_result.ok());
+  EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet");
 }
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
@@ -203,15 +268,25 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
 
-  // Perform request matching and get the generated bucket ids if matched.
-  auto match = filter_->requestMatching(default_headers_);
-  EXPECT_TRUE(match.ok());
-  auto bucket_ids = match.value().bucket();
+  // Perform request matching.
+  auto match_result = filter_->requestMatching2(default_headers_);
+  // Asserts that the request matching succeeded and then retrieve the matched action.
+  ASSERT_TRUE(match_result.ok());
+  const RateLimitOnMactchAction* match_action =
+      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+
+  RateLimitQuotaValidationVisitor visitor = {};
+  // Generate the bucket ids.
+  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+  // Asserts that the bucket id generation succeeded and then retrieve the bucket ids.
+  ASSERT_TRUE(ret.ok());
+  auto bucket_ids = ret.value().bucket();
 
   // Serialize the proto map to std map for comparison. We can avoid this conversion by using
   // `EqualsProto()` directly once it is available in the Envoy code base.
   auto serialized_bucket_ids =
       absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
@@ -221,7 +296,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   constructMismatchedRequestHeader();
 
   // Perform request matching.
-  auto match = filter_->requestMatching(default_headers_);
+  auto match = filter_->requestMatching2(default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to mismatched inputs.
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
@@ -230,15 +305,30 @@ TEST_F(FilterTest, RequestMatchingFailed) {
 
 TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::IncludeOnNoMatchConfig);
-  constructMismatchedRequestHeader();
-
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
+      {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
   // Perform request matching.
-  auto match = filter_->requestMatching(default_headers_);
+  // TODO(tyxia) Rmove deprecated requestmatching
+  auto match_result = filter_->requestMatching2(default_headers_);
+  // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching failed. It is because
   // `on_no_match` field is configured.
-  EXPECT_TRUE(match.ok());
-  // Empty BucketId is expected to be returned here.
-  EXPECT_EQ(match.value().bucket().size(), 0);
+  ASSERT_TRUE(match_result.ok());
+  // Retrieve the matched action.
+  const RateLimitOnMactchAction* match_action =
+      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+
+  RateLimitQuotaValidationVisitor visitor = {};
+  // Generate the bucket ids.
+  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+  // Asserts that the bucket id generation succeeded and then retrieve the bucket ids.
+  ASSERT_TRUE(ret.ok());
+  auto bucket_ids = ret.value().bucket();
+  auto serialized_bucket_ids =
+      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+  // Verfies that the expected bucket ids are generated for `on_no_match` case.
+  EXPECT_THAT(expected_bucket_ids,
+              testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
 } // namespace

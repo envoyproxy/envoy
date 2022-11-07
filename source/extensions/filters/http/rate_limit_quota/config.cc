@@ -1,9 +1,11 @@
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
+#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -18,11 +20,23 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   FilterConfigConstSharedPtr config = std::make_shared<
       envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig>(
       filter_config);
-  return
-      [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-            config, context, createRateLimitClient(context, config->rlqs_server())));
-      };
+  //   RateLimitClientSharedPtr shared_client =
+  //       createRateLimitGrpcClient(context, config->rlqs_server());
+  //   std::shared_ptr<BucketCache> bucket_cache = std::make_shared<BucketCache>(context,
+  //   shared_client);
+  std::shared_ptr<BucketCache> bucket_cache = std::make_shared<BucketCache>(context);
+//   return
+//       [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+//         callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
+//             config, context, createRateLimitClient(context, config->rlqs_server())));
+//       };
+
+  return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
+        config, context, createRateLimitClient(context, config->rlqs_server()),
+        &(bucket_cache->tls.get()->buckets())));
+  };
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr

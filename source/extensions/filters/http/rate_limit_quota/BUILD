@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     deps = [
         ":client_lib",
+        ":quota_bucket",
         "//envoy/registry",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -57,6 +58,7 @@ envoy_cc_library(
     hdrs = ["client_impl.h"],
     deps = [
         ":client_interface",
+        ":quota_bucket",
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:status",
         "//source/common/common:statusor_lib",
@@ -64,6 +66,22 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
+    ],
+)
+
+
+envoy_cc_library(
+    name = "quota_bucket",
+    hdrs = ["quota_bucket.h"],
+    deps = [
+        # ":client_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],
 )

@@ -99,6 +99,10 @@ message RateLimitQuotaFilterConfig {
   //     action:
   //       typed_config:
   //         '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+  //         bucket_id_builder:
+  //           bucket_id_builder:
+  //             name:
+  //               string_value: staging
   //         no_assignment_behavior:
   //           fallback_rate_limit:
   //             blanket_rule: DENY_ALL
