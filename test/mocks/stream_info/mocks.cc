@@ -113,9 +113,14 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(Const(*this), downstreamTiming())
       .WillByDefault(
           Invoke([this]() -> OptRef<const DownstreamTiming> { return downstream_timing_; }));
-  ON_CALL(Const(*this), upstreamTiming())
-      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamTiming> { return upstream_timing_; }));
   ON_CALL(*this, upstreamInfo()).WillByDefault(Invoke([this]() { return upstream_info_; }));
+  ON_CALL(testing::Const(*this), upstreamInfo())
+      .WillByDefault(Invoke([this]() -> OptRef<const UpstreamInfo> {
+        if (!upstream_info_) {
+          return {};
+        }
+        return *upstream_info_;
+      }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
