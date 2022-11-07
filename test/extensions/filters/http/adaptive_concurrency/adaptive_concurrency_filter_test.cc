@@ -411,7 +411,7 @@ concurrency_limit_exceeded_status:
 }
 
 /**
- * Tests that if an invalid (<400) status code is configure then the
+ * Tests that if an invalid (<400) status code is configured then the
  * Adaptive Concurrency Filter falls back to 503
  */
 TEST_F(AdaptiveConcurrencyFilterTest,
