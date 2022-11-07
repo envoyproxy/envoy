@@ -513,7 +513,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
   // First check that EDS is correctly mapping
-  // HealthStatus values to the expected health() status.
+  // HealthStatus values to the expected coarseHealth() status.
   const std::vector<std::pair<envoy::config::core::v3::HealthStatus, Host::Health>>
       health_status_expected = {
           {envoy::config::core::v3::UNKNOWN, Host::Health::Healthy},
@@ -542,7 +542,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(hosts.size(), health_status_expected.size());
 
     for (uint32_t i = 0; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -553,10 +553,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
 
     for (uint32_t i = 1; i < hosts.size(); ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -568,10 +568,10 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), health_status_expected.size());
-    EXPECT_EQ(Host::Health::Healthy, hosts[hosts.size() - 1]->health());
+    EXPECT_EQ(Host::Health::Healthy, hosts[hosts.size() - 1]->coarseHealth());
 
     for (uint32_t i = 1; i < hosts.size() - 1; ++i) {
-      EXPECT_EQ(health_status_expected[i].second, hosts[i]->health());
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->coarseHealth());
     }
   }
 
@@ -584,7 +584,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
   }
 
   // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
@@ -593,7 +593,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Unhealthy, hosts[0]->coarseHealth());
   }
 
   // Finally, mark host 0 healthy again via active health check. It should be
@@ -601,7 +601,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Healthy, hosts[0]->coarseHealth());
   }
 
   const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
@@ -610,7 +610,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->coarseHealth());
   }
 
   // We should rebuild the cluster since we went from healthy -> degraded.
@@ -625,7 +625,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->coarseHealth());
   }
 
   // Since the host health didn't change, expect no rebuild.
@@ -855,10 +855,10 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
-    EXPECT_EQ(hosts[0]->health(), Host::Health::Unhealthy);
+    EXPECT_EQ(hosts[0]->coarseHealth(), Host::Health::Unhealthy);
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
-    EXPECT_EQ(hosts[1]->health(), Host::Health::Healthy);
+    EXPECT_EQ(hosts[1]->coarseHealth(), Host::Health::Healthy);
   }
 
   // Now remove the first host. Even though it is still passing active HC, since EDS has
@@ -1545,71 +1545,6 @@ TEST_F(EdsTest, EndpointLocalityUpdated) {
     EXPECT_EQ("space", locality.region());
     EXPECT_EQ("station", locality.zone());
     EXPECT_EQ("mars", locality.sub_zone());
-  }
-}
-
-// Validate that onConfigUpdate() does not update the endpoint locality if fix for the issue,
-// https://github.com/envoyproxy/envoy/issues/12392, is disabled.
-// Unlike EndpointLocalityUpdated, runtime feature flag is disabled this time and then it is
-// verified that locality update does not happen on eds cluster endpoints.
-TEST_F(EdsTest, EndpointLocalityNotUpdatedIfFixDisabled) {
-  runtime_.mergeValues(
-      {{"envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints", "false"}});
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-  auto* endpoints = cluster_load_assignment.add_endpoints();
-  auto* locality = endpoints->mutable_locality();
-  locality->set_region("oceania");
-  locality->set_zone("hello");
-  locality->set_sub_zone("world");
-
-  {
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.4");
-    endpoint_address->set_port_value(80);
-  }
-  {
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("2.3.4.5");
-    endpoint_address->set_port_value(80);
-  }
-
-  initialize();
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-
-  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(hosts.size(), 2);
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_EQ(0, hosts[i]->priority());
-    const auto& locality = hosts[i]->locality();
-    EXPECT_EQ("oceania", locality.region());
-    EXPECT_EQ("hello", locality.zone());
-    EXPECT_EQ("world", locality.sub_zone());
-  }
-  EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
-
-  // Update locality now
-  locality->set_region("space");
-  locality->set_zone("station");
-  locality->set_sub_zone("mars");
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-
-  // runtime flag is disabled, verify that locality does not get updated
-  auto& updatedHosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(updatedHosts.size(), 2);
-  for (int i = 0; i < 2; ++i) {
-    EXPECT_EQ(0, updatedHosts[i]->priority());
-    const auto& locality = updatedHosts[i]->locality();
-    EXPECT_EQ("oceania", locality.region());
-    EXPECT_EQ("hello", locality.zone());
-    EXPECT_EQ("world", locality.sub_zone());
   }
 }
 

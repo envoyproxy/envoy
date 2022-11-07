@@ -14,6 +14,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class FilterConfig;
+}
 namespace Http {
 
 /**
@@ -218,6 +221,10 @@ public:
       retry_policy = p;
       return *this;
     }
+    StreamOptions& setFilterConfig(Router::FilterConfig& config) {
+      filter_config_ = config;
+      return *this;
+    }
 
     StreamOptions& setIsShadow(bool s) {
       is_shadow = s;
@@ -252,6 +259,8 @@ public:
     envoy::config::core::v3::Metadata metadata;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
+
+    OptRef<Router::FilterConfig> filter_config_;
 
     bool is_shadow{false};
   };

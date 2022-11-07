@@ -5,6 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Config {
@@ -44,7 +46,7 @@ public:
 
   std::vector<envoy::service::discovery::v3::Resource>
   getResources(const Envoy::Config::XdsSourceId& source_id,
-               const std::vector<std::string>& resource_names) const override;
+               const absl::flat_hash_set<std::string>& resource_names) const override;
 
   void onConfigUpdated(const Envoy::Config::XdsSourceId& source_id,
                        const std::vector<Envoy::Config::DecodedResourceRef>& resources) override;

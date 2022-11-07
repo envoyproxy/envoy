@@ -28,4 +28,5 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_creds_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )

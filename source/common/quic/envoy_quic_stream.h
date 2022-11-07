@@ -82,6 +82,8 @@ public:
     return connection()->connectionInfoProvider();
   }
 
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
+
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
     buffer_memory_account_ = account;
   }

@@ -144,8 +144,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context, "tcp_listener.",
-          false, "listener", createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.getServerFactoryContext(), context, false, "listener",
+          createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",

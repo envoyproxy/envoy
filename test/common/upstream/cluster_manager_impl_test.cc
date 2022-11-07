@@ -1132,8 +1132,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
-  EXPECT_EQ(cluster->get().info()->loadBalancingPolicy().typed_extension_config().name(),
-            "envoy.load_balancers.custom_lb");
+  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
 }
 
 // Verify that if Envoy does not have a factory for any of the load balancing policies specified in
@@ -4790,7 +4789,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data = cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
@@ -4966,7 +4965,7 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsClusterOverride) {
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -4984,9 +4983,103 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
                     address: 127.0.0.1
                     port_value: 11001
       upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
         socket_options: [
           { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
           { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: [
+              { level: 10, name: 12, int_value: 13, state: STATE_PREBIND },
+              { level: 14, name: 15, int_value: 16, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(10, 12), 13},
+                      {ENVOY_MAKE_SOCKET_OPTION_NAME(14, 15), 16}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndEmptyOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+          socket_options:
+            socket_options: []
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    expectOnlyNoSigpipeOptions();
+  } else {
+    expectNoSocketOptions();
+  }
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
   cluster_manager:
     upstream_bind_config:
       socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
@@ -4994,6 +5087,43 @@ TEST_F(SockoptsTest, SockoptsClusterOverride) {
   initialize(yaml);
   NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
                       {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManangerOpts) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        source_address:
+          address: '::'
+          port_value: 12345
+        extra_source_addresses:
+        - address:
+            address: 127.0.0.3
+            port_value: 12345
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(7, 8), 9}};
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
     names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
   }
@@ -5122,7 +5252,7 @@ public:
                           Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
-              EXPECT_EQ(nullptr, options.get());
+              EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
     auto conn_data =

@@ -39,9 +39,9 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/maglev_lb.h"
-#include "source/common/upstream/original_dst_cluster.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 #include "source/common/upstream/ring_hash_lb.h"
 #include "source/common/upstream/subset_lb.h"
@@ -403,6 +403,10 @@ ClusterManagerImpl::ClusterManagerImpl(
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
+      const std::string target_xds_authority =
+          Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or("");
+      auto xds_delegate_opt_ref = makeOptRefFromPtr(xds_resources_delegate_.get());
+
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -415,7 +419,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
@@ -428,8 +432,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), makeOptRefFromPtr(xds_resources_delegate_.get()),
-            Config::Utility::getGrpcControlPlane(dyn_resources.ads_config()).value_or(""));
+            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
       }
     }
   } else {
@@ -895,12 +898,11 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    const auto& policy = cluster_reference.info()->loadBalancingPolicy();
     TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
     cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-                                 cluster_reference.info()->statsScope(), runtime_, random_, policy);
+        typed_lb_factory->create(*cluster_reference.info(), cluster_reference.prioritySet(),
+                                 runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1180,7 +1182,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    lb_ = lb_factory_->create();
+    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }
 
@@ -1548,7 +1550,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Maglev:
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create();
+      lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
       break;
     }
     }
