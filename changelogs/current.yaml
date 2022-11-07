@@ -97,6 +97,6 @@ new_features:
     started merging the Envoy mobile library into the main Envoy repo.
 - area: redis
   change: |
-    added support for DNS resolving endponts returned by MOVED/ASK responses.
+    extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
 
 deprecated:
