@@ -105,7 +105,6 @@ using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFi
 
 class FilterChainBaseAction : public virtual Matcher::Action {
 public:
-  virtual ~FilterChainBaseAction() = default;
   virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                           const StreamInfo::StreamInfo& info) const PURE;
 };
