@@ -757,6 +757,9 @@ private:
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->connectionInfoProvider().localAddress();
     }
+    const Network::Address::InstanceConstSharedPtr& listeningAddress() const override {
+      return socket_->connectionInfoProvider().localAddress();
+    }
     Network::SocketSharedPtr getListenSocket(uint32_t) override { return socket_; }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
     void closeAllSockets() override {}

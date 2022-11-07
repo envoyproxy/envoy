@@ -47,6 +47,13 @@ public:
    */
   static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                     const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs are the same if ignoring address and
+   * addtional_addresses fields.
+   */
+  static bool addressOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                const envoy::config::listener::v3::Listener& rhs);
 };
 
 class ListenerManagerImpl;
@@ -67,6 +74,9 @@ public:
   Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
+  }
+  const Network::Address::InstanceConstSharedPtr& listeningAddress() const override {
+    return listening_address_;
   }
   Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
   Network::ListenSocketFactoryPtr clone() const override {
@@ -90,6 +100,7 @@ private:
   // Initially, its port number might be 0. Once a socket is created, its port
   // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
+  Network::Address::InstanceConstSharedPtr listening_address_;
   const Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
   const std::string listener_name_;
@@ -276,6 +287,18 @@ public:
   std::unique_ptr<ListenerImpl>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
+
+  /**
+   * Execute addresses only update. The addresses only update won't drain the connection on the
+   * address which isn't change.
+   */
+  std::unique_ptr<ListenerImpl>
+  newListenerWithAddressesOnlyChange(const envoy::config::listener::v3::Listener& config,
+                                     bool workers_started, uint64_t hash);
+
+  // Check whether the listener has different address config with the specified config.
+  bool addressOnlyChange(const envoy::config::listener::v3::Listener& config) const;
+
   /**
    * Determine if in place filter chain update could be executed at this moment.
    */
@@ -288,6 +311,13 @@ public:
    */
   void diffFilterChain(const ListenerImpl& another_listener,
                        std::function<void(Network::DrainableFilterChain&)> callback);
+
+  /**
+   * Run the callback on each new appened address.
+   */
+  void
+  diffNewAddresses(const ListenerImpl& another_listener,
+                   std::function<void(const Network::Address::InstanceConstSharedPtr&)> callback);
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -431,7 +461,8 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               bool address_changed = false);
   // Helpers for constructor.
   void buildAccessLog();
   void buildInternalListener();
@@ -449,6 +480,7 @@ private:
   void buildProxyProtocolListenerFilter();
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
+  void parseAddresses();
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();

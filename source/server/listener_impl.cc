@@ -76,8 +76,9 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     const std::string& listener_name, uint32_t tcp_backlog_size,
     ListenerComponentFactory::BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t num_sockets)
-    : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
-      listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
+    : factory_(factory), local_address_(address), listening_address_(address),
+      socket_type_(socket_type), options_(options), listener_name_(listener_name),
+      tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
       socket_creation_options_(creation_options) {
 
   if (local_address_->type() == Network::Address::Type::Ip) {
@@ -119,6 +120,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
 
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone)
     : factory_(factory_to_clone.factory_), local_address_(factory_to_clone.local_address_),
+      listening_address_(factory_to_clone.listening_address_),
       socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
       listener_name_(factory_to_clone.listener_name_),
       tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
@@ -359,30 +361,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
-  if (config.has_internal_listener()) {
-    addresses_.emplace_back(
-        std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
-  } else {
-    // All the addresses should be same socket type, so get the first address's socket type is
-    // enough.
-    auto address = Network::Address::resolveProtoAddress(config.address());
-    checkIpv4CompatAddress(address, config.address());
-    addresses_.emplace_back(address);
-
-    for (auto i = 0; i < config.additional_addresses_size(); i++) {
-      if (socket_type_ !=
-          Network::Utility::protobufAddressSocketType(config.additional_addresses(i).address())) {
-        throw EnvoyException(
-            fmt::format("listener {}: has different socket type. The listener only "
-                        "support same socket type for all the addresses.",
-                        name_));
-      }
-      auto additional_address =
-          Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
-      checkIpv4CompatAddress(address, config.additional_addresses(i).address());
-      addresses_.emplace_back(additional_address);
-    }
-  }
+  parseAddresses();
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -425,7 +404,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash)
+                           uint64_t hash, bool address_changed)
     : parent_(parent), addresses_(origin.addresses_), socket_type_(origin.socket_type_),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
@@ -457,14 +436,22 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           *origin.filter_chain_manager_)),
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
+                          [this, address_changed] {
                             ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this);
+                            if (address_changed) {
+                              parent_.inAddressesOnlyUpdate(*this);
+                            } else {
+                              parent_.inPlaceFilterChainUpdate(*this);
+                            }
                           }),
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
+  if (address_changed) {
+    parseAddresses();
+  }
+
   buildAccessLog();
   validateConfig();
   buildListenSocketOptions();
@@ -491,6 +478,33 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
     throw EnvoyException(fmt::format(
         "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
         address->asStringView()));
+  }
+}
+
+void ListenerImpl::parseAddresses() {
+  if (config_.has_internal_listener()) {
+    addresses_.emplace_back(
+        std::make_shared<Network::Address::EnvoyInternalInstance>(config_.name()));
+  } else {
+    // All the addresses should be same socket type, so get the first address's socket type is
+    // enough.
+    auto address = Network::Address::resolveProtoAddress(config_.address());
+    checkIpv4CompatAddress(address, config_.address());
+    addresses_.emplace_back(address);
+
+    for (auto i = 0; i < config_.additional_addresses_size(); i++) {
+      if (socket_type_ !=
+          Network::Utility::protobufAddressSocketType(config_.additional_addresses(i).address())) {
+        throw EnvoyException(
+            fmt::format("listener {}: has different socket type. The listener only "
+                        "support same socket type for all the addresses.",
+                        name_));
+      }
+      auto additional_address =
+          Network::Address::resolveProtoAddress(config_.additional_addresses(i).address());
+      checkIpv4CompatAddress(address, config_.additional_addresses(i).address());
+      addresses_.emplace_back(additional_address);
+    }
   }
 }
 
@@ -995,6 +1009,15 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
                                            /* use new hash */ hash));
 }
 
+ListenerImplPtr ListenerImpl::newListenerWithAddressesOnlyChange(
+    const envoy::config::listener::v3::Listener& config, bool workers_started, uint64_t hash) {
+  // Use WrapUnique since the constructor is private.
+  return absl::WrapUnique(new ListenerImpl(*this, config, version_info_, parent_, name_,
+                                           added_via_api_,
+                                           /* new new workers started state */ workers_started,
+                                           /* use new hash */ hash));
+}
+
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
   for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
@@ -1013,6 +1036,19 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
        !eq(*another_listener.filter_chain_manager_->defaultFilterChainMessage(),
            *filter_chain_manager_->defaultFilterChainMessage()))) {
     callback(*filter_chain_manager_->defaultFilterChain());
+  }
+}
+
+void ListenerImpl::diffNewAddresses(
+    const ListenerImpl& another_listener,
+    std::function<void(const Network::Address::InstanceConstSharedPtr&)> callback) {
+  for (auto& address : another_listener.addresses()) {
+    if (std::find_if(addresses_.begin(), addresses_.end(),
+                     [&address](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                       return *address == *other_addr;
+                     }) == addresses_.end()) {
+      callback(address);
+    }
   }
 }
 
@@ -1104,9 +1140,23 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   return false;
 }
 
+bool ListenerImpl::addressOnlyChange(const envoy::config::listener::v3::Listener& config) const {
+  if (socket_type_ != (config.has_internal_listener()
+                       ? Network::Socket::Type::Stream
+                       : Network::Utility::protobufAddressSocketType(config.address()))) {
+    return false;
+  }
+  return ListenerMessageUtil::addressOnlyChange(config_, config);
+}
+
 void ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {
   for (auto& socket_factory : other.getSocketFactories()) {
-    addSocketFactory(socket_factory->clone());
+    if (find_if(addresses_.begin(), addresses_.end(),
+                [&socket_factory](const Network::Address::InstanceConstSharedPtr& addr) {
+                  return *socket_factory->listeningAddress() == *addr;
+                }) != addresses_.end()) {
+      addSocketFactory(socket_factory->clone());
+    }
   }
 }
 
@@ -1127,6 +1177,19 @@ bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v
       "default_filter_chain"));
   differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
       "filter_chain_matcher"));
+  return differencer.Compare(lhs, rhs);
+}
+
+bool ListenerMessageUtil::addressOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                            const envoy::config::listener::v3::Listener& rhs) {
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.IgnoreField(
+      envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName("address"));
+
+  differencer.IgnoreField(envoy::config::listener::v3::Listener::GetDescriptor()->FindFieldByName(
+      "additional_addresses"));
   return differencer.Compare(lhs, rhs);
 }
 

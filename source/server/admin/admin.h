@@ -355,6 +355,9 @@ private:
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
       return socket_->connectionInfoProvider().localAddress();
     }
+    const Network::Address::InstanceConstSharedPtr& listeningAddress() const override {
+      return socket_->connectionInfoProvider().localAddress();
+    }
     Network::SocketSharedPtr getListenSocket(uint32_t) override {
       // This is only supposed to be called once.
       RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");

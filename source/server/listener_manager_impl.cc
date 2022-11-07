@@ -463,6 +463,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImplPtr new_listener = nullptr;
+  bool addresses_only_change = false;
 
   // In place filter chain update depends on the active listener at worker.
   if (existing_active_listener != active_listeners_.end() &&
@@ -472,6 +473,14 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     new_listener =
         (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
     stats_.listener_in_place_updated_.inc();
+  } else if (existing_active_listener != active_listeners_.end() &&
+             (*existing_active_listener)->addressOnlyChange(config)) {
+    ENVOY_LOG(debug, "use addresses only change update path for listener name={} hash={}", name,
+              hash);
+    addresses_only_change = true;
+    new_listener = (*existing_active_listener)
+                       ->newListenerWithAddressesOnlyChange(config, workers_started_, hash);
+    // TODO (soulxu): add metrics for this.
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
     new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
@@ -494,11 +503,22 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
+    // If this is addresses only change, then clone all the existing sockets.
+    if (!(addresses_only_change ||
+          (*existing_active_listener)->hasCompatibleAddress(*new_listener))) {
       setNewOrDrainingSocketFactory(name, *new_listener);
     } else {
       new_listener->cloneSocketFactoryFrom(**existing_active_listener);
     }
+
+    // Add new addresses
+    if (addresses_only_change) {
+      (*existing_active_listener)
+          ->diffNewAddresses(*new_listener, [](const Network::Address::InstanceConstSharedPtr&) {
+
+          });
+    }
+
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -699,6 +719,34 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
 }
 
 void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
+  auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
+  ASSERT(existing_warming_listener != warming_listeners_.end());
+  ASSERT(*existing_warming_listener != nullptr);
+
+  (*existing_warming_listener)->debugLog("execute in place filter chain update");
+
+  // Now that in place filter chain update was decided, the replaced listener must be in active
+  // list. It requires stop/remove listener procedure cancelling the in placed update if any.
+  ASSERT(existing_active_listener != active_listeners_.end());
+  ASSERT(*existing_active_listener != nullptr);
+
+  for (const auto& worker : workers_) {
+    // Explicitly override the existing listener with a new listener config.
+    addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
+  }
+
+  auto previous_listener = std::move(*existing_active_listener);
+  *existing_active_listener = std::move(*existing_warming_listener);
+  // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
+  // their state.
+  drainFilterChains(std::move(previous_listener), **existing_active_listener);
+
+  warming_listeners_.erase(existing_warming_listener);
+  updateWarmingActiveGauges();
+}
+
+void ListenerManagerImpl::inAddressesOnlyUpdate(ListenerImpl& listener) {
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
   auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
   ASSERT(existing_warming_listener != warming_listeners_.end());

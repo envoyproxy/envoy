@@ -393,6 +393,7 @@ public:
 
   MOCK_METHOD(Network::Socket::Type, socketType, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, listeningAddress, (), (const));
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
