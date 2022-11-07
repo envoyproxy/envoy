@@ -4,8 +4,8 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/utility.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
