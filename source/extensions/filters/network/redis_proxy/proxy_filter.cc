@@ -28,6 +28,12 @@ ProxyFilterConfig::ProxyFilterConfig(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)) {
 
+  if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
+    ENVOY_LOG(
+        warn,
+        "redirections enabled without DNS lookups so some responses might generate client errors");
+  }
+
   auto downstream_auth_password =
       Config::DataSource::read(config.downstream_auth_password(), true, api);
   if (!downstream_auth_password.empty()) {

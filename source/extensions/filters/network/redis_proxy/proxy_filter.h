@@ -46,7 +46,7 @@ struct ProxyStats {
 /**
  * Configuration for the redis proxy filter.
  */
-class ProxyFilterConfig {
+class ProxyFilterConfig : public Logger::Loggable<Logger::Id::redis> {
 public:
   ProxyFilterConfig(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
