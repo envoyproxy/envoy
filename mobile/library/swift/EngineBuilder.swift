@@ -27,7 +27,7 @@ open class EngineBuilder: NSObject {
   private var enableBrotli: Bool = false
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
-  private var enablePlatformCertificateValidation: Bool = true
+  private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
