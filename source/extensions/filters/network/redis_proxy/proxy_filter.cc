@@ -29,9 +29,8 @@ ProxyFilterConfig::ProxyFilterConfig(
       dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
-    ENVOY_LOG(
-        warn,
-        "redirections enabled without DNS lookups so some responses might generate client errors");
+    ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
+                    "dns_cache_config field within the connection pool settings to avoid them");
   }
 
   auto downstream_auth_password =
