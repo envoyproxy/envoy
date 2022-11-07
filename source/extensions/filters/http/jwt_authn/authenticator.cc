@@ -71,6 +71,9 @@ private:
   // finds one to verify with key.
   void startVerify();
 
+  // Copy the JWT Claim to HTTP Header
+  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
+
   // The jwks cache object.
   JwksCache& jwks_cache_;
   // the cluster manager object.
@@ -272,6 +275,43 @@ void AuthenticatorImpl::verifyKey() {
   handleGoodJwt(/*cache_hit=*/false);
 }
 
+void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
+                                            const std::string& header_name) {
+  StructUtils payload_getter(jwt_->payload_pb_);
+  const ::Envoy::ProtobufWkt::Value* claim_value;
+  const auto status = payload_getter.GetValue(claim_name, claim_value);
+  std::string str_claim_value;
+  if (status == StructUtils::OK) {
+    if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
+      str_claim_value = claim_value->string_value();
+    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
+      if (claim_value->number_value() < 0 ||
+          claim_value->number_value() >=
+              static_cast<double>(std::numeric_limits<uint64_t>::max())) {
+        ENVOY_LOG(debug, "--------claim : {} with value : {} not a valid integer -----------",
+                  claim_name, claim_value->number_value());
+      }
+      const uint64_t int_claim_value = static_cast<uint64_t>(claim_value->number_value());
+      str_claim_value = std::to_string(int_claim_value);
+    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kBoolValue) {
+      str_claim_value = claim_value->bool_value() ? "true" : "false";
+    } else {
+      ENVOY_LOG(debug,
+                "--------claim : {} is not a primitive type of int, string, or bool -----------",
+                claim_name);
+    }
+    if (!str_claim_value.empty()) {
+      headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
+      ENVOY_LOG(debug, "--------claim : {} with value : {} is added to the header : {} -----------",
+                claim_name, str_claim_value, header_name);
+    }
+  } else {
+    ENVOY_LOG(debug,
+              "--------claim : {} is not correct and can't be copied to header {}-----------",
+              claim_name, header_name);
+  }
+}
+
 void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
@@ -291,30 +331,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Copy JWT Claim to Header
   if (provider.claim_to_headers_size() != 0) {
     for (const auto& header_and_claim : provider.claim_to_headers()) {
-      if (!header_and_claim.claim_name().empty() && !header_and_claim.header_name().empty()) {
-        StructUtils payload_getter(jwt_->payload_pb_);
-        const ::google::protobuf::Value* found;
-        google::jwt_verify::StructUtils::FindResult claim_value =
-            payload_getter.GetValue(header_and_claim.claim_name(),found);
-        if (claim_value == StructUtils::OK) {
-          if (found->kind_case() == google::protobuf::Value::kStringValue) {
-            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
-                              found->string_value());
-          } else if (found->kind_case() == google::protobuf::Value::kNumberValue) {
-            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
-                              std::to_string(static_cast<uint64_t>(found->number_value())));
-          } else if (found->kind_case() == google::protobuf::Value::kBoolValue) {
-            headers_->addCopy(Http::LowerCaseString(header_and_claim.header_name()),
-                              found->bool_value() ? "true" : "false");
-          } else {
-            ENVOY_LOG(debug, "--------claim : {} is not of type string, int or bool -----------",
-                      header_and_claim.claim_name());
-          }
-        } else {
-          ENVOY_LOG(debug, "--------claim : {} is not correct -----------",
-                    header_and_claim.claim_name());
-        }
-      }
+      addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
     }
   }
 
