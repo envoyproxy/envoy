@@ -123,7 +123,7 @@ TEST(UUIDRequestIDExtensionTest, SetToStreamInfo) {
 
   EXPECT_CALL(stream_info_, setStreamIdProvider(_))
       .WillOnce(Invoke([&](StreamInfo::StreamIdProviderSharedPtr provider) {
-        EXPECT_EQ(255, provider->toInteger());
+        EXPECT_EQ(255, provider->toInteger().value());
       }));
   uuid_utils.setToStreamInfo(request_headers, stream_info_);
 }
