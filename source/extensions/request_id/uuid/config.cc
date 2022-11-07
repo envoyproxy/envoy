@@ -29,13 +29,22 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
-Envoy::StreamInfo::StreamIdProviderSharedPtr
-UUIDRequestIDExtension::toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const {
+absl::optional<uint64_t>
+UUIDRequestIDExtension::toInteger(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
-    return nullptr;
+    return absl::nullopt;
   }
-  return std::make_shared<Envoy::StreamInfo::StreamIdProviderImpl>(
-      request_headers.getRequestIdValue());
+  const std::string uuid(request_headers.getRequestIdValue());
+  if (uuid.length() < 8) {
+    return absl::nullopt;
+  }
+
+  uint64_t value;
+  if (!StringUtil::atoull(uuid.substr(0, 8).c_str(), value, 16)) {
+    return absl::nullopt;
+  }
+
+  return value;
 }
 
 Tracing::Reason
@@ -88,6 +97,15 @@ void UUIDRequestIDExtension::setTraceReason(Http::RequestHeaderMap& request_head
     break;
   }
   request_headers.setRequestId(uuid);
+}
+
+void UUIDRequestIDExtension::setToStreamInfo(const Http::RequestHeaderMap& request_headers,
+                                             StreamInfo::StreamInfo& stream_info) const {
+  if (request_headers.RequestId() == nullptr) {
+    return;
+  }
+  stream_info.setStreamIdProvider(
+      std::make_shared<StreamInfo::StreamIdProviderImpl>(request_headers.getRequestIdValue()));
 }
 
 REGISTER_FACTORY(UUIDRequestIDExtensionFactory, Server::Configuration::RequestIDExtensionFactory);

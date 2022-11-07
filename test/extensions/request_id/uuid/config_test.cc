@@ -5,6 +5,7 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -74,40 +75,57 @@ TEST(UUIDRequestIDExtensionTest, ModRequestIDBy) {
                                     random);
   Http::TestRequestHeaderMapImpl request_headers;
 
-  EXPECT_EQ(nullptr, uuid_utils.toStreamIdProvider(request_headers));
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("fffffff");
-  EXPECT_FALSE(uuid_utils.toStreamIdProvider(request_headers)->toInteger().has_value());
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("fffffffz-0012-0110-00ff-0c00400600ff");
-  EXPECT_FALSE(uuid_utils.toStreamIdProvider(request_headers)->toInteger().has_value());
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("00000000-0000-0000-0000-000000000000");
-  EXPECT_EQ(0, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value());
+  EXPECT_EQ(0, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("00000001-0000-0000-0000-000000000000");
-  EXPECT_EQ(1, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value());
+  EXPECT_EQ(1, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("0000000f-0000-0000-0000-00000000000a");
-  EXPECT_EQ(15, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value());
+  EXPECT_EQ(15, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("");
-  EXPECT_FALSE(uuid_utils.toStreamIdProvider(request_headers)->toInteger().has_value());
+  EXPECT_FALSE(uuid_utils.toInteger(request_headers).has_value());
 
   request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
-  EXPECT_EQ(55, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value() % 100);
+  EXPECT_EQ(55, uuid_utils.toInteger(request_headers).value() % 100);
 
   request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
-  EXPECT_EQ(255, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value());
+  EXPECT_EQ(255, uuid_utils.toInteger(request_headers).value());
 
   request_headers.setRequestId("a0090100-0012-0110-00ff-0c00400600ff");
-  EXPECT_EQ(8, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value() % 137);
+  EXPECT_EQ(8, uuid_utils.toInteger(request_headers).value() % 137);
 
   request_headers.setRequestId("ffffffff-0012-0110-00ff-0c00400600ff");
-  EXPECT_EQ(95, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value() % 100);
+  EXPECT_EQ(95, uuid_utils.toInteger(request_headers).value() % 100);
 
   request_headers.setRequestId("ffffffff-0012-0110-00ff-0c00400600ff");
-  EXPECT_EQ(7295, uuid_utils.toStreamIdProvider(request_headers)->toInteger().value() % 10000);
+  EXPECT_EQ(7295, uuid_utils.toInteger(request_headers).value() % 10000);
+}
+
+TEST(UUIDRequestIDExtensionTest, SetToStreamInfo) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+
+  Random::RandomGeneratorImpl random;
+
+  UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),
+                                    random);
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
+
+  EXPECT_CALL(stream_info_, setStreamIdProvider(_))
+      .WillOnce(Invoke([&](StreamInfo::StreamIdProviderSharedPtr provider) {
+        EXPECT_EQ(255, provider->toInteger());
+      }));
+  uuid_utils.setToStreamInfo(request_headers, stream_info_);
 }
 
 TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
@@ -129,8 +147,7 @@ TEST(UUIDRequestIDExtensionTest, RequestIDModDistribution) {
     ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
 
     request_headers.setRequestId(uuid);
-    const uint64_t value =
-        uuid_utils.toStreamIdProvider(request_headers)->toInteger().value() % mod;
+    const uint64_t value = uuid_utils.toInteger(request_headers).value() % mod;
 
     if (value < required_percentage) {
       interesting_samples++;

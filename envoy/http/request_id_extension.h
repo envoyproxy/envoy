@@ -5,7 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stream_info/stream_id_provider.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
@@ -55,11 +55,21 @@ public:
   virtual bool useRequestIdForTraceSampling() const PURE;
 
   /**
+   * Convert the request ID to a 64-bit integer representation for using in modulo, etc.
+   * calculations.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @return the unique id based on the request ID for stream info if the request ID is invalid.
+   * @return the integer or nullopt if the request ID is invalid.
    */
-  virtual Envoy::StreamInfo::StreamIdProviderSharedPtr
-  toStreamIdProvider(const Http::RequestHeaderMap& request_headers) const PURE;
+  virtual absl::optional<uint64_t>
+  toInteger(const Http::RequestHeaderMap& request_headers) const PURE;
+
+  /**
+   * Get the request ID from the request headers and set it to the stream info.
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @param stream_info supplies the stream info for setting the request ID.
+   */
+  virtual void setToStreamInfo(const Http::RequestHeaderMap& request_headers,
+                               StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;

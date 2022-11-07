@@ -315,8 +315,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!rid_extension->useRequestIdForTraceSampling()) {
     return Tracing::Reason::Sampling;
   }
-  const auto provider = rid_extension->toStreamIdProvider(request_headers);
-  const auto rid_to_integer = provider == nullptr ? absl::nullopt : provider->toInteger();
+  const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {
     return final_reason;

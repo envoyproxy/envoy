@@ -1907,9 +1907,8 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  StreamInfo::StreamIdProviderSharedPtr
-  toStreamIdProvider(const Http::RequestHeaderMap&) const override {
-    return nullptr;
+  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
     return Tracing::Reason::Sampling;
@@ -1917,6 +1916,7 @@ public:
   void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
   bool useRequestIdForTraceSampling() const override { return true; }
   std::string testField() { return config_.test_field(); }
+  void setToStreamInfo(const Http::RequestHeaderMap&, StreamInfo::StreamInfo&) const override {}
 
 private:
   test::http_connection_manager::CustomRequestIDExtension config_;

@@ -1084,9 +1084,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
   // Set stream unique id to stream info after the request header has been generated or
-  // overwritten (in the mutateRequestHeaders).
-  filter_manager_.streamInfo().setStreamIdProvider(
-      connection_manager_.config_.requestIDExtension()->toStreamIdProvider(*request_headers_));
+  // overwritten (in the mutateRequestHeaders and mutateTracingRequestHeader).
+  ASSERT(connection_manager_.config_.requestIDExtension() != nullptr);
+  connection_manager_.config_.requestIDExtension()->setToStreamInfo(*request_headers_,
+                                                                    filter_manager_.streamInfo());
 
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
