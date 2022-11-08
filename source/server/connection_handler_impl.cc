@@ -36,8 +36,8 @@ void ConnectionHandlerImpl::addListener(
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
     listener_detail->get().invokeListenerMethod(
-        [&config](Network::ConnectionHandler::ActiveListener& listener) {
-          listener.updateListenerConfig(config);
+        [&config](const PerAddressActiveListenerDetails& details) {
+          details.listener_->updateListenerConfig(config);
         });
     if (!new_addresses.has_value()) {
       return;
@@ -70,8 +70,8 @@ void ConnectionHandlerImpl::addListener(
         if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
             iter != listener_map_by_tag_.end()) {
           iter->second->invokeListenerMethod(
-              [&config](Network::ConnectionHandler::ActiveListener& listener) {
-                listener.updateListenerConfig(config);
+              [&config](const PerAddressActiveListenerDetails& details) {
+                details.listener_->updateListenerConfig(config);
               });
           return;
         }
@@ -81,13 +81,15 @@ void ConnectionHandlerImpl::addListener(
           local_registry->createActiveInternalListener(*this, config, dispatcher());
       // TODO(soulxu): support multiple internal addresses in listener in the future.
       ASSERT(config.listenSocketFactories().size() == 1);
-      details->addActiveListener(config, socket_factory->localAddress(), socket_factory->listeningAddress(), listener_reject_fraction_,
+      details->addActiveListener(config, socket_factory->localAddress(),
+                                 socket_factory->listeningAddress(), listener_reject_fraction_,
                                  disable_listeners_, std::move(internal_listener));
     } else if (socket_factory->socketType() == Network::Socket::Type::Stream) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
       details->addActiveListener(
-          config, address, socket_factory->listeningAddress(), listener_reject_fraction_, disable_listeners_,
+          config, address, socket_factory->listeningAddress(), listener_reject_fraction_,
+          disable_listeners_,
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
@@ -97,7 +99,8 @@ void ConnectionHandlerImpl::addListener(
       ASSERT(worker_index_.has_value());
       auto address = socket_factory->localAddress();
       details->addActiveListener(
-          config, address, socket_factory->listeningAddress(), listener_reject_fraction_, disable_listeners_,
+          config, address, socket_factory->listeningAddress(), listener_reject_fraction_,
+          disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
               dispatcher_, config));
@@ -244,8 +247,8 @@ void ConnectionHandlerImpl::removeFilterChains(
   if (auto listener_it = listener_map_by_tag_.find(listener_tag);
       listener_it != listener_map_by_tag_.end()) {
     listener_it->second->invokeListenerMethod(
-        [&filter_chains](Network::ConnectionHandler::ActiveListener& listener) {
-          listener.onFilterChainDraining(filter_chains);
+        [&filter_chains](const PerAddressActiveListenerDetails& details) {
+          details.listener_->onFilterChainDraining(filter_chains);
         });
   }
 
@@ -257,9 +260,9 @@ void ConnectionHandlerImpl::removeFilterChains(
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
-    iter->second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
-        listener.shutdownListener();
+    iter->second->invokeListenerMethod([](const PerAddressActiveListenerDetails& details) {
+      if (details.listener_->listener() != nullptr) {
+        details.listener_->shutdownListener();
       }
     });
   }
@@ -267,9 +270,9 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& iter : listener_map_by_tag_) {
-    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
-        listener.shutdownListener();
+    iter.second->invokeListenerMethod([](const PerAddressActiveListenerDetails& details) {
+      if (details.listener_->listener() != nullptr) {
+        details.listener_->shutdownListener();
       }
     });
   }
@@ -278,9 +281,9 @@ void ConnectionHandlerImpl::stopListeners() {
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& iter : listener_map_by_tag_) {
-    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
-        listener.pauseListening();
+    iter.second->invokeListenerMethod([](const PerAddressActiveListenerDetails& details) {
+      if (details.listener_->listener() != nullptr) {
+        details.listener_->pauseListening();
       }
     });
   }
@@ -289,9 +292,9 @@ void ConnectionHandlerImpl::disableListeners() {
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& iter : listener_map_by_tag_) {
-    iter.second->invokeListenerMethod([](Network::ConnectionHandler::ActiveListener& listener) {
-      if (listener.listener() != nullptr) {
-        listener.resumeListening();
+    iter.second->invokeListenerMethod([](const PerAddressActiveListenerDetails& details) {
+      if (details.listener_->listener() != nullptr) {
+        details.listener_->resumeListening();
       }
     });
   }
@@ -301,9 +304,9 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   listener_reject_fraction_ = reject_fraction;
   for (auto& iter : listener_map_by_tag_) {
     iter.second->invokeListenerMethod(
-        [&reject_fraction](Network::ConnectionHandler::ActiveListener& listener) {
-          if (listener.listener() != nullptr) {
-            listener.listener()->setRejectFraction(reject_fraction);
+        [&reject_fraction](const PerAddressActiveListenerDetails& details) {
+          if (details.listener_->listener() != nullptr) {
+            details.listener_->listener()->setRejectFraction(reject_fraction);
           }
         });
   }

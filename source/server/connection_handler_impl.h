@@ -97,16 +97,15 @@ private:
   struct ActiveListenerDetails {
     std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
 
-    using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
+    using ListenerMethodFn = std::function<void(const PerAddressActiveListenerDetails&)>;
 
     /**
      * A helper to execute specific method on each PerAddressActiveListenerDetails item.
      */
     void invokeListenerMethod(ListenerMethodFn fn) {
-      std::for_each(per_address_details_list_.begin(), per_address_details_list_.end(),
-                    [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
-                      fn(*details->listener_);
-                    });
+      std::for_each(
+          per_address_details_list_.begin(), per_address_details_list_.end(),
+          [&fn](std::shared_ptr<PerAddressActiveListenerDetails>& details) { fn(*details); });
     }
 
     /**
