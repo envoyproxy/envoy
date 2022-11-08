@@ -21,7 +21,7 @@ namespace FileSystemHttpCache {
  * consistency.
  *
  * This data is serialized as a flat object rather than protobuf serialization because it
- * needs to be readable from the start of the file, but writeable after the rest of the
+ * needs to be at the start of the file for efficient read, but write after the rest of the
  * file has been completely written (as the body size and trailer size aren't necessarily
  * known until the entire content has been streamed). Serialized proto messages can
  * change size when values change, which makes them unsuited for this purpose.

@@ -1,6 +1,5 @@
-#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
-
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 
 #include "gtest/gtest.h"
 
