@@ -12,19 +12,19 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
     Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-    std::shared_ptr<QuicSslConnectionInfo>&& info)
+    std::shared_ptr<QuicSslConnectionInfo>&& info,
+    std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
       network_connection_(&connection), quic_ssl_info_(std::move(info)),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
-      stream_info_(dispatcher.timeSource(),
-                   connection.connectionSocket()->connectionInfoProviderSharedPtr()),
+      stream_info_(std::move(stream_info)),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
-  stream_info_.protocol(Http::Protocol::Http3);
+  stream_info_->protocol(Http::Protocol::Http3);
   network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
       Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
 }

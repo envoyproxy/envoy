@@ -48,10 +48,9 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/eds.h"
 #include "source/common/upstream/health_checker_impl.h"
-#include "source/common/upstream/logical_dns_cluster.h"
-#include "source/common/upstream/original_dst_cluster.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -1872,14 +1871,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         (health_checker_ != nullptr && existing_host_found &&
          *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
     bool locality_changed = false;
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints")) {
-      locality_changed =
-          (existing_host_found &&
-           (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
-      if (locality_changed) {
-        hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
-      }
+    locality_changed = (existing_host_found &&
+                        (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+    if (locality_changed) {
+      hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
     }
 
     const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
