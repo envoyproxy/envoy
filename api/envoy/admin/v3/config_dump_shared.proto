@@ -376,8 +376,7 @@ message EndpointsConfigDump {
 // an Envoy ECDS listener and HTTP filters as static filters or by returning
 // them in ECDS response.
 message EcdsConfigDump {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.admin.v2alpha.EcdsConfigDump";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.EcdsConfigDump";
 
   // [#next-free-field: 6]
   message EcdsFilterConfig {
