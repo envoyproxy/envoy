@@ -82,7 +82,7 @@ following information:
 * The primaries for each shard.
 * Nodes entering or leaving the cluster.
 
-Envoy proxy supports identification of the nodes via both IP address and hostnames in the ``cluster slots`` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica.
+Envoy proxy supports identification of the nodes via both IP address and hostnames in the ``cluster slots`` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica. On the other hand, if the :ref:`enable_redirection <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>` option is set and a MOVED or ASK response containing a hostname is received Envoy will not automatically do a DNS lookup and instead bubble the error to the client verbatim. To have Envoy do the DNS lookup and follow the redirection, you need to configure the DNS cache option :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` under the connection pool settings. For a configuration example on how to enable DNS lookups for redirections, see the filter :ref:`configuration reference <config_network_filters_redis_proxy>`.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.

@@ -213,8 +213,8 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
-  const Network::FilterChain*
-  findFilterChain(const Network::ConnectionSocket& socket) const override;
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
+                                              const StreamInfo::StreamInfo& info) const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -240,8 +240,8 @@ public:
 
 private:
   void convertIPsToTries();
-  const Network::FilterChain*
-  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                          const StreamInfo::StreamInfo& info) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
