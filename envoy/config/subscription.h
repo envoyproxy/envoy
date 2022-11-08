@@ -62,9 +62,9 @@ public:
   virtual bool hasResource() const PURE;
 
   /**
-   * @return absl::optional<envoy::config::core::v3::Metadata> of a resource.
+   * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
    */
-  virtual OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
+  virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;

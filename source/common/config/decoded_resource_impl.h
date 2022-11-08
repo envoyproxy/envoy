@@ -76,14 +76,14 @@ public:
   const Protobuf::Message& resource() const override { return *resource_; };
   bool hasResource() const override { return has_resource_; }
   absl::optional<std::chrono::milliseconds> ttl() const override { return ttl_; }
-  OptRef<const envoy::config::core::v3::Metadata> metadata() const override { return metadata_; }
+  const OptRef<const envoy::config::core::v3::Metadata> metadata() const override { return metadata_; }
 
 private:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
                       const Protobuf::RepeatedPtrField<std::string>& aliases,
                       const ProtobufWkt::Any& resource, bool has_resource,
                       const std::string& version, absl::optional<std::chrono::milliseconds> ttl,
-                      OptRef<const envoy::config::core::v3::Metadata> metadata)
+                      const OptRef<const envoy::config::core::v3::Metadata> metadata)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
         aliases_(repeatedPtrFieldToVector(aliases)), version_(version), ttl_(ttl),
@@ -96,7 +96,7 @@ private:
   const std::string version_;
   // Per resource TTL.
   const absl::optional<std::chrono::milliseconds> ttl_;
-  OptRef<const envoy::config::core::v3::Metadata> metadata_;
+  const OptRef<const envoy::config::core::v3::Metadata> metadata_;
 };
 
 struct DecodedResourcesWrapper {
