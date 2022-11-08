@@ -35,6 +35,7 @@
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
@@ -495,8 +496,6 @@ private:
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
-      using HostStatusSet = std::bitset<32>;
-
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
@@ -531,14 +530,6 @@ private:
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
 
-      // A utility function to create override host status from lb config.
-      static HostStatusSet createOverrideHostStatus(
-          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
-      HostConstSharedPtr selectOverrideHost(LoadBalancerContext* context);
-      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
-      HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
-
     private:
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(ResourcePriority priority,
@@ -547,6 +538,9 @@ private:
 
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
                                                      LoadBalancerContext* context, bool peek);
+
+      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
+      HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -571,7 +565,7 @@ private:
       //
       // If multiple bit fields are set, it is acceptable as long as the status of override host is
       // in any of these statuses.
-      const HostStatusSet override_host_statuses_{};
+      const HostUtility::HostStatusSet override_host_statuses_{};
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;

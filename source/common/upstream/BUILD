@@ -91,6 +91,7 @@ envoy_cc_library(
         ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
+        ":host_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
@@ -246,7 +247,10 @@ envoy_cc_library(
     name = "host_utility_lib",
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
-    deps = ["//envoy/upstream:upstream_interface"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
 )
 
 envoy_cc_library(
