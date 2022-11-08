@@ -1,8 +1,10 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/quic_stats_gatherer.h"
 
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
+#include "quiche/common/platform/api/quiche_reference_counted.h"
 
 namespace Envoy {
 namespace Quic {
@@ -18,7 +20,12 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
-  void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
+  void setRequestDecoder(Http::RequestDecoder& decoder) {
+    request_decoder_ = &decoder;
+    stats_gatherer_->add_stream_info(request_decoder_->streamInfoSharedPtr());
+    stats_gatherer_->set_access_log_handlers(request_decoder_->accessLogHandlers());
+    stats_gatherer_->set_time_source(&connection()->dispatcher().timeSource());
+  }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
@@ -85,6 +92,8 @@ private:
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
 };
 
 } // namespace Quic

@@ -253,6 +253,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
+        ":quic_stats_gatherer",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
