@@ -135,7 +135,7 @@ public:
    * the serialized fixed header chunk.
    * @return a string view over the entire structure of the header chunk.
    */
-  absl::string_view stringView() const { return {contents_.as_str_, size()}; }
+  absl::string_view stringView() const { return {contents_.raw_, size()}; }
 
   /**
    * is this a valid cache file header block for the current code version?
@@ -171,7 +171,7 @@ private:
       uint32_t trailer_size_;
       uint64_t body_size_;
     };
-    char as_str_[1];
+    char raw_[sizeof(uint32_t) * 4 + sizeof(uint64_t)];
   } contents_;
   static_assert(sizeof(contents_) ==
                     sizeof(contents_.file_id_) + sizeof(contents_.cache_version_id_) +
