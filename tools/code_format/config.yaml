@@ -292,6 +292,7 @@ unsorted_flags:
 visibility_excludes:
 - source/extensions/clusters/strict_dns/
 - source/extensions/clusters/original_dst/
+- source/extensions/clusters/logical_dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
