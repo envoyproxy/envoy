@@ -22,7 +22,6 @@ using ::Envoy::Http::Http2::Http2Frame;
 
 enum class Http2Impl {
   Nghttp2,
-  WrappedNghttp2,
   Oghttp2,
 };
 

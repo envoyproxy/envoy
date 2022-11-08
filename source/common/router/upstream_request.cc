@@ -94,13 +94,15 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
       stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
-    span_ = parent_.callbacks()->activeSpan().spawnChild(
-        parent_.callbacks()->tracingConfig(),
-        "router " + parent.cluster()->observabilityName() + " egress",
-        parent.timeSource().systemTime());
-    if (parent.attemptCount() != 1) {
-      // This is a retry request, add this metadata to span.
-      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
+    if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+      span_ = parent_.callbacks()->activeSpan().spawnChild(
+          tracing_config.value().get(),
+          absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
+          parent.timeSource().systemTime());
+      if (parent.attemptCount() != 1) {
+        // This is a retry request, add this metadata to span.
+        span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
+      }
     }
   }
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -142,8 +144,10 @@ void UpstreamRequest::cleanUp() {
   }
 
   if (span_ != nullptr) {
+    auto tracing_config = parent_.callbacks()->tracingConfig();
+    ASSERT(tracing_config.has_value());
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
-                                                     parent_.callbacks()->tracingConfig());
+                                                     tracing_config.value().get());
   }
 
   if (per_try_timeout_ != nullptr) {
@@ -667,6 +671,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
 
+  stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
+
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
     return;
@@ -840,7 +846,7 @@ const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::scope() {
   return upstream_request_.parent_.callbacks()->scope();
 }
 
-const Tracing::Config& UpstreamRequestFilterManagerCallbacks::tracingConfig() {
+OptRef<const Tracing::Config> UpstreamRequestFilterManagerCallbacks::tracingConfig() const {
   return upstream_request_.parent_.callbacks()->tracingConfig();
 }
 

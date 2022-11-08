@@ -156,8 +156,8 @@ void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host)
   if (lb_factory_) {
     lb_factory_->onHostHealthUpdate();
   }
-  if (host && (host->health() == Upstream::Host::Health::Degraded ||
-               host->health() == Upstream::Host::Health::Unhealthy)) {
+  if (host && (host->coarseHealth() == Upstream::Host::Health::Degraded ||
+               host->coarseHealth() == Upstream::Host::Health::Unhealthy)) {
     refresh_manager_->onHostDegraded(cluster_name_);
   }
   ClusterImplBase::reloadHealthyHostsHelper(host);

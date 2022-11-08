@@ -283,6 +283,7 @@ envoy_cc_test_library(
         "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/server:worker_factory_mocks",
         "//test/mocks/server:worker_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -368,6 +369,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -503,6 +505,7 @@ envoy_cc_benchmark_binary(
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],

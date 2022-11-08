@@ -2424,19 +2424,26 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "quic_core_connection_id_generator_interface_lib",
     hdrs = ["quiche/quic/core/connection_id_generator.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_types_lib",
         ":quic_core_versions_lib",
     ],
 )
 
-cc_library(
+envoy_cc_library(
     name = "quic_core_deterministic_connection_id_generator_lib",
     srcs = ["quiche/quic/core/deterministic_connection_id_generator.cc"],
     hdrs = ["quiche/quic/core/deterministic_connection_id_generator.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_core_connection_id_generator_interface_lib",
@@ -5368,6 +5375,7 @@ envoy_cc_library(
     name = "quic_load_balancer_encoder_lib",
     srcs = ["quiche/quic/load_balancer/load_balancer_encoder.cc"],
     hdrs = ["quiche/quic/load_balancer/load_balancer_encoder.h"],
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],

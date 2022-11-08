@@ -63,7 +63,7 @@ experience a backward compatible break on a change. Specifically:
     churn.
 
   * Increasing the strictness of
-    [protoc-gen-validate](https://github.com/envoyproxy/protoc-gen-validate) annotations. Exceptions
+    [protoc-gen-validate](https://github.com/bufbuild/protoc-gen-validate) annotations. Exceptions
     may be granted for scenarios in which these stricter conditions model behavior already implied
     structurally or by documentation.
 

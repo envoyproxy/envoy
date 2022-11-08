@@ -627,16 +627,9 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     // If the content-type is not set, set it.
     // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
     // set a content type header, set the content type to be based on the changed body.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
-      if (response_headers->ContentType() == nullptr ||
-          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
-        response_headers->setReferenceContentType(content_type);
-      }
-    } else {
-      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-        response_headers->setReferenceContentType(content_type);
-      }
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
     }
   } else {
     response_headers->removeContentLength();
@@ -1013,7 +1006,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
     if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
     } else {
       encoded.push_back(ch);
     }
@@ -1142,13 +1135,10 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
 }
 
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
-  return remote_decode_complete &&
-                 Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
-             ? Http::Code::GatewayTimeout
-             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
-             // connection any more.
-             : Http::Code::RequestTimeout;
+  return remote_decode_complete ? Http::Code::GatewayTimeout
+                                // Http::Code::RequestTimeout is more expensive because HTTP1 client
+                                // cannot use the connection any more.
+                                : Http::Code::RequestTimeout;
 }
 
 } // namespace Http

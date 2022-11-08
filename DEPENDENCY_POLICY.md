@@ -156,4 +156,4 @@ The following dependencies are exempt from the policy:
 * Any developer-only facing tooling or the documentation build.
 
 * Transitive build time dependencies, e.g. Go projects vendored into
-  [protoc-gen-validate](https://github.com/envoyproxy/protoc-gen-validate).
+  [protoc-gen-validate](https://github.com/bufbuild/protoc-gen-validate).

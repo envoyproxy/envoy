@@ -1633,6 +1633,7 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+  EXPECT_EQ(Utility::PercentEncoding::encode("São Paulo"), "S%C3%A3o Paulo");
 }
 
 TEST(CheckRequiredHeaders, Request) {
