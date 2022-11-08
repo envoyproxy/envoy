@@ -21,7 +21,7 @@ static_resources:
               socket_address:
                 address: "{}"
                 port_value: 0
-      {}
+    {}
   listeners:
     name: listener_0
     address:
