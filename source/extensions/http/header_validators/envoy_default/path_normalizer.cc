@@ -144,9 +144,8 @@ std::string::iterator findStartOfPreviousSegment(std::string::iterator iter,
 
 PathNormalizer::PathNormalizationResult
 PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
-  // Attempt to parse the request-target to see if it is in origin-form. We are only normalizing
-  // the path component of the request-target, so if is is origin or absolute form we will extract
-  // the path. From RFC 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2:
+  // Parse and normalize the :path header and update it in the map. From RFC 9112,
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2:
   //
   // request-target = origin-form
   //                / absolute-form
@@ -157,6 +156,8 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // absolute-form  = absolute-URI
   // authority-form = uri-host ":" port
   // asterisk-form  = "*"
+  //
+  // TODO(#23887) - potentially separate path normalization into multiple independent operations.
   const bool is_connect_method =
       header_map.method() == ::Envoy::Http::Headers::get().MethodValues.Connect;
   const bool is_options_method =
@@ -264,6 +265,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::decodePass(std::string& 
   while (read != end) {
     if (*read == '%') {
       auto decode_result = normalizeAndDecodeOctet(read, end);
+      // TODO(#23885) - add and honor config to not reject invalid percent-encoded octets.
       switch (decode_result.result()) {
       case PercentDecodeResult::Invalid:
         ABSL_FALLTHROUGH_INTENDED;
@@ -383,6 +385,7 @@ PathNormalizer::collapseDotSegmentsPass(std::string& path) const {
 std::tuple<absl::string_view, absl::string_view>
 PathNormalizer::splitPathAndQueryParams(absl::string_view path_and_query_params) const {
   // Split on the query (?) or fragment (#) delimiter, whichever one is first.
+  // TODO(#23886) - add and honor config option for handling the path fragment component.
   auto delim = path_and_query_params.find_first_of("?#");
   if (delim == absl::string_view::npos) {
     // no query/fragment component
