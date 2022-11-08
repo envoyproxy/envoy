@@ -2,8 +2,6 @@
 
 #include <cstdint>
 
-#include "source/common/common/logger.h"
-
 namespace Envoy {
 namespace Quic {
 
