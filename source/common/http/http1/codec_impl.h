@@ -155,8 +155,7 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
-  void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {
-  }
+  void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
 
   // Http1::StreamEncoderImpl
   void resetStream(StreamResetReason reason) override;
