@@ -87,8 +87,8 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {
-      stats_.lb_subsets_removed_.inc();
-      stats_.lb_subsets_active_.dec();
+      stats_->lb_subsets_removed_.inc();
+      stats_->lb_subsets_active_.dec();
     }
   });
 }

@@ -254,6 +254,7 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
+        ":lazy_cluster_stats_lib",
         ":scheduler_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
@@ -519,6 +520,7 @@ envoy_cc_library(
         ":eds_lib",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
+        ":lazy_cluster_stats_lib",
         ":logical_dns_cluster_lib",
         ":static_cluster_lib",
         ":strict_dns_cluster_lib",
@@ -593,6 +595,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "lazy_cluster_stats_lib",
+    hdrs = ["lazy_cluster_stats.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:thread_lib",
+    ],
 )
 
 envoy_cc_library(

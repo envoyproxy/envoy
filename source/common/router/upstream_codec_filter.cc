@@ -23,6 +23,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/upstream/lazy_cluster_stats.h"
 
 namespace Envoy {
 namespace Router {
@@ -33,7 +34,7 @@ void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
 }
 
 void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
-  callbacks_->clusterInfo()->stats().upstream_flow_control_paused_reading_total_.inc();
+  callbacks_->clusterInfo()->stats()->upstream_flow_control_paused_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
 }
 

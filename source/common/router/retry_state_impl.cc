@@ -185,13 +185,13 @@ void RetryStateImpl::enableBackoffTimer() {
     // be reused.
     ratelimited_backoff_strategy_.reset();
 
-    cluster_.stats().upstream_rq_retry_backoff_ratelimited_.inc();
+    cluster_.stats()->upstream_rq_retry_backoff_ratelimited_.inc();
 
   } else {
     // Otherwise we use a fully jittered exponential backoff algorithm.
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 
-    cluster_.stats().upstream_rq_retry_backoff_exponential_.inc();
+    cluster_.stats()->upstream_rq_retry_backoff_exponential_.inc();
   }
 }
 
@@ -273,13 +273,15 @@ void RetryStateImpl::resetRetry() {
 }
 
 RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallback callback) {
+  InstantiatedClusterStats& stats = *cluster_.stats();
+
   // If a callback is armed from a previous shouldRetry and we don't need to
   // retry this particular request, we can infer that we did a retry earlier
   // and it was successful.
   if ((backoff_callback_ || next_loop_callback_) && would_retry == RetryDecision::NoRetry) {
-    cluster_.stats().upstream_rq_retry_success_.inc();
+    stats.upstream_rq_retry_success_.inc();
     if (vcluster_) {
-      vcluster_->stats().upstream_rq_retry_success_.inc();
+      stats.upstream_rq_retry_success_.inc();
     }
     if (route_stats_context_.has_value()) {
       route_stats_context_->stats().upstream_rq_retry_success_.inc();
@@ -295,7 +297,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   // The request has exhausted the number of retries allotted to it by the retry policy configured
   // (or the x-envoy-max-retries header).
   if (retries_remaining_ == 0) {
-    cluster_.stats().upstream_rq_retry_limit_exceeded_.inc();
+    stats.upstream_rq_retry_limit_exceeded_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_limit_exceeded_.inc();
     }
@@ -308,7 +310,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
   retries_remaining_--;
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
-    cluster_.stats().upstream_rq_retry_overflow_.inc();
+    stats.upstream_rq_retry_overflow_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_overflow_.inc();
     }
@@ -324,7 +326,7 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
 
   ASSERT(!backoff_callback_ && !next_loop_callback_);
   cluster_.resourceManager(priority_).retries().inc();
-  cluster_.stats().upstream_rq_retry_.inc();
+  stats.upstream_rq_retry_.inc();
   if (vcluster_) {
     vcluster_->stats().upstream_rq_retry_.inc();
   }

@@ -18,6 +18,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/lazy_cluster_stats.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -70,8 +71,8 @@ protected:
    */
   void recalculateLoadInTotalPanic();
 
-  LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random,
+  LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
+                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
@@ -220,7 +221,8 @@ public:
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
@@ -426,7 +428,8 @@ class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
                             Logger::Loggable<Logger::Id::upstream> {
 public:
   EdfLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
@@ -494,7 +497,8 @@ protected:
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>

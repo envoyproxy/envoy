@@ -711,7 +711,8 @@ public:
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 MAKE_STAT_NAMES_STRUCT(ClusterStatNames, ALL_CLUSTER_STATS);
-MAKE_STATS_STRUCT(ClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
+MAKE_STATS_STRUCT(InstantiatedClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
+struct ClusterStats;  // These are lazy -- and need to be instanted with * or ->
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
