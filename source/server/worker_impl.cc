@@ -42,11 +42,12 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
       [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
 }
 
-void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                             Network::ListenerConfig& listener, AddListenerCompletion completion,
-                             Runtime::Loader& runtime) {
+void WorkerImpl::addListener(
+    absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+    AddListenerCompletion completion, Runtime::Loader& runtime,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   dispatcher_->post([this, overridden_listener, &listener, &runtime, completion]() -> void {
-    handler_->addListener(overridden_listener, listener, runtime);
+    handler_->addListener(overridden_listener, listener, runtime, addresses);
     hooks_.onWorkerListenerAdded();
     completion();
   });

@@ -238,7 +238,9 @@ private:
 
   bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
   void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
-                           ListenerImpl& listener, ListenerCompletionCallback completion_callback);
+                           ListenerImpl& listener, ListenerCompletionCallback completion_callback,
+                           OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                               addresses = absl::nullopt);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);

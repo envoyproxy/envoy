@@ -53,7 +53,9 @@ public:
 
   // Server::Worker
   void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
-                   AddListenerCompletion completion, Runtime::Loader& loader) override;
+                   AddListenerCompletion completion, Runtime::Loader& loader,
+                   OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses =
+                       absl::nullopt) override;
   uint64_t numConnections() const override;
 
   void removeListener(Network::ListenerConfig& listener, std::function<void()> completion) override;

@@ -670,10 +670,10 @@ bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   }
 }
 
-void ListenerManagerImpl::addListenerToWorker(Worker& worker,
-                                              absl::optional<uint64_t> overridden_listener,
-                                              ListenerImpl& listener,
-                                              ListenerCompletionCallback completion_callback) {
+void ListenerManagerImpl::addListenerToWorker(
+    Worker& worker, absl::optional<uint64_t> overridden_listener, ListenerImpl& listener,
+    ListenerCompletionCallback completion_callback,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   if (overridden_listener.has_value()) {
     ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
   }
@@ -689,7 +689,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
           }
         });
       },
-      server_.runtime());
+      server_.runtime(), addresses);
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
@@ -764,6 +764,20 @@ void ListenerManagerImpl::inAddressesOnlyUpdate(ListenerImpl& listener) {
   // list. It requires stop/remove listener procedure cancelling the in placed update if any.
   ASSERT(existing_active_listener != active_listeners_.end());
   ASSERT(*existing_active_listener != nullptr);
+
+  std::vector<Network::Address::InstanceConstSharedPtr> add_addresseses;
+  (*existing_active_listener)
+      ->diffNewAddresses(
+          listener, [&add_addresseses](const Network::Address::InstanceConstSharedPtr& address) {
+            add_addresseses.push_back(address);
+          });
+
+  std::vector<Network::Address::InstanceConstSharedPtr> remove_addresseses;
+  listener.diffNewAddresses(
+      **existing_active_listener,
+      [&remove_addresseses](const Network::Address::InstanceConstSharedPtr& address) {
+        remove_addresseses.push_back(address);
+      });
 
   for (const auto& worker : workers_) {
     // Explicitly override the existing listener with a new listener config.

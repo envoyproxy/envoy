@@ -31,6 +31,7 @@ void ConnectionHandlerImpl::addListener(
     absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
     Runtime::Loader& runtime,
     OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> new_addresses) {
+  ASSERT(!overridden_listener.has_value() ? !new_addresses.has_value() : true);
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());

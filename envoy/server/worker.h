@@ -32,10 +32,13 @@ public:
    * @param completion supplies the completion to call when the listener has been added (or not) on
    *                   the worker.
    * @param runtime, supplies the runtime for the server
+   * @param addresses will be added.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener,
-                           Network::ListenerConfig& listener, AddListenerCompletion completion,
-                           Runtime::Loader& runtime) PURE;
+  virtual void
+  addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
+              AddListenerCompletion completion, Runtime::Loader& runtime,
+              OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses =
+                  absl::nullopt) PURE;
 
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.

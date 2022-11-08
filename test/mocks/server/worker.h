@@ -33,7 +33,8 @@ public:
   // Server::Worker
   MOCK_METHOD(void, addListener,
               (absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
-               AddListenerCompletion completion, Runtime::Loader&));
+               AddListenerCompletion completion, Runtime::Loader&,
+               OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses));
   MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
