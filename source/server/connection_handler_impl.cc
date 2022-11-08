@@ -258,9 +258,17 @@ void ConnectionHandlerImpl::removeFilterChains(
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
-void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
+void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
+                                          OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
-    iter->second->invokeListenerMethod([](const PerAddressActiveListenerDetails& details) {
+    iter->second->invokeListenerMethod([addresses](const PerAddressActiveListenerDetails& details) {
+      if (addresses.has_value() && std::find_if(
+              addresses->begin(), addresses->end(),
+              [&details](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                return *(details.listen_address_) == *other_addr;
+              }) != addresses->end()) {
+        return;
+      }
       if (details.listener_->listener() != nullptr) {
         details.listener_->shutdownListener();
       }

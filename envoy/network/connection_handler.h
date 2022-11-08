@@ -76,8 +76,10 @@ public:
    * Stop listeners using the listener tag as a key. This will not close any connections and is used
    * for draining.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param addresses will be stopped. If not specified, the whole listener will be stopped.
    */
-  virtual void stopListeners(uint64_t listener_tag) PURE;
+  virtual void stopListeners(uint64_t listener_tag,
+                             OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses = absl::nullopt) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.

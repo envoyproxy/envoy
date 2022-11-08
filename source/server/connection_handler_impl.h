@@ -51,7 +51,8 @@ public:
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
-  void stopListeners(uint64_t listener_tag) override;
+  void stopListeners(uint64_t listener_tag,
+                     OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses = absl::nullopt) override;
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
