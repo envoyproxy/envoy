@@ -27,6 +27,33 @@ constexpr uint32_t ExpectedCacheVersionId =
     (static_cast<uint32_t>('0') << 24) | (static_cast<uint32_t>('0') << 16) |
     (static_cast<uint32_t>('0') << 8) | static_cast<uint32_t>('0');
 
+// Deserialize 4 bytes into a uint32_t.
+uint32_t deserializeUint32(const char* p) {
+  return static_cast<uint32_t>(static_cast<uint8_t>(p[0])) << 24 |
+         static_cast<uint32_t>(static_cast<uint8_t>(p[1])) << 16 |
+         static_cast<uint32_t>(static_cast<uint8_t>(p[2])) << 8 |
+         static_cast<uint32_t>(static_cast<uint8_t>(p[3]));
+}
+
+// Deserialize 8 bytes into a uint64_t.
+uint64_t deserializeUint64(const char* p) {
+  return static_cast<uint64_t>(deserializeUint32(p)) | deserializeUint32(p + 4);
+}
+
+// Serialize a uint32 into 4 bytes at pointer p.
+void serializeUint32(uint32_t value, char* p) {
+  p[0] = value >> 24;
+  p[1] = value >> 16 & 0xff;
+  p[2] = value >> 8 & 0xff;
+  p[3] = value & 0xff;
+}
+
+// Serialize a uint64 into 8 bytes at pointer p.
+void serializeUint64(uint64_t value, char* p) {
+  serializeUint32(value >> 32, p);
+  serializeUint32(value & 0xffffffff, p + 4);
+}
+
 } // namespace
 
 CacheFileFixedBlock::CacheFileFixedBlock() {
@@ -44,59 +71,21 @@ void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   // from a byte array into value types.
   // chars must be cast to uint8_t first so that e.g. -1 becomes 0xff, before casting to uint64_t
   // - otherwise -1 becomes 0xffffffffffffffff.
-  file_id_ = static_cast<uint32_t>(static_cast<uint8_t>(s[0])) << 24 |
-             static_cast<uint32_t>(static_cast<uint8_t>(s[1])) << 16 |
-             static_cast<uint32_t>(static_cast<uint8_t>(s[2])) << 8 |
-             static_cast<uint32_t>(static_cast<uint8_t>(s[3]));
-  cache_version_id_ = static_cast<uint32_t>(static_cast<uint8_t>(s[4])) << 24 |
-                      static_cast<uint32_t>(static_cast<uint8_t>(s[5])) << 16 |
-                      static_cast<uint32_t>(static_cast<uint8_t>(s[6])) << 8 |
-                      static_cast<uint32_t>(static_cast<uint8_t>(s[7]));
-  header_size_ = static_cast<uint32_t>(static_cast<uint8_t>(s[8])) << 24 |
-                 static_cast<uint32_t>(static_cast<uint8_t>(s[9])) << 16 |
-                 static_cast<uint32_t>(static_cast<uint8_t>(s[10])) << 8 |
-                 static_cast<uint32_t>(static_cast<uint8_t>(s[11]));
-  body_size_ = static_cast<uint64_t>(static_cast<uint8_t>(s[12])) << 56 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[13])) << 48 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[14])) << 40 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[15])) << 32 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[16])) << 24 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[17])) << 16 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[18])) << 8 |
-               static_cast<uint64_t>(static_cast<uint8_t>(s[19]));
-  trailer_size_ = static_cast<uint32_t>(static_cast<uint8_t>(s[20])) << 24 |
-                  static_cast<uint32_t>(static_cast<uint8_t>(s[21])) << 16 |
-                  static_cast<uint32_t>(static_cast<uint8_t>(s[22])) << 8 |
-                  static_cast<uint32_t>(static_cast<uint8_t>(s[23]));
+  file_id_ = deserializeUint32(&s[0]);
+  cache_version_id_ = deserializeUint32(&s[4]);
+  header_size_ = deserializeUint32(&s[8]);
+  body_size_ = deserializeUint64(&s[12]);
+  trailer_size_ = deserializeUint32(&s[20]);
 }
 
 void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
   char b[size()];
   ASSERT(size() == 24);
-  b[0] = file_id_ >> 24;
-  b[1] = file_id_ >> 16 & 0xff;
-  b[2] = file_id_ >> 8 & 0xff;
-  b[3] = file_id_ & 0xff;
-  b[4] = cache_version_id_ >> 24;
-  b[5] = cache_version_id_ >> 16 & 0xff;
-  b[6] = cache_version_id_ >> 8 & 0xff;
-  b[7] = cache_version_id_ & 0xff;
-  b[8] = header_size_ >> 24;
-  b[9] = header_size_ >> 16 & 0xff;
-  b[10] = header_size_ >> 8 & 0xff;
-  b[11] = header_size_ & 0xff;
-  b[12] = body_size_ >> 56;
-  b[13] = body_size_ >> 48 & 0xff;
-  b[14] = body_size_ >> 40 & 0xff;
-  b[15] = body_size_ >> 32 & 0xff;
-  b[16] = body_size_ >> 24 & 0xff;
-  b[17] = body_size_ >> 16 & 0xff;
-  b[18] = body_size_ >> 8 & 0xff;
-  b[19] = body_size_ & 0xff;
-  b[20] = trailer_size_ >> 24;
-  b[21] = trailer_size_ >> 16 & 0xff;
-  b[22] = trailer_size_ >> 8 & 0xff;
-  b[23] = trailer_size_ & 0xff;
+  serializeUint32(file_id_, &b[0]);
+  serializeUint32(cache_version_id_, &b[4]);
+  serializeUint32(header_size_, &b[8]);
+  serializeUint64(body_size_, &b[12]);
+  serializeUint32(trailer_size_, &b[20]);
   buffer.add(absl::string_view{b, size()});
 }
 
