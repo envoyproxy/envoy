@@ -5,9 +5,7 @@ rules:
   indentation:
     spaces: consistent
     indent-sequences: false
-  line-length:
-    max: 200
-    level: warning
+  line-length: disable
   truthy:
     allowed-values:
     - "yes"
