@@ -1128,7 +1128,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = lb_->chooseHost(context);
+  HostConstSharedPtr logical_host = chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1507,7 +1507,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+      override_host_statuses_(createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1617,7 +1618,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1721,10 +1722,94 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
   }
 }
 
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::HostStatusSet
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::createOverrideHostStatus(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+  HostStatusSet override_host_status;
+
+  if (!common_config.has_override_host_status()) {
+    // No override host status and 'Healthy' and 'Degraded' will be applied by default.
+    override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+    override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+    return override_host_status;
+  }
+
+  for (auto single_status : common_config.override_host_status().statuses()) {
+    switch (static_cast<envoy::config::core::v3::HealthStatus>(single_status)) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::HealthStatus::UNKNOWN:
+    case envoy::config::core::v3::HealthStatus::HEALTHY:
+      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
+      break;
+    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+    case envoy::config::core::v3::HealthStatus::DRAINING:
+    case envoy::config::core::v3::HealthStatus::TIMEOUT:
+      override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
+      break;
+    case envoy::config::core::v3::HealthStatus::DEGRADED:
+      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+      break;
+    }
+  }
+  return override_host_status;
+}
+
+HostConstSharedPtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::selectOverrideHost(
+    LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return nullptr;
+  }
+
+  auto host_map = priority_set_.crossPriorityHostMap();
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+
+  auto host_iter = host_map->find(override_host.value());
+
+  // The override host cannot be found in the host map.
+  if (host_iter == host_map->end()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = host_iter->second;
+  ASSERT(host != nullptr);
+
+  if (override_host_statuses_[static_cast<size_t>(host->coarseHealth())]) {
+    return host;
+  }
+  return nullptr;
+}
+
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+    LoadBalancerContext* context) {
+  HostConstSharedPtr host = selectOverrideHost(context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->chooseHost(context);
+}
+
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
+    LoadBalancerContext* context) {
+  HostConstSharedPtr host = selectOverrideHost(context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->peekAnotherHost(context);
+}
+
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");

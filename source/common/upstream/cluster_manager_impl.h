@@ -495,6 +495,8 @@ private:
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
+      using HostStatusSet = std::bitset<32>;
+
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
@@ -529,6 +531,14 @@ private:
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
 
+      // A utility function to create override host status from lb config.
+      static HostStatusSet createOverrideHostStatus(
+          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+
+      HostConstSharedPtr selectOverrideHost(LoadBalancerContext* context);
+      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
+      HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
+
     private:
       Http::ConnectionPool::Instance*
       httpConnPoolImpl(ResourcePriority priority,
@@ -551,6 +561,17 @@ private:
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
+
+      // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value
+      // of Host::Health. The specific correspondence is shown below:
+      //
+      // * 0b001: Host::Health::Unhealthy
+      // * 0b010: Host::Health::Degraded
+      // * 0b100: Host::Health::Healthy
+      //
+      // If multiple bit fields are set, it is acceptable as long as the status of override host is
+      // in any of these statuses.
+      const HostStatusSet override_host_statuses_{};
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
