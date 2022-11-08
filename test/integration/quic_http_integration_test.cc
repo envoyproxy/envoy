@@ -1179,6 +1179,18 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   EXPECT_GT(std::stoi(waitForAccessLog(access_log_name_)), 0);
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
+  useAccessLog("%ROUNDTRIP_DURATION%");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  codec_client_->close();
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ(waitForAccessLog(access_log_name_), "-");
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {

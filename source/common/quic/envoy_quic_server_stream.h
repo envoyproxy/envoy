@@ -20,7 +20,7 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
-  void setRequestDecoder(Http::RequestDecoder& decoder) {
+  void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = &decoder;
     stats_gatherer_->add_stream_info(request_decoder_->streamInfoSharedPtr());
     stats_gatherer_->set_access_log_handlers(request_decoder_->accessLogHandlers());

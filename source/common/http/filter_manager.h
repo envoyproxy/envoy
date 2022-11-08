@@ -808,6 +808,7 @@ public:
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+  bool saw_downstream_reset() { return state_.saw_downstream_reset_; }
 
 protected:
   struct State {

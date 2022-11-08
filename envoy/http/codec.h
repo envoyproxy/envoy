@@ -238,6 +238,12 @@ public:
    * error.
    */
   virtual bool streamErrorOnInvalidHttpMessage() const PURE;
+
+  /**
+   * Set a new request decoder for this ResponseEncoder.
+   * @param decoder new request decoder.
+   */
+  virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
 };
 
 /**

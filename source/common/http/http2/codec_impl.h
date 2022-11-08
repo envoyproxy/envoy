@@ -520,6 +520,9 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override {
+      request_decoder_ = &decoder;
+    }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
