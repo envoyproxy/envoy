@@ -107,9 +107,9 @@ def kotlin_repos():
 
     http_archive(
         name = "rules_jvm_external",
-        sha256 = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca",
-        strip_prefix = "rules_jvm_external-4.2",
-        url = "https://github.com/bazelbuild/rules_jvm_external/archive/4.2.zip",
+        sha256 = "b17d7388feb9bfa7f2fa09031b32707df529f26c91ab9e5d909eb1676badd9a6",
+        strip_prefix = "rules_jvm_external-4.5",
+        url = "https://github.com/bazelbuild/rules_jvm_external/archive/4.5.zip",
     )
 
     http_archive(
