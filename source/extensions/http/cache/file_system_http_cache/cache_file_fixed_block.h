@@ -58,7 +58,7 @@ public:
    * fileId is a compile-time fixed value used to identify that this is a cache file.
    * @return the file ID.
    */
-  uint32_t fileId() const { return file_id_; }
+  std::array<char, 4> fileId() const { return file_id_; }
 
   /**
    * cacheVersionId is a compile-time fixed value that should be consistent between
@@ -66,7 +66,7 @@ public:
    * invalidate all cache entries where the version ID does not match.
    * @return the cache version ID.
    */
-  uint32_t cacheVersionId() const { return cache_version_id_; }
+  std::array<char, 4> cacheVersionId() const { return cache_version_id_; }
 
   /**
    * the size of the serialized proto message capturing headers and metadata.
@@ -135,7 +135,7 @@ private:
    * a compile-time constant in ordinary use.
    * @param id The file ID to set.
    */
-  void setFileId(uint32_t id) { file_id_ = id; }
+  void setFileId(std::array<char, 4> id) { file_id_ = id; }
 
   /**
    * sets the cacheVersionId, a value that should be consistent between versions
@@ -144,10 +144,10 @@ private:
    * a compile-time constant in ordinary use.
    * @param id The cache version ID to set.
    */
-  void setCacheVersionId(uint32_t id) { cache_version_id_ = id; }
+  void setCacheVersionId(std::array<char, 4> id) { cache_version_id_ = id; }
 
-  uint32_t file_id_;
-  uint32_t cache_version_id_;
+  std::array<char, 4> file_id_;
+  std::array<char, 4> cache_version_id_;
   size_t header_size_;
   size_t trailer_size_;
   size_t body_size_;

@@ -13,22 +13,18 @@ namespace {
 // The expected first four bytes of the header - if fileId() doesn't match ExpectedFileId
 // then the file is not a cache file and should be removed from the cache.
 // Beginning of file should be "CACH".
-constexpr uint32_t ExpectedFileId = (static_cast<uint32_t>('C') << 24) |
-                                    (static_cast<uint32_t>('A') << 16) |
-                                    (static_cast<uint32_t>('C') << 8) | static_cast<uint32_t>('H');
+std::array<char, 4> ExpectedFileId = {'C', 'A', 'C', 'H'};
 
 // The expected next four bytes of the header - if cacheVersionId() doesn't match
 // ExpectedCacheVersionId then the file is from an incompatible cache version and should
 // be removed from the cache.
 // Next 4 bytes of file should be "0000".
-// Increment this to invalidate old cache files if the format changes.
-// Formatted string-style rather than as an actual int to make it easily human-readable.
-constexpr uint32_t ExpectedCacheVersionId =
-    (static_cast<uint32_t>('0') << 24) | (static_cast<uint32_t>('0') << 16) |
-    (static_cast<uint32_t>('0') << 8) | static_cast<uint32_t>('0');
+std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
 
 // Deserialize 4 bytes into a uint32_t.
 uint32_t deserializeUint32(const char* p) {
+  // chars must be cast to uint8_t first so that e.g. -1 becomes 0xff, before casting to uint32_t
+  // - otherwise -1 becomes 0xffffffff.
   return static_cast<uint32_t>(static_cast<uint8_t>(p[0])) << 24 |
          static_cast<uint32_t>(static_cast<uint8_t>(p[1])) << 16 |
          static_cast<uint32_t>(static_cast<uint8_t>(p[2])) << 8 |
@@ -66,13 +62,9 @@ CacheFileFixedBlock::CacheFileFixedBlock() {
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   ASSERT(s.size() == size() && size() == 24);
-  // Bytewise copy the values from the string_view into the fields.
-  // This ensures consistent endianness, and is the only safe way to copy values
-  // from a byte array into value types.
-  // chars must be cast to uint8_t first so that e.g. -1 becomes 0xff, before casting to uint64_t
-  // - otherwise -1 becomes 0xffffffffffffffff.
-  file_id_ = deserializeUint32(&s[0]);
-  cache_version_id_ = deserializeUint32(&s[4]);
+  // Bytewise serialize the values from the string_view s into the member values.
+  std::copy_n(s.begin(), 4, file_id_.begin());
+  std::copy_n(s.begin() + 4, 4, cache_version_id_.begin());
   header_size_ = deserializeUint32(&s[8]);
   body_size_ = deserializeUint64(&s[12]);
   trailer_size_ = deserializeUint32(&s[20]);
@@ -81,11 +73,13 @@ void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
 void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
   char b[size()];
   ASSERT(size() == 24);
-  serializeUint32(file_id_, &b[0]);
-  serializeUint32(cache_version_id_, &b[4]);
+  // Bytewise serialize the values from the member values into the stack buffer b.
+  std::copy_n(file_id_.begin(), 4, &b[0]);
+  std::copy_n(cache_version_id_.begin(), 4, &b[4]);
   serializeUint32(header_size_, &b[8]);
   serializeUint64(body_size_, &b[12]);
   serializeUint32(trailer_size_, &b[20]);
+  // Append that buffer into the target buffer object.
   buffer.add(absl::string_view{b, size()});
 }
 

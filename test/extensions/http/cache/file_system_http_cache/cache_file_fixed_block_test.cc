@@ -12,8 +12,10 @@ namespace FileSystemHttpCache {
 class CacheFileFixedBlockTest : public ::testing::Test {
 public:
   // Wrappers for private test-only functions.
-  void setFileId(CacheFileFixedBlock& block, uint32_t id) { block.setFileId(id); }
-  void setCacheVersionId(CacheFileFixedBlock& block, uint32_t id) { block.setCacheVersionId(id); }
+  void setFileId(CacheFileFixedBlock& block, std::array<char, 4> id) { block.setFileId(id); }
+  void setCacheVersionId(CacheFileFixedBlock& block, std::array<char, 4> id) {
+    block.setCacheVersionId(id);
+  }
 };
 
 namespace {
@@ -25,13 +27,15 @@ TEST_F(CacheFileFixedBlockTest, InitializesToValid) {
 
 TEST_F(CacheFileFixedBlockTest, GettersRecoverValuesThatWereSet) {
   CacheFileFixedBlock block;
-  setFileId(block, 98765);
-  setCacheVersionId(block, 56789);
+  std::array<char, 4> test_file_id{'F', 'I', 'L', 'E'};
+  std::array<char, 4> test_cache_version_id{'V', 'E', 'R', 'S'};
+  setFileId(block, test_file_id);
+  setCacheVersionId(block, test_cache_version_id);
   block.setBodySize(999999);
   block.setHeadersSize(1234);
   block.setTrailersSize(4321);
-  EXPECT_EQ(block.fileId(), 98765);
-  EXPECT_EQ(block.cacheVersionId(), 56789);
+  EXPECT_EQ(block.fileId(), test_file_id);
+  EXPECT_EQ(block.cacheVersionId(), test_cache_version_id);
   EXPECT_EQ(block.bodySize(), 999999);
   EXPECT_EQ(block.headerSize(), 1234);
   EXPECT_EQ(block.trailerSize(), 4321);
@@ -40,14 +44,14 @@ TEST_F(CacheFileFixedBlockTest, GettersRecoverValuesThatWereSet) {
 TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadFileId) {
   CacheFileFixedBlock block;
   // Any file id other than the current compile time constant should be invalid.
-  setFileId(block, 98765);
+  setFileId(block, {'B', 'A', 'D', 'F'});
   EXPECT_FALSE(block.isValid());
 }
 
 TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadCacheVersionId) {
   CacheFileFixedBlock block;
   // Any cache version id other than the current compile time constant should be invalid.
-  setCacheVersionId(block, 98765);
+  setCacheVersionId(block, {'B', 'A', 'D', 'C'});
   EXPECT_FALSE(block.isValid());
 }
 
