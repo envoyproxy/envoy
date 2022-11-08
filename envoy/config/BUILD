@@ -119,8 +119,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "xds_config_tracer_interface",
-    hdrs = ["xds_config_tracer.h"],
+    name = "xds_config_tracker_interface",
+    hdrs = ["xds_config_tracker.h"],
     deps = [
         ":subscription_interface",
         ":typed_config_interface",

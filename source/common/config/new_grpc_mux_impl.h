@@ -6,7 +6,7 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_config_tracer.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/logger.h"
@@ -36,7 +36,7 @@ public:
                  Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
                  CustomConfigValidatorsPtr&& config_validators,
-                 XdsConfigTracerOptRef xds_config_tracer);
+                 XdsConfigTrackerOptRef xds_config_tracker);
 
   ~NewGrpcMuxImpl() override;
 
@@ -85,8 +85,9 @@ public:
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators& config_validators)
-        : watch_map_(use_namespace_matching, type_url, config_validators),
+                      CustomConfigValidators& config_validators,
+                      XdsConfigTrackerOptRef xds_config_tracker)
+        : watch_map_(use_namespace_matching, type_url, config_validators, xds_config_tracker),
           sub_state_(type_url, watch_map_, local_info, dispatcher) {}
 
     WatchMap watch_map_;
@@ -180,7 +181,7 @@ private:
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   Event::Dispatcher& dispatcher_;
-  XdsConfigTracerOptRef xds_config_tracer_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.

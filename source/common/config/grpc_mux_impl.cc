@@ -39,13 +39,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         XdsConfigTracerOptRef xds_config_tracer,
+                         XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)), xds_config_tracer_(xds_config_tracer),
+      config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
       xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
       first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -220,6 +220,13 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+
+  // Processing point when DiscoveryResponse is received.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onResponseReceiveOrFail(*message,
+                                                 ProcessingDetails(ProcessingState::RECEIVED));
+  }
+
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -285,17 +292,12 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
-    // Log point when the resources are successfully parsed.
-    if (xds_config_tracer_.has_value()) {
-      xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::RECEIVE));
-    }
-
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
 
-    // Log point when the resources are successfully ingested.
-    if (xds_config_tracer_.has_value()) {
-      xds_config_tracer_->log(type_url, resources, TraceDetails(TraceState::INGESTED));
+    // Processing point when resources are successfully ingested.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onConfigIngested(type_url, resources);
     }
   }
   END_TRY
@@ -308,9 +310,10 @@ void GrpcMuxImpl::onDiscoveryResponse(
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
 
-    // Log point when there is any exception during the parse and ingestion process.
-    if (xds_config_tracer_.has_value()) {
-      xds_config_tracer_->log(*message, TraceDetails(TraceState::FAILED, *error_detail));
+    // Processing point when there is any exception during the parse and ingestion process.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onResponseReceiveOrFail(
+          *message, ProcessingDetails(ProcessingState::FAILED, *error_detail));
     }
   }
   previously_fetched_data_ = true;

@@ -242,6 +242,11 @@ void WatchMap::onConfigUpdate(
       cur_watch->callbacks_.onConfigUpdate({}, {}, system_version_info);
     }
   }
+
+  // Processing point when resources are successfully ingested.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onConfigIngested(type_url_, decoded_resources, removed_resources);
+  }
 }
 
 void WatchMap::onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) {

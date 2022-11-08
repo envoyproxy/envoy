@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
-#include "envoy/config/xds_config_tracer.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -65,7 +65,7 @@ public:
       mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *method_descriptor_, random_, stats_store_, rate_limit_settings_, true,
-          std::move(config_validators_), /*xds_config_tracer=*/XdsConfigTracerOptRef(),
+          std::move(config_validators_), /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/"");
     }

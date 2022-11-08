@@ -2020,14 +2020,14 @@ envoy_proto_library(
 )
 
 envoy_cc_test(
-    name = "xds_config_tracer_integration_test",
-    srcs = ["xds_config_tracer_integration_test.cc"],
+    name = "xds_config_tracker_integration_test",
+    srcs = ["xds_config_tracker_integration_test.cc"],
     external_deps = ["abseil_strings"],
     deps = [
         ":http_integration_lib",
-        ":xds_config_tracer_test_proto_cc_proto",
+        ":xds_config_tracker_test_proto_cc_proto",
         "//envoy/config:subscription_interface",
-        "//envoy/config:xds_config_tracer_interface",
+        "//envoy/config:xds_config_tracker_interface",
         "//envoy/protobuf:message_validator_interface",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
@@ -2039,6 +2039,6 @@ envoy_cc_test(
 )
 
 envoy_proto_library(
-    name = "xds_config_tracer_test_proto",
-    srcs = ["xds_config_tracer_test.proto"],
+    name = "xds_config_tracker_test_proto",
+    srcs = ["xds_config_tracker_test.proto"],
 )

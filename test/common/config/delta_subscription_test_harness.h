@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
-#include "envoy/config/xds_config_tracer.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/grpc_subscription_impl.h"
@@ -58,7 +58,7 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
-          /*xds_config_tracer=*/XdsConfigTracerOptRef());
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         xds_context_, callbacks_, resource_decoder_, stats_,

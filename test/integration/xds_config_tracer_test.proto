@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package test.envoy.config.xds;
-
-// Configuration for TestXdsConfigTracer.
-message TestXdsConfigTracer {
-}

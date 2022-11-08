@@ -5,7 +5,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
-#include "envoy/config/xds_config_tracer.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/server/instance.h"
 #include "envoy/stats/scope.h"
@@ -23,7 +23,7 @@ public:
                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                           const Server::Instance& server,
                           XdsResourcesDelegateOptRef xds_resources_delegate,
-                          XdsConfigTracerOptRef xds_config_tracer);
+                          XdsConfigTrackerOptRef xds_config_tracker);
 
   // Config::SubscriptionFactory
   SubscriptionPtr subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config,
@@ -46,7 +46,7 @@ private:
   Api::Api& api_;
   const Server::Instance& server_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
-  XdsConfigTracerOptRef xds_config_tracer_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
 };
 
 } // namespace Config

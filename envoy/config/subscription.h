@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
@@ -63,7 +64,7 @@ public:
   /**
    * @return absl::optional<envoy::config::core::v3::Metadata> of a resource.
    */
-  virtual absl::optional<envoy::config::core::v3::Metadata> metadata() const PURE;
+  virtual OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
