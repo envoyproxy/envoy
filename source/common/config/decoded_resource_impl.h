@@ -76,7 +76,9 @@ public:
   const Protobuf::Message& resource() const override { return *resource_; };
   bool hasResource() const override { return has_resource_; }
   absl::optional<std::chrono::milliseconds> ttl() const override { return ttl_; }
-  const OptRef<const envoy::config::core::v3::Metadata> metadata() const override { return metadata_; }
+  const OptRef<const envoy::config::core::v3::Metadata> metadata() const override {
+    return metadata_;
+  }
 
 private:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
