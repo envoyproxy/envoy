@@ -58,11 +58,6 @@ public:
         config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), *api_, dispatcher_);
   }
 
-  void SetUp() override {
-    // Initialize the time source (otherwise it returns the real time)
-    time_source_.setSystemTime(std::chrono::hours(1));
-  }
-
 protected:
   envoy::service::runtime::v3::Runtime parseYamlIntoRuntimeResource(const std::string& yaml) {
     envoy::service::runtime::v3::Runtime runtime;
