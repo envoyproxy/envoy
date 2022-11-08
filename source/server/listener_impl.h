@@ -348,8 +348,10 @@ public:
 
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
-  // Check whether a new listener has duplicated listening address this listener.
-  bool hasDuplicatedAddress(const ListenerImpl& other) const;
+  // Check whether a new listener has duplicated listening address with this listener.
+  bool hasDuplicatedAddress(const ListenerImpl& other,
+                            OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                                addresses = absl::nullopt) const;
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }

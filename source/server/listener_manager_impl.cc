@@ -25,6 +25,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
+#include "listener_impl.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_transport_socket_factory.h"
@@ -513,10 +514,14 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
     // Add new addresses
     if (addresses_only_change) {
+      std::vector<Network::Address::InstanceConstSharedPtr> new_addresses;
       (*existing_active_listener)
-          ->diffNewAddresses(*new_listener, [](const Network::Address::InstanceConstSharedPtr&) {
-
-          });
+          ->diffNewAddresses(
+              *new_listener,
+              [&new_addresses](const Network::Address::InstanceConstSharedPtr& address) {
+                new_addresses.push_back(address);
+              });
+      setNewOrDrainingSocketFactory(name, *new_listener, new_addresses);
     }
 
     if (workers_started_) {
@@ -552,10 +557,11 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
-                                                           const ListenerImpl& listener) {
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(
+    const ListenerList& list, const ListenerImpl& listener,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   for (const auto& existing_listener : list) {
-    if (existing_listener->hasDuplicatedAddress(listener)) {
+    if (existing_listener->hasDuplicatedAddress(listener, addresses)) {
       return true;
     }
   }
@@ -766,9 +772,8 @@ void ListenerManagerImpl::inAddressesOnlyUpdate(ListenerImpl& listener) {
 
   auto previous_listener = std::move(*existing_active_listener);
   *existing_active_listener = std::move(*existing_warming_listener);
-  // Finish active_listeners_ transformation before calling `drainFilterChains` as it depends on
-  // their state.
-  drainFilterChains(std::move(previous_listener), **existing_active_listener);
+
+  // TODO (soulxu): drain the deleted address listener.
 
   warming_listeners_.erase(existing_warming_listener);
   updateWarmingActiveGauges();
@@ -1057,10 +1062,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   return filter_chain_res;
 }
 
-void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
-                                                        ListenerImpl& listener) {
-  if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
-      hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
+void ListenerManagerImpl::setNewOrDrainingSocketFactory(
+    const std::string& name, ListenerImpl& listener,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
+  if (hasListenerWithDuplicatedAddress(warming_listeners_, listener, addresses) ||
+      hasListenerWithDuplicatedAddress(active_listeners_, listener, addresses)) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
@@ -1073,43 +1079,47 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::string& name,
   // may happen if a listener is removed and then added back with a same or different name and
   // intended to listen on the same address. This should work and not fail.
   const ListenerImpl* draining_listener_ptr = nullptr;
-  auto existing_draining_listener =
-      std::find_if(draining_listeners_.cbegin(), draining_listeners_.cend(),
-                   [&listener](const DrainingListener& draining_listener) {
-                     return draining_listener.listener_->listenSocketFactories()[0]
-                                ->getListenSocket(0)
-                                ->isOpen() &&
-                            listener.hasCompatibleAddress(*draining_listener.listener_);
-                   });
+  if (!addresses.has_value()) {
+    auto existing_draining_listener =
+        std::find_if(draining_listeners_.cbegin(), draining_listeners_.cend(),
+                     [&listener](const DrainingListener& draining_listener) {
+                       return draining_listener.listener_->listenSocketFactories()[0]
+                                  ->getListenSocket(0)
+                                  ->isOpen() &&
+                              listener.hasCompatibleAddress(*draining_listener.listener_);
+                     });
 
-  if (existing_draining_listener != draining_listeners_.cend()) {
-    existing_draining_listener->listener_->debugLog("clones listener sockets");
-    draining_listener_ptr = existing_draining_listener->listener_.get();
-  } else {
-    auto existing_draining_filter_chain = std::find_if(
-        draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
-        [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
-          return draining_filter_chain.getDrainingListener()
-                     .listenSocketFactories()[0]
-                     ->getListenSocket(0)
-                     ->isOpen() &&
-                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
-        });
+    if (existing_draining_listener != draining_listeners_.cend()) {
+      existing_draining_listener->listener_->debugLog("clones listener sockets");
+      draining_listener_ptr = existing_draining_listener->listener_.get();
+    } else {
+      auto existing_draining_filter_chain = std::find_if(
+          draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
+          [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
+            return draining_filter_chain.getDrainingListener()
+                       .listenSocketFactories()[0]
+                       ->getListenSocket(0)
+                       ->isOpen() &&
+                   listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+          });
 
-    if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
-      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
-      draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
+      if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
+        existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+        draining_listener_ptr = &existing_draining_filter_chain->getDrainingListener();
+      }
     }
   }
 
   if (draining_listener_ptr != nullptr) {
     listener.cloneSocketFactoryFrom(*draining_listener_ptr);
   } else {
-    createListenSocketFactory(listener);
+    createListenSocketFactory(listener, addresses);
   }
 }
 
-void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
+void ListenerManagerImpl::createListenSocketFactory(
+    ListenerImpl& listener,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   Network::Socket::Type socket_type = listener.socketType();
   ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::NoBind;
   if (listener.bindToPort()) {
@@ -1119,6 +1129,8 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
+    const std::vector<Network::Address::InstanceConstSharedPtr> addrs =
+        addresses.has_value() ? addresses.ref() : listener.addresses();
     for (auto& address : listener.addresses()) {
       listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
           factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),

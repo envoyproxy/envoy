@@ -1118,15 +1118,20 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   return true;
 }
 
-bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
+bool ListenerImpl::hasDuplicatedAddress(
+    const ListenerImpl& other,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) const {
   if (socket_type_ != other.socket_type_) {
     return false;
   }
+
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addrs =
+      addresses.has_value() ? addresses.ref() : other.addresses();
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
   // sure we are not duplicating the address. This avoids ambiguity about which non-binding
   // listener is used or even worse for the binding to port != 0 and reuse port case multiple
   // different listeners receiving connections destined for the same port.
-  for (auto& other_addr : other.addresses()) {
+  for (auto& other_addr : addrs) {
     if (other_addr->ip() == nullptr ||
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
       if (find_if(addresses_.begin(), addresses_.end(),
@@ -1142,8 +1147,8 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
 
 bool ListenerImpl::addressOnlyChange(const envoy::config::listener::v3::Listener& config) const {
   if (socket_type_ != (config.has_internal_listener()
-                       ? Network::Socket::Type::Stream
-                       : Network::Utility::protobufAddressSocketType(config.address()))) {
+                           ? Network::Socket::Type::Stream
+                           : Network::Utility::protobufAddressSocketType(config.address()))) {
     return false;
   }
   return ListenerMessageUtil::addressOnlyChange(config_, config);

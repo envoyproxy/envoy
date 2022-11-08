@@ -242,8 +242,10 @@ private:
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
-  static bool hasListenerWithDuplicatedAddress(const ListenerList& list,
-                                               const ListenerImpl& listener);
+  static bool hasListenerWithDuplicatedAddress(
+      const ListenerList& list, const ListenerImpl& listener,
+      OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses =
+          absl::nullopt);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
@@ -299,8 +301,13 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
-  void setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
-  void createListenSocketFactory(ListenerImpl& listener);
+  void setNewOrDrainingSocketFactory(
+      const std::string& name, ListenerImpl& listener,
+      OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses =
+          absl::nullopt);
+  void createListenSocketFactory(ListenerImpl& listener,
+                                 OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                                     addresses = absl::nullopt);
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
 
