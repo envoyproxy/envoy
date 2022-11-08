@@ -23,7 +23,7 @@ using HostPredicate = std::function<bool(const Host&)>;
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    ClusterLbStats& lb_stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
@@ -36,8 +36,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     TimeSource& time_source)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
-      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      least_request_config_(least_request_config), common_config_(common_config),
+      lb_stats_(lb_stats), scope_(scope), runtime_(runtime), random_(random),
+      fallback_policy_(subsets.fallbackPolicy()),
       metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
@@ -87,8 +88,8 @@ SubsetLoadBalancer::~SubsetLoadBalancer() {
   // Ensure gauges reflect correct values.
   forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
     if (entry->active()) {
-      stats_.lb_subsets_removed_.inc();
-      stats_.lb_subsets_active_.dec();
+      lb_stats_.lb_subsets_removed_.inc();
+      lb_stats_.lb_subsets_active_.dec();
     }
   });
 }
@@ -266,14 +267,14 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
 
   HostConstSharedPtr host = fallback_subset_->lb_subset_->chooseHost(context);
   if (host != nullptr) {
-    stats_.lb_subsets_fallback_.inc();
+    lb_stats_.lb_subsets_fallback_.inc();
     return host;
   }
 
   if (panic_mode_subset_ != nullptr) {
     HostConstSharedPtr host = panic_mode_subset_->lb_subset_->chooseHost(context);
     if (host != nullptr) {
-      stats_.lb_subsets_fallback_panic_.inc();
+      lb_stats_.lb_subsets_fallback_panic_.inc();
       return host;
     }
   }
@@ -353,7 +354,7 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
   }
 
   host_chosen = true;
-  stats_.lb_subsets_selected_.inc();
+  lb_stats_.lb_subsets_selected_.inc();
   return entry->lb_subset_->chooseHost(context);
 }
 
@@ -440,8 +441,8 @@ void SubsetLoadBalancer::initLbSubsetEntryOnce(LbSubsetEntryPtr& entry, bool sin
     entry->single_host_subset_ = false;
   }
 
-  stats_.lb_subsets_active_.inc();
-  stats_.lb_subsets_created_.inc();
+  lb_stats_.lb_subsets_active_.inc();
+  lb_stats_.lb_subsets_created_.inc();
 }
 
 // Iterates all the hosts of specified priority, looking up an LbSubsetEntryPtr for each and add
@@ -661,8 +662,8 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
 
       // If it wasn't initialized, it wasn't accounted for.
       if (entry->initialized()) {
-        stats_.lb_subsets_active_.dec();
-        stats_.lb_subsets_removed_.inc();
+        lb_stats_.lb_subsets_active_.dec();
+        lb_stats_.lb_subsets_removed_.inc();
       }
 
       auto next_it = std::next(it);
@@ -693,20 +694,20 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   switch (subset_lb.lb_type_) {
   case LoadBalancerType::LeastRequest:
     lb_ = std::make_unique<LeastRequestLoadBalancer>(
-        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        *this, subset_lb.original_local_priority_set_, subset_lb.lb_stats_, subset_lb.runtime_,
         subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_,
         subset_lb.time_source_);
     break;
 
   case LoadBalancerType::Random:
     lb_ = std::make_unique<RandomLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                               subset_lb.stats_, subset_lb.runtime_,
+                                               subset_lb.lb_stats_, subset_lb.runtime_,
                                                subset_lb.random_, subset_lb.common_config_);
     break;
 
   case LoadBalancerType::RoundRobin:
     lb_ = std::make_unique<RoundRobinLoadBalancer>(
-        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        *this, subset_lb.original_local_priority_set_, subset_lb.lb_stats_, subset_lb.runtime_,
         subset_lb.random_, subset_lb.common_config_, subset_lb.round_robin_config_,
         subset_lb.time_source_);
     break;
@@ -716,7 +717,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
+        *this, subset_lb.lb_stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
@@ -727,7 +728,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // We should make the subset LB thread aware since the calculations are costly, and then we
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-        *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
+        *this, subset_lb.lb_stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_maglev_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();

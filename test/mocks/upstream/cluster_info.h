@@ -152,6 +152,8 @@ public:
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(ClusterStats&, stats, (), (const));
+  MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
+  MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
   MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
   MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
@@ -198,11 +200,17 @@ public:
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStatNames stat_names_;
+  ClusterConfigUpdateStatNames config_update_stats_names_;
+  ClusterLbStatNames lb_stat_names_;
+  ClusterEndpointStatNames endpoint_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
   ClusterStats stats_;
+  ClusterConfigUpdateStats config_update_stats_;
+  ClusterLbStats lb_stats_;
+  ClusterEndpointStats endpoint_stats_;
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;

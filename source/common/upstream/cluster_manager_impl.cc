@@ -301,6 +301,8 @@ ClusterManagerImpl::ClusterManagerImpl(
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
       cluster_config_update_stat_names_(stats.symbolTable()),
+      cluster_lb_stat_names_(stats.symbolTable()),
+      cluster_endpoint_stat_names_(stats.symbolTable()),
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
@@ -885,14 +887,14 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
           cluster_reference.info()->statsScope(), runtime_, random_,
           cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
           cluster_reference.info()->statsScope(), runtime_, random_,
           cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
     }
@@ -1515,7 +1517,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
     lb_ = std::make_unique<SubsetLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->lbStats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
@@ -1525,7 +1527,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
           parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
           parent.thread_local_dispatcher_.timeSource());
       break;
@@ -1533,14 +1535,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                 cluster->stats(), parent.parent_.runtime_,
+                                                 cluster->lbStats(), parent.parent_.runtime_,
                                                  parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<RoundRobinLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
           parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
           parent.thread_local_dispatcher_.timeSource());
       break;

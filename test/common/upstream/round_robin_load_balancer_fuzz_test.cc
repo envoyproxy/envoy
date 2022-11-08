@@ -29,7 +29,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
     zone_aware_load_balancer_fuzz.lb_ = std::make_unique<RoundRobinLoadBalancer>(
         zone_aware_load_balancer_fuzz.priority_set_,
         zone_aware_load_balancer_fuzz.local_priority_set_.get(),
-        zone_aware_load_balancer_fuzz.stats_, zone_aware_load_balancer_fuzz.runtime_,
+        zone_aware_load_balancer_fuzz.lb_stats_, zone_aware_load_balancer_fuzz.runtime_,
         zone_aware_load_balancer_fuzz.random_,
         zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
         input.round_robin_lb_config(), zone_aware_load_balancer_fuzz.simTime());

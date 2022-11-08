@@ -109,10 +109,10 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
 }
 
 LoadBalancerBase::LoadBalancerBase(
-    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+    const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
     Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : stats_(stats), runtime_(runtime), random_(random),
+    : lb_stats_(lb_stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config, healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set),
@@ -352,10 +352,10 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
-    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& lb_stats, 
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
+    : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config),
       local_priority_set_(local_priority_set),
       routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
@@ -395,7 +395,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   ASSERT(local_priority_set_);
-  stats_.lb_recalculate_zone_structures_.inc();
+  lb_stats_.lb_recalculate_zone_structures_.inc();
   // resizePerPriorityState should ensure these stay in sync.
   ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
 
@@ -493,14 +493,14 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   // panic mode for local cluster".
   if (!host_set.healthyHostsPerLocality().hasLocalLocality() ||
       host_set.healthyHostsPerLocality().get()[0].empty()) {
-    stats_.lb_local_cluster_not_ok_.inc();
+    lb_stats_.lb_local_cluster_not_ok_.inc();
     return true;
   }
 
   // Same number of localities should be for local and upstream cluster.
   if (host_set.healthyHostsPerLocality().get().size() !=
       localHostSet().healthyHostsPerLocality().get().size()) {
-    stats_.lb_zone_number_differs_.inc();
+    lb_stats_.lb_zone_number_differs_.inc();
     return true;
   }
 
@@ -508,7 +508,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   const uint64_t min_cluster_size =
       runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
   if (host_set.healthyHosts().size() < min_cluster_size) {
-    stats_.lb_zone_cluster_too_small_.inc();
+    lb_stats_.lb_zone_cluster_too_small_.inc();
     return true;
   }
 
@@ -644,7 +644,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 
   // Try to push all of the requests to the same locality first.
   if (state.locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
-    stats_.lb_zone_routing_all_directly_.inc();
+    lb_stats_.lb_zone_routing_all_directly_.inc();
     return 0;
   }
 
@@ -653,17 +653,17 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   // If we cannot route all requests to the same locality, we already calculated how much we can
   // push to the local locality, check if we can push to local locality on current iteration.
   if (random_.random() % 10000 < state.local_percent_to_route_) {
-    stats_.lb_zone_routing_sampled_.inc();
+    lb_stats_.lb_zone_routing_sampled_.inc();
     return 0;
   }
 
   // At this point we must route cross locality as we cannot route to the local locality.
-  stats_.lb_zone_routing_cross_zone_.inc();
+  lb_stats_.lb_zone_routing_cross_zone_.inc();
 
   // This is *extremely* unlikely but possible due to rounding errors when calculating
   // locality percentages. In this case just select random locality.
   if (state.residual_capacity_[number_of_localities - 1] == 0) {
-    stats_.lb_zone_no_capacity_left_.inc();
+    lb_stats_.lb_zone_no_capacity_left_.inc();
     return random_.random() % number_of_localities;
   }
 
@@ -696,7 +696,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // If the selected host set has insufficient healthy hosts, return all hosts (unless we should
   // fail traffic on panic, in which case return no host).
   if (per_priority_panic_[hosts_source.priority_]) {
-    stats_.lb_healthy_panic_.inc();
+    lb_stats_.lb_healthy_panic_.inc();
     if (fail_traffic_on_panic_) {
       return absl::nullopt;
     } else {
@@ -746,7 +746,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   }
 
   if (isHostSetInPanic(localHostSet())) {
-    stats_.lb_local_cluster_not_ok_.inc();
+    lb_stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
     if (fail_traffic_on_panic_) {
@@ -788,12 +788,12 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
-    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& lb_stats, 
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
     TimeSource& time_source)
-    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, lb_stats, runtime, random,
                                 common_config),
       seed_(random_.random()),
       slow_start_window_(slow_start_config.has_value()

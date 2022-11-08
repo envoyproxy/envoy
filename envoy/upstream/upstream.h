@@ -584,10 +584,20 @@ public:
   GAUGE(version, NeverImport)
 
 /**
- * All cluster stats. @see stats_macros.h
+ * All cluster endpoints related stats.
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
-  COUNTER(bind_errors)                                                                             \
+#define ALL_CLUSTER_ENDPOINT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)              \
+  GAUGE(max_host_weight, NeverImport)                                                              \
+  COUNTER(membership_change)                                                                       \
+  GAUGE(membership_degraded, NeverImport)                                                          \
+  GAUGE(membership_excluded, NeverImport)                                                          \
+  GAUGE(membership_healthy, NeverImport)                                                           \
+  GAUGE(membership_total, NeverImport)
+
+/**
+ * All cluster loadbalancing related stats.
+ */
+#define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
   COUNTER(lb_recalculate_zone_structures)                                                          \
@@ -602,7 +612,13 @@ public:
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
-  COUNTER(membership_change)                                                                       \
+  GAUGE(lb_subsets_active, Accumulate)
+
+/**
+ * All cluster stats. @see stats_macros.h
+ */
+#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
+  COUNTER(bind_errors)                                                                             \
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
   COUNTER(upstream_cx_close_notify)                                                                \
@@ -656,12 +672,6 @@ public:
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
   COUNTER(upstream_http3_broken)                                                                   \
-  GAUGE(lb_subsets_active, Accumulate)                                                             \
-  GAUGE(max_host_weight, NeverImport)                                                              \
-  GAUGE(membership_degraded, NeverImport)                                                          \
-  GAUGE(membership_excluded, NeverImport)                                                          \
-  GAUGE(membership_healthy, NeverImport)                                                           \
-  GAUGE(membership_total, NeverImport)                                                             \
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
@@ -724,6 +734,18 @@ public:
 MAKE_STAT_NAMES_STRUCT(ClusterConfigUpdateStatNames, ALL_CLUSTER_CONFIG_UPDATE_STATS);
 MAKE_STATS_STRUCT(ClusterConfigUpdateStats, ClusterConfigUpdateStatNames,
                   ALL_CLUSTER_CONFIG_UPDATE_STATS);
+
+/**
+ * Struct definition for cluster endpoint related stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterEndpointStatNames, ALL_CLUSTER_ENDPOINT_STATS);
+MAKE_STATS_STRUCT(ClusterEndpointStats, ClusterEndpointStatNames, ALL_CLUSTER_ENDPOINT_STATS);
+
+/**
+ * Struct definition for cluster load balancing stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
+MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
 
 /**
  * Struct definition for all cluster stats. @see stats_macros.h
@@ -1013,6 +1035,16 @@ public:
    * @return ClusterConfigUpdateStats& strongly named config update stats for this cluster.
    */
   virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
+  
+  /**
+   * @return ClusterLbStats& strongly named stats for this cluster.
+   */
+  virtual ClusterLbStats& lbStats() const PURE;
+
+  /**
+   * @return ClusterEndpointStats& strongly named stats for this cluster.
+   */
+  virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
    * @return ClusterStats& strongly named stats for this cluster.

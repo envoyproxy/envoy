@@ -107,11 +107,11 @@ public:
 
 protected:
   ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random, override_host_status_)) {}
+      : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config),
+        factory_(new LoadBalancerFactoryImpl(lb_stats, random, override_host_status_)) {}
 
 private:
   struct PerPriorityState {
@@ -121,8 +121,8 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random)
+        : lb_stats_(lb_stats), random_(random) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -138,7 +138,7 @@ private:
       return {};
     }
 
-    ClusterStats& stats_;
+    ClusterLbStats& lb_stats_;
     Random::RandomGenerator& random_;
     HostStatusSet override_host_status_{};
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
@@ -150,16 +150,16 @@ private:
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
+    LoadBalancerFactoryImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random,
                             HostStatusSet status)
-        : stats_(stats), random_(random), override_host_status_(status) {}
+        : lb_stats_(lb_stats), random_(random), override_host_status_(status) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
     // Ignore the params for the thread-aware LB.
     LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
 
-    ClusterStats& stats_;
+    ClusterLbStats& lb_stats_;
     Random::RandomGenerator& random_;
     HostStatusSet override_host_status_{};
     absl::Mutex mutex_;

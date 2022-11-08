@@ -21,7 +21,7 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RandomLoadBalancerTestCase& in
 
   try {
     load_balancer_fuzz.lb_ = std::make_unique<RandomLoadBalancer>(
-        load_balancer_fuzz.priority_set_, nullptr, load_balancer_fuzz.stats_,
+        load_balancer_fuzz.priority_set_, nullptr, load_balancer_fuzz.lb_stats_,
         load_balancer_fuzz.runtime_, load_balancer_fuzz.random_,
         input.load_balancer_test_case().common_lb_config());
   } catch (EnvoyException& e) {

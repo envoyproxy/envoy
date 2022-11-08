@@ -70,8 +70,8 @@ protected:
    */
   void recalculateLoadInTotalPanic();
 
-  LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                   Random::RandomGenerator& random,
+  LoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
+                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the healthy_per_priority_load_ and
@@ -105,7 +105,7 @@ protected:
     }
   }
 
-  ClusterStats& stats_;
+  ClusterLbStats& lb_stats_;
   Runtime::Loader& runtime_;
   std::deque<uint64_t> stashed_random_;
   Random::RandomGenerator& random_;
@@ -220,8 +220,8 @@ public:
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.
   ZoneAwareLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
@@ -426,8 +426,8 @@ class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase,
                             Logger::Loggable<Logger::Id::upstream> {
 public:
   EdfLoadBalancerBase(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
       TimeSource& time_source);
@@ -494,14 +494,14 @@ protected:
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
           round_robin_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, common_config,
+            priority_set, local_priority_set, lb_stats, runtime, random, common_config,
             (round_robin_config.has_value() && round_robin_config.value().has_slow_start_config())
                 ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
                       round_robin_config.value().slow_start_config())
@@ -572,14 +572,14 @@ private:
 class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(
-      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
           least_request_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, common_config,
+            priority_set, local_priority_set, lb_stats, runtime, random, common_config,
             (least_request_config.has_value() &&
              least_request_config.value().has_slow_start_config())
                 ? absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig>(
@@ -672,9 +672,10 @@ class RandomLoadBalancer : public ZoneAwareLoadBalancerBase,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                     ClusterStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     ClusterLbStats& lb_stats, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, lb_stats, runtime, random,
                                   common_config) {}
 
   // Upstream::ZoneAwareLoadBalancerBase

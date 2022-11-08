@@ -66,8 +66,8 @@ public:
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_{stats_store_.symbolTable()};
-  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_, stat_names_)};
+  ClusterLbStatNames lb_stat_names_{stats_store_.symbolTable()};
+  ClusterLbStats lb_stats_{lb_stat_names_, stats_store_};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -81,7 +81,7 @@ public:
       : BaseTester(num_hosts, weighted_subset_percent, weight) {}
 
   void initialize() {
-    lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, &local_priority_set_, lb_stats_,
                                                    runtime_, random_, common_config_,
                                                    round_robin_lb_config_, simTime());
   }
@@ -94,7 +94,7 @@ public:
   LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
     envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
     lr_lb_config.mutable_choice_count()->set_value(choice_count);
-    lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+    lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, lb_stats_,
                                                      runtime_, random_, common_config_,
                                                      lr_lb_config, simTime());
   }
@@ -155,7 +155,7 @@ public:
     config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
     ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
-        priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
+        priority_set_, lb_stats_, stats_store_, runtime_, random_, config_, common_config_);
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
@@ -166,8 +166,8 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                                      random_, config_, common_config_);
+    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, lb_stats_, stats_store_,
+                                                      runtime_, random_, config_, common_config_);
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
@@ -544,7 +544,7 @@ public:
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
     lb_ = std::make_unique<SubsetLoadBalancer>(
-        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
+        LoadBalancerType::Random, priority_set_, &local_priority_set_, lb_stats_, stats_store_,
         runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
         absl::nullopt, common_config_, simTime());
 
