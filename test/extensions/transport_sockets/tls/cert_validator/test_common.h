@@ -93,7 +93,7 @@ public:
     return ca_provider_instance_;
   }
 
-  void setCAUpdateCallback(std::function<void()> /*callback*/) override {};
+  void setCAUpdateCallback(std::function<void()> /*callback*/) override{};
 
 private:
   bool allow_expired_certificate_{false};
