@@ -6,6 +6,8 @@ build --platform_mappings=envoy/bazel/platform_mappings
 build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
+build --define=admin_html=disabled
+build --define=library_autolink=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
 build --features=debug_prefix_map_pwd_is_dot
