@@ -3,8 +3,8 @@
 #include "source/common/quic/envoy_quic_stream.h"
 #include "source/common/quic/quic_stats_gatherer.h"
 
-#include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
 #include "quiche/common/platform/api/quiche_reference_counted.h"
+#include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
 
 namespace Envoy {
 namespace Quic {
