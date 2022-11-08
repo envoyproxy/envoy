@@ -1,5 +1,7 @@
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 
+#include "source/common/buffer/buffer_impl.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -68,28 +70,22 @@ TEST_F(CacheFileFixedBlockTest, ReturnsCorrectOffsets) {
   EXPECT_EQ(block.offsetToTrailers(), CacheFileFixedBlock::size() + 1100);
 }
 
-TEST_F(CacheFileFixedBlockTest, CopiesCorrectlyViaStringView) {
+TEST_F(CacheFileFixedBlockTest, SerializesAndDeserializesCorrectly) {
   CacheFileFixedBlock block;
   block.setHeadersSize(100);
   block.setBodySize(1000);
   block.setTrailersSize(10);
   CacheFileFixedBlock block2;
-  block2.populateFromStringView(block.stringView());
+  Buffer::OwnedImpl buf;
+  block.serializeToBuffer(buf);
+  block2.populateFromStringView(buf.toString());
+  EXPECT_TRUE(block2.isValid());
   EXPECT_EQ(block2.offsetToHeaders(), CacheFileFixedBlock::size());
   EXPECT_EQ(block2.offsetToBody(), CacheFileFixedBlock::size() + 100);
   EXPECT_EQ(block2.offsetToTrailers(), CacheFileFixedBlock::size() + 1100);
-  EXPECT_TRUE(block2.isValid());
-}
-
-TEST_F(CacheFileFixedBlockTest, NumbersAreInLittleEndianByteOrder) {
-  CacheFileFixedBlock block;
-  block.setHeadersSize(0x7654);
-  absl::string_view str = block.stringView();
-  ASSERT_GT(str.size(), 12);
-  EXPECT_EQ(str[8], 0x54);
-  EXPECT_EQ(str[9], 0x76);
-  EXPECT_EQ(str[10], 0x00);
-  EXPECT_EQ(str[11], 0x00);
+  EXPECT_EQ(block2.headerSize(), 100);
+  EXPECT_EQ(block2.bodySize(), 1000);
+  EXPECT_EQ(block2.trailerSize(), 10);
 }
 
 } // namespace

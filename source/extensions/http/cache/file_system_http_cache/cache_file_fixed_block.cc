@@ -38,8 +38,66 @@ CacheFileFixedBlock::CacheFileFixedBlock() {
 }
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
-  ASSERT(s.size() == size());
-  safeMemcpyUnsafeSrc(&contents_, s.begin());
+  ASSERT(s.size() == size() && size() == 24);
+  // Bytewise copy the values from the string_view into the fields.
+  // This ensures consistent endianness, and is the only safe way to copy values
+  // from a byte array into value types.
+  // chars must be cast to uint8_t first so that e.g. -1 becomes 0xff, before casting to uint64_t
+  // - otherwise -1 becomes 0xffffffffffffffff.
+  file_id_ = static_cast<uint32_t>(static_cast<uint8_t>(s[0])) << 24 |
+             static_cast<uint32_t>(static_cast<uint8_t>(s[1])) << 16 |
+             static_cast<uint32_t>(static_cast<uint8_t>(s[2])) << 8 |
+             static_cast<uint32_t>(static_cast<uint8_t>(s[3]));
+  cache_version_id_ = static_cast<uint32_t>(static_cast<uint8_t>(s[4])) << 24 |
+                      static_cast<uint32_t>(static_cast<uint8_t>(s[5])) << 16 |
+                      static_cast<uint32_t>(static_cast<uint8_t>(s[6])) << 8 |
+                      static_cast<uint32_t>(static_cast<uint8_t>(s[7]));
+  header_size_ = static_cast<uint32_t>(static_cast<uint8_t>(s[8])) << 24 |
+                 static_cast<uint32_t>(static_cast<uint8_t>(s[9])) << 16 |
+                 static_cast<uint32_t>(static_cast<uint8_t>(s[10])) << 8 |
+                 static_cast<uint32_t>(static_cast<uint8_t>(s[11]));
+  body_size_ = static_cast<uint64_t>(static_cast<uint8_t>(s[12])) << 56 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[13])) << 48 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[14])) << 40 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[15])) << 32 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[16])) << 24 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[17])) << 16 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[18])) << 8 |
+               static_cast<uint64_t>(static_cast<uint8_t>(s[19]));
+  trailer_size_ = static_cast<uint32_t>(static_cast<uint8_t>(s[20])) << 24 |
+                  static_cast<uint32_t>(static_cast<uint8_t>(s[21])) << 16 |
+                  static_cast<uint32_t>(static_cast<uint8_t>(s[22])) << 8 |
+                  static_cast<uint32_t>(static_cast<uint8_t>(s[23]));
+}
+
+void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
+  char b[size()];
+  ASSERT(size() == 24);
+  b[0] = file_id_ >> 24;
+  b[1] = file_id_ >> 16 & 0xff;
+  b[2] = file_id_ >> 8 & 0xff;
+  b[3] = file_id_ & 0xff;
+  b[4] = cache_version_id_ >> 24;
+  b[5] = cache_version_id_ >> 16 & 0xff;
+  b[6] = cache_version_id_ >> 8 & 0xff;
+  b[7] = cache_version_id_ & 0xff;
+  b[8] = header_size_ >> 24;
+  b[9] = header_size_ >> 16 & 0xff;
+  b[10] = header_size_ >> 8 & 0xff;
+  b[11] = header_size_ & 0xff;
+  b[12] = body_size_ >> 56;
+  b[13] = body_size_ >> 48 & 0xff;
+  b[14] = body_size_ >> 40 & 0xff;
+  b[15] = body_size_ >> 32 & 0xff;
+  b[16] = body_size_ >> 24 & 0xff;
+  b[17] = body_size_ >> 16 & 0xff;
+  b[18] = body_size_ >> 8 & 0xff;
+  b[19] = body_size_ & 0xff;
+  b[20] = trailer_size_ >> 24;
+  b[21] = trailer_size_ >> 16 & 0xff;
+  b[22] = trailer_size_ >> 8 & 0xff;
+  b[23] = trailer_size_ & 0xff;
+  buffer.add(absl::string_view{b, size()});
 }
 
 bool CacheFileFixedBlock::isValid() const {

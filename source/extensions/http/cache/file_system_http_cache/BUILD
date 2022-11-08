@@ -13,9 +13,7 @@ envoy_cc_library(
     srcs = ["cache_file_fixed_block.cc"],
     hdrs = ["cache_file_fixed_block.h"],
     deps = [
-        "//source/common/common:assert_lib",
-        "//source/common/common:byte_order_lib",
-        "//source/common/common:safe_memcpy_lib",
+        "//envoy/buffer:buffer_interface",
         "@com_google_absl//absl/strings",
     ],
 )
