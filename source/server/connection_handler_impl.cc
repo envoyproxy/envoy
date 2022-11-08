@@ -163,13 +163,26 @@ void ConnectionHandlerImpl::addListener(
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
 }
 
-void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
+void ConnectionHandlerImpl::removeListeners(
+    uint64_t listener_tag,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   if (auto listener_iter = listener_map_by_tag_.find(listener_tag);
       listener_iter != listener_map_by_tag_.end()) {
     // listener_map_by_address_ may already update to the new listener. Compare it with the one
     // which find from listener_map_by_tag_, only delete it when it is same listener.
     for (const auto& per_address_details : listener_iter->second->per_address_details_list_) {
       auto& address = per_address_details->address_;
+
+      // Skip if this isn't address to remove.
+      if (addresses.has_value() &&
+          std::find_if(
+              addresses->begin(), addresses->end(),
+              [&per_address_details](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                return *(per_address_details->listen_address_) == *other_addr;
+              }) == addresses->end()) {
+        return;
+      }
+
       auto address_view = address->asStringView();
       if (tcp_listener_map_by_address_.contains(address_view) &&
           tcp_listener_map_by_address_[address_view]->listener_tag_ ==
@@ -208,7 +221,15 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
         }
       }
     }
-    listener_map_by_tag_.erase(listener_iter);
+
+    // If addresses specified, then only remove the specified active listeners.
+    if (addresses.has_value()) {
+      for (auto& address : addresses.ref()) {
+        listener_iter->second->removeActiveListener(address);
+      }
+    } else {
+      listener_map_by_tag_.erase(listener_iter);
+    }
   }
 }
 
@@ -258,15 +279,16 @@ void ConnectionHandlerImpl::removeFilterChains(
   Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
-void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
-                                          OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
+void ConnectionHandlerImpl::stopListeners(
+    uint64_t listener_tag,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
     iter->second->invokeListenerMethod([addresses](const PerAddressActiveListenerDetails& details) {
-      if (addresses.has_value() && std::find_if(
-              addresses->begin(), addresses->end(),
-              [&details](const Network::Address::InstanceConstSharedPtr& other_addr) {
-                return *(details.listen_address_) == *other_addr;
-              }) != addresses->end()) {
+      if (addresses.has_value() &&
+          std::find_if(addresses->begin(), addresses->end(),
+                       [&details](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                         return *(details.listen_address_) == *other_addr;
+                       }) != addresses->end()) {
         return;
       }
       if (details.listener_->listener() != nullptr) {

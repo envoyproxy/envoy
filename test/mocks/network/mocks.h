@@ -486,11 +486,15 @@ public:
               (absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
                Runtime::Loader& runtime,
                OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>));
-  MOCK_METHOD(void, removeListeners, (uint64_t listener_tag));
+  MOCK_METHOD(void, removeListeners,
+              (uint64_t listener_tag,
+               OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
                std::function<void()> completion));
-  MOCK_METHOD(void, stopListeners, (uint64_t listener_tag, OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses));
+  MOCK_METHOD(void, stopListeners,
+              (uint64_t listener_tag,
+               OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses));
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());

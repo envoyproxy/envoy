@@ -47,12 +47,15 @@ public:
                    Runtime::Loader& runtime,
                    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
                        new_addresses = absl::nullopt) override;
-  void removeListeners(uint64_t listener_tag) override;
+  void removeListeners(uint64_t listener_tag,
+                       OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                           addresses = absl::nullopt) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
   void stopListeners(uint64_t listener_tag,
-                     OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses = absl::nullopt) override;
+                     OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses =
+                         absl::nullopt) override;
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
@@ -131,6 +134,16 @@ private:
       }
       per_address_details->listener_tag_ = config.listenerTag();
       per_address_details_list_.emplace_back(per_address_details);
+    }
+
+    void removeActiveListener(const Network::Address::InstanceConstSharedPtr& listen_address) {
+      auto per_address_details_iter =
+          find_if(per_address_details_list_.begin(), per_address_details_list_.end(),
+                  [&listen_address](std::shared_ptr<PerAddressActiveListenerDetails>& details) {
+                    return *(details->listen_address_) == *listen_address;
+                  });
+      ASSERT(per_address_details_iter != per_address_details_list_.end());
+      per_address_details_list_.erase(per_address_details_iter);
     }
   };
 

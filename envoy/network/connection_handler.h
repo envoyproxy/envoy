@@ -58,8 +58,11 @@ public:
    * Remove listeners using the listener tag as a key. All connections owned by the removed
    * listeners will be closed.
    * @param listener_tag supplies the tag passed to addListener().
+   * @param addresses specified listeners will be removed.
    */
-  virtual void removeListeners(uint64_t listener_tag) PURE;
+  virtual void removeListeners(uint64_t listener_tag,
+                               OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                                   addresses = absl::nullopt) PURE;
 
   /**
    * Remove the filter chains and the connections in the listener. All connections owned
@@ -79,7 +82,8 @@ public:
    * @param addresses will be stopped. If not specified, the whole listener will be stopped.
    */
   virtual void stopListeners(uint64_t listener_tag,
-                             OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> addresses = absl::nullopt) PURE;
+                             OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                                 addresses = absl::nullopt) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
