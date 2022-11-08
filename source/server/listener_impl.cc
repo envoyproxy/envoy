@@ -263,7 +263,7 @@ OverloadManager& ListenerFactoryContextBaseImpl::overloadManager() {
 ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
-Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
+OptRef<Admin> ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -861,7 +861,9 @@ OverloadManager& PerListenerFactoryContextImpl::overloadManager() {
 ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
   return listener_factory_context_base_->threadLocal();
 }
-Admin& PerListenerFactoryContextImpl::admin() { return listener_factory_context_base_->admin(); }
+OptRef<Admin> PerListenerFactoryContextImpl::admin() {
+  return listener_factory_context_base_->admin();
+}
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };

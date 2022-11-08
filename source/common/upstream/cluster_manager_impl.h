@@ -50,7 +50,7 @@ namespace Upstream {
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
   ProdClusterManagerFactory(
-      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Server::Configuration::ServerFactoryContext& server_context, OptRef<Server::Admin> admin,
       Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
       Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
@@ -105,7 +105,7 @@ protected:
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
   Router::Context& router_context_;
-  Server::Admin& admin_;
+  OptRef<Server::Admin> admin_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -245,7 +245,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
                      Router::Context& router_context, const Server::Instance& server);

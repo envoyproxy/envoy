@@ -41,6 +41,14 @@
   } while (0)
 #endif
 
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+#define DISABLE_IF_ADMIN_DISABLED return
+#else
+#define DISABLE_IF_ADMIN_DISABLED                                                                  \
+  do {                                                                                             \
+  } while (0)
+#endif
+
 namespace Envoy {
 
 struct ApiFilesystemConfig {

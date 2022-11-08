@@ -336,6 +336,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_admin_functionality",
+    values = {"define": "admin_functionality=disabled"},
+)
+
+config_setting(
     name = "disable_hot_restart_setting",
     values = {"define": "hot_restart=disabled"},
     # TODO(keith): make private again https://github.com/bazelbuild/bazel-skylib/issues/404
