@@ -3,6 +3,11 @@
 Rate Limit Quota (Work-In-Progress)
 ===================================
 
+.. attention::
+
+  The Rate Limit Quota filter is currently under active development and is not ready for use yet.
+  Capabilities and the configuration structures could be changed.
+
 * Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig>`
 
