@@ -32,6 +32,11 @@ message GcpAuthnFilterConfig {
 
   // Token cache configuration. This field is optional.
   TokenCacheConfig cache_config = 3;
+
+  // Name of the request header that holds the token. If this field is not specified, the token
+  // is added to the Authorization HTTP header.
+  string header_name = 4
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
 // Audience is the URL of the receiving service that performs token authentication.

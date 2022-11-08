@@ -38,6 +38,7 @@ constexpr char DefaultConfig[] = R"EOF(
         base_interval: 1s
         max_interval: 10s
       num_retries: 5
+    header_name: customheader
   )EOF";
 
 class GcpAuthnFilterTest : public testing::Test {
@@ -247,7 +248,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-TEST_F(GcpAuthnFilterTest, DestoryFilter) {
+TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.

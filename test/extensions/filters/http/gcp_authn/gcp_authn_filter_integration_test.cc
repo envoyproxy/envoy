@@ -46,8 +46,8 @@ public:
     }
   }
 
-  void initializeConfig(bool add_audience) {
-    config_helper_.addConfigModifier([this, add_audience](
+  void initializeConfig(bool add_audience, bool configure_header_name = false) {
+    config_helper_.addConfigModifier([this, add_audience, configure_header_name](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* gcp_authn_cluster = bootstrap.mutable_static_resources()->add_clusters();
       gcp_authn_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -77,6 +77,10 @@ public:
 
       // Add the filter to the filter chain.
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(gcp_authn_filter));
+
+      if (configure_header_name) {
+        proto_config_.mutable_header_name()->append("service-to-service-auth");
+      }
     });
   }
 
@@ -129,7 +133,17 @@ public:
   }
 
   // Send the request to destination upstream cluster
-  void sendRequestToDestinationAndValidateResponse(bool with_audience) {
+  void sendRequestToDestinationAndValidateResponse(bool with_audience,
+                                                   bool with_configured_header_name = false) {
+    // By default, the expected ID token is added to the request in the HTTP
+    // Authorization header, in format of `Bearer ID_TOKEN`; however a different
+    // header can be configured.
+    Http::LowerCaseString header_key(with_configured_header_name
+                                         ? Http::LowerCaseString("service-to-service-auth")
+                                         : authorizationHeaderKey());
+    std::string id_token(with_configured_header_name ? MockTokenString
+                                                     : absl::StrCat("Bearer ", MockTokenString));
+
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -148,18 +162,14 @@ public:
     // The authorization header is only added when the configuration is valid (e.g., with audience
     // field).
     if (with_audience) {
-      ASSERT_FALSE(upstream_request_->headers().get(authorizationHeaderKey()).empty());
-      // The expected ID token is in format of `Bearer ID_TOKEN`
-      std::string id_token = absl::StrCat("Bearer ", MockTokenString);
+      ASSERT_FALSE(upstream_request_->headers().get(header_key).empty());
       // Verify the request header modification:
       // 1) Only one entry with authorization header key. i.e., Any existing values should be
       // overridden by response from authentication server.
-      EXPECT_EQ(upstream_request_->headers().get(authorizationHeaderKey()).size(), 1);
+      EXPECT_EQ(upstream_request_->headers().get(header_key).size(), 1);
       // 2) the token returned from authentication server has been added to the request header that
       // is sent to destination upstream.
-      EXPECT_EQ(
-          upstream_request_->headers().get(authorizationHeaderKey())[0]->value().getStringView(),
-          id_token);
+      EXPECT_EQ(upstream_request_->headers().get(header_key)[0]->value().getStringView(), id_token);
     }
 
     EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -204,6 +214,26 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
 
 TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
   initializeConfig(/*add_audience=*/true);
+  HttpIntegrationTest::initialize();
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
+    initiateClientConnection();
+    // Send the request to cluster `gcp_authn`.
+    waitForGcpAuthnServerResponse();
+    // Send the request to cluster `cluster_0` and validate the response.
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+    // Clean up the codec and connections.
+    cleanup();
+  }
+
+  // Verify request has been routed to both upstream clusters.
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
+  initializeConfig(/*add_audience=*/true, true);
   HttpIntegrationTest::initialize();
   int num = 2;
   // Send multiple requests.
