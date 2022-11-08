@@ -828,8 +828,8 @@ TEST_P(AdminInstanceTest, ConfigDumpEcds) {
  ]
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=ecds_filters",
-                                        header_map, response));
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=ecds_filters", header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
 }

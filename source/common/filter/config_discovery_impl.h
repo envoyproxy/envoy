@@ -376,12 +376,13 @@ public:
   virtual std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const PURE;
-  virtual void storeFilterConfigs(
-      const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-      const std::string& last_type_url,
-      const std::string& last_version_info, const SystemTime& last_updated) PURE;
+  virtual void
+  storeFilterConfigs(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
+                     const std::string& last_type_url, const std::string& last_version_info,
+                     const SystemTime& last_updated) PURE;
   virtual void removeFilterConfigs(const std::string& last_type_url,
                                    const std::string& filter_config_name) PURE;
+
 protected:
   std::shared_ptr<FilterConfigSubscription> getSubscription(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
@@ -500,12 +501,10 @@ protected:
     return message;
   }
 
-  void storeFilterConfigs(
-      const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-      const std::string& last_type_url, const std::string& last_version_info,
-      const SystemTime& last_updated) override {
-    const std::string subscription_id = absl::StrCat(
-        last_type_url, ".", filter_config.name());
+  void storeFilterConfigs(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
+                          const std::string& last_type_url, const std::string& last_version_info,
+                          const SystemTime& last_updated) override {
+    const std::string subscription_id = absl::StrCat(last_type_url, ".", filter_config.name());
     // Remove the old config if existing.
     auto it = filter_config_store_.find(subscription_id);
     if (it != filter_config_store_.end()) {
@@ -521,8 +520,7 @@ protected:
 
   void removeFilterConfigs(const std::string& last_type_url,
                            const std::string& filter_config_name) override {
-    const std::string subscription_id = absl::StrCat(
-        last_type_url, ".", filter_config_name);
+    const std::string subscription_id = absl::StrCat(last_type_url, ".", filter_config_name);
     auto it = filter_config_store_.find(subscription_id);
     if (it != filter_config_store_.end()) {
       filter_config_store_.erase(it);
@@ -554,8 +552,7 @@ private:
   void setupEcdsConfigDumpCallbacks(Server::Admin& admin) {
     if (config_tracker_entry_ == nullptr) {
       config_tracker_entry_ = admin.getConfigTracker().add(
-          "ecds_filters",
-          [this](const Matchers::StringMatcher& name_matcher) {
+          "ecds_filters", [this](const Matchers::StringMatcher& name_matcher) {
             return dumpEcdsFilterConfigs(name_matcher);
           });
     }
@@ -572,8 +569,7 @@ private:
       filter_config_dump.mutable_ecds_filter()->PackFrom(ecds_filter.filter_config_);
       filter_config_dump.set_version_info(ecds_filter.last_version_info_);
       TimestampUtil::systemClockToTimestamp(ecds_filter.last_updated_,
-                                              *(filter_config_dump.mutable_last_updated()));
-
+                                            *(filter_config_dump.mutable_last_updated()));
     }
     return config_dump;
   }

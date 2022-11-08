@@ -580,8 +580,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
                                         "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"
-                                         };
+                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);

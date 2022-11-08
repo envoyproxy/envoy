@@ -131,8 +131,8 @@ void FilterConfigSubscription::onConfigUpdate(
   last_type_url_ = type_url;
   last_version_info_ = version_info;
   last_factory_name_ = factory_name;
-  filter_config_provider_manager_.storeFilterConfigs(filter_config,
-                                                     last_type_url_, last_version_info_,
+  filter_config_provider_manager_.storeFilterConfigs(filter_config, last_type_url_,
+                                                     last_version_info_,
                                                      factory_context_.timeSource().systemTime());
 }
 
@@ -149,8 +149,7 @@ void FilterConfigSubscription::onConfigUpdate(
         },
         [this]() { stats_.config_reload_.inc(); });
 
-    filter_config_provider_manager_.removeFilterConfigs(last_type_url_,
-                                                        filter_config_name_);
+    filter_config_provider_manager_.removeFilterConfigs(last_type_url_, filter_config_name_);
     last_config_hash_ = 0;
     last_config_ = nullptr;
     last_type_url_ = "";
