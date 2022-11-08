@@ -566,6 +566,12 @@ public:
 
 /**
  * All cluster config update related stats.
+ * See https://github.com/envoyproxy/envoy/issues/23575 for details. Stats from ClusterInfo::stats()
+ * will be split into subgroups "config-update", "lb", "endpoint" and "upstream", roughly based on
+ * their semantics. This list of stats are separated from Cluster::stats() since they are "config
+ * pipeline related".
+ *
+ * Each group of
  */
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
