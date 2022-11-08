@@ -80,6 +80,7 @@ private:
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
     Network::Address::InstanceConstSharedPtr address_;
+    Network::Address::InstanceConstSharedPtr listen_address_;
     uint64_t listener_tag_;
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
@@ -114,12 +115,14 @@ private:
     template <class ActiveListener>
     void addActiveListener(Network::ListenerConfig& config,
                            const Network::Address::InstanceConstSharedPtr& address,
+                           const Network::Address::InstanceConstSharedPtr& listen_address,
                            UnitFloat& listener_reject_fraction, bool disable_listeners,
                            ActiveListener&& listener) {
       auto per_address_details = std::make_shared<PerAddressActiveListenerDetails>();
       per_address_details->typed_listener_ = *listener;
       per_address_details->listener_ = std::move(listener);
       per_address_details->address_ = address;
+      per_address_details->listen_address_ = listen_address;
       if (disable_listeners) {
         per_address_details->listener_->pauseListening();
       }

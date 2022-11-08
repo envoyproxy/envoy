@@ -306,9 +306,13 @@ public:
     if (address == nullptr) {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
           .WillRepeatedly(ReturnRef(local_address_));
+      EXPECT_CALL(listeners_.back()->socketFactory(), listeningAddress())
+          .WillRepeatedly(ReturnRef(local_address_));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(local_address_);
     } else {
       EXPECT_CALL(listeners_.back()->socketFactory(), localAddress())
+          .WillRepeatedly(ReturnRefOfCopy(address));
+      EXPECT_CALL(listeners_.back()->socketFactory(), listeningAddress())
           .WillRepeatedly(ReturnRefOfCopy(address));
       listeners_.back()->sockets_[0]->connection_info_provider_->setLocalAddress(address);
     }
@@ -377,6 +381,8 @@ public:
     for (std::vector<Network::Listener*>::size_type i = 0; i < mock_listeners.size(); i++) {
       EXPECT_CALL(listeners_.back()->socketFactory(i), socketType()).WillOnce(Return(socket_type));
       EXPECT_CALL(listeners_.back()->socketFactory(i), localAddress())
+          .WillRepeatedly(ReturnRef(addresses[i]));
+      EXPECT_CALL(listeners_.back()->socketFactory(i), listeningAddress())
           .WillRepeatedly(ReturnRef(addresses[i]));
       EXPECT_CALL(listeners_.back()->socketFactory(i), getListenSocket(_))
           .WillOnce(Return(listeners_.back()->sockets_[i]));

@@ -81,13 +81,13 @@ void ConnectionHandlerImpl::addListener(
           local_registry->createActiveInternalListener(*this, config, dispatcher());
       // TODO(soulxu): support multiple internal addresses in listener in the future.
       ASSERT(config.listenSocketFactories().size() == 1);
-      details->addActiveListener(config, socket_factory->localAddress(), listener_reject_fraction_,
+      details->addActiveListener(config, socket_factory->localAddress(), socket_factory->listeningAddress(), listener_reject_fraction_,
                                  disable_listeners_, std::move(internal_listener));
     } else if (socket_factory->socketType() == Network::Socket::Type::Stream) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
       details->addActiveListener(
-          config, address, listener_reject_fraction_, disable_listeners_,
+          config, address, socket_factory->listeningAddress(), listener_reject_fraction_, disable_listeners_,
           std::make_unique<ActiveTcpListener>(
               *this, config, runtime,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
@@ -97,7 +97,7 @@ void ConnectionHandlerImpl::addListener(
       ASSERT(worker_index_.has_value());
       auto address = socket_factory->localAddress();
       details->addActiveListener(
-          config, address, listener_reject_fraction_, disable_listeners_,
+          config, address, socket_factory->listeningAddress(), listener_reject_fraction_, disable_listeners_,
           config.udpListenerConfig()->listenerFactory().createActiveUdpListener(
               runtime, *worker_index_, *this, socket_factory->getListenSocket(*worker_index_),
               dispatcher_, config));
