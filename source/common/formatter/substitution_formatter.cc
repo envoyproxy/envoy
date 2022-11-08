@@ -913,6 +913,15 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return timing.downstreamHandshakeComplete();
                                   });
                             }}},
+                          {"ROUNDTRIP_DURATION",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoDurationFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    StreamInfo::TimingUtility timing(stream_info);
+                                    return timing.lastDownstreamAckReceived();
+                                  });
+                            }}},
                           {"BYTES_RECEIVED",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
