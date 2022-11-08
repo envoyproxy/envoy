@@ -525,3 +525,15 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "quic_stats_gatherer",
+    srcs = ["quic_stats_gatherer.cc"],
+    hdrs = ["quic_stats_gatherer.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/access_log:access_log_interface",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
+    ],
+)
