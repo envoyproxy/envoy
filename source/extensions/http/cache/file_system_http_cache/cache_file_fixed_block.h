@@ -48,7 +48,7 @@ public:
 
   /**
    * the size in bytes of a serialized CacheFileFixedBlock. This is compile-time constant.
-   * fileId, cacheVersionId, headerSize and trailerSize serialize to 4-byte uints.
+   * fileId, cacheVersionId, headerSize and trailerSize serialize to 4 bytes each.
    * bodySize serializes to an 8-byte uint.
    * @return the size in bytes.
    */
