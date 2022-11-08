@@ -95,11 +95,11 @@ new_features:
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
-- area: http
-  change: |
-    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: redis
   change: |
     extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
+- area: http
+  change: |
+    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 
 deprecated:
