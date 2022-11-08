@@ -1167,6 +1167,18 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
   codec_client_->close();
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
+  useAccessLog("%ROUNDTRIP_DURATION%");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
+                                default_response_headers_,
+                                /*response_size=*/0,
+                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
+  codec_client_->close();
+  EXPECT_GT(std::stoi(waitForAccessLog(access_log_name_)), 0);
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {

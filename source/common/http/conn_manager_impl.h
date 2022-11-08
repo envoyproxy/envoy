@@ -207,6 +207,19 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
+    StreamInfo::DeferredLoggingInfo deferredLoggingInfo() {
+      StreamInfo::DeferredLoggingInfo info;
+      if (requestHeaders()) {
+        info.request_header_map = request_headers_;
+      }
+      if (responseHeaders()) {
+        info.response_header_map = response_headers_;
+      }
+      if (responseTrailers()) {
+        info.response_trailer_map = response_trailers_;
+      }
+      return info;
+    }
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;

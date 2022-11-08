@@ -278,7 +278,11 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
-  stream.filter_manager_.log();
+  if (codec_ && codec_->protocol() == Protocol::Http3) {
+    stream.filter_manager_.streamInfo().setDeferredLoggingInfo(stream.deferredLoggingInfo());
+  } else {
+    stream.filter_manager_.log();
+  }
 
   stream.filter_manager_.destroyFilters();
 
