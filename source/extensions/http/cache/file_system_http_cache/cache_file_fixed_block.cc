@@ -62,7 +62,7 @@ CacheFileFixedBlock::CacheFileFixedBlock() {
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   ASSERT(s.size() == size() && size() == 24);
-  // Bytewise serialize the values from the string_view s into the member values.
+  // Serialize the values from the string_view s into the member values.
   std::copy_n(s.begin(), 4, file_id_.begin());
   std::copy_n(s.begin() + 4, 4, cache_version_id_.begin());
   header_size_ = deserializeUint32(&s[8]);
@@ -73,7 +73,7 @@ void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
 void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
   char b[size()];
   ASSERT(size() == 24);
-  // Bytewise serialize the values from the member values into the stack buffer b.
+  // Serialize the values from the member values into the stack buffer b.
   std::copy_n(file_id_.begin(), 4, &b[0]);
   std::copy_n(cache_version_id_.begin(), 4, &b[4]);
   serializeUint32(header_size_, &b[8]);
