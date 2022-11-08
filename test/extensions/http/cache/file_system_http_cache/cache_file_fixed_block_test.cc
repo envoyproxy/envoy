@@ -38,17 +38,19 @@ TEST_F(CacheFileFixedBlockTest, GettersRecoverValuesThatWereSet) {
 
 TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadFileId) {
   CacheFileFixedBlock block;
+  // Any file id other than the current compile time constant should be invalid.
   setFileId(block, 98765);
   EXPECT_FALSE(block.isValid());
 }
 
 TEST_F(CacheFileFixedBlockTest, IsValidReturnsFalseOnBadCacheVersionId) {
   CacheFileFixedBlock block;
+  // Any cache version id other than the current compile time constant should be invalid.
   setCacheVersionId(block, 98765);
   EXPECT_FALSE(block.isValid());
 }
 
-TEST_F(CacheFileFixedBlockTest, IsValidReturnsTrueOnBlockWithNonDefaultValues) {
+TEST_F(CacheFileFixedBlockTest, IsValidReturnsTrueOnBlockWithNonDefaultSizes) {
   CacheFileFixedBlock block;
   block.setHeadersSize(1234);
   block.setBodySize(999999);
@@ -79,13 +81,15 @@ TEST_F(CacheFileFixedBlockTest, CopiesCorrectlyViaStringView) {
   EXPECT_TRUE(block2.isValid());
 }
 
-TEST_F(CacheFileFixedBlockTest, NumbersAreInNetworkByteOrder) {
+TEST_F(CacheFileFixedBlockTest, NumbersAreInLittleEndianByteOrder) {
   CacheFileFixedBlock block;
-  block.setHeadersSize(0xfaaf);
-  EXPECT_EQ(static_cast<unsigned char>(block.stringView()[8]), 0);
-  EXPECT_EQ(static_cast<unsigned char>(block.stringView()[9]), 0);
-  EXPECT_EQ(static_cast<unsigned char>(block.stringView()[10]), 0xfa);
-  EXPECT_EQ(static_cast<unsigned char>(block.stringView()[11]), 0xaf);
+  block.setHeadersSize(0x7654);
+  absl::string_view str = block.stringView();
+  ASSERT_GT(str.size(), 12);
+  EXPECT_EQ(str[8], 0x54);
+  EXPECT_EQ(str[9], 0x76);
+  EXPECT_EQ(str[10], 0x00);
+  EXPECT_EQ(str[11], 0x00);
 }
 
 } // namespace
