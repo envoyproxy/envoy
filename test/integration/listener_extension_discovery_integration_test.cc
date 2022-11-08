@@ -222,6 +222,23 @@ public:
     tcp_client->close();
   }
 
+  // Utilities used for config dump.
+  absl::string_view request(const std::string port_key, const std::string method,
+                            const std::string endpoint, BufferingStreamDecoderPtr& response) {
+    response = IntegrationUtil::makeSingleRequest(lookupPort(port_key), method, endpoint, "",
+                                                  Http::CodecType::HTTP1, version_);
+    EXPECT_TRUE(response->complete());
+    return response->headers().getStatusValue();
+  }
+
+  absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
+    const Http::HeaderEntry* entry = response->headers().ContentType();
+    if (entry == nullptr) {
+      return "(null)";
+    }
+    return entry->value().getStringView();
+  }
+
   const uint32_t default_drain_bytes_{2};
   const std::string filter_name_;
   const std::string data_;
@@ -535,6 +552,56 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   auto result = ecds_connection_->waitForDisconnect();
   ASSERT_TRUE(result);
   ecds_connection_.reset();
+}
+
+// ECDS filter config dump test.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, false);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  // Send 1st config update to have listener filter drain 5 bytes of data.
+  sendXdsResponse(filter_name_, "1", 5);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  sendDataVerifyResults(5);
+
+  // Verify ECDS config dump are working correctly.
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
+
+  std::cout << response->body();
+  EXPECT_EQ("application/json", contentType(response));
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  size_t index = 0;
+  const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"
+                                         };
+
+  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+    index++;
+  }
+
+  // Validate we can parse as proto.
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(5, config_dump.configs_size());
+
+  // .. and that we can unpack one of the entries.
+  envoy::admin::v3::EcdsConfigDump ecds_config_dump;
+  config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  envoy::config::core::v3::TypedExtensionConfig filter_config;
+  EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
+  EXPECT_EQ("foo", filter_config.name());
+  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  filter_config.typed_config().UnpackTo(&listener_config);
+  EXPECT_EQ(5, listener_config.drain_bytes());
 }
 
 } // namespace

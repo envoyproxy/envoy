@@ -213,6 +213,7 @@ envoy_cc_test(
     srcs = ["config_dump_handler_test.cc"],
     deps = [
         ":admin_instance_lib",
+        "//test/integration/filters:test_listener_filter_lib",
     ],
 )
 
