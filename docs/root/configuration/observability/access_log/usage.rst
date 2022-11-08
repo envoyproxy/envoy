@@ -902,6 +902,13 @@ The following command operators are supported:
   UDP
     Not implemented ("-").
 
+%TLS_JA3_FINGERPRINT%
+  HTTP/TCP/THRIFT
+    The JA3 fingerprint computed from the downstream client's TLS ClientHello. Computation of the
+    fingerprint must be enabled in the :ref:`TLS inspector listener filter. <config_listener_filters_tls_inspector>`
+  UDP
+    Not implemented ("-").
+
 %DOWNSTREAM_PEER_FINGERPRINT_256%
   HTTP/TCP/THRIFT
     The hex-encoded SHA256 fingerprint of the client certificate used to establish the downstream TLS connection.

@@ -328,6 +328,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
     field_extractor_ = sslConnectionInfoStringHeaderExtractor(
         [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
+  } else if (field_name == "TLS_JA3_FINGERPRINT") {
+    field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
     field_extractor_ =
         sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {

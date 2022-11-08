@@ -451,6 +451,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamTlsVersionNoTls) {
   testFormatting(stream_info, "DOWNSTREAM_TLS_VERSION", EMPTY_STRING);
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithTlsJa3Hash) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setJA3Hash("ABADCAFE");
+  testFormatting(stream_info, "TLS_JA3_FINGERPRINT", "ABADCAFE");
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithTlsJa3HashNoHash) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  testFormatting(stream_info, "TLS_JA3_FINGERPRINT", EMPTY_STRING);
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerSha256Fingerprint) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
