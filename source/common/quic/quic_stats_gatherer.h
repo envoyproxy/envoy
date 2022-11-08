@@ -41,6 +41,7 @@ private:
   std::list<std::shared_ptr<StreamInfo::StreamInfo>> stream_info_{};
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
   Envoy::TimeSource* time_source_ = nullptr;
+  bool logging_done_ = false;
 };
 
 } // namespace Quic

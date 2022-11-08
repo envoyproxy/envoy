@@ -1,7 +1,8 @@
 #include "source/common/quic/quic_stats_gatherer.h"
-#include "source/common/common/logger.h"
 
 #include <cstdint>
+
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {
@@ -9,12 +10,13 @@ namespace Quic {
 void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
                                       quic::QuicTime::Delta /* delta_largest_observed */) {
   bytes_outstanding_ -= acked_bytes;
-  if (bytes_outstanding_ == 0 && fin_sent_) {
+  if (bytes_outstanding_ == 0 && fin_sent_ && !logging_done_) {
     DoDeferredLog();
   }
 }
 
 void QuicStatsGatherer::DoDeferredLog() {
+  logging_done_ = true;
   for (const std::shared_ptr<StreamInfo::StreamInfo>& stream_info : stream_info_) {
     if (!stream_info->deferredLoggingInfo().has_value()) {
       continue;
