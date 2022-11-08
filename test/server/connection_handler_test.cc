@@ -374,8 +374,8 @@ public:
     TestMultiAddressesListener* test_listener_raw_ptr = test_listener.get();
     listeners_.emplace_back(std::move(test_listener));
 
-    EXPECT_CALL(listeners_.back()->socketFactory(0), socketType()).WillOnce(Return(socket_type));
     for (std::vector<Network::Listener*>::size_type i = 0; i < mock_listeners.size(); i++) {
+      EXPECT_CALL(listeners_.back()->socketFactory(i), socketType()).WillOnce(Return(socket_type));
       EXPECT_CALL(listeners_.back()->socketFactory(i), localAddress())
           .WillRepeatedly(ReturnRef(addresses[i]));
       EXPECT_CALL(listeners_.back()->socketFactory(i), getListenSocket(_))

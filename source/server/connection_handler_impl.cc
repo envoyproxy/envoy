@@ -41,35 +41,35 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   }
 
   auto details = std::make_unique<ActiveListenerDetails>();
-  if (config.internalListenerConfig().has_value()) {
-    // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
-    // should be done only once. However, an extra phase and interface is overkill.
-    Network::InternalListenerRegistry& internal_listener_registry =
-        config.internalListenerConfig()->internalListenerRegistry();
-    Network::LocalInternalListenerRegistry* local_registry =
-        internal_listener_registry.getLocalRegistry();
-    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry.");
-    local_registry->setInternalListenerManager(*this);
-    if (overridden_listener.has_value()) {
-      if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
-          iter != listener_map_by_tag_.end()) {
-        iter->second->invokeListenerMethod(
-            [&config](Network::ConnectionHandler::ActiveListener& listener) {
-              listener.updateListenerConfig(config);
-            });
-        return;
+  for (auto& socket_factory : config.listenSocketFactories()) {
+    if (config.internalListenerConfig().has_value()) {
+      // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
+      // should be done only once. However, an extra phase and interface is overkill.
+      Network::InternalListenerRegistry& internal_listener_registry =
+          config.internalListenerConfig()->internalListenerRegistry();
+      Network::LocalInternalListenerRegistry* local_registry =
+          internal_listener_registry.getLocalRegistry();
+      RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry.");
+      local_registry->setInternalListenerManager(*this);
+      if (overridden_listener.has_value()) {
+        if (auto iter = listener_map_by_tag_.find(overridden_listener.value());
+            iter != listener_map_by_tag_.end()) {
+          iter->second->invokeListenerMethod(
+              [&config](Network::ConnectionHandler::ActiveListener& listener) {
+                listener.updateListenerConfig(config);
+              });
+          return;
+        }
+        IS_ENVOY_BUG("unexpected");
       }
-      IS_ENVOY_BUG("unexpected");
-    }
-    auto internal_listener =
-        local_registry->createActiveInternalListener(*this, config, dispatcher());
-    // TODO(soulxu): support multiple internal addresses in listener in the future.
-    ASSERT(config.listenSocketFactories().size() == 1);
-    details->addActiveListener(config, config.listenSocketFactories()[0]->localAddress(),
-                               listener_reject_fraction_, disable_listeners_,
-                               std::move(internal_listener));
-  } else if (config.listenSocketFactories()[0]->socketType() == Network::Socket::Type::Stream) {
-    for (auto& socket_factory : config.listenSocketFactories()) {
+      auto internal_listener =
+          local_registry->createActiveInternalListener(*this, config, dispatcher());
+      // TODO(soulxu): support multiple internal addresses in listener in the future.
+      ASSERT(config.listenSocketFactories().size() == 1);
+      details->addActiveListener(config, socket_factory->localAddress(),
+                                listener_reject_fraction_, disable_listeners_,
+                                std::move(internal_listener));
+    } else if (socket_factory->socketType() == Network::Socket::Type::Stream) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
       details->addActiveListener(
@@ -78,11 +78,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
               *this, config, runtime,
               socket_factory->getListenSocket(worker_index_.has_value() ? *worker_index_ : 0),
               address, config.connectionBalancer(*address)));
-    }
-  } else {
-    ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
-    ASSERT(worker_index_.has_value());
-    for (auto& socket_factory : config.listenSocketFactories()) {
+    } else {
+      ASSERT(config.udpListenerConfig().has_value(), "UDP listener factory is not initialized.");
+      ASSERT(worker_index_.has_value());
       auto address = socket_factory->localAddress();
       details->addActiveListener(
           config, address, listener_reject_fraction_, disable_listeners_,
