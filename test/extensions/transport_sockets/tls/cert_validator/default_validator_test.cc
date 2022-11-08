@@ -320,11 +320,19 @@ public:
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
   absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  Envoy::CertificateProvider::CertificateProviderSharedPtr caProvider() const override {
+    return ca_provider_instance_;
+  };
+
+  void setCAUpdateCallback(std::function<void()> /*callback*/) override {}
 
 private:
   std::string s_;
   std::vector<std::string> strs_;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers_;
+  Envoy::CertificateProvider::CertificateProviderSharedPtr ca_provider_instance_;
+  std::string ca_provider_cert_name_;
+  Envoy::Common::CallbackHandlePtr ca_update_callback_handle_;
 };
 
 TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {

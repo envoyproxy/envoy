@@ -56,7 +56,7 @@ public:
 
   Envoy::CertificateProvider::CertificateProviderSharedPtr caProvider() const override {
     return ca_provider_instance_;
-  };
+  }
 
   void setCAUpdateCallback(std::function<void()> callback) override;
 
