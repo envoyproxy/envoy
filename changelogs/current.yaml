@@ -86,5 +86,8 @@ new_features:
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: gcp_authn
+  change: |
+    added support for configuring header that holds token fetched from GCE metadata server.
 
 deprecated:
