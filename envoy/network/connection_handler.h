@@ -47,9 +47,12 @@ public:
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
+   * @param new_addresses will be added.
    */
   virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
-                           Runtime::Loader& runtime) PURE;
+                           Runtime::Loader& runtime,
+                           OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>>
+                               new_addresses = absl::nullopt) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed

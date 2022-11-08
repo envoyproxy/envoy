@@ -27,8 +27,10 @@ void ConnectionHandlerImpl::decNumConnections() {
   --num_handler_connections_;
 }
 
-void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config, Runtime::Loader& runtime) {
+void ConnectionHandlerImpl::addListener(
+    absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
+    Runtime::Loader& runtime,
+    OptRef<const std::vector<Network::Address::InstanceConstSharedPtr>> new_addresses) {
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
@@ -37,11 +39,24 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         [&config](Network::ConnectionHandler::ActiveListener& listener) {
           listener.updateListenerConfig(config);
         });
-    return;
+    if (!new_addresses.has_value()) {
+      return;
+    }
   }
 
   auto details = std::make_unique<ActiveListenerDetails>();
   for (auto& socket_factory : config.listenSocketFactories()) {
+    // If we only add new addresses, then skip the address isn't new one.
+    if (new_addresses.has_value()) {
+      if (std::find_if(
+              new_addresses->begin(), new_addresses->end(),
+              [&socket_factory](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                return *(socket_factory->listeningAddress()) == *other_addr;
+              }) != new_addresses->end()) {
+        continue;
+      }
+    }
+
     if (config.internalListenerConfig().has_value()) {
       // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
       // should be done only once. However, an extra phase and interface is overkill.
@@ -66,9 +81,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           local_registry->createActiveInternalListener(*this, config, dispatcher());
       // TODO(soulxu): support multiple internal addresses in listener in the future.
       ASSERT(config.listenSocketFactories().size() == 1);
-      details->addActiveListener(config, socket_factory->localAddress(),
-                                listener_reject_fraction_, disable_listeners_,
-                                std::move(internal_listener));
+      details->addActiveListener(config, socket_factory->localAddress(), listener_reject_fraction_,
+                                 disable_listeners_, std::move(internal_listener));
     } else if (socket_factory->socketType() == Network::Socket::Type::Stream) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -93,6 +107,17 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
 
   for (const auto& per_address_details : details->per_address_details_list_) {
+    // If we only add new addresses, then skip the address isn't new one.
+    if (new_addresses.has_value()) {
+      if (std::find_if(
+              new_addresses->begin(), new_addresses->end(),
+              [&per_address_details](const Network::Address::InstanceConstSharedPtr& other_addr) {
+                return *(per_address_details->address_) == *other_addr;
+              }) != new_addresses->end()) {
+        continue;
+      }
+    }
+
     // This map only stores the new listener.
     if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
             per_address_details->typed_listener_)) {
