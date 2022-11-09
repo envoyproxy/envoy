@@ -67,6 +67,9 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
         flag_values = {":enabled": "True"},
     )
 
+def envoy_mobile_package():
+    envoy_extension_package()
+
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
 

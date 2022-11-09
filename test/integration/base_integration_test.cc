@@ -305,9 +305,11 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       absl::string_view destination_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enableHalfClose(), options, source_address);
+                                                enableHalfClose(), options, source_address,
+                                                destination_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {

@@ -121,13 +121,11 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           }
         } else {
           auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-          // Remove this check when runtime flag
-          // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-          // If this isn't a valid Ipv4-mapped address, then do nothing.
-          if (v4_compatible_addr != nullptr) {
-            tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
-                                                          per_address_details);
-          }
+          // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+          // early.
+          ASSERT(v4_compatible_addr != nullptr);
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
+                                                        per_address_details);
         }
       }
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
@@ -167,13 +165,12 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             }
           } else {
             auto v4_compatible_addr = address->ip()->ipv6()->v4CompatibleAddress();
-            // Remove this check when runtime flag
-            // `envoy.reloadable_features.strict_check_on_ipv4_compat` deprecated.
-            if (v4_compatible_addr != nullptr) {
-              // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
-              // remove the v4 compatible addr item directly.
-              tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
-            }
+            // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
+            // early.
+            ASSERT(v4_compatible_addr != nullptr);
+            // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
+            // remove the v4 compatible addr item directly.
+            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
           }
         }
       } else if (address->type() == Network::Address::Type::EnvoyInternal) {

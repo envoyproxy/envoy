@@ -211,7 +211,7 @@ public:
   }
 
 protected:
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 
   std::unique_ptr<RouteMatcherImpl> route_matcher_;
 };

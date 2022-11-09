@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/extensions/common/dynamic_forward_proxy/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

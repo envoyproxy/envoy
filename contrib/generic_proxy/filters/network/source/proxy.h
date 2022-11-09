@@ -20,6 +20,8 @@
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/rds.h"
+#include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 
 namespace Envoy {
@@ -41,19 +43,22 @@ struct NamedFilterFactoryCb {
 
 class FilterConfig : public FilterChainFactory {
 public:
-  FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec, RouteMatcherPtr route_matcher,
-               std::vector<NamedFilterFactoryCb> factories, Server::Configuration::FactoryContext&)
+  FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec,
+               Rds::RouteConfigProviderSharedPtr route_config_provider,
+               std::vector<NamedFilterFactoryCb> factories)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
+        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)) {
+  }
 
-  FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context)
+  FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context,
+               RouteConfigProviderManager& route_config_provider_manager)
       : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec_config(), context),
-                     routeMatcherFromProto(config.route_config(), context),
-                     filtersFactoryFromProto(config.filters(), config.stat_prefix(), context),
-                     context) {}
+                     routeConfigProviderFromProto(config, context, route_config_provider_manager),
+                     filtersFactoryFromProto(config.filters(), config.stat_prefix(), context)) {}
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const {
-    return route_matcher_->routeEntry(request);
+    auto config = std::static_pointer_cast<const RouteMatcher>(route_config_provider_->config());
+    return config->routeEntry(request);
   }
 
   // FilterChainFactory
@@ -69,8 +74,10 @@ public:
   codecFactoryFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
                         Server::Configuration::FactoryContext& context);
 
-  static RouteMatcherPtr routeMatcherFromProto(const RouteConfiguration& route_config,
-                                               Server::Configuration::FactoryContext& context);
+  static Rds::RouteConfigProviderSharedPtr
+  routeConfigProviderFromProto(const ProxyConfig& config,
+                               Server::Configuration::FactoryContext& context,
+                               RouteConfigProviderManager& route_config_provider_manager);
 
   static std::vector<NamedFilterFactoryCb> filtersFactoryFromProto(
       const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
@@ -84,7 +91,7 @@ private:
 
   CodecFactoryPtr codec_factory_;
 
-  RouteMatcherPtr route_matcher_;
+  Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::vector<NamedFilterFactoryCb> factories_;
 };
@@ -192,6 +199,8 @@ public:
   void addEncoderFilter(ActiveEncoderFilterPtr filter) {
     encoder_filters_.emplace_back(std::move(filter));
   }
+
+  void initializeFilterChain(FilterChainFactory& factory);
 
   Envoy::Event::Dispatcher& dispatcher();
   const CodecFactory& downstreamCodec();
