@@ -302,6 +302,8 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
     ],
 )
 
