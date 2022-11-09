@@ -45,8 +45,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
-      time_source_(time_source),
-      override_host_status_(LoadBalancerContextBase::createOverrideHostStatus(common_config)) {
+      time_source_(time_source) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -75,9 +74,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) {
-        // Update cross priority host map.
-        cross_priority_host_map_ = original_priority_set_.crossPriorityHostMap();
-
         refreshSubsets(priority);
         purgeEmptySubsets(subsets_);
       });
@@ -170,11 +166,6 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr override_host = LoadBalancerContextBase::selectOverrideHost(
-      cross_priority_host_map_.get(), override_host_status_, context);
-  if (override_host != nullptr) {
-    return override_host;
-  }
   if (metadata_fallback_policy_ !=
       envoy::config::cluster::v3::
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {

@@ -15,6 +15,7 @@ Supported service discovery types
 
 Static
 ^^^^^^
+.. _extension_envoy.clusters.static:
 
 Static is the simplest service discovery type. The configuration explicitly specifies the resolved
 network name (IP address/port, unix domain socket, etc.) of each upstream host.
