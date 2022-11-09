@@ -55,6 +55,7 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/common/upstream/upstream_http_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -669,25 +670,6 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
-class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
-public:
-  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager, Stats::Scope& scope)
-      : server_context_(context), init_manager_(init_manager), scope_(scope) {}
-
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
-    return server_context_;
-  }
-
-  Init::Manager& initManager() override { return init_manager_; }
-  Stats::Scope& scope() override { return scope_; }
-
-private:
-  Server::Configuration::ServerFactoryContext& server_context_;
-  Init::Manager& init_manager_;
-  Stats::Scope& scope_;
-};
-
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -849,6 +831,7 @@ public:
   void createFilterChain(Http::FilterChainManager& manager) const override {
     Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
   }
+  int filterChainLength() const override { return http_filter_factories_.size(); }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     // Upgrade filter chains not yet supported for upstream filters.

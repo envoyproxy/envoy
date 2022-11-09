@@ -125,7 +125,13 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
       parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
       *parent_.cluster(), *this);
-  parent_.cluster()->createFilterChain(*filter_manager_);
+  if (parent_.cluster()->filterChainLength() <= 1 && parent_.config().filterChainLength() > 0) {
+    // The cluster has no filters on it besides the codec filter -- create filter
+    // chain from the Router filter config.
+    parent_.config().createFilterChain(*filter_manager_);
+  } else {
+    parent_.cluster()->createFilterChain(*filter_manager_);
+  }
   // The cluster will always create a codec filter, which sets the upstream
   // interface. Fast-fail any tests that don't set up mocks correctly.
   ASSERT(upstream_interface_.has_value());

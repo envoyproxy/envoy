@@ -71,6 +71,11 @@ public:
   virtual void createFilterChain(FilterChainManager& manager) const PURE;
 
   /**
+   * @return length of the filter chain created by createFilterChain.
+   */
+  virtual int filterChainLength() const PURE;
+
+  /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.

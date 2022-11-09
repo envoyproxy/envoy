@@ -208,6 +208,7 @@ public:
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
                FilterChainManager& manager),
               (const));
+  MOCK_METHOD(int, filterChainLength, (), (const, override));
 };
 
 class MockStreamFilterCallbacksBase {

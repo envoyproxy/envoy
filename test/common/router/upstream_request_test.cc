@@ -28,15 +28,6 @@ public:
     HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
     ON_CALL(router_filter_interface_, downstreamHeaders())
         .WillByDefault(Return(&downstream_request_header_map_));
-
-    ON_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
   }
 
   void initialize() {

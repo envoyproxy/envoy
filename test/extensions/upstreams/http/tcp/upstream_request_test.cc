@@ -38,14 +38,6 @@ public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
-    ON_CALL(*cm.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-        .WillByDefault(Invoke([&](Envoy::Http::FilterChainManager& manager) -> void {
-          Envoy::Http::FilterFactoryCb factory_cb =
-              [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
     cm.initializeThreadLocalClusters({"fake_cluster"});
     EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));

@@ -135,6 +135,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainManager& manager) const override;
+  int filterChainLength() const override { return filter_factories_.size(); }
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {

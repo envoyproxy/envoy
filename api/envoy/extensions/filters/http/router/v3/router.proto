@@ -91,11 +91,6 @@ message Router {
   // for more details.
   bool suppress_grpc_request_failure_code_stats = 7;
 
-  // [#not-implemented-hide:]
-  // .. warning::
-  //   Upstream HTTP filters are not supported by default.
-  //   This warning will be removed as support moves beyond alpha.
-  //
   // Optional HTTP filters for the upstream filter chain.
   //
   // These filters will be applied for all requests that pass through the router.
