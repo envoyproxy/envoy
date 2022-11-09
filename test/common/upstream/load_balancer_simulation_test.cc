@@ -107,7 +107,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 class DISABLED_SimulationTest : public testing::Test {
 public:
   DISABLED_SimulationTest()
-      : lb_stat_names_(stats_store_.symbolTable()), lb_stats_(lb_stat_names_, stats_store_) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -128,7 +128,7 @@ public:
            std::vector<uint32_t> healthy_destination_cluster) {
     local_priority_set_ = new PrioritySetImpl;
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(priority_set_, local_priority_set_, lb_stats_, runtime_, random_,
+    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_,
                           common_config_);
 
     HostsPerLocalitySharedPtr upstream_per_zone_hosts =
@@ -245,8 +245,8 @@ public:
   NiceMock<MockTimeSystem> time_source_;
   Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterLbStatNames lb_stat_names_;
-  ClusterLbStats lb_stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 

@@ -21,7 +21,7 @@ namespace Upstream {
 class LoadBalancerFuzzBase {
 public:
   LoadBalancerFuzzBase()
-      : lb_stat_names_(stats_store_.symbolTable()), lb_stats_(lb_stat_names_, stats_store_){};
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_){};
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
@@ -41,8 +41,8 @@ public:
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterLbStatNames lb_stat_names_;
-  ClusterLbStats lb_stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;
   NiceMock<MockPrioritySet> priority_set_;
