@@ -123,6 +123,14 @@ public:
       content_length_ = content_length;
       return result;
     }
+    ASSERT(!header_name.empty());
+    if (Http::HeaderUtility::isPseudoHeader(header_name) && saw_regular_headers_) {
+      // If any regular header appears before pseudo headers, the request or response is malformed.
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
+    if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+      saw_regular_headers_ = true;
+    }
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
 
@@ -179,6 +187,8 @@ protected:
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
   bool got_304_response_{false};
   bool sent_head_request_{false};
+  // True if a regular (non-pseudo) HTTP header has been seen before.
+  bool saw_regular_headers_{false};
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts
