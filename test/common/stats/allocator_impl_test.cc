@@ -429,7 +429,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
+      sink_predicates->add(stat_name);
       sinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
     } else {
       unsinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
@@ -444,7 +444,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
   alloc_.forEachSinkedCounter(
       [&num_sinked_counters](std::size_t size) { num_sinked_counters = size; },
       [&num_iterations, sink_predicates](Counter& counter) {
-        EXPECT_EQ(sink_predicates->sinkedStatNames().count(counter.statName()), 1);
+        EXPECT_TRUE(sink_predicates->has(counter.statName()));
         ++num_iterations;
       });
   EXPECT_EQ(num_sinked_counters, 3);
@@ -474,7 +474,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
     // sink every 5th stat
     if ((idx + 1) % 5 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
+      sink_predicates->add(stat_name);
       sinked_gauges.emplace_back(
           alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
     } else {
@@ -490,8 +490,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   size_t num_iterations = 0;
   alloc_.forEachSinkedGauge([&num_sinked_gauges](std::size_t size) { num_sinked_gauges = size; },
                             [&num_iterations, sink_predicates](Gauge& gauge) {
-                              EXPECT_EQ(sink_predicates->sinkedStatNames().count(gauge.statName()),
-                                        1);
+                              EXPECT_TRUE(sink_predicates->has(gauge.statName()));
                               ++num_iterations;
                             });
   EXPECT_EQ(num_sinked_gauges, 2);
@@ -520,7 +519,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
     // sink every 2nd stat
     if ((idx + 1) % 2 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
+      sink_predicates->add(stat_name);
       sinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
     } else {
       unsinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
@@ -535,7 +534,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   alloc_.forEachSinkedTextReadout(
       [&num_sinked_text_readouts](std::size_t size) { num_sinked_text_readouts = size; },
       [&num_iterations, sink_predicates](TextReadout& text_readout) {
-        EXPECT_EQ(sink_predicates->sinkedStatNames().count(text_readout.statName()), 1);
+        EXPECT_TRUE(sink_predicates->has(text_readout.statName()));
         ++num_iterations;
       });
   EXPECT_EQ(num_sinked_text_readouts, 5);

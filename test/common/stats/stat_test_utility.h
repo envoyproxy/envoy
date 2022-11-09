@@ -222,7 +222,10 @@ void serializeDeserializeString(absl::string_view in);
 class TestSinkPredicates : public SinkPredicates {
 public:
   ~TestSinkPredicates() override = default;
-  StatNameHashSet& sinkedStatNames() { return sinked_stat_names_; }
+
+  bool has(StatName name) { return sinked_stat_names_.find(name) != sinked_stat_names_.end(); }
+
+  void add(StatName name) { sinked_stat_names_.insert(name); }
 
   // SinkPredicates
   bool includeCounter(const Counter& counter) override {

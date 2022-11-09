@@ -214,6 +214,12 @@ public:
     }
   }
 
+  TestUtil::TestSinkPredicates& sinkPredicates() {
+    auto predicates = dynamic_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr());
+    ASSERT(predicates != nullptr);
+    return *predicates;
+  }
+
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -1969,6 +1975,7 @@ protected:
   void SetUp() override {
     HistogramTest::SetUp();
 
+    // Set the feature flag in SetUp as store_ is constructed in HistogramTest::SetUp.
     api_ = Api::createApiForTest(*store_);
     ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(
         GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
@@ -2004,7 +2011,7 @@ protected:
 TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
   StatNamePool pool(store_->symbolTable());
 
-  std::unique_ptr<TestUtil::TestSinkPredicates> sink_predicates =
+  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Histogram>> unsinked_histograms;
@@ -2016,7 +2023,7 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
     StatName stat_name = pool.add(name);
     //  sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
+      moved_sink_predicates->add(stat_name);
       sinked_histograms.emplace_back(
           store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
     } else {
@@ -2025,7 +2032,8 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
     }
   }
 
-  store_->setSinkPredicates(std::move(sink_predicates));
+  store_->setSinkPredicates(std::move(moved_sink_predicates));
+  auto& sink_predicates = sinkPredicates();
 
   // Create some histograms after setting the predicates.
   for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
@@ -2033,9 +2041,7 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
     StatName stat_name = pool.add(name);
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      static_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr())
-          ->sinkedStatNames()
-          .insert(stat_name);
+      sink_predicates.add(stat_name);
       sinked_histograms.emplace_back(
           store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
     } else {
@@ -2051,11 +2057,9 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
   size_t num_iterations = 0;
   store_->forEachSinkedHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations, sink_predicates = static_cast<TestUtil::TestSinkPredicates*>(
-                            store_->sinkPredicates().ptr())](ParentHistogram& histogram) {
+      [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
         if (GetParam() == EnableIncludeHistograms::Yes) {
-          EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
-                    sink_predicates->sinkedStatNames().end());
+          EXPECT_TRUE(sink_predicates.has(histogram.statName()));
         }
         ++num_iterations;
       });
@@ -2084,10 +2088,9 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
 TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
   StatNamePool pool(store_->symbolTable());
   store_->setSinkPredicates(std::make_unique<TestUtil::TestSinkPredicates>());
-  auto& sink_predicates =
-      static_cast<TestUtil::TestSinkPredicates&>(store_->sinkPredicates().ref());
+  auto& sink_predicates = sinkPredicates();
   StatName stat_name = pool.add("h1");
-  sink_predicates.sinkedStatNames().insert(stat_name);
+  sink_predicates.add(stat_name);
 
   auto& h1 = static_cast<ParentHistogramImpl&>(
       store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
@@ -2117,8 +2120,7 @@ TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
         [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
         [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
           if (GetParam() == EnableIncludeHistograms::Yes) {
-            EXPECT_NE(sink_predicates.sinkedStatNames().find(histogram.statName()),
-                      sink_predicates.sinkedStatNames().end());
+            EXPECT_TRUE(sink_predicates.has(histogram.statName()));
           }
           ++num_iterations;
         });
