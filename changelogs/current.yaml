@@ -2,6 +2,18 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: listener
+  change: |
+    Previously a listener update with different :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`, :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`,
+    :ref:`tcp_fast_open_queue_length <envoy_v3_api_field_config.listener.v3.Listener.tcp_fast_open_queue_length>` or :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` was ignored.
+    Now, when those fields are updated, a new socket will be created for
+    the listener and the new value of those fields applied to it. This only happens when :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` is true.
+    Otherwise if those fields change the update is rejected.
+    New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
+- area: listener
+  change: |
+    Previously a listener update with different :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` value will be ignored. Now,
+    this kind of update will be rejected. The runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
 - area: build
   change: |
     moved the strict_dns, original_dst, and logical_dns clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
