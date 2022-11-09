@@ -604,7 +604,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -636,7 +636,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -665,7 +665,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -692,7 +692,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -717,7 +717,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -747,7 +747,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -987,7 +987,7 @@ request_rules:
   // empty payload on the field
   const std::string value = "";
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -1015,7 +1015,7 @@ request_rules:
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
   const std::string value = std::string(length, 'x');
 
-  writeMessage(std::move(value));;
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
