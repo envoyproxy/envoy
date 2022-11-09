@@ -120,6 +120,18 @@ public:
         MapPair<std::string, Any>("envoy.filters.http.custom_response", cfg_any));
   }
 
+  void setLocalResponseFor5xx() {
+    auto& matcher = custom_response_filter_config_.mutable_custom_response_matcher()
+                        ->mutable_matcher_list()
+                        ->mutable_matchers()
+                        ->at(0);
+    matcher.mutable_predicate()
+        ->mutable_single_predicate()
+        ->mutable_value_match()
+        ->mutable_exact()
+        ->assign("5xx");
+  }
+
 protected:
   Http::TestResponseHeaderMapImpl unauthorized_response_{{":status", "401"},
                                                          {"content-length", "0"}};
@@ -324,6 +336,71 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   // Verify we don't get a modified status value.
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that we do intercept local replies sent during decode with the local
+// response policy.
+TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyBeforeCERLocalReplyPolicy) {
+  // Add filter that sends local reply after.
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+
+  setLocalResponseFor5xx();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // Verify we do get a modified status value.
+  EXPECT_EQ("499", response->headers().getStatusValue());
+  EXPECT_EQ("not allowed", response->body());
+}
+
+// Verify that we do intercept local replies sent during decode with the local
+// response policy.
+TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyAfterCERLocalReplyPolicy) {
+  // Add filter that sends local reply after.
+  filters_after_cer_.emplace_back(R"EOF(
+name: local-reply-during-decode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+
+  setLocalResponseFor5xx();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // Verify we do get a modified status value.
+  EXPECT_EQ("499", response->headers().getStatusValue());
+  EXPECT_EQ("not allowed", response->body());
+}
+
+// Verify that we can NOT intercept local replies sent during encode
+TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyBeforeCERLocalReplyPolicy) {
+  // Add filter that sends local reply after.
+  filters_before_cer_.emplace_back(R"EOF(
+name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+
+  setLocalResponseFor5xx();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("some.route");
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
+  // Verify we don't get the modified status value.
   EXPECT_EQ("500", response->headers().getStatusValue());
 }
 
