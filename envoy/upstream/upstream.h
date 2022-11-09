@@ -567,11 +567,8 @@ public:
 /**
  * All cluster config update related stats.
  * See https://github.com/envoyproxy/envoy/issues/23575 for details. Stats from ClusterInfo::stats()
- * will be split into subgroups "config-update", "lb", "endpoint" and "upstream", roughly based on
- * their semantics. This list of stats are separated from Cluster::stats() since they are "config
- * pipeline related".
- *
- * Each group of
+ * will be split into subgroups "config-update", "lb", "endpoint" and "the rest"(which are mainly
+ * upstream related), roughly based on their semantics.
  */
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
@@ -1032,22 +1029,22 @@ public:
   virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
-   * @return ClusterConfigUpdateStats& strongly named config update stats for this cluster.
+   * @return ClusterConfigUpdateStats& config update stats for this cluster.
    */
   virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
-  
+
   /**
-   * @return ClusterLbStats& strongly named stats for this cluster.
+   * @return ClusterLbStats& load-balancer-related stats for this cluster.
    */
   virtual ClusterLbStats& lbStats() const PURE;
 
   /**
-   * @return ClusterEndpointStats& strongly named stats for this cluster.
+   * @return ClusterEndpointStats& endpoint related stats for this cluster.
    */
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterStats& strongly named stats for this cluster.
+   * @return ClusterStats& all other stats for this cluster.
    */
   virtual ClusterStats& stats() const PURE;
 
@@ -1058,7 +1055,7 @@ public:
   virtual Stats::Scope& statsScope() const PURE;
 
   /**
-   * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
+   * @return ClusterLoadReportStats& load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
