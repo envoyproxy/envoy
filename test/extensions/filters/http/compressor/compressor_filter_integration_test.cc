@@ -2,6 +2,8 @@
 
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#include "google/protobuf/any.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -9,6 +11,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using Envoy::ProtobufWkt::Any;
+using Envoy::Protobuf::MapPair;
 
 class CompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Event::SimulatedTimeSystem,
@@ -390,4 +395,28 @@ TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
                                                       {"content-type", "application/json"}});
 }
 
+TEST_P(CompressorIntegrationTest, PerRoute) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/nocompress");
+    envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+    per_route.mutable_response_compression_enabled()->set_value(false);
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(per_route));
+    route->mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+  });
+  initializeFilter(default_config);
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                         {":path", "/nocompress"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"accept-encoding", "deflate, gzip"}},
+                          Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                          {"content-length", "40"},
+                                                          {"content-type", "text/xml"}});
+}
+
 } // namespace Envoy
+
