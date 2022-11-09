@@ -44,7 +44,7 @@ public:
   }
 
   void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DiscoveryResponse&,
-                               const Config::ProcessingDetails& process_details) override {
+                                const Config::ProcessingDetails& process_details) override {
     countState(process_details.state_);
     if (process_details.state_ == Config::ProcessingState::FAILED) {
       ErrorMessage = process_details.error_detail_.message();
@@ -52,7 +52,7 @@ public:
   }
 
   void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
-                               const Config::ProcessingDetails& process_details) override {
+                                const Config::ProcessingDetails& process_details) override {
     countState(process_details.state_);
     if (process_details.state_ == Config::ProcessingState::FAILED) {
       ErrorMessage = process_details.error_detail_.message();

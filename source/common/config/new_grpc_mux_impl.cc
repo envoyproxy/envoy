@@ -94,7 +94,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   // Processing point when DeltaDiscoveryResponse is received.
   if (xds_config_tracker_.has_value()) {
     xds_config_tracker_->onConfigReceivedOrFailed(*message,
-                                                 ProcessingDetails(ProcessingState::RECEIVED));
+                                                  ProcessingDetails(ProcessingState::RECEIVED));
   }
 
   auto sub = subscriptions_.find(message->type_url());
