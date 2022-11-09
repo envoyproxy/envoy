@@ -85,6 +85,9 @@ private:
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  // True if a :path header has been seen before.
+  bool saw_path_{false};
 };
 
 } // namespace Quic

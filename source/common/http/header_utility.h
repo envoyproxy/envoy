@@ -305,6 +305,11 @@ public:
    */
   static std::string addEncodingToAcceptEncoding(absl::string_view accept_encoding_header,
                                                  absl::string_view encoding);
+
+  /**
+   * Return true if the given header name is a pseudo header.
+   */
+  static bool isPseudoHeader(absl::string_view header_name);
 };
 
 } // namespace Http
