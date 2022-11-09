@@ -19,7 +19,7 @@ namespace RegexMutation {
 using ProtoHeaderMutations =
     Protobuf::RepeatedPtrField<envoy::config::common::mutation_rules::v3::HeaderMutation>;
 
-class RegexMutation : public Envoy::Http::HeaderMutation {
+class RegexMutation : public Envoy::Http::EarlyHeaderMutation {
 public:
   struct HeaderMutation {
     const Envoy::Http::LowerCaseString header_;

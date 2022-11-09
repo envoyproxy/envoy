@@ -14,9 +14,9 @@ namespace Http {
 /**
  * Interface class for early header mutation extensions.
  */
-class HeaderMutation {
+class EarlyHeaderMutation {
 public:
-  virtual ~HeaderMutation() = default;
+  virtual ~EarlyHeaderMutation() = default;
 
   /**
    * Mutate the request headers at very early.
@@ -28,7 +28,7 @@ public:
   virtual bool mutate(RequestHeaderMap& headers) const PURE;
 };
 
-using HeaderMutationPtr = std::unique_ptr<HeaderMutation>;
+using EarlyHeaderMutationPtr = std::unique_ptr<EarlyHeaderMutation>;
 
 /*
  * A factory for creating early header mutation extensions.
@@ -43,8 +43,9 @@ public:
    * @param config supplies the configuration for the early mutation extension.
    * @return EarlyHeaderMutationPtr the extension instance.
    */
-  virtual HeaderMutationPtr createExtension(const Protobuf::Message& config,
-                                            Server::Configuration::FactoryContext& context) PURE;
+  virtual EarlyHeaderMutationPtr
+  createExtension(const Protobuf::Message& config,
+                  Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.early_header_mutation"; }
 };

@@ -10,7 +10,7 @@ namespace Http {
 namespace EarlyHeaderMutation {
 namespace RegexMutation {
 
-Envoy::Http::HeaderMutationPtr
+Envoy::Http::EarlyHeaderMutationPtr
 Factory::createExtension(const Protobuf::Message& message,
                          Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
@@ -22,12 +22,6 @@ Factory::createExtension(const Protobuf::Message& message,
 }
 
 REGISTER_FACTORY(Factory, Envoy::Http::EarlyHeaderMutationFactory);
-
-} // namespace RegexMutation
-} // namespace EarlyHeaderMutation
-} // namespace Http
-} // namespace Extensions
-} // namespace Envoy
 
 } // namespace RegexMutation
 } // namespace EarlyHeaderMutation

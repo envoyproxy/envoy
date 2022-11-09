@@ -14,7 +14,7 @@ class Factory : public Envoy::Http::EarlyHeaderMutationFactory {
 public:
   std::string name() const override { return "envoy.http.early_header_mutation.regex_mutation"; }
 
-  Envoy::Http::HeaderMutationPtr
+  Envoy::Http::EarlyHeaderMutationPtr
   createExtension(const Protobuf::Message& config,
                   Server::Configuration::FactoryContext& context) override;
 
