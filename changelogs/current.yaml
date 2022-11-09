@@ -5,6 +5,9 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, and logical_dns clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: build
+  change: |
+    removed the cares and apple resolvers as required extensions. Envoy now only creates DNS resolvers when necessary (e.g. for logical DNS cluster) so does not require cares to always be included. If your Envoys do DNS resolution and you override extensions_build_config you will need to include cares explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
