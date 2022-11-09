@@ -95,6 +95,11 @@ envoy.clusters.redis:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.clusters.logical_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.compression.brotli.compressor:
   categories:
   - envoy.compression.compressor

@@ -145,7 +145,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
     return response_flags_ != 0;
   }));
-  ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
+  ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
+    return response_flags_;
+  }));
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
