@@ -110,9 +110,10 @@ void KeyValueStoreBase::addOrUpdate(absl::string_view key_view, absl::string_vie
   // Attempt to insert the entry into the store. If it already exists, remove
   // the old entry and insert the new one so it will be in the proper place in
   // the linked list.
-  if (!store_.emplace(key, std::pair(value, absolute_ttl)).second) {
+  ValueWithTtl value_with_ttl(value, absolute_ttl);
+  if (!store_.emplace(key, value_with_ttl).second) {
     store_.erase(key);
-    store_.emplace(key, std::pair(value, absolute_ttl));
+    store_.emplace(key, value_with_ttl);
     ttl_manager_.clear(key);
   }
   if (ttl) {
@@ -151,7 +152,7 @@ absl::optional<absl::string_view> KeyValueStoreBase::get(absl::string_view key) 
   if (it == store_.end()) {
     return {};
   }
-  return it->second.first;
+  return it->second.value_;
 }
 
 void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
@@ -159,7 +160,7 @@ void KeyValueStoreBase::iterate(ConstIterateCb cb) const {
   absl::Cleanup restore_under_iterate = [this] { under_iterate_ = false; };
 
   for (const auto& [key, value] : store_) {
-    Iterate ret = cb(key, value.first);
+    Iterate ret = cb(key, value.value_);
     if (ret == Iterate::Break) {
       return;
     }
