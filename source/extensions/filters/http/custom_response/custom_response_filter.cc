@@ -19,8 +19,8 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
   // expectation is that if a custom response policy recreates the stream, it
   // adds itself to the filter state. In that case do not look for
   // route-specific config, as this is not the original request from downstream.
-  // Note that the original request headermap is NOT carried over to the
-  // redirected response. The redirected request headermap does NOT participate
+  // Note that the original request header map is NOT carried over to the
+  // redirected response. The redirected request header map does NOT participate
   // in the custom response framework.
   auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");

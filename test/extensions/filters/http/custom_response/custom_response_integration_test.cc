@@ -75,8 +75,8 @@ public:
           hcm.mutable_http_filters()->SwapElements(0, 1);
           int cer_position = 0;
 
-          // If a test point populates filter configs in filters_before_cer_ add
-          // them to the http filter chain config here.
+          // If a test point populates filter configs to be added before the
+          // custom response filter, add them to the http filter chain config here.
           for (const auto& config : filters_before_cer_) {
             auto* filter = hcm.mutable_http_filters()->Add();
             TestUtility::loadFromYaml(config, *filter);
@@ -88,8 +88,8 @@ public:
                                                      cer_position);
             cer_position = hcm.mutable_http_filters()->size() - 2;
           }
-          // If a test point populates filter configs in filters_after_cer_ add
-          // them to the http filter chain config here.
+          // If a test point populates filter configs to be added after the
+          // custom response filter, add them to the http filter chain config here.
           for (const auto& config : filters_after_cer_) {
             auto* filter = hcm.mutable_http_filters()->Add();
             TestUtility::loadFromYaml(config, *filter);
