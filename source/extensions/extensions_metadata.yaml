@@ -100,6 +100,11 @@ envoy.clusters.original_dst:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.clusters.eds:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.clusters.redis:
   categories:
   - envoy.clusters

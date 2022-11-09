@@ -1,4 +1,4 @@
-#include "source/common/upstream/leds.h"
+#include "source/extensions/clusters/eds/leds.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
