@@ -52,6 +52,8 @@ public:
             envoy::config::core::v3::HttpProtocolOptions::ALLOW)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
+    EXPECT_CALL(stream_decoder_, streamInfoSharedPtr());
+    EXPECT_CALL(stream_decoder_, accessLogHandlers());
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -102,7 +104,7 @@ public:
   size_t receiveRequest(const std::string& payload, bool fin,
                         size_t decoder_buffer_high_watermark) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
           EXPECT_EQ(host_, headers->getHostValue());
           EXPECT_EQ("/", headers->getPathValue());
           EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
@@ -126,7 +128,7 @@ public:
 
   size_t receiveRequestHeaders(bool end_stream) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, end_stream))
-        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
           EXPECT_EQ(host_, headers->getHostValue());
           EXPECT_EQ("/", headers->getPathValue());
           EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
@@ -193,7 +195,7 @@ protected:
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
@@ -454,8 +456,9 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   std::string payload(1024, 'a');
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke(
-          [this](const Http::RequestHeaderMapPtr&, bool) { quic_stream_->readDisable(true); }));
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
+        quic_stream_->readDisable(true);
+      }));
   EXPECT_CALL(stream_decoder_, decodeData(_, _));
   std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
                                   bodyToHttp3StreamPayload(payload));
