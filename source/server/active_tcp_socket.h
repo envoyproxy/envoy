@@ -84,6 +84,7 @@ public:
 
   // Network::ListenerFilterCallbacks
   Network::ConnectionSocket& socket() override { return *socket_.get(); }
+  Event::Dispatcher& dispatcher() override;
   void continueFilterChain(bool success) override;
 
   void startFilterChain() { continueFilterChain(true); }

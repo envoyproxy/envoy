@@ -307,6 +307,11 @@ public:
   virtual StreamInfo::FilterState& filterState() PURE;
 
   /**
+   * @return the Dispatcher for issuing events.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
    * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
    * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
    * should be called if the filter returned `FilterStatus::StopIteration` and closed
