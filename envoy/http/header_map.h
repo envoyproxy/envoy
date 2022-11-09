@@ -205,7 +205,8 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
-  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)
+  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)                                                       \
+  HEADER_FUNC(ForwardedPort)
 
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \
@@ -249,8 +250,7 @@ private:
 
 #define INLINE_REQ_RESP_NUMERIC_HEADERS(HEADER_FUNC)                                               \
   HEADER_FUNC(ContentLength)                                                                       \
-  HEADER_FUNC(EnvoyAttemptCount)                                                                   \
-  HEADER_FUNC(ForwardedPort)
+  HEADER_FUNC(EnvoyAttemptCount)
 
 #define INLINE_REQ_RESP_HEADERS(HEADER_FUNC)                                                       \
   INLINE_REQ_RESP_STRING_HEADERS(HEADER_FUNC)                                                      \
