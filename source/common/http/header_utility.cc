@@ -601,5 +601,9 @@ std::string HeaderUtility::addEncodingToAcceptEncoding(absl::string_view accept_
   return absl::StrJoin(newContentEncodings, ",");
 }
 
+bool HeaderUtility::isPseudoHeader(absl::string_view header_name) {
+  return !header_name.empty() && header_name[0] == ':';
+}
+
 } // namespace Http
 } // namespace Envoy
