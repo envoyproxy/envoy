@@ -53,14 +53,14 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      stat_names_(stats_store_.symbolTable()),
+      upstream_stat_names_(stats_store_.symbolTable()),
       config_update_stats_names_(stats_store_.symbolTable()),
       lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),
       cluster_load_report_stat_names_(stats_store_.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
-      stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
+      upstream_stats_(stats_store_, upstream_stat_names_),
       config_update_stats_(config_update_stats_names_, stats_store_),
       lb_stats_(lb_stat_names_, stats_store_), endpoint_stats_(endpoint_stat_names_, stats_store_),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
@@ -98,7 +98,7 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
-  ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, upstreamStats()).WillByDefault(ReturnRef(upstream_stats_));
   ON_CALL(*this, lbStats()).WillByDefault(ReturnRef(lb_stats_));
   ON_CALL(*this, configUpdateStats()).WillByDefault(ReturnRef(config_update_stats_));
   ON_CALL(*this, endpointStats()).WillByDefault(ReturnRef(endpoint_stats_));

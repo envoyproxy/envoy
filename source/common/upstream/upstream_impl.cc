@@ -833,9 +833,9 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
-                                            const ClusterStatNames& stat_names) {
-  return ClusterStats(stat_names, scope);
+LazyInitStats<ClusterUpstreamStats>
+ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterUpstreamStatNames& stat_names) {
+  return {scope, stat_names};
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -978,7 +978,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      upstream_stats_(
+          generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
@@ -2059,21 +2060,21 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
                              Network::ConnectionEvent event) {
-  host->cluster().stats().upstream_cx_destroy_.inc();
+  host->cluster().upstreamStats()->upstream_cx_destroy_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
-    host->cluster().stats().upstream_cx_destroy_remote_.inc();
+    host->cluster().upstreamStats()->upstream_cx_destroy_remote_.inc();
   } else {
-    host->cluster().stats().upstream_cx_destroy_local_.inc();
+    host->cluster().upstreamStats()->upstream_cx_destroy_local_.inc();
   }
 }
 
 void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event) {
-  host->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+  host->cluster().upstreamStats()->upstream_cx_destroy_with_active_rq_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
-    host->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
+    host->cluster().upstreamStats()->upstream_cx_destroy_remote_with_active_rq_.inc();
   } else {
-    host->cluster().stats().upstream_cx_destroy_local_with_active_rq_.inc();
+    host->cluster().upstreamStats()->upstream_cx_destroy_local_with_active_rq_.inc();
   }
 }
 
