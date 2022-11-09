@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
 
     # CodeQL runs on ubuntu-latest and windows-latest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
 
     steps:
     - name: Checkout repository
