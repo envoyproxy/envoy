@@ -174,6 +174,7 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 template <typename StatsStructType> struct LazyInitStats {
   LazyInitStats(Stats::Scope& scope, const typename StatsStructType::StatNameType& stat_names)
       : scope_(scope), ctor_([&scope, &stat_names]() -> StatsStructType* {
+          ENVOY_LOG_MISC(error, "DDDD begin to create stats now...");
           return new StatsStructType(stat_names, scope);
         }) {}
 

@@ -1030,7 +1030,8 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
 }
 
 void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
-  onPerTryTimeoutCommon(upstream_request, cluster_->upstreamStats()->upstream_rq_per_try_idle_timeout_,
+  onPerTryTimeoutCommon(upstream_request,
+                        cluster_->upstreamStats()->upstream_rq_per_try_idle_timeout_,
                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryIdleTimeout);
 }
 

@@ -195,6 +195,23 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  // With https://github.com/envoyproxy/envoy/pull/23921 all the
+  // upstream_xxxx are lazy-inited.
+  // We need to trigger an inc on the ClusterInfo::upstreamStats() to create the upstream stats.
+  absl::Notification n;
+  test_server_->server().dispatcher().post([&]() {
+    auto _ = *test_server_->server()
+                  .clusterManager()
+                  .clusters()
+                  .getCluster("cluster_1")
+                  ->get()
+                  .info()
+                  ->upstreamStats();
+    (void)_;
+    n.Notify();
+  });
+  n.WaitForNotification();
+
   test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
   Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.

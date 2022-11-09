@@ -1035,7 +1035,7 @@ public:
    * @return ClusterConfigUpdateStats& strongly named config update stats for this cluster.
    */
   virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
-  
+
   /**
    * @return ClusterLbStats& strongly named stats for this cluster.
    */
