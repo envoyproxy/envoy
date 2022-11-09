@@ -26,6 +26,7 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/custom_response/policies:redirect_policy_lib",
         "//test/integration/filters:common_lib",
         "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
     ],
 )
 
@@ -94,6 +95,7 @@ envoy_extension_cc_test(
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

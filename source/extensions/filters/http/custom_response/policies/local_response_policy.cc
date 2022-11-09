@@ -34,6 +34,8 @@ LocalResponsePolicy::LocalResponsePolicy(
   header_parser_ = Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
 }
 
+// TODO(pradeepcrao): investigate if this code can be made common with
+// Envoy::LocalReply::BodyFormatter for consistent behavior.
 void LocalResponsePolicy::formatBody(const Http::RequestHeaderMap& request_headers,
                                      const Http::ResponseHeaderMap& response_headers,
                                      const StreamInfo::StreamInfo& stream_info,

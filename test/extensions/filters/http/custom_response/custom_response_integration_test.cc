@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
@@ -20,6 +21,9 @@ namespace CustomResponse {
 using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
+using LocalResponsePolicyProto =
+    envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy;
+using RedirectPolicyProto = envoy::extensions::filters::http::custom_response::v3::RedirectPolicy;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
@@ -64,39 +68,38 @@ public:
           header_value_option->mutable_header()->set_value("direct-response-enabled");
           header_value_option->mutable_header()->set_key("x-direct-response-header");
 
-          if (!custom_response_filter_config_.empty()) {
-            auto* filter = hcm.mutable_http_filters()->Add();
-            filter->set_name("envoy.filters.http.custom_response");
-            const auto default_configuration =
-                TestUtility::parseYaml<CustomResponse>(custom_response_filter_config_);
-            filter->mutable_typed_config()->PackFrom(default_configuration);
-            hcm.mutable_http_filters()->SwapElements(0, 1);
-            int cer_position = 0;
+          auto* filter = hcm.mutable_http_filters()->Add();
+          filter->set_name("envoy.filters.http.custom_response");
+          filter->mutable_typed_config()->PackFrom(custom_response_filter_config_);
+          hcm.mutable_http_filters()->SwapElements(0, 1);
+          int cer_position = 0;
 
-            for (const auto& config : filters_before_cer_) {
-              auto* filter = hcm.mutable_http_filters()->Add();
-              TestUtility::loadFromYaml(config, *filter);
-              // swap with router filter
-              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
-                                                       hcm.mutable_http_filters()->size() - 1);
-              // swap with custom response filter
-              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
-                                                       cer_position);
-              cer_position = hcm.mutable_http_filters()->size() - 2;
-            }
-            for (const auto& config : filters_after_cer_) {
-              auto* filter = hcm.mutable_http_filters()->Add();
-              TestUtility::loadFromYaml(config, *filter);
-              // swap with router filter
-              hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
-                                                       hcm.mutable_http_filters()->size() - 1);
-            }
+          for (const auto& config : filters_before_cer_) {
+            auto* filter = hcm.mutable_http_filters()->Add();
+            TestUtility::loadFromYaml(config, *filter);
+            // swap with router filter
+            hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                     hcm.mutable_http_filters()->size() - 1);
+            // swap with custom response filter
+            hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                     cer_position);
+            cer_position = hcm.mutable_http_filters()->size() - 2;
+          }
+          for (const auto& config : filters_after_cer_) {
+            auto* filter = hcm.mutable_http_filters()->Add();
+            TestUtility::loadFromYaml(config, *filter);
+            // swap with router filter
+            hcm.mutable_http_filters()->SwapElements(hcm.mutable_http_filters()->size() - 2,
+                                                     hcm.mutable_http_filters()->size() - 1);
           }
         });
     HttpProtocolIntegrationTest::initialize();
   }
 
-  CustomResponseIntegrationTest() : custom_response_filter_config_{kDefaultConfig} {}
+  CustomResponseIntegrationTest() {
+    custom_response_filter_config_ =
+        TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
+  }
 
   void setPerRouteConfig(Route* route, const CustomResponse& cfg) {
     Any cfg_any;
@@ -122,7 +125,7 @@ protected:
                                                          {"content-length", "0"}};
 
   Envoy::Http::LowerCaseString test_header_key_{kTestHeaderKey};
-  std::string custom_response_filter_config_;
+  CustomResponse custom_response_filter_config_;
   std::vector<std::string> filters_before_cer_;
   std::vector<std::string> filters_after_cer_;
 };
@@ -175,8 +178,9 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
 // Verify we get the original response if the route is not found for the
 // specified custom response.
 TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
-  // Modify custom response route so there is no matching route entry
-  custom_response_filter_config_.replace(custom_response_filter_config_.find("foo."), 4, "fo1.");
+  modifyPolicy<RedirectPolicyProto>(
+      custom_response_filter_config_, "gateway_error_action",
+      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -193,15 +197,17 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
 
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
-
   // Add per route filter config
   auto some_other_host = config_helper_.createVirtualHost("some.other.host");
-  std::string per_route_config(kDefaultConfig);
-  per_route_config.replace(per_route_config.find("299"), 3, "291");
-  per_route_config.replace(per_route_config.find("x-bar2"), 6, "y-foo2");
+  auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
+  modifyPolicy<RedirectPolicyProto>(
+      per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
+        policy.mutable_status_code()->set_value(291);
+        policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
+            "y-foo2");
+      });
 
-  setPerRouteConfig(some_other_host.mutable_routes(0),
-                    TestUtility::parseYaml<CustomResponse>(std::string(per_route_config)));
+  setPerRouteConfig(some_other_host.mutable_routes(0), per_route_config);
   config_helper_.addVirtualHost(some_other_host);
 
   initialize();
@@ -232,18 +238,21 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
 // Verify that we don't pick a route specific config in the absence of an hcm
 // config
 TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
-
   // Don't create custom response filter for the hcm.
-  custom_response_filter_config_.clear();
+  custom_response_filter_config_.clear_custom_response_matcher();
 
   // Add per route filter config
   auto some_other_host = config_helper_.createVirtualHost("some.other.host");
-  std::string per_route_config(kDefaultConfig);
-  per_route_config.replace(per_route_config.find("299"), 3, "291");
-  per_route_config.replace(per_route_config.find("x-bar2"), 6, "y-foo2");
+  // std::string per_route_config(kDefaultConfig);
+  auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
+  modifyPolicy<RedirectPolicyProto>(
+      per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
+        policy.mutable_status_code()->set_value(291);
+        policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
+            "y-foo2");
+      });
 
-  setPerRouteConfig(some_other_host.mutable_routes(0),
-                    TestUtility::parseYaml<CustomResponse>(per_route_config));
+  setPerRouteConfig(some_other_host.mutable_routes(0), per_route_config);
   config_helper_.addVirtualHost(some_other_host);
 
   initialize();
@@ -262,7 +271,6 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
 // already been redirected by the custom response filter.
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, NoRecursion) {
-
   // Make the remote response for gateway_error policy return 401
   auto fo1 = config_helper_.createVirtualHost("fo1.example");
   fo1.mutable_routes(0)->set_name("fo1");
@@ -270,7 +278,9 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   fo1.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_string("fo1");
   fo1.mutable_routes(0)->mutable_match()->set_prefix("/");
   config_helper_.addVirtualHost(fo1);
-  custom_response_filter_config_.replace(custom_response_filter_config_.find("foo."), 4, "fo1.");
+  modifyPolicy<RedirectPolicyProto>(
+      custom_response_filter_config_, "gateway_error_action",
+      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -295,10 +305,11 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
 // Verify that we can NOT intercept local replies sent during decode
 TEST_P(CustomResponseIntegrationTest, DecodeLocalReplyBeforeCER) {
-
   // Add filter that sends local reply after.
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
   initialize();
 
@@ -313,10 +324,11 @@ name: local-reply-during-decode
 
 // Verify that we can NOT intercept local replies sent during encode
 TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyBeforeCER) {
-
   // Add filter that sends local reply after.
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
   initialize();
 
@@ -329,10 +341,11 @@ name: local-reply-during-encode
 
 // Verify that we can NOT intercept local replies sent during encode
 TEST_P(CustomResponseIntegrationTest, EncodeLocalReplyAfterCER) {
-
   // Add filter that sends local reply after.
   filters_after_cer_.emplace_back(R"EOF(
 name: local-reply-during-encode
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
   initialize();
 
@@ -348,10 +361,11 @@ name: local-reply-during-encode
 // TODO(pradeepcrao): Make this work by modifying the interaction between
 // sendLocalReply and recreateStream
 TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyBeforeRedirectedCER) {
-
   // Add filter that sends local reply before.
   filters_before_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode-if-not-cer
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
   SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
@@ -368,10 +382,11 @@ name: local-reply-during-decode-if-not-cer
 }
 
 TEST_P(CustomResponseIntegrationTest, RouteSpecificDecodeLocalReplyAfterRedirectedCER) {
-
   // Add filter that sends local reply after.
   filters_after_cer_.emplace_back(R"EOF(
 name: local-reply-during-decode-if-not-cer
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
   SimpleFilterConfig<LocalReplyDuringDecodeIfNotCER> factory;
   Envoy::Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
@@ -390,7 +405,6 @@ name: local-reply-during-decode-if-not-cer
 // Verify that the route meant for custom response redirection can be routed to with the required
 // header.
 TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
-
   // Add route with header matcher
   auto some_other_host = config_helper_.createVirtualHost("some.other.host");
   some_other_host.mutable_routes(0)->mutable_match()->set_prefix("/");
@@ -424,12 +438,14 @@ TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
 
 // Test ModifyRequestHeadersAction
 TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
-  // Uncomment the config related to modify_request_headers_action
-  auto pos = custom_response_filter_config_.find("##");
-  while (pos != std::string::npos) {
-    custom_response_filter_config_.replace(pos, 2, "  ");
-    pos = custom_response_filter_config_.find("##");
-  }
+  // Add modify_request_headers_action to the config.
+  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "520_action",
+                                    [](RedirectPolicyProto& policy) {
+                                      auto action = policy.mutable_modify_request_headers_action();
+                                      action->set_name("modify-request-headers-action");
+                                      action->mutable_typed_config()->mutable_type_url()->assign(
+                                          "type.googleapis.com/google.protobuf.Struct");
+                                    });
 
   TestModifyRequestHeadersActionFactory factory;
   Envoy::Registry::InjectFactory<ModifyRequestHeadersActionFactory> registration(factory);

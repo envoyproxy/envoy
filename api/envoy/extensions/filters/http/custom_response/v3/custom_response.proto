@@ -23,8 +23,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // policies in a matcher tree. The configuration can be defined at the filter,
 // virtual host or route level. The most specific configuration will apply.
 message CustomResponse {
-  // [#next-free-field: 2]
-
   // Matcher to match against the original response.
   // Example:
   //
@@ -97,7 +95,7 @@ message CustomResponse {
   //
   // -- attention::
   //  The first matched policy wins. Once the response is matched, matcher
-  //  evaluations ends.
+  //  evaluations end.
   //
   // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
   // documentation for more information on the matcher trees.

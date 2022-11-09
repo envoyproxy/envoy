@@ -18,6 +18,7 @@ namespace CustomResponse {
 
 class CustomResponseFilter;
 
+// Base class for custom response policies.
 class Policy : public std::enable_shared_from_this<Policy>, public StreamInfo::FilterState::Object {
 
 public:
@@ -42,6 +43,7 @@ struct CustomResponseActionFactoryContext {
   Stats::StatName stats_prefix_;
 };
 
+// Base class for action factories for custom response policies.
 template <typename PolicyConfig>
 class PolicyMatchActionFactory : public Matcher::ActionFactory<CustomResponseActionFactoryContext>,
                                  Logger::Loggable<Logger::Id::config> {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
+#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -31,7 +33,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               exact: "4xx"
         on_match:
           action:
-            name: action
+            name: 4xx_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
               status_code: 499
@@ -72,7 +74,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                   exact: "504"
         on_match:
           action:
-            name: action
+            name: gateway_error_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
               status_code: 299
@@ -92,7 +94,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               exact: "500"
         on_match:
           action:
-            name: action
+            name: 500_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
               status_code: 292
@@ -116,7 +118,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               exact: "520"
         on_match:
           action:
-            name: action
+            name: 520_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
               host: "https://global/storage"
@@ -125,11 +127,42 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               - header:
                   key: "foo3"
                   value: "x-bar3"
-##            modify_request_headers_action:
-##              name: modify-request-headers-action
-##              typed_config:
-##                "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
+
+template <typename Policy> inline const char* getTypeUrlHelper();
+template <typename Policy> struct Traits {
+  using ModifyPolicyFn = std::function<void(Policy&)>;
+  static const char* getTypeUrl() { return getTypeUrlHelper<Policy>(); }
+};
+template <>
+inline const char*
+getTypeUrlHelper<envoy::extensions::filters::http::custom_response::v3::RedirectPolicy>() {
+  return "type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy";
+}
+
+template <>
+inline const char*
+getTypeUrlHelper<envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy>() {
+  return "type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy";
+}
+
+template <typename Policy>
+void modifyPolicy(
+    envoy::extensions::filters::http::custom_response::v3::CustomResponse& custom_response,
+    absl::string_view name, typename Traits<Policy>::ModifyPolicyFn function) {
+  for (auto& matcher : *custom_response.mutable_custom_response_matcher()
+                            ->mutable_matcher_list()
+                            ->mutable_matchers()) {
+    auto& action = *matcher.mutable_on_match()->mutable_action();
+    if (action.typed_config().type_url() == Traits<Policy>::getTypeUrl() && action.name() == name) {
+      auto& any = *action.mutable_typed_config();
+      Policy policy;
+      any.UnpackTo(&policy);
+      function(policy);
+      any.PackFrom(policy);
+    }
+  }
+}
 
 // Simulate filters that send local reply during either encode or decode based
 // on route specific config.

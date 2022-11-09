@@ -77,8 +77,7 @@ public:
                Envoy::Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override {
-    return "envoy.extensions.http.filters.custom_response.redirect_policy."
-           "modify_request_headers_action";
+    return "envoy.filters.http.custom_response.redirect_policy.modify_request_headers_action";
   }
 };
 
