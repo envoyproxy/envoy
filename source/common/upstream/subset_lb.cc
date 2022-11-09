@@ -23,7 +23,7 @@ using HostPredicate = std::function<bool(const Host&)>;
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterLbStats& lb_stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
@@ -37,7 +37,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
       least_request_config_(least_request_config), common_config_(common_config),
-      stats_(lb_stats), scope_(scope), runtime_(runtime), random_(random),
+      stats_(stats), scope_(scope), runtime_(runtime), random_(random),
       fallback_policy_(subsets.fallbackPolicy()),
       metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),

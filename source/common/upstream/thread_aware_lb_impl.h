@@ -107,11 +107,11 @@ public:
 
 protected:
   ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(lb_stats, random)) {}
+      : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
+        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 private:
   struct PerPriorityState {
@@ -121,8 +121,8 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random)
-        : stats_(lb_stats), random_(random) {}
+    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
+        : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -146,8 +146,8 @@ private:
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random)
-        : stats_(lb_stats), random_(random) {}
+    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
+        : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
