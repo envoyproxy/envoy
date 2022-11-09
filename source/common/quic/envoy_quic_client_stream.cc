@@ -43,21 +43,22 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
-  auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
+  spdy::Http2HeaderBlock spdy_headers;
   if (headers.Method()) {
     if (headers.Method()->value() == "CONNECT") {
-      // It is a bytestream connect and should have :path and :protocol set accordingly
-      // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-      // if shifting codecs. For now, default to "/" - this can be made
-      // configurable if necessary.
-      // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-      spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
+      Http::RequestHeaderMapPtr modified_headers =
+          Http::createHeaderMap<Http::RequestHeaderMapImpl>(headers);
+      modified_headers->setProtocol(Http::Headers::get().ProtocolValues.Bytestream);
       if (!headers.Path()) {
-        spdy_headers[":path"] = "/";
+        modified_headers->setPath("/");
       }
+      spdy_headers = envoyHeadersToSpdyHeaderBlock(*modified_headers);
     } else if (headers.Method()->value() == "HEAD") {
       sent_head_request_ = true;
     }
+  }
+  if (spdy_headers.empty()) {
+    spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
   }
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
@@ -161,7 +162,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
-
+  saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::ResponseHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
