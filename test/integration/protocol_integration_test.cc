@@ -4165,4 +4165,32 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":a", "evil.com"},
+                                     {":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  ASSERT_TRUE(response->waitForReset());
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+#else
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr((downstreamProtocol() == Http::CodecType::HTTP2 &&
+                         GetParam().http2_implementation == Http2Impl::Oghttp2)
+                            ? "violation"
+                            : "invalid"));
+#endif
+}
+
 } // namespace Envoy
