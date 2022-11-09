@@ -161,6 +161,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+  saw_regular_headers_ = false;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
@@ -399,6 +400,22 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
       stats_.requests_rejected_with_underscores_in_headers_);
   if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     details_ = Http3ResponseCodeDetailValues::invalid_underscore;
+    return result;
+  }
+  ASSERT(!header_name.empty());
+  if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+    return result;
+  }
+  static const absl::flat_hash_set<std::string> known_pseudo_headers{":authority", ":protocol",
+                                                                     ":path", ":method", ":scheme"};
+  if (header_name == ":path") {
+    if (saw_path_) {
+      // According to RFC9114, :path header should only have one value.
+      return Http::HeaderUtility::HeaderValidationResult::REJECT;
+    }
+    saw_path_ = true;
+  } else if (!known_pseudo_headers.contains(header_name)) {
+    return Http::HeaderUtility::HeaderValidationResult::REJECT;
   }
   return result;
 }

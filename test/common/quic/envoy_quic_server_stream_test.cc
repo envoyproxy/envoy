@@ -657,5 +657,36 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
+TEST_F(EnvoyQuicServerStreamTest, RegularHeaderBeforePseudoHeader) {
+  spdy::Http2HeaderBlock spdy_headers;
+  spdy_headers["foo"] = "bar";
+  spdy_headers[":authority"] = host_;
+  spdy_headers[":method"] = "GET";
+  spdy_headers[":path"] = "/";
+  spdy_headers[":scheme"] = "https";
+  std::string payload = spdyHeaderToHttp3StreamPayload(spdy_headers);
+  quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  quic_stream_->OnStreamFrame(frame);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
+  quic::QuicHeaderList header_list;
+  header_list.OnHeaderBlockStart();
+  header_list.OnHeader(":authority", "www.google.com:4433");
+  header_list.OnHeader(":method", "GET");
+  header_list.OnHeader(":scheme", "https");
+  header_list.OnHeader(":path", "/");
+  header_list.OnHeader(":path", "/");
+  header_list.OnHeaderBlockEnd(0, 0);
+
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::ProtocolError, _));
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  quic_stream_->OnStreamHeaderList(true, 0, header_list);
+}
+
 } // namespace Quic
 } // namespace Envoy
