@@ -31,29 +31,36 @@ RedirectPolicy::RedirectPolicy(
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
       stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),
-      path_(config.path()) {
-
+      path_(config.path()), status_code_{config.has_status_code()
+                                             ? absl::optional<Http::Code>(static_cast<Http::Code>(
+                                                   config.status_code().value()))
+                                             : absl::optional<Http::Code>{}},
+      response_header_parser_(
+          Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
+      request_header_parser_(
+          Envoy::Router::HeaderParser::configure(config.request_headers_to_add())),
+      modify_request_headers_action_(createModifyRequestHeadersAction(config, context)) {
   Http::Utility::Url absolute_url;
   std::string uri(absl::StrCat(host_, path_));
   if (!absolute_url.initialize(uri, false)) {
     throw EnvoyException(
         absl::StrCat("Invalid uri specified for redirection for custom response: ", uri));
   }
+}
 
-  if (config.has_status_code()) {
-    status_code_ = static_cast<Http::Code>(config.status_code().value());
-  }
-  response_header_parser_ =
-      Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
-  request_header_parser_ = Envoy::Router::HeaderParser::configure(config.request_headers_to_add());
+std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestHeadersAction(
+    const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+    Envoy::Server::Configuration::ServerFactoryContext& context) {
+  std::unique_ptr<ModifyRequestHeadersAction> action;
   if (config.has_modify_request_headers_action()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<ModifyRequestHeadersActionFactory>(
         config.modify_request_headers_action());
     auto action_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         config.modify_request_headers_action().typed_config(), context.messageValidationVisitor(),
         factory);
-    modify_request_headers_action_ = factory.createAction(*action_config, context);
+    action = factory.createAction(*action_config, context);
   }
+  return action;
 }
 
 Http::FilterHeadersStatus

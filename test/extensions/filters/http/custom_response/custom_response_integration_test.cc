@@ -39,9 +39,13 @@ public:
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
 
+    // Add a virtual host for the original request.
     auto some_route = config_helper_.createVirtualHost("some.route");
     config_helper_.addVirtualHost(some_route);
 
+    // Add a virtual host corresponding to redirected route for
+    // gateway_error_action in kDefaultConfig. Note that the redirect policy
+    // overwrites the response code specified here.
     auto foo = config_helper_.createVirtualHost("foo.example");
     foo.mutable_routes(0)->set_name("foo");
     foo.mutable_routes(0)->mutable_direct_response()->set_status(221);
@@ -53,27 +57,26 @@ public:
         [this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
           // adding direct response mode to the default route
           auto* default_route =
               hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+          // Restrict default route [*] to paths with /default
           default_route->mutable_match()->set_prefix("/default");
           default_route->mutable_direct_response()->set_status(static_cast<uint32_t>(201));
           // Use inline bytes rather than a filename to avoid using a path that may look illegal
           // to Envoy.
           default_route->mutable_direct_response()->mutable_body()->set_inline_bytes(
               "Response body");
-          // adding headers to the default route
-          auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
-          header_value_option->mutable_header()->set_value("direct-response-enabled");
-          header_value_option->mutable_header()->set_key("x-direct-response-header");
 
+          // Add the custom response filter to the http filter chain.
           auto* filter = hcm.mutable_http_filters()->Add();
           filter->set_name("envoy.filters.http.custom_response");
           filter->mutable_typed_config()->PackFrom(custom_response_filter_config_);
           hcm.mutable_http_filters()->SwapElements(0, 1);
           int cer_position = 0;
 
+          // If a test point populates filter configs in filters_before_cer_ add
+          // them to the http filter chain config here.
           for (const auto& config : filters_before_cer_) {
             auto* filter = hcm.mutable_http_filters()->Add();
             TestUtility::loadFromYaml(config, *filter);
@@ -85,6 +88,8 @@ public:
                                                      cer_position);
             cer_position = hcm.mutable_http_filters()->size() - 2;
           }
+          // If a test point populates filter configs in filters_after_cer_ add
+          // them to the http filter chain config here.
           for (const auto& config : filters_after_cer_) {
             auto* filter = hcm.mutable_http_filters()->Add();
             TestUtility::loadFromYaml(config, *filter);
@@ -197,7 +202,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
 
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
-  // Add per route filter config
+  // Add per route filter config to a new virtual host.
   auto some_other_host = config_helper_.createVirtualHost("some.other.host");
   auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
   modifyPolicy<RedirectPolicyProto>(

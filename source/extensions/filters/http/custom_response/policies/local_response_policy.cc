@@ -19,20 +19,17 @@ namespace CustomResponse {
 LocalResponsePolicy::LocalResponsePolicy(
     const envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy& config,
     Server::Configuration::CommonFactoryContext& context)
-    : formatter_(config.has_body_format()
+    : local_body_{config.has_body() ? absl::optional<std::string>(Config::DataSource::read(
+                                          config.body(), true, context.api()))
+                                    : absl::optional<std::string>{}},
+      formatter_(config.has_body_format()
                      ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                            config.body_format(), context)
-                     : nullptr) {
-  // TODO: is true right here?
-  if (config.has_body()) {
-    local_body_.emplace(Config::DataSource::read(config.body(), true, context.api()));
-  }
-
-  if (config.has_status_code()) {
-    status_code_ = static_cast<Http::Code>(config.status_code().value());
-  }
-  header_parser_ = Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
-}
+                     : nullptr),
+      status_code_{config.has_status_code() ? absl::optional<Http::Code>(static_cast<Http::Code>(
+                                                  config.status_code().value()))
+                                            : absl::optional<Http::Code>{}},
+      header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
 
 // TODO(pradeepcrao): investigate if this code can be made common with
 // Envoy::LocalReply::BodyFormatter for consistent behavior.
@@ -40,7 +37,6 @@ void LocalResponsePolicy::formatBody(const Http::RequestHeaderMap& request_heade
                                      const Http::ResponseHeaderMap& response_headers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      std::string& body) const {
-
   if (local_body_.has_value()) {
     body = local_body_.value();
   }
@@ -61,10 +57,10 @@ LocalResponsePolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   // Handle local body
   std::string body;
   Http::Code code = getStatusCodeForLocalReply(headers);
-  if (encoder_callbacks->streamInfo().getRequestHeaders() != nullptr) {
-    formatBody(*encoder_callbacks->streamInfo().getRequestHeaders(), headers,
-               encoder_callbacks->streamInfo(), body);
-  }
+  formatBody(encoder_callbacks->streamInfo().getRequestHeaders() == nullptr
+                 ? *Http::StaticEmptyHeaders::get().request_headers
+                 : *encoder_callbacks->streamInfo().getRequestHeaders(),
+             headers, encoder_callbacks->streamInfo(), body);
 
   const auto mutate_headers = [this, encoder_callbacks](Http::ResponseHeaderMap& headers) {
     header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());

@@ -32,13 +32,13 @@ private:
                   const StreamInfo::StreamInfo& stream_info, std::string& body) const;
 
   // Body read from local data source.
-  absl::optional<std::string> local_body_;
+  const absl::optional<std::string> local_body_;
 
   // body format
   const Formatter::FormatterPtr formatter_;
 
-  absl::optional<Http::Code> status_code_;
-  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  const absl::optional<Http::Code> status_code_;
+  const std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 };
 } // namespace CustomResponse
 } // namespace HttpFilters

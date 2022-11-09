@@ -47,17 +47,21 @@ public:
   const std::string& path() const { return path_; }
 
 private:
-  CustomResponseRedirectStatNames stat_names_;
-  CustomResponseRedirectStats stats_;
+  std::unique_ptr<ModifyRequestHeadersAction> createModifyRequestHeadersAction(
+      const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+      Envoy::Server::Configuration::ServerFactoryContext& context);
+
+  const CustomResponseRedirectStatNames stat_names_;
+  const CustomResponseRedirectStats stats_;
 
   // Remote source the request should be redirected to.
   const std::string host_;
   const std::string path_;
 
-  absl::optional<Http::Code> status_code_;
-  std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
-  std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;
-  std::unique_ptr<ModifyRequestHeadersAction> modify_request_headers_action_;
+  const absl::optional<Http::Code> status_code_;
+  const std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
+  const std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;
+  const std::unique_ptr<ModifyRequestHeadersAction> modify_request_headers_action_;
 };
 
 class ModifyRequestHeadersAction {

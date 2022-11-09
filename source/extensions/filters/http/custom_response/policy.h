@@ -20,7 +20,6 @@ class CustomResponseFilter;
 
 // Base class for custom response policies.
 class Policy : public std::enable_shared_from_this<Policy>, public StreamInfo::FilterState::Object {
-
 public:
   ~Policy() override = default;
 

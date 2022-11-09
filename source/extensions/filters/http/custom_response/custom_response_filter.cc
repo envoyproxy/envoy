@@ -15,6 +15,13 @@ namespace CustomResponse {
 
 Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeaderMap& header_map,
                                                               bool) {
+  // Check filter state for the existence of a custom response policy. The
+  // expectation is that if a custom response policy recreates the stream, it
+  // adds itself to the filter state. In that case do not look for
+  // route-specific config, as this is not the original request from downstream.
+  // Note that the original request headermap is NOT carried over to the
+  // redirected response. The redirected request headermap does NOT participate
+  // in the custom response framework.
   auto filter_state = encoder_callbacks_->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");
   if (!filter_state) {
@@ -38,6 +45,7 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return filter_state->encodeHeaders(headers, end_stream, *this);
   }
 
+  // Check if any custom response policy applies to this response.
   auto policy = config_to_use_->getPolicy(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
@@ -45,6 +53,7 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
+  // Apply the custom response policy.
   return policy->encodeHeaders(headers, end_stream, *this);
 }
 

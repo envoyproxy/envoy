@@ -27,6 +27,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
+  // TODO(pradeepcrao): Add the ability to specify the full uri, or just host or
+  // path rewrite for the redirection in the same vein as
+  // config.route.v3.RedirectAction
   // The host that will serve the custom response.
   //
   // Example:
