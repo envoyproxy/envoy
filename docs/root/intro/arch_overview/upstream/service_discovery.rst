@@ -51,6 +51,7 @@ controls the refresh frequency during failures, and, if not configured, the DNS 
 DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
 
 .. _arch_overview_service_discovery_types_logical_dns:
+.. _extension_envoy.clusters.logical_dns:
 
 Logical DNS
 ^^^^^^^^^^^
