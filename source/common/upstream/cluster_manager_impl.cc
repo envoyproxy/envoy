@@ -1724,8 +1724,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
-  auto corss_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(corss_priority_host_map.get(),
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
                                                             override_host_statuses_, context);
   if (host != nullptr) {
     return host;
@@ -1735,8 +1735,8 @@ HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
     LoadBalancerContext* context) {
-  auto corss_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(corss_priority_host_map.get(),
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
                                                             override_host_statuses_, context);
   if (host != nullptr) {
     return host;
