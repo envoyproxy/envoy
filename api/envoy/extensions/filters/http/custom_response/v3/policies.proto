@@ -65,7 +65,7 @@ message RedirectPolicy {
 
   // Custom action to modify request headers before selection of the
   // redirected route.
-  // [#extension-category: envoy.filters.http.custom_response.redirect_policy.modify_request_headers_action]
+  // TODO(pradeepcrao) add an extension category.
   config.core.v3.TypedExtensionConfig modify_request_headers_action = 6;
 }
 

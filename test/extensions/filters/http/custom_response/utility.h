@@ -129,11 +129,14 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
                   value: "x-bar3"
   )EOF";
 
+// Helper methods and classes to modify the custom response config for tests.
 template <typename Policy> inline const char* getTypeUrlHelper();
+
 template <typename Policy> struct Traits {
   using ModifyPolicyFn = std::function<void(Policy&)>;
   static const char* getTypeUrl() { return getTypeUrlHelper<Policy>(); }
 };
+
 template <>
 inline const char*
 getTypeUrlHelper<envoy::extensions::filters::http::custom_response::v3::RedirectPolicy>() {
