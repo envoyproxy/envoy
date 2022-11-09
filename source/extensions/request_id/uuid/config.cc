@@ -29,8 +29,16 @@ void UUIDRequestIDExtension::setInResponse(Http::ResponseHeaderMap& response_hea
   }
 }
 
+absl::optional<absl::string_view>
+UUIDRequestIDExtension::get(const Http::RequestHeaderMap& request_headers) const {
+  if (request_headers.RequestId() == nullptr) {
+    return absl::nullopt;
+  }
+  return request_headers.getRequestIdValue();
+}
+
 absl::optional<uint64_t>
-UUIDRequestIDExtension::toInteger(const Http::RequestHeaderMap& request_headers) const {
+UUIDRequestIDExtension::getInteger(const Http::RequestHeaderMap& request_headers) const {
   if (request_headers.RequestId() == nullptr) {
     return absl::nullopt;
   }
@@ -97,15 +105,6 @@ void UUIDRequestIDExtension::setTraceReason(Http::RequestHeaderMap& request_head
     break;
   }
   request_headers.setRequestId(uuid);
-}
-
-void UUIDRequestIDExtension::setToStreamInfo(const Http::RequestHeaderMap& request_headers,
-                                             StreamInfo::StreamInfo& stream_info) const {
-  if (request_headers.RequestId() == nullptr) {
-    return;
-  }
-  stream_info.setStreamIdProvider(
-      std::make_shared<StreamInfo::StreamIdProviderImpl>(request_headers.getRequestIdValue()));
 }
 
 REGISTER_FACTORY(UUIDRequestIDExtensionFactory, Server::Configuration::RequestIDExtensionFactory);

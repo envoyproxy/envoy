@@ -21,9 +21,9 @@ public:
   virtual ~StreamIdProvider() = default;
 
   /**
-   * @return the string view of the stream id.
+   * @return the optional string view of the stream id.
    */
-  virtual absl::string_view toStringView() const PURE;
+  virtual absl::optional<absl::string_view> toStringView() const PURE;
 
   /**
    * @return the optional integer view of the stream id.

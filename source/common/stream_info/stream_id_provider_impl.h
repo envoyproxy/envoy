@@ -5,14 +5,17 @@
 namespace Envoy {
 namespace StreamInfo {
 
-// TODO(wbpcode): This is super simple implementation. Could we
-// make this a non-virtual simple struct in the future?
+// Simple implementation of StreamIdProvider that returns the unique
+// stream ID.
 class StreamIdProviderImpl : public StreamIdProvider {
 public:
-  StreamIdProviderImpl(absl::string_view id) : id_(id) {}
+  StreamIdProviderImpl(std::string&& id) : id_(std::move(id)) {}
 
   // StreamInfo::StreamIdProvider
-  absl::string_view toStringView() const override { return id_; }
+  absl::optional<absl::string_view> toStringView() const override {
+    return absl::make_optional<absl::string_view>(id_);
+  }
+
   // This is only supported for UUID format ids.
   absl::optional<uint64_t> toInteger() const override;
 

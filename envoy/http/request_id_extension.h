@@ -5,7 +5,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
@@ -17,6 +16,23 @@ namespace Http {
 class RequestIDExtension {
 public:
   virtual ~RequestIDExtension() = default;
+
+  /**
+   *  Get the request ID from the request headers.
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return the integer or nullopt if the request ID is invalid.
+   */
+  virtual absl::optional<absl::string_view>
+  get(const Http::RequestHeaderMap& request_headers) const PURE;
+
+  /**
+   * Get and convert the request ID to a 64-bit integer representation for using in modulo, etc.
+   * calculations.
+   * @param request_headers supplies the incoming request headers for retrieving the request ID.
+   * @return the integer or nullopt if the request ID is invalid.
+   */
+  virtual absl::optional<uint64_t>
+  getInteger(const Http::RequestHeaderMap& request_headers) const PURE;
 
   /**
    * Directly set a request ID into the provided request headers. Override any previous request ID
@@ -53,23 +69,6 @@ public:
    * @return whether to use request_id based sampling policy or not.
    */
   virtual bool useRequestIdForTraceSampling() const PURE;
-
-  /**
-   * Convert the request ID to a 64-bit integer representation for using in modulo, etc.
-   * calculations.
-   * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @return the integer or nullopt if the request ID is invalid.
-   */
-  virtual absl::optional<uint64_t>
-  toInteger(const Http::RequestHeaderMap& request_headers) const PURE;
-
-  /**
-   * Get the request ID from the request headers and set it to the stream info.
-   * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @param stream_info supplies the stream info for setting the request ID.
-   */
-  virtual void setToStreamInfo(const Http::RequestHeaderMap& request_headers,
-                               StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;

@@ -316,7 +316,7 @@ TEST_F(StreamInfoImplTest, StreamIdProvider) {
 
   EXPECT_EQ(true, stream_info.getStreamIdProvider().has_value());
   EXPECT_EQ("a121e9e1-feae-4136-9e0e-6fac343d56c9",
-            stream_info.getStreamIdProvider().value().get().toStringView());
+            stream_info.getStreamIdProvider().value().get().toStringView().value());
   EXPECT_EQ(true, stream_info.getStreamIdProvider().value().get().toInteger().has_value());
 }
 
