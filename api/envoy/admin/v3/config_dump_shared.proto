@@ -407,6 +407,6 @@ message EcdsConfigDump {
     ClientResourceStatus client_status = 5;
   }
 
-  // The  ECDS filter configs.
+  // The ECDS filter configs.
   repeated EcdsFilterConfig ecds_filters = 1;
 }
