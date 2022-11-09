@@ -223,7 +223,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
   // Processing point when DiscoveryResponse is received.
   if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onResponseReceiveOrFail(*message,
+    xds_config_tracker_->onConfigReceivedOrFailed(*message,
                                                  ProcessingDetails(ProcessingState::RECEIVED));
   }
 
@@ -312,7 +312,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Processing point when there is any exception during the parse and ingestion process.
     if (xds_config_tracker_.has_value()) {
-      xds_config_tracker_->onResponseReceiveOrFail(
+      xds_config_tracker_->onConfigReceivedOrFailed(
           *message, ProcessingDetails(ProcessingState::FAILED, *error_detail));
     }
   }

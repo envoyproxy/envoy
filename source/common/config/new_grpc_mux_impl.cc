@@ -93,7 +93,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 
   // Processing point when DeltaDiscoveryResponse is received.
   if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onResponseReceiveOrFail(*message,
+    xds_config_tracker_->onConfigReceivedOrFailed(*message,
                                                  ProcessingDetails(ProcessingState::RECEIVED));
   }
 
@@ -121,7 +121,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   // Processing point to record error if there is any failure after the response is processed.
   if (xds_config_tracker_.has_value() &&
       ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    xds_config_tracker_->onResponseReceiveOrFail(
+    xds_config_tracker_->onConfigReceivedOrFailed(
         *message, ProcessingDetails(ProcessingState::FAILED, ack.error_detail_));
   }
   kickOffAck(ack);
