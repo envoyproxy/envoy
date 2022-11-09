@@ -634,5 +634,9 @@ bool HeaderUtility::isExtendedH2ConnectRequest(const Http::RequestHeaderMap& hea
          !headers.getProtocolValue().empty();
 }
 
+bool HeaderUtility::isPseudoHeader(absl::string_view header_name) {
+  return !header_name.empty() && header_name[0] == ':';
+}
+
 } // namespace Http
 } // namespace Envoy
