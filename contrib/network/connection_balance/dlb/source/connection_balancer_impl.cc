@@ -50,7 +50,7 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
 
-  retry_times = dlb_config.retry_times();
+  most_send_retries = dlb_config.most_send_retries();
 
   dlb_resources_t rsrcs;
   if (dlb_open(device_id, &dlb) == -1) {
@@ -250,7 +250,7 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
   int ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
   if (ret != 1) {
     uint i = 0;
-    while (i < DlbConnectionBalanceFactorySingleton::get().retry_times) {
+    while (i < DlbConnectionBalanceFactorySingleton::get().most_send_retries) {
       ENVOY_LOG(debug, "{} dlb_send fail, start retry, errono: {}", name_, errno);
       ret = dlb_send(DlbConnectionBalanceFactorySingleton::get().tx_ports[index_], 1, &events[0]);
       if (ret == 1) {
@@ -262,7 +262,7 @@ void DlbBalancedConnectionHandlerImpl::post(Network::ConnectionSocketPtr&& socke
 
     if (ret != 1) {
       ENVOY_LOG(error, "{} dlb_send fail with {} times retry, errono: {}, message: {}", name_,
-                DlbConnectionBalanceFactorySingleton::get().retry_times, errno,
+                DlbConnectionBalanceFactorySingleton::get().most_send_retries, errno,
                 errorDetails(errno));
     }
   } else {

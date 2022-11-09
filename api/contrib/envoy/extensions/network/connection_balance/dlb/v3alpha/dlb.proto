@@ -33,5 +33,5 @@ message Dlb {
 
   // Control how many times Envoy makes an attempt to send event to DLB hardware.
   // No retry as default.
-  uint32 retry_times = 2;
+  uint32 most_send_retries = 2;
 }
