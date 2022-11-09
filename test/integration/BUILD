@@ -296,6 +296,7 @@ envoy_cc_test_binary(
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
     ],
 )
@@ -874,6 +875,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",

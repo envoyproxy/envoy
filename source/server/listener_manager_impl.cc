@@ -423,6 +423,30 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   return false;
 }
 
+void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
+                                                        const ListenerImpl& existing_listener) {
+  bool same_socket_options = true;
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
+    if (new_listener.reusePort() != existing_listener.reusePort()) {
+      throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
+                                       new_listener.name()));
+    }
+
+    same_socket_options = existing_listener.socketOptionsEqual(new_listener);
+    if (!same_socket_options && new_listener.reusePort() == false) {
+      throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
+                                       "when the reuse port isn't enabled",
+                                       new_listener.name()));
+    }
+  }
+
+  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+    setNewOrDrainingSocketFactory(new_listener.name(), new_listener);
+  } else {
+    new_listener.cloneSocketFactoryFrom(existing_listener);
+  }
+}
+
 bool ListenerManagerImpl::addOrUpdateListenerInternal(
     const envoy::config::listener::v3::Listener& config, const std::string& version_info,
     bool added_via_api, const std::string& name) {
@@ -482,23 +506,15 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
-    // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, *new_listener);
-    } else {
-      new_listener->cloneSocketFactoryFrom(**existing_warming_listener);
-    }
+    setupSocketFactoryForListener(*new_listener, **existing_warming_listener);
+    // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
+    setupSocketFactoryForListener(*new_listener, **existing_active_listener);
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, *new_listener);
-    } else {
-      new_listener->cloneSocketFactoryFrom(**existing_active_listener);
-    }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));

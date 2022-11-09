@@ -35,6 +35,7 @@
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
@@ -538,6 +539,9 @@ private:
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
                                                      LoadBalancerContext* context, bool peek);
 
+      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
+      HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
+
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
       // LB factory if applicable. Not all load balancer types have a factory. LB types that have
@@ -551,6 +555,17 @@ private:
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
+
+      // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value
+      // of Host::Health. The specific correspondence is shown below:
+      //
+      // * 0b001: Host::Health::Unhealthy
+      // * 0b010: Host::Health::Degraded
+      // * 0b100: Host::Health::Healthy
+      //
+      // If multiple bit fields are set, it is acceptable as long as the status of override host is
+      // in any of these statuses.
+      const HostUtility::HostStatusSet override_host_statuses_{};
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
