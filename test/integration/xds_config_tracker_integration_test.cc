@@ -43,7 +43,7 @@ public:
     ++IngestedCount;
   }
 
-  void onResponseReceiveOrFail(const envoy::service::discovery::v3::DiscoveryResponse&,
+  void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DiscoveryResponse&,
                                const Config::ProcessingDetails& process_details) override {
     countState(process_details.state_);
     if (process_details.state_ == Config::ProcessingState::FAILED) {
@@ -51,7 +51,7 @@ public:
     }
   }
 
-  void onResponseReceiveOrFail(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
+  void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
                                const Config::ProcessingDetails& process_details) override {
     countState(process_details.state_);
     if (process_details.state_ == Config::ProcessingState::FAILED) {

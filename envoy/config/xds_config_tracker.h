@@ -69,26 +69,26 @@ public:
                    const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 
   /**
-   * Invoked when received or failed to process the DiscoveryResponse.
+   * Invoked when received or failed to decode and apply the xds configs in the response.
    * The ProcessingState can be RECIEVED or FALIED.
    *
    * @param message The SotW discovery response message body.
    * @param details The process state and error details.
    */
   virtual void
-  onResponseReceiveOrFail(const envoy::service::discovery::v3::DiscoveryResponse& message,
-                          const ProcessingDetails& details) PURE;
+  onConfigReceivedOrFailed(const envoy::service::discovery::v3::DiscoveryResponse& message,
+                           const ProcessingDetails& details) PURE;
 
   /**
-   * Invoked when received or failed to process the DeltaDiscoveryResponse.
+   * Invoked when received or failed to decode and apply the xds configs in the response.
    * The ProcessingState can be RECIEVED or FALIED.
    *
    * @param message The Delta discovery response message body.
    * @param details The process state and error details.
    */
   virtual void
-  onResponseReceiveOrFail(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
-                          const ProcessingDetails& details) PURE;
+  onConfigReceivedOrFailed(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message,
+                           const ProcessingDetails& details) PURE;
 };
 
 using XdsConfigTrackerPtr = std::unique_ptr<XdsConfigTracker>;
