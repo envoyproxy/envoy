@@ -184,6 +184,10 @@ bug_fixes:
   change: |
     stop forwarding ``:method`` value which is not a valid token defined in https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2.
     Also, reject ``:method`` and ``:scheme`` headers with multiple values.
+- area: http3
+  change: |
+    reject pseudo headers violating RFC 9114. Specifically, pseudo-header fields with more than one value for the ``:method``
+    (non-``CONNECT``), ``:scheme``, and ``:path``; or pseudo-header fields after regular header fields; or undefined pseudo-headers.
 
 removed_config_or_runtime:
 - area: config

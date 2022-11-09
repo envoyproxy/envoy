@@ -326,6 +326,11 @@ public:
    * according to https://datatracker.ietf.org/doc/html/rfc8441#section-4
    */
   static bool isExtendedH2ConnectRequest(const Http::RequestHeaderMap& headers);
+
+  /**
+   * Return true if the given header name is a pseudo header.
+   */
+  static bool isPseudoHeader(absl::string_view header_name);
 };
 
 } // namespace Http
