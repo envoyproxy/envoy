@@ -46,11 +46,11 @@ DlbConnectionBalanceFactory::createConnectionBalancerFromProto(
     ENVOY_LOG(warn, "dlb device {} is not found, use dlb device {} instead", config_id, device_id);
   }
 
-  retry_times = dlb_config.retry_times();
-
 #ifdef DLB_DISABLED
   throw EnvoyException("X86_64 architecture is required for Dlb.");
 #else
+
+  retry_times = dlb_config.retry_times();
 
   dlb_resources_t rsrcs;
   if (dlb_open(device_id, &dlb) == -1) {
