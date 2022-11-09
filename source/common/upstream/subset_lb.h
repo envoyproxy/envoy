@@ -365,7 +365,7 @@ private:
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
-  ClusterLbStats& lb_stats_;
+  ClusterLbStats& stats_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;

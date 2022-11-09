@@ -122,7 +122,7 @@ private:
 
   struct LoadBalancerImpl : public LoadBalancer {
     LoadBalancerImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random)
-        : lb_stats_(lb_stats), random_(random) {}
+        : stats_(lb_stats), random_(random) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -138,7 +138,7 @@ private:
       return {};
     }
 
-    ClusterLbStats& lb_stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
@@ -147,14 +147,14 @@ private:
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
     LoadBalancerFactoryImpl(ClusterLbStats& lb_stats, Random::RandomGenerator& random)
-        : lb_stats_(lb_stats), random_(random) {}
+        : stats_(lb_stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
     // Ignore the params for the thread-aware LB.
     LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
 
-    ClusterLbStats& lb_stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
