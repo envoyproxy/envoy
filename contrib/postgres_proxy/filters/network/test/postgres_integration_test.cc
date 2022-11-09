@@ -226,12 +226,12 @@ public:
   common_tls_context:
     validation_context:
       trusted_ca:
-        filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcacert.pem"
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/clientcert.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/config/integration/certs/clientkey.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/upstreamkey.pem"
 )EOF";
 
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), downstream_tls_context);
