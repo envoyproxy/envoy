@@ -283,6 +283,7 @@ envoy_cc_test_library(
         "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/server:worker_factory_mocks",
         "//test/mocks/server:worker_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -368,6 +369,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -422,6 +424,7 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
@@ -503,6 +506,7 @@ envoy_cc_benchmark_binary(
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],
