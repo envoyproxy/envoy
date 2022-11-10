@@ -225,6 +225,8 @@ public:
 
   bool has(StatName name) { return sinked_stat_names_.find(name) != sinked_stat_names_.end(); }
 
+  // Note: The backing store for the StatName needs to live longer than the
+  // TestSinkPredicates object.
   void add(StatName name) { sinked_stat_names_.insert(name); }
 
   // SinkPredicates

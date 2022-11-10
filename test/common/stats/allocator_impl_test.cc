@@ -20,7 +20,7 @@ namespace {
 
 class AllocatorImplTest : public testing::Test {
 protected:
-  AllocatorImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
+  AllocatorImplTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
   ~AllocatorImplTest() override { clearStorage(); }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
@@ -40,8 +40,10 @@ protected:
   }
 
   SymbolTableImpl symbol_table_;
-  AllocatorImpl alloc_;
+  // Decleare the pool before the allocator because the allocator could contain
+  // a TestSinkPredicates object whose lifetime should be bounded by that of the pool.
   StatNamePool pool_;
+  AllocatorImpl alloc_;
   bool are_stats_marked_for_deletion_ = false;
 };
 

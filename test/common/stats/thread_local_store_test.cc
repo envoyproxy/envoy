@@ -125,7 +125,7 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(symbol_table_) {}
+  HistogramTest() : pool_(symbol_table_), alloc_(symbol_table_) {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc_);
@@ -214,7 +214,7 @@ public:
     }
   }
 
-  TestUtil::TestSinkPredicates& sinkPredicates() {
+  TestUtil::TestSinkPredicates& testSinkPredicatesOrDie() {
     auto predicates = dynamic_cast<TestUtil::TestSinkPredicates*>(store_->sinkPredicates().ptr());
     ASSERT(predicates != nullptr);
     return *predicates;
@@ -223,6 +223,7 @@ public:
   SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  StatNamePool pool_;
   AllocatorImpl alloc_;
   MockSink sink_;
   ThreadLocalStoreImplPtr store_;
@@ -2009,9 +2010,7 @@ protected:
 };
 
 TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
-  StatNamePool pool(store_->symbolTable());
-
-  std::unique_ptr<TestUtil::TestSinkPredicates> moved_sink_predicates =
+  std::unique_ptr<TestUtil::TestSinkPredicates> test_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Histogram>> unsinked_histograms;
@@ -2020,10 +2019,10 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
   // Create some histograms before setting the predicates.
   for (size_t idx = 0; idx < num_stats / 2; ++idx) {
     auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
+    StatName stat_name = pool_.add(name);
     //  sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      moved_sink_predicates->add(stat_name);
+      test_sink_predicates->add(stat_name);
       sinked_histograms.emplace_back(
           store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
     } else {
@@ -2032,13 +2031,13 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
     }
   }
 
-  store_->setSinkPredicates(std::move(moved_sink_predicates));
-  auto& sink_predicates = sinkPredicates();
+  store_->setSinkPredicates(std::move(test_sink_predicates));
+  auto& sink_predicates = testSinkPredicatesOrDie();
 
   // Create some histograms after setting the predicates.
   for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
     auto name = absl::StrCat("histogram.", idx);
-    StatName stat_name = pool.add(name);
+    StatName stat_name = pool_.add(name);
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
       sink_predicates.add(stat_name);
@@ -2086,15 +2085,14 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
 // Verify that histograms that are not flushed to sinks are merged in the call
 // to mergeHistograms
 TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
-  StatNamePool pool(store_->symbolTable());
   store_->setSinkPredicates(std::make_unique<TestUtil::TestSinkPredicates>());
-  auto& sink_predicates = sinkPredicates();
-  StatName stat_name = pool.add("h1");
+  auto& sink_predicates = testSinkPredicatesOrDie();
+  StatName stat_name = pool_.add("h1");
   sink_predicates.add(stat_name);
 
   auto& h1 = static_cast<ParentHistogramImpl&>(
       store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
-  stat_name = pool.add("h2");
+  stat_name = pool_.add("h2");
   auto& h2 = static_cast<ParentHistogramImpl&>(
       store_->histogramFromStatName(stat_name, Histogram::Unit::Unspecified));
 
