@@ -704,7 +704,7 @@ public:
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterTrafficStats generateStats(Stats::Scope& scope,
-                                           const ClusterStatNames& cluster_stat_names);
+                                           const ClusterTrafficStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats

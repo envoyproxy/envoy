@@ -833,7 +833,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 }
 
 ClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
-                                                   const ClusterStatNames& stat_names) {
+                                                   const ClusterTrafficStatNames& stat_names) {
    return ClusterTrafficStats(stat_names, scope);
 }
 
