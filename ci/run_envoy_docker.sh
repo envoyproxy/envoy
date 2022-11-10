@@ -46,8 +46,8 @@ else
     && useradd -o --uid $(id -u) --gid ${DOCKER_GID} --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
-    && ls -lh /dev/stderr \
-    && chown envoybuild /dev/stderr \
+    && ls -lh /proc/self/fd/2 \
+    && chown envoybuild /proc/self/fd/2 \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
