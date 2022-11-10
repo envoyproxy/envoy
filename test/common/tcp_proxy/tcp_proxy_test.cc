@@ -956,11 +956,9 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
 
-// Test that intermediate log entry by field
-// %DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:connection_uuid)% and %DURATION%.
+// Test that intermediate log entry by field %DURATION%.
 TEST_F(TcpProxyTest, IntermediateLogEntry) {
-  auto config = accessLogConfig(
-      "%DURATION% %DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:connection_uuid)%");
+  auto config = accessLogConfig("%DURATION%");
   config.mutable_access_log_flush_interval()->set_seconds(1);
   config.mutable_idle_timeout()->set_seconds(0);
 
@@ -975,7 +973,7 @@ TEST_F(TcpProxyTest, IntermediateLogEntry) {
   flush_timer->invokeCallback();
 
   // No valid duration until the connection is closed.
-  EXPECT_EQ(access_log_data_.value(), fmt::format("- {}", factory_context_.api_.random_.uuid_));
+  EXPECT_EQ(access_log_data_.value(), fmt::format("-"));
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();

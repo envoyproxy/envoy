@@ -32,16 +32,10 @@
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
-
-const std::string& tcpProxyName() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.tcp_proxy");
-}
-const std::string& tcpConnectionUuidKey() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "connection_uuid");
-}
 
 const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
@@ -648,9 +642,8 @@ Network::FilterStatus Filter::onNewConnection() {
   }
 
   // Set UUID for the connection. This is used for logging and tracing.
-  Envoy::Config::Metadata::mutableMetadataValue(getStreamInfo().dynamicMetadata(), tcpProxyName(),
-                                                tcpConnectionUuidKey())
-      .set_string_value(config_->randomGenerator().uuid());
+  getStreamInfo().setStreamIdProvider(
+      std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->randomGenerator().uuid()));
 
   ASSERT(upstream_ == nullptr);
   route_ = pickRoute();
