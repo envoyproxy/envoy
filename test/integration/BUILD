@@ -11,7 +11,6 @@ load(
     "envoy_select_enable_http3",
     "envoy_sh_test",
 )
-load("@bazel_skylib//lib:selects.bzl", "selects")
 
 licenses(["notice"])  # Apache 2
 
@@ -307,14 +306,9 @@ envoy_cc_test_binary(
 envoy_sh_test(
     name = "hotrestart_test",
     size = "enormous",
-    srcs = selects.with_or({
-        (
-            "//bazel:disable_hot_restart",
-            "//bazel:disable_admin_functionality",
-        ): [],
-        "//conditions:default": [
-            "hotrestart_test.sh",
-        ],
+    srcs = select({
+        "//bazel:disable_hot_restart_or_admin": [],
+        "//conditions:default": ["hotrestart_test.sh"],
     }),
     cc_binary = [":hotrestart_main"],
     data = [

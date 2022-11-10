@@ -306,6 +306,14 @@ config_setting(
     values = {"define": "deprecated_features=disabled"},
 )
 
+selects.config_setting_group(
+    name = "disable_hot_restart_or_admin",
+    match_any = [
+        "//bazel:disable_hot_restart",
+        "//bazel:disable_admin_functionality",
+    ],
+)
+
 bool_flag(
     name = "http3",
     build_setting_default = True,
