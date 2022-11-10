@@ -39,13 +39,23 @@ public:
   void iterate(ConstIterateCb cb) const override;
 
 protected:
+  // Values in a KeyValueStore have an optional TTL.
+  struct ValueWithTtl {
+    ValueWithTtl(std::string value, absl::optional<std::chrono::seconds> ttl)
+        : value_(value), ttl_(ttl) {}
+    std::string value_;
+    absl::optional<std::chrono::seconds> ttl_;
+  };
+
+  using KeyValueMap = quiche::QuicheLinkedHashMap<std::string, ValueWithTtl>;
+
+  const KeyValueMap& store() { return store_; }
+
+private:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
   Config::TtlManager ttl_manager_;
-  // Pair.first is the value and pair.second is an optional TTL
-  quiche::QuicheLinkedHashMap<std::string,
-                              std::pair<std::string, absl::optional<std::chrono::seconds>>>
-      store_;
+  KeyValueMap store_;
   // Used for validation only.
   mutable bool under_iterate_{};
   TimeSource& time_source_;
