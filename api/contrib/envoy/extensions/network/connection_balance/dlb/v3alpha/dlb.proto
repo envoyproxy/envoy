@@ -31,7 +31,7 @@ message Dlb {
   // If not specified, use the first available device as default.
   uint32 id = 1;
 
-  // Control how many times Envoy makes an attempt to send event to DLB hardware.
+  // Maximum number of retries when sending to DLB device fails.
   // No retry as default.
-  uint32 most_send_retries = 2;
+  uint32 max_retries = 2;
 }
