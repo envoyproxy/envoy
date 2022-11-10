@@ -547,7 +547,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
-// Test the client when a call to authorization server returns a 5xx error status and runtime guard is set to false
+// Test the client when a call to authorization server returns a 5xx error status and runtime guard
+// is set to false
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxErrorWhenRuntimeGuardFalse) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -564,7 +565,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxErrorWhenRuntimeGuardFalse
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
-// Test the client when a call to authorization server returns a 5xx 
+// Test the client when a call to authorization server returns a 5xx
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   const auto expected_body = std::string{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(

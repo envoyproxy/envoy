@@ -726,13 +726,13 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
 }
 
 TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseWhenAuthzReturn5xx) {
-  config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.envoy.reloadable_features.ext_authz_http_service_5xx_is_denied_instead_of_error",
-        "false");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.envoy.reloadable_features.ext_authz_"
+                                    "http_service_5xx_is_denied_instead_of_error",
+                                    "false");
   initializeConfig();
   HttpIntegrationTest::initialize();
   initiateClientConnection();
-  
+
   AssertionResult result =
       fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
   RELEASE_ASSERT(result, result.message());
@@ -742,11 +742,9 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseWhenAuthzReturn5xx) {
   result = ext_authz_request->waitForEndStream(*dispatcher_);
   RELEASE_ASSERT(result, result.message());
 
-  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
-      {":status", "500"}
-  };
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{{":status", "500"}};
   ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
-  
+
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().Status()->value().getStringView());

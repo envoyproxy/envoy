@@ -2059,21 +2059,17 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith5xx) {
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl response_headers{
-    {":status", "500"},
-    {"content-length", "3"},
-    {"content-type", "text/plain"},
-    {"foo", "bar"}};
+      {":status", "500"}, {"content-length", "3"}, {"content-type", "text/plain"}, {"foo", "bar"}};
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
-    .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ(headers.getStatusValue(),
-                    std::to_string(enumToInt(Http::Code::InternalServerError)));
-        }));
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
-    .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
-      EXPECT_EQ(data.toString(), "foo");
-    }));
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { EXPECT_EQ(data.toString(), "foo"); }));
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
@@ -2112,8 +2108,7 @@ TEST_P(HttpFilterTestParam, ErrorWithResponse5xx) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl response_headers{
-    {":status", "403"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   Filters::Common::ExtAuthz::Response response{};
