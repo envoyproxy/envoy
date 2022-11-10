@@ -393,11 +393,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "libipp-crypto",
         project_desc = "Intel® Integrated Performance Primitives Cryptography",
         project_url = "https://github.com/intel/ipp-crypto",
-        version = "2021.5",
-        sha256 = "0b277548c59e6bfe489e634d622b54be3708086fc006a441d39922c2d6d43f0d",
+        version = "2021.6",
+        sha256 = "632cc5ba54413eeab575682619c05d247e9b7f2fc58ea3e5f4a02bdcab3e6b78",
         strip_prefix = "ipp-crypto-ippcp_{version}",
         urls = ["https://github.com/intel/ipp-crypto/archive/ippcp_{version}.tar.gz"],
-        release_date = "2021-12-21",
+        release_date = "2022-08-09",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
@@ -1176,6 +1176,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Note: the llvm/clang version should match the version specifed in:
+        #  - .github/workflows/codeql-daily.yml
+        #  - .github/workflows/codeql-push.yml
+        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
         version = "14.0.0",
         sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
         # Only allow peeking at fuzzer related files for now.

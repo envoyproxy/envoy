@@ -396,17 +396,11 @@ private:
 
   Stats::Gauge* single_duplicate_stat_{};
 
-  // Cross priority host map for fast cross priority host searching. When the priority update
-  // callback is executed, the host map will also be updated.
-  HostMapConstSharedPtr cross_priority_host_map_;
-
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
   const bool list_as_any_;
 
   TimeSource& time_source_;
-
-  const HostStatusSet override_host_status_{};
 
   friend class SubsetLoadBalancerDescribeMetadataTester;
 };

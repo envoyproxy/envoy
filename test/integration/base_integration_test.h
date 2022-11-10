@@ -88,6 +88,9 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  // Get socket option for a specific listener's socket.
+  bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
+                       socklen_t* optlen);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 

@@ -25,8 +25,6 @@ namespace Upstream {
 // Priority levels and localities are considered overprovisioned with this factor.
 static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
 
-using HostStatusSet = std::bitset<32>;
-
 /**
  * Base class for all LB implementations.
  */
@@ -158,31 +156,12 @@ protected:
   // The total count of healthy hosts across all priority levels.
   uint32_t total_healthy_hosts_;
 
-  // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value of
-  // Host::Health. The specific correspondence is shown below:
-  //
-  // * 0b001: Host::Health::Unhealthy
-  // * 0b010: Host::Health::Degraded
-  // * 0b100: Host::Health::Healthy
-  //
-  // If multiple bit fields are set, it is acceptable as long as the status of override host is in
-  // any of these statuses.
-  const HostStatusSet override_host_status_{};
-
 private:
   Common::CallbackHandlePtr priority_update_cb_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
-  // A utility function to select override host from host map according to load balancer context.
-  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
-                                               LoadBalancerContext* context);
-
-  // A utility function to create override host status from lb config.
-  static HostStatusSet createOverrideHostStatus(
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
@@ -306,10 +285,6 @@ protected:
    * Index into priority_set via hosts source descriptor.
    */
   const HostVector& hostSourceToHosts(HostsSource hosts_source) const;
-
-  // Cross priority host map for fast cross priority host searching. When the priority update
-  // callback is executed, the host map will also be updated.
-  HostMapConstSharedPtr cross_priority_host_map_;
 
 private:
   enum class LocalityRoutingState {
