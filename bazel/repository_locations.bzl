@@ -336,12 +336,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "tcmalloc",
         project_desc = "Fast, multi-threaded malloc implementation",
         project_url = "https://github.com/google/tcmalloc",
-        version = "59400332b9cff9920b6a1da203ac1575272a9f44",
-        sha256 = "3e0a0c135318fa69e748b140d32cb24a64d885bedfeb5f23fa01cc0d7859bbf0",
+        version = "e33c7bc60415127c104006d3301c96902f98d42a",
+        sha256 = "14a2c91b71d6719558768a79671408c9acd8284b418e80386c5888047e2c15aa",
         strip_prefix = "tcmalloc-{version}",
         urls = ["https://github.com/google/tcmalloc/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-08-06",
+        release_date = "2022-10-24",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/google/tcmalloc/blob/{version}/LICENSE",
@@ -1176,6 +1176,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Note: the llvm/clang version should match the version specifed in:
+        #  - .github/workflows/codeql-daily.yml
+        #  - .github/workflows/codeql-push.yml
+        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
         version = "14.0.0",
         sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
         # Only allow peeking at fuzzer related files for now.
