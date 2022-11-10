@@ -47,7 +47,7 @@ JwtProvider
 Default Extract Location
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-If *from_headers* and *from_params* is empty, the default location to extract JWT is from HTTP header::
+If `from_headers` and `from_params` is empty, the default location to extract JWT is from HTTP header::
 
   Authorization: Bearer <token>
 
@@ -63,6 +63,45 @@ In the :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v
    For ``remote_jwks``, a ``jwks_cluster`` cluster is required.
 
 Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
+
+Token Extraction from a Custom HTTP Header
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the JWT is specified in other HTTP header, use `from_headers` to specify the header name.
+In addition to the `name` field, which specifies the HTTP header name,
+the `from_headers` section can specify an optional `value_prefix` value, as in:
+
+.. code-block:: yaml
+
+    from_headers:
+      - name: bespoke
+        value_prefix: jwt_value
+
+
+The above will cause the jwt_authn filter to look for the JWT in the `bespoke` header, following the tag `jwt_value`.
+
+Any non-JWT characters (i.e., anything _other than_ alphanumerics, `_`, `-`, and `.`) will be skipped,
+and all following, contiguous, JWT-legal chars will be taken as the JWT.
+
+This means all of the following will return a JWT of `eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk`:
+
+.. code-block:: text
+
+bespoke: jwt_value=eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk
+
+bespoke: {"jwt_value": "eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk"}
+
+bespoke: beta:true,jwt_value:"eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk",trace=1234
+
+
+The header `name` may be `Authorization`.
+
+The `value_prefix` must match exactly, i.e., case-sensitively.
+If the `value_prefix` is not found, the header is skipped: not considered as a source for a JWT token.
+
+If there are no JWT-legal characters after the `value_prefix`, the entire string after it
+is taken to be the JWT token. This is unlikely to succeed; the error will reported by the JWT parser.
+
 
 Remote JWKS config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
