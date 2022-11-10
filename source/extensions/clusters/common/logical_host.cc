@@ -1,4 +1,4 @@
-#include "source/common/upstream/logical_host.h"
+#include "source/extensions/clusters/common/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {

@@ -14,7 +14,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -639,7 +638,7 @@ protected:
         new NetworkFilters::Common::Redis::RespValue()};
     dummy_value->type(NetworkFilters::Common::Redis::RespType::Error);
     dummy_value->asString() = "dummy text";
-    EXPECT_TRUE(discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false));
+    discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false);
 
     RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
     EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());

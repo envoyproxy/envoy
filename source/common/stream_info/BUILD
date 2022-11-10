@@ -60,3 +60,13 @@ envoy_cc_library(
         "//envoy/stream_info:filter_state_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "stream_id_provider_lib",
+    srcs = ["stream_id_provider_impl.cc"],
+    hdrs = ["stream_id_provider_impl.h"],
+    deps = [
+        "//envoy/stream_info:stream_id_provider_interface",
+        "//source/common/common:utility_lib",
+    ],
+)

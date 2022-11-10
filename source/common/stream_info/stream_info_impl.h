@@ -257,12 +257,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
-    ASSERT(provider != nullptr);
-    request_id_provider_ = provider;
+  void setStreamIdProvider(StreamIdProviderSharedPtr provider) override {
+    stream_id_provider_ = std::move(provider);
   }
-  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
-    return request_id_provider_.get();
+  OptRef<const StreamIdProvider> getStreamIdProvider() const override {
+    if (stream_id_provider_ == nullptr) {
+      return {};
+    }
+    return makeOptRef<const StreamIdProvider>(*stream_id_provider_);
   }
 
   void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
@@ -381,7 +383,7 @@ private:
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
-  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
+  StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;

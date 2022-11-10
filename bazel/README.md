@@ -41,8 +41,19 @@ Given all required [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/lat
 1. `python3 tools/github/write_current_source_version.py` from the repository root.
 1. `bazel build -c opt envoy` from the repository root.
 
-> Note: If the the `write_current_source_version.py` script is missing from the extracted source code directory, you can download it from [here](https://raw.githubusercontent.com/envoyproxy/envoy/main/tools/github/write_current_source_version.py).
+> **Note**: If the the `write_current_source_version.py` script is missing from the extracted source code directory, you can download it from [here](https://raw.githubusercontent.com/envoyproxy/envoy/main/tools/github/write_current_source_version.py).
 > This script is used to generate SOURCE_VERSION that is required by [`bazel/get_workspace_status`](./get_workspace_status) to "stamp" the binary in a non-git directory.
+
+> **Note**: To avoid rate-limiting by GitHub API, you can provide [a valid GitHub token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats) to `GITHUB_TOKEN` environment variable.
+> The environment variable name that holds the token can also be customized by setting `--github_api_token_env_name`.
+> In a GitHub Actions workflow file, you can set this token from [`secrets.GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret).
+
+Examples:
+
+```console
+GITHUB_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py
+MY_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py --github_api_token_env_name=MY_TOKEN
+```
 
 ## Quick start Bazel build for developers
 
