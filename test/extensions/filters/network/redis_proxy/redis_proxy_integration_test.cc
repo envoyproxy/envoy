@@ -78,6 +78,14 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
 )EOF";
 
+// This is a configuration with moved/ask redirection support and DNS lookups enabled.
+const std::string CONFIG_WITH_REDIRECTION_DNS = CONFIG_WITH_REDIRECTION + R"EOF(
+            dns_cache_config:
+              name: foo
+              dns_lookup_family: {}
+              max_hosts: 100
+)EOF";
+
 // This is a configuration with batching enabled.
 const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             max_buffer_size_before_flush: 1024
@@ -355,6 +363,13 @@ public:
     return result.str();
   }
 
+  std::string redisHostnameAndPort(FakeUpstreamPtr& upstream) {
+    std::stringstream result;
+    result << "localhost"
+           << ":" << upstream->localAddress()->ip()->port();
+    return result.str();
+  }
+
   void initialize() override;
 
   /**
@@ -433,6 +448,9 @@ public:
   RedisProxyWithRedirectionIntegrationTest()
       : RedisProxyIntegrationTest(CONFIG_WITH_REDIRECTION, 2) {}
 
+  RedisProxyWithRedirectionIntegrationTest(const std::string& config, int num_upstreams)
+      : RedisProxyIntegrationTest(config, num_upstreams) {}
+
   /**
    * Simple bi-directional test with a fake Redis client and 2 fake Redis servers.
    * @param target_server a handle to the second server that will respond to the request.
@@ -445,6 +463,16 @@ public:
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
                          const std::string& redirection_response, const std::string& response,
                          const std::string& asking_response = "+OK\r\n");
+};
+
+class RedisProxyWithRedirectionAndDNSIntegrationTest
+    : public RedisProxyWithRedirectionIntegrationTest {
+public:
+  RedisProxyWithRedirectionAndDNSIntegrationTest()
+      : RedisProxyWithRedirectionIntegrationTest(
+            fmt::format(CONFIG_WITH_REDIRECTION_DNS,
+                        Network::Test::ipVersionToDnsFamily(GetParam())),
+            2) {}
 };
 
 class RedisProxyWithBatchingIntegrationTest : public RedisProxyIntegrationTest {
@@ -497,6 +525,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionAndDNSIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -770,6 +802,19 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
 
   redirection_error.str("");
   redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple Redis command to a sequence of fake upstream
+// Redis servers. The first server replies with a MOVED redirection
+// error that specifies the hostname as its target.
+// The target server responds to a possibly transformed request, and its response
+// is received unchanged by the fake Redis client.
+TEST_P(RedisProxyWithRedirectionAndDNSIntegrationTest, RedirectUsingHostname) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+  std::stringstream redirection_error;
+  redirection_error << "-MOVED 1111 " << redisHostnameAndPort(fake_upstreams_[1]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 

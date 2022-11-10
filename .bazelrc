@@ -159,7 +159,7 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
-build:sizeopt -c opt --copt -Os
+build:sizeopt -c opt --copt -Os --linkopt=-Wl,--gc-sections --linkopt=-Wl,--dead_strip
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH

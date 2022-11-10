@@ -213,6 +213,55 @@ TEST_F(DatadogDriverTest, NoBody) {
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
 }
 
+TEST_F(DatadogDriverTest, CollectorHostname) {
+  // Valid config but not valid cluster.
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_hostname: fake_host
+  )EOF";
+  envoy::config::trace::v3::DatadogConfig datadog_config;
+  TestUtility::loadFromYaml(yaml_string, datadog_config);
+  cm_.initializeClusters({"fake_cluster"}, {});
+  setup(datadog_config, true);
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(1));
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            EXPECT_EQ("fake_host", message->headers().getHostValue());
+            EXPECT_EQ("application/msgpack", message->headers().getContentTypeValue());
+
+            return &request;
+          }));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  // Timer should be re-enabled.
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
+
+  timer_->invokeCallback();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.timer_flushed").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.traces_sent").value());
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "0"}}}));
+  callback->onSuccess(request, std::move(msg));
+
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_skipped_no_cluster").value());
+  EXPECT_EQ(1U, stats_.counter("tracing.datadog.reports_sent").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
+}
+
 TEST_F(DatadogDriverTest, SkipReportIfCollectorClusterHasBeenRemoved) {
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks;
   EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))

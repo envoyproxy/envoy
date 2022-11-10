@@ -13,6 +13,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
@@ -1019,6 +1020,16 @@ public:
     skip_tag_extraction_rule_check_ = true;
   }
 
+  ~ListenerFilterIntegrationTest() override {
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      lds_connection_.reset();
+    }
+  }
+
   void createLdsStream() {
     AssertionResult result =
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, lds_connection_);
@@ -1354,6 +1365,155 @@ TEST_P(ListenerFilterIntegrationTest, UpdateListenerFilterOrder) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(long_data.size() - 2, &long_data_after_drain));
   tcp_client3->close();
+}
+
+#ifdef __linux__
+TEST_P(ListenerFilterIntegrationTest, UpdateListenerWithDifferentSocketOptions) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    auto* socket_option = listener_config_.add_socket_options();
+    socket_option->set_level(IPPROTO_IP);
+    socket_option->set_name(IP_TOS);
+    socket_option->set_int_value(8); // IPTOS_THROUGHPUT
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  int opt_value = 0;
+  socklen_t opt_len = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value, &opt_len));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(8, opt_value);
+
+  listener_config_.mutable_socket_options(0)->set_int_value(4);
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // We want to test update listener with same address but different socket options. But
+  // the test is using zero port address. It turns out when create a new socket on zero
+  // port address, kernel will generate new port for it. So we have to register the
+  // port again here. IPTOS_RELIABILITY	= 4.
+  registerTestServerPorts({"test_listener"});
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client2->write(data));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+  tcp_client2->close();
+  ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+
+  int opt_value2 = 0;
+  socklen_t opt_len2 = sizeof(opt_value);
+  EXPECT_TRUE(getSocketOption("listener_foo", IPPROTO_IP, IP_TOS, &opt_value2, &opt_len2));
+  EXPECT_EQ(opt_len2, sizeof(opt_value2));
+  EXPECT_EQ(4, opt_value2);
+}
+#endif
+
+TEST_P(ListenerFilterIntegrationTest,
+       UpdateListenerWithDifferentSocketOptionsWhenReusePortDisabled) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Add the static cluster to serve LDS.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    lds_cluster->set_name("lds_cluster");
+    ConfigHelper::setHttp2(*lds_cluster);
+  });
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    listener_config_.Swap(bootstrap.mutable_static_resources()->mutable_listeners(0));
+    listener_config_.set_name("listener_foo");
+    listener_config_.mutable_enable_reuse_port()->set_value(false);
+    ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+    auto* lds_config_source = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api_config_source = lds_config_source->mutable_api_config_source();
+    lds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    envoy::config::core::v3::GrpcService* grpc_service = lds_api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "lds_cluster", fake_upstreams_[1]->localAddress());
+  });
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+  };
+  use_lds_ = false;
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Workers not started, the LDS added test_listener is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({"test_listener"});
+  std::string data = "hello";
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("test_listener"));
+  ASSERT_TRUE(tcp_client->write(data));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size(), &data));
+  tcp_client->close();
+
+  auto* socket_option = listener_config_.add_socket_options();
+  socket_option->set_level(IPPROTO_IP);
+  socket_option->set_name(IP_TOS);
+  socket_option->set_int_value(8); // IPTOS_THROUGHPUT
+  socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  ENVOY_LOG_MISC(debug, "listener config: {}", listener_config_.DebugString());
+
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "gRPC config for type.googleapis.com/envoy.config.listener.v3.Listener rejected: Error "
+      "adding/updating listener(s) listener_foo: Listener listener_foo: doesn't support update any "
+      "socket options when the reuse port isn't enabled",
+      {
+        sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+        test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+        IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("test_listener"));
+        ASSERT_TRUE(tcp_client2->write(data));
+        FakeRawConnectionPtr fake_upstream_connection2;
+        ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+        ASSERT_TRUE(fake_upstream_connection2->waitForData(data.size(), &data));
+        tcp_client2->close();
+        ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+      });
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerFilterIntegrationTest,
