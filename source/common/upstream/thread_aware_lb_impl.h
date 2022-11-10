@@ -111,7 +111,7 @@ protected:
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(lb_stats, random, override_host_status_)) {}
+        factory_(new LoadBalancerFactoryImpl(lb_stats, random)) {}
 
 private:
   struct PerPriorityState {
