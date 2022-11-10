@@ -1,0 +1,35 @@
+name: android_build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  androidbuild:
+    name: android_build
+    runs-on: macos-12
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/setup-java@v1
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
+      - name: 'Check out Envoy Mobile repo'
+        run: ./ci/envoy_mobile_mirror.sh
+      - name: 'Install dependencies'
+        run: ./envoy-mobile/ci/mac_ci_setup.sh --android
+      - name: 'Build envoy.aar distributable'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd envoy-mobile && ./bazelw build \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --fat_apk_cpu=x86_64 \
+            //:android_dist
