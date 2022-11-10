@@ -425,7 +425,6 @@ private:
     return config_dump;
   }
 
-
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   friend class FilterConfigSubscription;

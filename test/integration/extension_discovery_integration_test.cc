@@ -144,23 +144,22 @@ public:
   }
 
   void addDynamicListenerFilter(const std::string& name) {
-    config_helper_.addConfigModifier([name,
-                                      this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      auto* listener_filter = listener->add_listener_filters();
-      listener_filter->set_name(name);
-      auto* discovery = listener_filter->mutable_config_discovery();
-      discovery->add_type_urls(
-          "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
-      discovery->mutable_config_source()->set_resource_api_version(
-          envoy::config::core::v3::ApiVersion::V3);
-      auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
-      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "ecds2_cluster",
-                     getEcds2FakeUpstream().localAddress());
-    });
+    config_helper_.addConfigModifier(
+        [name, this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          auto* listener_filter = listener->add_listener_filters();
+          listener_filter->set_name(name);
+          auto* discovery = listener_filter->mutable_config_discovery();
+          discovery->add_type_urls(
+              "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig");
+          discovery->mutable_config_source()->set_resource_api_version(
+              envoy::config::core::v3::ApiVersion::V3);
+          auto* api_config_source = discovery->mutable_config_source()->mutable_api_config_source();
+          api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+          auto* grpc_service = api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "ecds2_cluster", getEcds2FakeUpstream().localAddress());
+        });
   }
 
   void initialize() override {
@@ -876,14 +875,15 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessConfigDump) {
   EXPECT_EQ("application/json", contentType(response));
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
-  const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.EcdsConfigDump", // HTTP
-                                        "type.googleapis.com/envoy.admin.v3.EcdsConfigDump", // TCP Listener
-                                        "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
+  const std::string expected_types[] = {
+      "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.EcdsConfigDump", // HTTP
+      "type.googleapis.com/envoy.admin.v3.EcdsConfigDump", // TCP Listener
+      "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3.ScopedRoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
