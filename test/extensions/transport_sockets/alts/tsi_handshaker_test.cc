@@ -158,7 +158,7 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   handshaker->deferredDelete();
 
   // Make sure the handshaker is not in dispatcher_ queue, since the next call is not done.
-  EXPECT_NE(dispatcher_.to_delete_.back().get(), handshaker.get());
+  EXPECT_TRUE(dispatcher_.to_delete_.empty());
 
   // After deferredDelete, the callback should be never invoked, in real use it might be already
   // a dangling pointer.

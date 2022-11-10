@@ -334,6 +334,34 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen) {
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([&]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
+  for (auto& listener : listeners) {
+    if (listener.get().name() == listener_name) {
+      for (auto& socket_factory : listener.get().listenSocketFactories()) {
+        auto socket = socket_factory->getListenSocket(0);
+        if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,
                                                   IntegrationTestServerPtr& test_server) {
   bool listeners_ready = false;
