@@ -109,7 +109,7 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
   if (scope_pos == std::string::npos) {
     // Parse IPv6 with no scope.
     if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) != 1) {
-      return nullptr;
+      return absl::FailedPreconditionError("failed parsing ipv6");
     }
     sa6.sin6_family = AF_INET6;
   } else {
