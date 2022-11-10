@@ -78,6 +78,9 @@ removed_config_or_runtime:
 - area: ecds
   change: |
     removed ``envoy.reloadable_features.top_level_ecds_stats`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.skip_delay_close`` and legacy code paths.
 
 new_features:
 - area: build
