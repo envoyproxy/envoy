@@ -527,6 +527,8 @@ protected:
     }
   }
 
+  virtual const std::string getConfigDumpType() const PURE;
+
 private:
   // Data structure to hold data related to filter configuration.
   struct FilterConfigData {
@@ -552,7 +554,7 @@ private:
   void setupEcdsConfigDumpCallbacks(Server::Admin& admin) {
     if (config_tracker_entry_ == nullptr) {
       config_tracker_entry_ = admin.getConfigTracker().add(
-          "ecds_filters", [this](const Matchers::StringMatcher& name_matcher) {
+          getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
             return dumpEcdsFilterConfigs(name_matcher);
           });
     }
@@ -599,6 +601,7 @@ protected:
     Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
                                              is_terminal_filter, last_filter_in_filter_chain);
   }
+  const std::string getConfigDumpType() const override { return "ecds_filter_http"; }
 };
 
 // HTTP filter
@@ -625,6 +628,7 @@ protected:
     Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
                                              is_terminal_filter, last_filter_in_filter_chain);
   }
+  const std::string getConfigDumpType() const override { return "ecds_filter_upstream_http"; }
 };
 
 // TCP listener filter
@@ -635,6 +639,9 @@ class TcpListenerFilterConfigProviderManagerImpl
           TcpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_tcp_listener"; }
 };
 
 // UDP listener filter
@@ -645,6 +652,9 @@ class UdpListenerFilterConfigProviderManagerImpl
           UdpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "udp_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
 };
 
 } // namespace Filter
