@@ -1,6 +1,6 @@
-#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
-
 #include <memory>
+
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 
 #include "source/common/common/regex.h"
 #include "source/common/http/message_impl.h"
@@ -26,40 +26,35 @@ using envoy::extensions::filters::http::jwt_authn::v3::PerRouteConfig;
 using testing::NiceMock;
 
 class MockJwksUpstream {
- public:
-  MockJwksUpstream(Upstream::MockClusterManager& mock_cm,
-                   const std::string& remote_jwks)
-      : remote_jwks_(remote_jwks),
-        jwks_request_(&mock_cm.thread_local_cluster_.async_client_) {
-    ON_CALL(mock_cm, getThreadLocalCluster(_))
-        .WillByDefault(Return(&thread_local_cluster_));
+public:
+  MockJwksUpstream(Upstream::MockClusterManager& mock_cm, const std::string& remote_jwks)
+      : remote_jwks_(remote_jwks), jwks_request_(&mock_cm.thread_local_cluster_.async_client_) {
+    ON_CALL(mock_cm, getThreadLocalCluster(_)).WillByDefault(Return(&thread_local_cluster_));
     ON_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillByDefault(Invoke([this](const Http::RequestMessagePtr&,
-                                     Http::AsyncClient::Callbacks& callback,
-                                     const Http::AsyncClient::RequestOptions&)
-                                  -> Http::AsyncClient::Request* {
-          if (remote_jwks_.empty()) {
-            callback.onFailure(jwks_request_,
-                               Http::AsyncClient::FailureReason::Reset);
-          } else {
-            Http::ResponseMessagePtr response_message(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response_message->body().add(remote_jwks_);
-            callback.onSuccess(jwks_request_, std::move(response_message));
-          }
-          return &jwks_request_;
-        }));
+        .WillByDefault(
+            Invoke([this](const Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callback,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              if (remote_jwks_.empty()) {
+                callback.onFailure(jwks_request_, Http::AsyncClient::FailureReason::Reset);
+              } else {
+                Http::ResponseMessagePtr response_message(
+                    new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                        new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+                response_message->body().add(remote_jwks_);
+                callback.onSuccess(jwks_request_, std::move(response_message));
+              }
+              return &jwks_request_;
+            }));
   }
 
- private:
+private:
   std::string remote_jwks_;
   NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster_;
   NiceMock<Http::MockAsyncClientRequest> jwks_request_;
 };
 
 class MockPerRouteConfig {
- public:
+public:
   MockPerRouteConfig(Http::MockStreamDecoderFilterCallbacks& mock_callback,
                      const PerRouteConfig& per_route) {
     per_route_config_ = std::make_shared<PerRouteFilterConfig>(per_route);
@@ -69,15 +64,14 @@ class MockPerRouteConfig {
         .WillByDefault(Return(per_route_config_.get()));
   }
 
- private:
+private:
   std::shared_ptr<NiceMock<Envoy::Router::MockRoute>> mock_route_;
   std::shared_ptr<PerRouteFilterConfig> per_route_config_;
 };
 
 DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   // regex matcher requires such engine init.
-  ScopedInjectableLoader<Regex::Engine> engine(
-      std::make_unique<Regex::GoogleReEngine>());
+  ScopedInjectableLoader<Regex::Engine> engine(std::make_unique<Regex::GoogleReEngine>());
 
   try {
     TestUtility::validate(input);
@@ -96,14 +90,12 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     mock_factory_ctx.time_system_.advanceTimeWait(Envoy::Seconds(615168000));
   }
 
-  MockJwksUpstream mock_jwks(mock_factory_ctx.cluster_manager_,
-                             input.remote_jwks());
+  MockJwksUpstream mock_jwks(mock_factory_ctx.cluster_manager_, input.remote_jwks());
 
   // Mock per route config.
   std::unique_ptr<MockPerRouteConfig> mock_per_route;
   if (input.has_per_route()) {
-    mock_per_route = std::make_unique<MockPerRouteConfig>(filter_callbacks,
-                                                          input.per_route());
+    mock_per_route = std::make_unique<MockPerRouteConfig>(filter_callbacks, input.per_route());
   }
 
   // Set filter_state_selector only there is a valid filter_state_rules.
@@ -113,9 +105,7 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     const auto& rules = input.config().filter_state_rules();
     if (!rules.name().empty() && rules.requires().size() > 0) {
       filter_callbacks.stream_info_.filter_state_->setData(
-          rules.name(),
-          std::make_unique<Router::StringAccessorImpl>(
-              input.filter_state_selector()),
+          rules.name(), std::make_unique<Router::StringAccessorImpl>(input.filter_state_selector()),
           StreamInfo::FilterState::StateType::ReadOnly,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
@@ -123,12 +113,9 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
 
   std::shared_ptr<FilterConfigImpl> filter_config;
   try {
-    filter_config = std::make_shared<FilterConfigImpl>(input.config(), "",
-                                                       mock_factory_ctx);
+    filter_config = std::make_shared<FilterConfigImpl>(input.config(), "", mock_factory_ctx);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug,
-                   "EnvoyException during filter config construction: {}",
-                   e.what());
+    ENVOY_LOG_MISC(debug, "EnvoyException during filter config construction: {}", e.what());
     return;
   }
 
@@ -138,8 +125,7 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     filter->setDecoderFilterCallbacks(filter_callbacks);
 
     HttpFilterFuzzer fuzzer;
-    fuzzer.runData(static_cast<Http::StreamDecoderFilter*>(filter.get()),
-                   input.request_data());
+    fuzzer.runData(static_cast<Http::StreamDecoderFilter*>(filter.get()), input.request_data());
 
     if (input.filter_on_destroy()) {
       filter->onDestroy();
@@ -147,8 +133,8 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
   }
 }
 
-}  // namespace
-}  // namespace JwtAuthn
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace
+} // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
