@@ -679,14 +679,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory& dns_resolver_factory =
-      Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-  dns_resolver_ =
-      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), *admin_, runtime(), stats_store_, thread_local_, dns_resolver_,
+      serverFactoryContext(), *admin_, runtime(), stats_store_, thread_local_,
+      [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
       access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
@@ -1040,6 +1035,17 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;
+}
+
+Network::DnsResolverSharedPtr InstanceImpl::getOrCreateDnsResolver() {
+  if (!dns_resolver_) {
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
+    dns_resolver_ =
+        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
+  }
+  return dns_resolver_;
 }
 
 bool InstanceImpl::enableReusePortDefault() { return enable_reuse_port_default_; }
