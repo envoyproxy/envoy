@@ -49,7 +49,7 @@ StatusOr<Interface> getLocalNetworkInterface() {
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   ASSERT(rc.return_value_ == 0);
-  if (interface_addresses.size() > 0) {
+  if (!interface_addresses.empty()) {
     for (const auto& ifc : interface_addresses) {
       Interface interface;
       interface.name = ifc.interface_name_;
