@@ -203,7 +203,7 @@ public:
 
 private:
   const std::string key_;
-  StringMatcherPtr value_matcher_;
+  const StringMatcherPtr value_matcher_;
 };
 
 class PathMatcher : public StringMatcher {

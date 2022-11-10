@@ -96,18 +96,23 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
   value_matcher_ = ValueMatcher::create(v);
 }
 
-FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
-    : key_(matcher.key()) {
+namespace {
+StringMatcherPtr
+valueMatcherFromProto(const envoy::type::matcher::v3::FilterStateMatcher& matcher) {
   switch (matcher.matcher_case()) {
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringMatch:
-    value_matcher_ =
-        std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher.string_match());
+    return std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+        matcher.string_match());
     break;
   default:
     PANIC_DUE_TO_PROTO_UNSET;
   }
 }
+
+} // namespace
+
+FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
+    : key_(matcher.key()), value_matcher_(valueMatcherFromProto(matcher)) {}
 
 bool FilterStateMatcher::match(const StreamInfo::FilterState& filter_state) const {
   const auto* object = filter_state.getDataReadOnlyGeneric(key_);
