@@ -171,7 +171,6 @@ public:
   SubsetLoadBalancerTest()
       : scope_(stats_store_.createScope("testprefix")), stat_names_(stats_store_.symbolTable()),
         stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
-    stats_.max_host_weight_.set(1UL);
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
