@@ -751,7 +751,7 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 MAKE_STAT_NAMES_STRUCT(ClusterUpstreamStatNames, ALL_CLUSTER_UPSTREAM_STATS);
-MAKE_STATS_STRUCT(ClusterUpstreamStats, ClusterUpstreamStatNames, ALL_CLUSTER_UPSTREAM_STATS);
+MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterUpstreamStatNames, ALL_CLUSTER_UPSTREAM_STATS);
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1047,9 +1047,9 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterUpstreamStats& strongly named stats for this cluster.
+   * @return ClusterTrafficStats& strongly named stats for this cluster.
    */
-  virtual LazyInitStats<ClusterUpstreamStats>& upstreamStats() const PURE;
+  virtual LazyInitStats<ClusterTrafficStats>& upstreamStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic

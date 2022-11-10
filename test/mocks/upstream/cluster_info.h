@@ -151,7 +151,7 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(LazyInitStats<ClusterUpstreamStats>&, upstreamStats, (), (const));
+  MOCK_METHOD(LazyInitStats<ClusterTrafficStats>&, upstreamStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
@@ -207,7 +207,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  LazyInitStats<ClusterUpstreamStats> upstream_stats_;
+  LazyInitStats<ClusterTrafficStats> traffic_stats_;
   ClusterConfigUpdateStats config_update_stats_;
   ClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;
