@@ -68,7 +68,9 @@ def envoy_extension_package(enabled_default = True, default_visibility = EXTENSI
     )
 
 def envoy_mobile_package():
-    envoy_extension_package()
+    # Mobile packages should only be visible to other mobile packages, not any other
+    # parts of the Envoy codebase.
+    envoy_extension_package(default_visibility = ["//:mobile_library"])
 
 def envoy_contrib_package():
     envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
