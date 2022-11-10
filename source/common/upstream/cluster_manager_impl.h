@@ -50,10 +50,12 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
+  using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
+
   ProdClusterManagerFactory(
       Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
       Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
-      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
       Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
@@ -65,7 +67,7 @@ public:
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
-        tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        tls_(tls), dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
@@ -109,7 +111,7 @@ protected:
   Server::Admin& admin_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
-  Network::DnsResolverSharedPtr dns_resolver_;
+  LazyCreateDnsResolver dns_resolver_fn_;
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;

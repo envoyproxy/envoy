@@ -1944,7 +1944,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
                                         ssl_context_manager_, outlier_event_logger, added_via_api,
                                         added_via_api
                                             ? validation_context_.dynamicValidationVisitor()
