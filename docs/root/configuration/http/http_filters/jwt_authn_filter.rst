@@ -62,7 +62,7 @@ The :ref:`providers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.Jwt
 
 .. important::
    If :ref:`remote_jwks <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.remote_jwks>` is used, a ``jwks_cluster`` cluster is required to be specified in the field
-   :ref:`cluster <envoy_v3_api_field_envoy_config.core.v3.HttpUri.cluster>`.
+   :ref:`cluster <envoy_v3_api_field_config.core.v3.HttpUri.cluster>`.
 
 Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
 
