@@ -3932,8 +3932,10 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
     return;
   }
+  // Other HTTP codecs accept the bad scheme but the Envoy should replace it with a valid one.
   waitForNextUpstreamRequest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // The scheme header is not conveyed in HTTP/1.
     EXPECT_EQ(nullptr, upstream_request_->headers().Scheme());
   } else {
     EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
