@@ -1959,14 +1959,12 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   // Host weight is 1.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    stats_.max_host_weight_.set(1UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    stats_.max_host_weight_.set(100UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -1991,7 +1989,6 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 TEST_P(LeastRequestLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
-  stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -2011,7 +2008,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
-  stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -2058,7 +2054,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -2183,7 +2178,6 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
