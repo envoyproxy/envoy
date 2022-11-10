@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package = "github.com/envoy/examples/grpc-s2s/service";
+
+message WorldRequest {}
+
+message WorldResponse {
+  string reply = 1;
+}
+
+service World {
+  rpc Greet(WorldRequest) returns (WorldResponse);
+}

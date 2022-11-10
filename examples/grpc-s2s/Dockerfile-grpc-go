@@ -1,0 +1,12 @@
+FROM golang:1.19.3-bullseye@sha256:34e901ebac66df44ce97b56a9e1bb407307e54fe13e843d6c59da7826ce4dd2c
+
+RUN apt-get -y update && apt-get -y install unzip
+
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28 && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2 && \
+    export PATH="$PATH:$(go env GOPATH)/bin"
+
+RUN curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v21.9/protoc-21.9-linux-x86_64.zip && \
+    unzip protoc-21.9-linux-x86_64.zip -d /usr/local/
+
+WORKDIR /protos
