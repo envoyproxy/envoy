@@ -98,7 +98,7 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
-  ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, trafficStats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, lbStats()).WillByDefault(ReturnRef(lb_stats_));
   ON_CALL(*this, configUpdateStats()).WillByDefault(ReturnRef(config_update_stats_));
   ON_CALL(*this, endpointStats()).WillByDefault(ReturnRef(endpoint_stats_));
