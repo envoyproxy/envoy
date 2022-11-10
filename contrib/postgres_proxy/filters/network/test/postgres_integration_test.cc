@@ -110,9 +110,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, BasicPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Base class for tests with `terminate_ssl` enabled and `starttls` transport socket added.
-class SSLPostgresIntegrationTest : public PostgresBaseIntegrationTest {
+class DownstreamSSLPostgresIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  SSLPostgresIntegrationTest()
+  DownstreamSSLPostgresIntegrationTest()
       : PostgresBaseIntegrationTest(
             std::make_tuple(
                 "terminate_ssl: true",
@@ -137,7 +137,7 @@ public:
 
 // Test verifies that Postgres filter replies with correct code upon
 // receiving request to terminate SSL.
-TEST_P(SSLPostgresIntegrationTest, TerminateSSL) {
+TEST_P(DownstreamSSLPostgresIntegrationTest, TerminateSSL) {
   Buffer::OwnedImpl data;
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -165,19 +165,19 @@ TEST_P(SSLPostgresIntegrationTest, TerminateSSL) {
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SSLPostgresIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-class SSLWrongConfigPostgresIntegrationTest : public PostgresBaseIntegrationTest {
+class DownstreamSSLWrongConfigPostgresIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  SSLWrongConfigPostgresIntegrationTest()
+  DownstreamSSLWrongConfigPostgresIntegrationTest()
       // Enable SSL termination but do not configure downstream transport socket.
       : PostgresBaseIntegrationTest(std::make_tuple("terminate_ssl: true", ""), NoUpstreamSSL) {}
 };
 
 // Test verifies that Postgres filter closes connection when it is configured to
 // terminate SSL, but underlying transport socket does not allow for such operation.
-TEST_P(SSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSocket) {
+TEST_P(DownstreamSSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSocket) {
   Buffer::OwnedImpl data;
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -206,10 +206,15 @@ TEST_P(SSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTransportSoc
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 0);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, SSLWrongConfigPostgresIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Upstream SSL integration tests.
+// Tests do not use the real postgres server and concentrate only on initial exchange.
+// The initial packet
+// sent by the downstream client, SSL request sent to fake upstream and SSL response sent back by
+// fake client  are valid postgres payloads, because they must be parsed by postgres filter.
+
 class UpstreamSSLBaseIntegrationTest : public PostgresBaseIntegrationTest {
 public:
   UpstreamSSLBaseIntegrationTest(SSLConfig upstream_ssl_config)
@@ -218,7 +223,9 @@ public:
 
   std::unique_ptr<Ssl::ContextManager> tls_context_manager_;
   Network::DownstreamTransportSocketFactoryPtr tls_context_;
-  void setupUpstreamTLSCtx() {
+
+  // Method prepares TLS context to be injected to fake upstream.
+  void setupFakeUpstreamTLSCtx() {
     // Setup factory and context for tls transport socket.
     // The tls transport socket will be inserted into fake_upstream when
     // upstream starttls transport socket is converted to secure mode.
@@ -250,8 +257,9 @@ public:
         new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
             std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
   }
+
+  // Method creates and attaches TLS transport socket in fake upstream.
   void enableTLSOnFakeUpstream() {
-    // Create TLS transport socket and install it in fake_upstream.
     Network::TransportSocketPtr ts = tls_context_->createDownstreamTransportSocket();
 
     // Synchronization object used to suspend execution
@@ -284,7 +292,8 @@ public:
 };
 
 // Verify that postgres filter does not send any additional messages when
-// upstream SSL is disabled.
+// upstream SSL is disabled. Fake upstream should receive only the initial
+// postgres message.
 TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
@@ -309,6 +318,7 @@ TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Base class for parameterized tests with REQUIRE option for upstream SSL.
 class UpstreamSSLRequirePostgresIntegrationTest : public UpstreamSSLBaseIntegrationTest {
 public:
   UpstreamSSLRequirePostgresIntegrationTest()
@@ -322,9 +332,13 @@ public:
 )EOF")) {}
 };
 
+// Test verifies that postgres filter starts upstream SSL negotiation with
+// fake upstream upon receiving initial postgres packet. When server agrees
+// to use SSL, TLS transport socket is attached to fake upstream and
+// fake upstream receives initial postgres packet over encrypted connection.
 TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerAgreesForSSLTest) {
-  setupUpstreamTLSCtx();
-  // START
+  // Prepare TLS context for fake upstream.
+  setupFakeUpstreamTLSCtx();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
 
@@ -345,7 +359,6 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerAgreesForSSLTest) {
 
   // Reply to Envoy with 'S' and attach TLS socket to upstream.
   upstream_data.add("S");
-  ASSERT_EQ(1, upstream_data.length());
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
 
   enableTLSOnFakeUpstream();
@@ -365,6 +378,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerAgreesForSSLTest) {
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
 }
 
+// Test verifies that postgres filter will not continue when upstream SSL
+// is required and fake upstream does not agree for SSL.
 TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
@@ -384,9 +399,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
   ASSERT_EQ(80877103, upstream_data.peekBEInt<uint32_t>(4));
   upstream_data.drain(upstream_data.length());
 
-  // Reply to Envoy with 'S' and attach TLS socket to upstream.
+  // Reply to Envoy with 'E' (SSL not allowed).
   upstream_data.add("E");
-  ASSERT_EQ(1, upstream_data.length());
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
 
   data.drain(data.length());
@@ -402,6 +416,7 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLRequirePostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Base class for parameterized tests when upstream SSL is PREFER.
 class UpstreamSSLPreferPostgresIntegrationTest : public UpstreamSSLBaseIntegrationTest {
 public:
   UpstreamSSLPreferPostgresIntegrationTest()
@@ -417,8 +432,12 @@ public:
   Network::DownstreamTransportSocketFactoryPtr tls_context_;
 };
 
+// Test verifies that postgres filter starts upstream SSL negotiation with
+// fake upstream upon receiving initial postgres packet. When server agrees
+// to use SSL, TLS transport socket is attached to fake upstream and
+// fake upstream receives initial postgres packet over encrypted connection.
 TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerAgreesForSSLTest) {
-  setupUpstreamTLSCtx();
+  setupFakeUpstreamTLSCtx();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
 
@@ -439,7 +458,6 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerAgreesForSSLTest) {
 
   // Reply to Envoy with 'S' and attach TLS socket to upstream.
   upstream_data.add("S");
-  ASSERT_EQ(1, upstream_data.length());
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
 
   enableTLSOnFakeUpstream();
@@ -459,6 +477,9 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerAgreesForSSLTest) {
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
 }
 
+// Test verifies that postgres filter continues in clear-text
+// when upstream server does not agree for upstream SSL and
+// upstream SSL configuration is PREFER.
 TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerDeniesSSLTest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
@@ -478,20 +499,17 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerDeniesSSLTest) {
   ASSERT_EQ(80877103, upstream_data.peekBEInt<uint32_t>(4));
   upstream_data.drain(upstream_data.length());
 
-  // Reply to Envoy with 'S' and attach TLS socket to upstream.
+  // Reply to Envoy with 'E' (upstream SSL not allowed).
   upstream_data.add("E");
-  ASSERT_EQ(1, upstream_data.length());
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
 
   fake_upstream_connection_->clearData();
   ASSERT_TRUE(fake_upstream_connection_->waitForData(data.length(), &rcvd));
-  // Make sure that upstream received initial postgres request, which
-  // triggered upstream SSL negotiation and TLS handshake.
+  // Make sure that upstream received initial postgres request in clear-text.
   ASSERT_EQ(data.toString(), rcvd);
 
   data.drain(data.length());
 
-  // Connection to client should be closed.
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
@@ -499,6 +517,10 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerDeniesSSLTest) {
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 1);
 }
 
+// Test verifies that postgres filter continues transaction in clear-text when
+// upstream server sends unknown reply when negotiating SSL with PREFER setting
+// for upstream SSL. Internally the postgres filter should move to out-of-sync mode
+// and just pass packets without parsing them.
 TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerSendsWrongReplySSLTest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
@@ -518,20 +540,17 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerSendsWrongReplySSLTest) {
   ASSERT_EQ(80877103, upstream_data.peekBEInt<uint32_t>(4));
   upstream_data.drain(upstream_data.length());
 
-  // Reply to Envoy with 'S' and attach TLS socket to upstream.
+  // Reply to Envoy with unexpected 'W'.
   upstream_data.add("W");
-  ASSERT_EQ(1, upstream_data.length());
   ASSERT_TRUE(fake_upstream_connection_->write(upstream_data.toString()));
 
   fake_upstream_connection_->clearData();
   ASSERT_TRUE(fake_upstream_connection_->waitForData(data.length(), &rcvd));
-  // Make sure that upstream received initial postgres request, which
-  // triggered upstream SSL negotiation and TLS handshake.
+  // Make sure that upstream received initial postgres request in clear-text.
   ASSERT_EQ(data.toString(), rcvd);
 
   data.drain(data.length());
 
-  // Connection to client should be closed.
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 

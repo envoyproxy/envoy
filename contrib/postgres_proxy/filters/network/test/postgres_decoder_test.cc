@@ -124,25 +124,8 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
 TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   decoder_->state(DecoderImpl::State::InitState);
 
-  buf_[0] = '\0';
-  // Startup message has the following structure:
-  // Length (4 bytes) - payload and length field
-  // version (4 bytes)
-  // Attributes: key/value pairs separated by '\0'
-  data_.writeBEInt<uint32_t>(37);
-  // Add version code
-  data_.writeBEInt<uint32_t>(0x00030000);
-  // user-postgres key-pair
-  data_.add("user"); // 4 bytes
-  data_.add(buf_, 1);
-  data_.add("postgres"); // 8 bytes
-  data_.add(buf_, 1);
-  // database-test-db key-pair
-  // Some other attribute
-  data_.add("attribute"); // 9 bytes
-  data_.add(buf_, 1);
-  data_.add("blah"); // 4 bytes
-  data_.add(buf_, 1);
+  createInitialPostgresRequest(data_);
+
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
