@@ -20,7 +20,7 @@ public:
   /**
    *  Get the request ID from the request headers.
    * @param request_headers supplies the incoming request headers for retrieving the request ID.
-   * @return the integer or nullopt if the request ID is invalid.
+   * @return the string view or nullopt if the request ID is invalid.
    */
   virtual absl::optional<absl::string_view>
   get(const Http::RequestHeaderMap& request_headers) const PURE;
