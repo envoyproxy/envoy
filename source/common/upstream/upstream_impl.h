@@ -828,10 +828,14 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override {
-    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+  bool createFilterChain(Http::FilterChainManager& manager,
+                         bool only_create_if_configured) const override {
+    if (!only_create_if_configured || has_custom_http_filters_) {
+      Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+      return true;
+    }
+    return false;
   }
-  int filterChainLength() const override { return http_filter_factories_.size(); }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     // Upgrade filter chains not yet supported for upstream filters.
@@ -922,6 +926,7 @@ private:
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
+  bool has_custom_http_filters_{false};
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

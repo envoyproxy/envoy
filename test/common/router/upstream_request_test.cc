@@ -114,15 +114,21 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-      .WillOnce(Invoke([&](Http::FilterChainManager& manager) -> void {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-      }));
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+            if (only_create_if_configured) {
+              return false;
+            }
+            auto factory = createDecoderFilterFactoryCb(filter);
+            manager.applyFilterFactoryCb({}, factory);
+            Http::FilterFactoryCb factory_cb =
+                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+              callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+            };
+            manager.applyFilterFactoryCb({}, factory_cb);
+            return true;
+          }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);

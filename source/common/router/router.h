@@ -257,12 +257,14 @@ public:
     }
   }
 
-  void createFilterChain(Http::FilterChainManager& manager) const override {
+  bool createFilterChain(Http::FilterChainManager& manager, bool) const override {
+    if (upstream_http_filter_factories_.empty()) {
+      return false;
+    }
     Http::FilterChainUtility::createFilterChainForFactories(manager,
                                                             upstream_http_filter_factories_);
+    return true;
   }
-
-  int filterChainLength() const override { return upstream_http_filter_factories_.size(); }
 
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {

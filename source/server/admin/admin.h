@@ -112,8 +112,7 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override;
-  int filterChainLength() const override { return 1; }
+  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     return false;
