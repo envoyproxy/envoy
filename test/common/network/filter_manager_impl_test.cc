@@ -85,6 +85,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  manager.startReading();
   read_filter->callbacks_->continueReading();
 
   read_buffer_.add("hello");
@@ -184,6 +185,7 @@ TEST_F(NetworkFilterManagerTest, ReadFilterCloseConnectionAndReturnContinue) {
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   read_buffer_.add("hello");
   EXPECT_CALL(connection_, state()).WillOnce(Return(Connection::State::Open));
@@ -217,6 +219,7 @@ TEST_F(NetworkFilterManagerTest, WriteFilterCloseConnectionAndReturnContinue) {
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   read_buffer_.add("hello");
   EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), _))
@@ -256,6 +259,7 @@ TEST_F(NetworkFilterManagerTest, ReadCloseConnectionReturnStopAndCallback) {
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   read_buffer_.add("hello");
   EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), _))
@@ -290,6 +294,7 @@ TEST_F(NetworkFilterManagerTest, WriteCloseConnectionReturnStopAndCallback) {
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   read_buffer_.add("hello");
   EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), _))
@@ -331,6 +336,7 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   read_buffer_.add("hello");
   read_end_stream_ = true;
@@ -371,6 +377,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
   read_filter->callbacks_->continueReading();

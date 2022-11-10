@@ -109,6 +109,7 @@ public:
   void addReadFilter(ReadFilterSharedPtr filter);
   void removeReadFilter(ReadFilterSharedPtr filter);
   bool initializeReadFilters();
+  void startReading();
   void onRead();
   FilterStatus onWrite();
   bool startUpstreamSecureTransport();

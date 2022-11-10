@@ -127,7 +127,13 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
   filter_manager_.removeReadFilter(filter);
 }
 
-bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
+bool ConnectionImpl::initializeReadFilters() {
+  auto result = filter_manager_.initializeReadFilters();
+  if (!connecting_) {
+    transport_socket_->onConnected();
+  }
+  return result;
+}
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!ioHandle().isOpen()) {
@@ -836,6 +842,8 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
     // The transport socket is still connecting, so skip changing connect state.
     break;
   case ConnectionEvent::Connected:
+    filter_manager_.startReading();
+    FALLTHRU;
   case ConnectionEvent::RemoteClose:
   case ConnectionEvent::LocalClose:
     transport_connect_pending_ = false;
@@ -917,6 +925,12 @@ ClientConnectionImpl::ClientConnectionImpl(
                                           object.stream_sharing_);
     }
   }
+}
+
+bool ClientConnectionImpl::initializeReadFilters() {
+  bool result = filter_manager_.initializeReadFilters();
+  filter_manager_.startReading();
+  return result;
 }
 
 void ClientConnectionImpl::connect() {

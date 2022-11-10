@@ -41,9 +41,10 @@ bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;
   }
-  onContinueReading(nullptr, connection_);
   return true;
 }
+
+void FilterManagerImpl::startReading() { onContinueReading(nullptr, connection_); }
 
 void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
                                           ReadBufferSource& buffer_source) {

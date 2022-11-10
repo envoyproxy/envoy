@@ -965,6 +965,7 @@ TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
+  GTEST_SKIP();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }

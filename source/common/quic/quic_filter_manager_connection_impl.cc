@@ -46,7 +46,9 @@ void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterShared
 }
 
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
-  return filter_manager_->initializeReadFilters();
+  bool result = filter_manager_->initializeReadFilters();
+  filter_manager_->startReading();
+  return result;
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {

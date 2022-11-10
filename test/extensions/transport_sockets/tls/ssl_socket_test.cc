@@ -5325,11 +5325,11 @@ protected:
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+    EXPECT_CALL(*read_filter_, onNewConnection());
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     uint32_t filter_seen = 0;
 
-    EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
         .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
           EXPECT_GE(expected_chunk_size, data.length());
@@ -5399,9 +5399,9 @@ protected:
           EXPECT_EQ(read_buffer_limit, server_connection_->bufferLimit());
         }));
 
+    EXPECT_CALL(*read_filter_, onNewConnection());
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-    EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _)).Times(testing::AnyNumber());
 
     std::string data_to_write(bytes_to_write, 'a');
@@ -5520,6 +5520,7 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(*read_filter_, onNewConnection());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(address_string,
@@ -5553,11 +5554,11 @@ TEST_P(SslReadBufferLimitTest, SmallReadsIntoSameSlice) {
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(*read_filter_, onNewConnection());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   uint32_t filter_seen = 0;
 
-  EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> Network::FilterStatus {
         EXPECT_GE(expected_chunk_size, data.length());

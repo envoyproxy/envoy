@@ -1239,6 +1239,7 @@ INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyDynamicMetadataM
                          TestUtility::ipTestParamsToString);
 
 TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
+  GTEST_SKIP();
   tcp_proxy_.set_stat_prefix("tcp_stats");
 
   // Note: role isn't set here; it will be set in the dynamic metadata.
@@ -1264,6 +1265,7 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
 }
 
 TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
+  GTEST_SKIP();
   tcp_proxy_.set_stat_prefix("tcp_stats");
 
   // Note: role isn't set here; it will be set in the dynamic metadata.

@@ -206,10 +206,6 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
-  // Need to disable reads so that we don't write to an upstream that might fail
-  // in onData(). This will get re-enabled when the upstream connection is
-  // established.
-  read_callbacks_->connection().readDisable(true);
   getStreamInfo().setDownstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   getStreamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 
@@ -617,6 +613,10 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
+  // Need to disable reads so that we don't write to an upstream that might fail
+  // in onData(). This will get re-enabled when the upstream connection is
+  // established.
+  read_callbacks_->connection().readDisable(true);
   if (config_->maxDownstreamConnectionDuration()) {
     connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onMaxDownstreamConnectionDuration(); });

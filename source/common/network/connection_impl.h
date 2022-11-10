@@ -274,6 +274,8 @@ public:
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
+  bool initializeReadFilters() override;
+
   // Network::ClientConnection
   void connect() override;
 

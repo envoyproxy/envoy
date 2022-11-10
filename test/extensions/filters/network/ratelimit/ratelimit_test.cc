@@ -555,6 +555,7 @@ stat_prefix: name
           })));
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
+  manager.startReading();
 
   EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
