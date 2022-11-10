@@ -1,6 +1,5 @@
 #include <string>
 
-#include "source/common/common/base64.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_to_metadata_filter.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -42,7 +41,9 @@ MATCHER_P(MapEqNum, rhs, "") {
 
 using namespace Envoy::Extensions::NetworkFilters;
 
-class PayloadToMetadataTest : public testing::Test {
+class PayloadToMetadataTest : public testing::Test,
+                              public DecoderCallbacks,
+                              public PassThroughDecoderEventHandler {
 public:
   void initializeFilter(const std::string& yaml, bool expect_type_inquiry = true) {
     envoy::extensions::filters::network::thrift_proxy::filters::payload_to_metadata::v3::
@@ -52,12 +53,26 @@ public:
     filter_ = std::make_shared<PayloadToMetadataFilter>(filter_config);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     if (expect_type_inquiry) {
-      EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).WillOnce(Return(transport_));
       EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).WillOnce(Return(protocol_));
     } else {
-      EXPECT_CALL(decoder_callbacks_, downstreamTransportType()).Times(0);
       EXPECT_CALL(decoder_callbacks_, downstreamProtocolType()).Times(0);
     }
+  }
+
+  // DecoderCallbacks
+  DecoderEventHandler& newDecoderEventHandler() override { return *this; }
+  bool passthroughEnabled() const override { return true; }
+  bool isRequest() const override { return false; }
+  bool headerKeysPreserveCase() const override { return false; }
+
+  // PassThroughDecoderEventHandler
+  FilterStatus passthroughData(Buffer::Instance& data) override {
+    EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+    return ThriftProxy::FilterStatus::Continue;
+  }
+  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
+    EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
+    return ThriftProxy::FilterStatus::Continue;
   }
 
   // Request payload
@@ -75,8 +90,12 @@ public:
   //     f10: set
   //   }
   // }
-  void writeMessage(MessageMetadata& metadata, Buffer::Instance& buffer,
-                    std::string string_value = "two") {
+  void writeMessage(std::string string_value = "two") {
+    Buffer::OwnedImpl buffer;
+    auto metadata_ptr =
+        std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+    auto& metadata = *metadata_ptr;
+
     Buffer::OwnedImpl msg;
     ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
     metadata.setProtocol(protocol_);
@@ -154,6 +173,14 @@ public:
 
     TransportPtr transport = NamedTransportConfigFactory::getFactory(transport_).createTransport();
     transport->encodeFrame(buffer, metadata, msg);
+
+    // Simulate the decoder events. Check PassThroughDecoderEventHandler.
+    ProtocolPtr decoder_proto = NamedProtocolConfigFactory::getFactory(protocol_).createProtocol();
+    TransportPtr decoder_transport =
+        NamedTransportConfigFactory::getFactory(transport_).createTransport();
+    DecoderPtr decoder = std::make_unique<Decoder>(*decoder_transport, *decoder_proto, *this);
+    bool underflow = false;
+    decoder->onData(buffer, underflow);
   }
 
   NiceMock<ThriftProxy::ThriftFilters::MockDecoderFilterCallbacks> decoder_callbacks_;
@@ -185,11 +212,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -218,11 +241,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -248,11 +267,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -281,11 +296,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -314,11 +325,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -347,11 +354,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -380,11 +383,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -413,11 +412,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -446,11 +441,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -476,11 +467,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -504,11 +491,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -531,11 +514,7 @@ request_rules:
               setDynamicMetadata("envoy.filters.thrift.payload_to_metadata", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -562,11 +541,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -597,11 +572,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -633,11 +604,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, value);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -669,11 +636,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, value);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -696,16 +659,13 @@ request_rules:
 )EOF";
 
   std::map<std::string, int> expected = {{"number", 1}};
+  const std::string value = "1";
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, "1");
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -726,15 +686,13 @@ request_rules:
       key: missing
       value: unknown
 )EOF";
+
+  const std::string value = "invalid";
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, "invalid");
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -753,16 +711,13 @@ request_rules:
 )EOF";
 
   std::map<std::string, int> expected = {{"number", 1}};
+  const std::string value = "1";
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, "1");
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -786,16 +741,13 @@ request_rules:
 )EOF";
 
   std::map<std::string, int> expected = {{"number", 911}};
+  const std::string value = "1";
 
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEqNum(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data, "1");
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -821,11 +773,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -854,11 +802,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -890,11 +834,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -920,11 +860,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -953,11 +889,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -986,11 +918,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -1011,11 +939,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -1036,11 +960,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -1064,13 +984,10 @@ request_rules:
   initializeFilter(request_config_yaml);
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
   // empty payload on the field
-  writeMessage(*metadata, data, "");
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  const std::string value = "";
+
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -1095,13 +1012,10 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-
   auto length = MAX_PAYLOAD_VALUE_LEN + 1;
-  writeMessage(*metadata, data, std::string(length, 'x'));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  const std::string value = std::string(length, 'x');
+
+  writeMessage(std::move(value));
   filter_->onDestroy();
 }
 
@@ -1151,11 +1065,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 
@@ -1212,11 +1122,7 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
 
-  Buffer::OwnedImpl data;
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  writeMessage(*metadata, data);
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->messageBegin(metadata));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->passthroughData(data));
+  writeMessage();
   filter_->onDestroy();
 }
 

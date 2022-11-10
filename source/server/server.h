@@ -308,6 +308,8 @@ public:
   registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
+  Network::DnsResolverSharedPtr getOrCreateDnsResolver();
+
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
