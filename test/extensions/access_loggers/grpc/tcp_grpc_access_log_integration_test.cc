@@ -231,23 +231,8 @@ public:
                                         ->mutable_peer_certificate_properties());
     }
 
-    // Clear connection UUID which is not deterministic.
-    auto metadata_entry =
-        log_entry->mutable_common_properties()->mutable_metadata()->mutable_filter_metadata()->find(
-            "envoy.filters.network.tcp_proxy");
-    if (metadata_entry != log_entry->mutable_common_properties()
-                              ->mutable_metadata()
-                              ->mutable_filter_metadata()
-                              ->end()) {
-      metadata_entry->second.mutable_fields()->erase("connection_uuid");
-
-      if (metadata_entry->second.fields().empty()) {
-        log_entry->mutable_common_properties()
-            ->mutable_metadata()
-            ->mutable_filter_metadata()
-            ->erase("envoy.filters.network.tcp_proxy");
-      }
-    }
+    // Clear connection unique id which is not deterministic.
+    log_entry->mutable_common_properties()->clear_stream_unique_id();
 
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
                                         /*ignore_repeated_field_ordering=*/false));
