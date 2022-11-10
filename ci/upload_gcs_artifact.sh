@@ -32,6 +32,9 @@ fi
 GCS_LOCATION="${GCS_ARTIFACT_BUCKET}/${UPLOAD_PATH}/${TARGET_SUFFIX}"
 
 echo "Uploading to gs://${GCS_LOCATION} ..."
+
+find "${SOURCE_DIRECTORY}" -name "*"
+
 gsutil -mq rsync -dr "${SOURCE_DIRECTORY}" "gs://${GCS_LOCATION}"
 
 # For PR uploads, add a redirect `PR_NUMBER` -> `COMMIT_SHA`
