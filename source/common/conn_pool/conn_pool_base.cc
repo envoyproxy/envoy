@@ -757,9 +757,11 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
       connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host()->cluster().trafficStats().upstream_cx_connect_ms_, parent_.dispatcher().timeSource());
+      parent_.host()->cluster().trafficStats().upstream_cx_connect_ms_,
+      parent_.dispatcher().timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host()->cluster().trafficStats().upstream_cx_length_ms_, parent_.dispatcher().timeSource());
+      parent_.host()->cluster().trafficStats().upstream_cx_length_ms_,
+      parent_.dispatcher().timeSource());
   connect_timer_->enableTimer(parent_.host()->cluster().connectTimeout());
   parent_.host()->stats().cx_total_.inc();
   parent_.host()->stats().cx_active_.inc();

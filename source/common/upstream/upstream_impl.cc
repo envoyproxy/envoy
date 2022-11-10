@@ -834,7 +834,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 
 ClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
                                                    const ClusterTrafficStatNames& stat_names) {
-   return ClusterTrafficStats(stat_names, scope);
+  return ClusterTrafficStats(stat_names, scope);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
