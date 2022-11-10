@@ -228,10 +228,8 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
     res = uring.prepareConnect(fd_, address, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare connect");
   }
-  if (isLeader()) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-  }
+  // Need to ensure the connect request submitted.
+  uring.submit();
   return Api::SysCallIntResult{0, SOCKET_ERROR_IN_PROGRESS};
 }
 
