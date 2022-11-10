@@ -72,6 +72,7 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
+        "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
