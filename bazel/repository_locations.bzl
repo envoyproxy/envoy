@@ -1176,6 +1176,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Note: the llvm/clang version should match the version specifed in:
+        #  - .github/workflows/codeql-daily.yml
+        #  - .github/workflows/codeql-push.yml
+        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
         version = "14.0.0",
         sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
         # Only allow peeking at fuzzer related files for now.
