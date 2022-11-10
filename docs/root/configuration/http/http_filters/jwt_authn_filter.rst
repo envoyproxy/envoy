@@ -66,7 +66,7 @@ Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/op
 
 
 Token Extraction from Custom HTTP Headers
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If the JWT needs to be extracted in other HTTP header, use ``from_headers`` to specify the header name.
 In addition to the ``name`` field, which specifies the HTTP header name, the ``from_headers`` section can specify an optional ``value_prefix`` value, as in:
@@ -79,7 +79,7 @@ In addition to the ``name`` field, which specifies the HTTP header name, the ``f
 
 
 The above will cause the jwt_authn filter to look for the JWT in the ``x-jwt-header`` header, following the tag ``jwt_value``.
-Any non-JWT characters (i.e., anything _other than_ alphanumerics, `_`, `-`, and `.`) will be skipped,
+Any non-JWT characters (i.e., anything _other than alphanumerics, `_`, `-`, and `.`) will be skipped,
 and all following, contiguous, JWT-legal chars will be taken as the JWT.
 
 This means all of the following will return a JWT of ``eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk``:
