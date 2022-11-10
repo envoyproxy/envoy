@@ -26,6 +26,18 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
+// If the number is unsigned 64 bit integer, convert to string as integer,
+// otherwise, convert to string as double.
+static std::string convertClaimDoubleToString(double double_value) {
+  double int_part;
+  if (double_value < 0 ||
+      double_value >= static_cast<double>(std::numeric_limits<uint64_t>::max()) ||
+      modf(double_value, &int_part) != 0) {
+    return std::to_string(double_value);
+  }
+  const uint64_t int_claim_value = static_cast<uint64_t>(double_value);
+  return std::to_string(int_claim_value);
+}
 /**
  * Object to implement Authenticator interface.
  */
@@ -76,6 +88,7 @@ private:
 
   // The jwks cache object.
   JwksCache& jwks_cache_;
+
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
 
@@ -278,37 +291,27 @@ void AuthenticatorImpl::verifyKey() {
 void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
                                             const std::string& header_name) {
   StructUtils payload_getter(jwt_->payload_pb_);
-  const ::Envoy::ProtobufWkt::Value* claim_value;
+  const ProtobufWkt::Value* claim_value;
   const auto status = payload_getter.GetValue(claim_name, claim_value);
   std::string str_claim_value;
   if (status == StructUtils::OK) {
     if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
       str_claim_value = claim_value->string_value();
     } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
-      if (claim_value->number_value() < 0 ||
-          claim_value->number_value() >=
-              static_cast<double>(std::numeric_limits<uint64_t>::max())) {
-        ENVOY_LOG(debug, "--------claim : {} with value : {} not a valid integer -----------",
-                  claim_name, claim_value->number_value());
-      }
-      const uint64_t int_claim_value = static_cast<uint64_t>(claim_value->number_value());
-      str_claim_value = std::to_string(int_claim_value);
+      str_claim_value = convertClaimDoubleToString(claim_value->number_value());
     } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kBoolValue) {
       str_claim_value = claim_value->bool_value() ? "true" : "false";
     } else {
-      ENVOY_LOG(debug,
-                "--------claim : {} is not a primitive type of int, string, or bool -----------",
-                claim_name);
+      ENVOY_LOG(
+          debug,
+          "--------claim : {} is not a primitive type of int, double, string, or bool -----------",
+          claim_name);
     }
     if (!str_claim_value.empty()) {
       headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
       ENVOY_LOG(debug, "--------claim : {} with value : {} is added to the header : {} -----------",
                 claim_name, str_claim_value, header_name);
     }
-  } else {
-    ENVOY_LOG(debug,
-              "--------claim : {} is not correct and can't be copied to header {}-----------",
-              claim_name, header_name);
   }
 }
 
@@ -328,11 +331,9 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     }
   }
 
-  // Copy JWT Claim to Header
-  if (provider.claim_to_headers_size() != 0) {
-    for (const auto& header_and_claim : provider.claim_to_headers()) {
-      addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
-    }
+  // Copy JWT claim to header
+  for (const auto& header_and_claim : provider.claim_to_headers()) {
+    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
 
   if (!provider.forward()) {

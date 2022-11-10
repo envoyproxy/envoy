@@ -68,8 +68,8 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
-      {"x-jwt-claim-sub", ""},
-      {"x-jwt-claim-nested", ""},
+      {"x-jwt-claim-sub", "value-to-be-replaced"},
+      {"x-jwt-claim-nested", "header-to-be-deleted"},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
