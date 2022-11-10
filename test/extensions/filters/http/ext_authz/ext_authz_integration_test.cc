@@ -745,7 +745,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseWhenAuthzReturn5xx) {
   Http::TestResponseHeaderMapImpl ext_authz_response_headers{
       {":status", "500"}
   };
-  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);  
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
   
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());

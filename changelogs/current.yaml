@@ -120,5 +120,8 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: ext_authz
+  change: |
+    added ``envoy.reloadable_features.ext_authz_http_service_5xx_is_denied_instead_of_error`` to change http ext_authz behaviour. When it is enabled, envoy will not change status code to ``403`` (or ``status_on_error``, if set) and drop the body, in case ext_authz server returns ``5xx`` status code. It instead returns the http response status code and body to the client as it is.
 
 deprecated:

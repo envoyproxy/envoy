@@ -514,7 +514,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
                      TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
-
 // Verify client response headers when the authorization server denies the request and
 // allowed_client_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
