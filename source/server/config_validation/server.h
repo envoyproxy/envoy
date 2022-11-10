@@ -71,7 +71,7 @@ public:
 
   // Server::Instance
   OptRef<Admin> admin() override {
-    return makeOptRefFromPtr(reinterpret_cast<Envoy::Server::Admin*>(admin_.get()));
+    return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
   }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }

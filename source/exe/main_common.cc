@@ -186,14 +186,15 @@ bool MainCommonBase::run() {
 
 void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
                                   const AdminRequestFn& handler) {
-  RELEASE_ASSERT(server_->admin().has_value(),
-                 "adminRequest called with admin support compiled out");
+  ASSERT(server_->admin().has_value(), "adminRequest called with admin support compiled out");
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
     auto response_headers = Http::ResponseHeaderMapImpl::create();
     std::string body;
-    server_->admin()->request(path_and_query_buf, method_buf, *response_headers, body);
+    if (server_->admin()) {
+      server_->admin()->request(path_and_query_buf, method_buf, *response_headers, body);
+    }
     handler(*response_headers, body);
   });
 }
