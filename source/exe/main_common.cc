@@ -184,9 +184,9 @@ bool MainCommonBase::run() {
   return false; // for gcc.
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
                                   const AdminRequestFn& handler) {
-  ASSERT(server_->admin().has_value(), "adminRequest called with admin support compiled out");
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
@@ -198,6 +198,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
     handler(*response_headers, body);
   });
 }
+#endif
 
 MainCommon::MainCommon(const std::vector<std::string>& args)
     : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
