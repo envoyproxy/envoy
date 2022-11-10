@@ -112,7 +112,7 @@ LoadBalancerBase::LoadBalancerBase(
     const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
     Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : lb_stats_(lb_stats), runtime_(runtime), random_(random),
+    : stats_(lb_stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config, healthy_panic_threshold, 100, 50)),
       priority_set_(priority_set),
@@ -395,7 +395,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   ASSERT(local_priority_set_);
-  lb_stats_.lb_recalculate_zone_structures_.inc();
+  stats_.lb_recalculate_zone_structures_.inc();
   // resizePerPriorityState should ensure these stay in sync.
   ASSERT(per_priority_state_.size() == priority_set_.hostSetsPerPriority().size());
 
@@ -493,14 +493,14 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   // panic mode for local cluster".
   if (!host_set.healthyHostsPerLocality().hasLocalLocality() ||
       host_set.healthyHostsPerLocality().get()[0].empty()) {
-    lb_stats_.lb_local_cluster_not_ok_.inc();
+    stats_.lb_local_cluster_not_ok_.inc();
     return true;
   }
 
   // Same number of localities should be for local and upstream cluster.
   if (host_set.healthyHostsPerLocality().get().size() !=
       localHostSet().healthyHostsPerLocality().get().size()) {
-    lb_stats_.lb_zone_number_differs_.inc();
+    stats_.lb_zone_number_differs_.inc();
     return true;
   }
 
@@ -508,7 +508,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   const uint64_t min_cluster_size =
       runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
   if (host_set.healthyHosts().size() < min_cluster_size) {
-    lb_stats_.lb_zone_cluster_too_small_.inc();
+    stats_.lb_zone_cluster_too_small_.inc();
     return true;
   }
 
@@ -644,7 +644,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 
   // Try to push all of the requests to the same locality first.
   if (state.locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
-    lb_stats_.lb_zone_routing_all_directly_.inc();
+    stats_.lb_zone_routing_all_directly_.inc();
     return 0;
   }
 
@@ -653,17 +653,17 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   // If we cannot route all requests to the same locality, we already calculated how much we can
   // push to the local locality, check if we can push to local locality on current iteration.
   if (random_.random() % 10000 < state.local_percent_to_route_) {
-    lb_stats_.lb_zone_routing_sampled_.inc();
+    stats_.lb_zone_routing_sampled_.inc();
     return 0;
   }
 
   // At this point we must route cross locality as we cannot route to the local locality.
-  lb_stats_.lb_zone_routing_cross_zone_.inc();
+  stats_.lb_zone_routing_cross_zone_.inc();
 
   // This is *extremely* unlikely but possible due to rounding errors when calculating
   // locality percentages. In this case just select random locality.
   if (state.residual_capacity_[number_of_localities - 1] == 0) {
-    lb_stats_.lb_zone_no_capacity_left_.inc();
+    stats_.lb_zone_no_capacity_left_.inc();
     return random_.random() % number_of_localities;
   }
 
@@ -696,7 +696,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // If the selected host set has insufficient healthy hosts, return all hosts (unless we should
   // fail traffic on panic, in which case return no host).
   if (per_priority_panic_[hosts_source.priority_]) {
-    lb_stats_.lb_healthy_panic_.inc();
+    stats_.lb_healthy_panic_.inc();
     if (fail_traffic_on_panic_) {
       return absl::nullopt;
     } else {
@@ -746,7 +746,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   }
 
   if (isHostSetInPanic(localHostSet())) {
-    lb_stats_.lb_local_cluster_not_ok_.inc();
+    stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
     if (fail_traffic_on_panic_) {

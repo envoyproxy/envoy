@@ -105,7 +105,7 @@ protected:
     }
   }
 
-  ClusterLbStats& lb_stats_;
+  ClusterLbStats& stats_;
   Runtime::Loader& runtime_;
   std::deque<uint64_t> stashed_random_;
   Random::RandomGenerator& random_;
