@@ -7,6 +7,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
 
@@ -21,7 +22,7 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
-    request_id_provider_ = Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_);
+    stream_id_provider_ = std::make_shared<Envoy::StreamInfo::StreamIdProviderImpl>(random_.uuid());
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
     end_time_ = now + std::chrono::milliseconds(3);
@@ -45,12 +46,15 @@ public:
     return duration(end_time_);
   }
 
-  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
+  void setStreamIdProvider(Envoy::StreamInfo::StreamIdProviderSharedPtr provider) override {
     ASSERT(provider != nullptr);
-    request_id_provider_ = provider;
+    stream_id_provider_ = std::move(provider);
   }
-  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
-    return request_id_provider_.get();
+  OptRef<const Envoy::StreamInfo::StreamIdProvider> getStreamIdProvider() const override {
+    if (stream_id_provider_ != nullptr) {
+      return makeOptRef<const Envoy::StreamInfo::StreamIdProvider>(*stream_id_provider_);
+    }
+    return {};
   }
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
@@ -63,7 +67,7 @@ public:
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Envoy::Event::SimulatedTimeSystem test_time_;
-  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
+  Envoy::StreamInfo::StreamIdProviderSharedPtr stream_id_provider_;
 };
 
 } // namespace Envoy

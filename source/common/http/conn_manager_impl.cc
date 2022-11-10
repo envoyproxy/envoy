@@ -644,6 +644,24 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
                                                    std::move(scoped_route_config_updated_cb));
 }
 
+absl::optional<absl::string_view>
+ConnectionManagerImpl::HttpStreamIdProviderImpl::toStringView() const {
+  if (parent_.request_headers_ == nullptr) {
+    return {};
+  }
+  ASSERT(parent_.connection_manager_.config_.requestIDExtension() != nullptr);
+  return parent_.connection_manager_.config_.requestIDExtension()->get(*parent_.request_headers_);
+}
+
+absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInteger() const {
+  if (parent_.request_headers_ == nullptr) {
+    return {};
+  }
+  ASSERT(parent_.connection_manager_.config_.requestIDExtension() != nullptr);
+  return parent_.connection_manager_.config_.requestIDExtension()->getInteger(
+      *parent_.request_headers_);
+}
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
@@ -676,8 +694,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     filter_manager_.addAccessLogHandler(access_log);
   }
 
-  filter_manager_.streamInfo().setRequestIDProvider(
-      connection_manager.config_.requestIDExtension());
+  filter_manager_.streamInfo().setStreamIdProvider(
+      std::make_shared<HttpStreamIdProviderImpl>(*this));
 
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
