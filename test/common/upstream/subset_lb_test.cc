@@ -171,7 +171,6 @@ public:
   SubsetLoadBalancerTest()
       : scope_(stats_store_.createScope("testprefix")), stat_names_(stats_store_.symbolTable()),
         stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
-    stats_.max_host_weight_.set(1UL);
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
@@ -551,26 +550,6 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
-}
-
-TEST_F(SubsetLoadBalancerTest, SelectOverrideHost) {
-  init();
-
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
-
-  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
-
-  // Mock membership update and update host map shared pointer in the lb.
-  auto host_map = std::make_shared<HostMap>();
-  host_map->insert({"1.2.3.4", mock_host});
-  priority_set_.cross_priority_host_map_ = host_map;
-  configureHostSet({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}}, host_set_);
-
-  EXPECT_EQ(mock_host, lb_->chooseHost(&context));
 }
 
 // Validate that SubsetLoadBalancer unregisters its priority set member update
