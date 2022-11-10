@@ -13,13 +13,13 @@ namespace {
 // The expected first four bytes of the header - if fileId() doesn't match ExpectedFileId
 // then the file is not a cache file and should be removed from the cache.
 // Beginning of file should be "CACH".
-std::array<char, 4> ExpectedFileId = {'C', 'A', 'C', 'H'};
+constexpr std::array<char, 4> ExpectedFileId = {'C', 'A', 'C', 'H'};
 
 // The expected next four bytes of the header - if cacheVersionId() doesn't match
 // ExpectedCacheVersionId then the file is from an incompatible cache version and should
 // be removed from the cache.
 // Next 4 bytes of file should be "0000".
-std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
+constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
 
 // Deserialize 4 bytes into a uint32_t.
 uint32_t deserializeUint32(const char* p) {
@@ -63,8 +63,8 @@ CacheFileFixedBlock::CacheFileFixedBlock() {
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   ASSERT(s.size() == size() && size() == 24);
   // Serialize the values from the string_view s into the member values.
-  std::copy_n(s.begin(), 4, file_id_.begin());
-  std::copy_n(s.begin() + 4, 4, cache_version_id_.begin());
+  std::copy(s.begin(), s.begin() + 4, file_id_.begin());
+  std::copy(s.begin() + 4, s.begin() + 8, cache_version_id_.begin());
   header_size_ = deserializeUint32(&s[8]);
   body_size_ = deserializeUint64(&s[12]);
   trailer_size_ = deserializeUint32(&s[20]);
@@ -74,8 +74,8 @@ void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
   char b[size()];
   ASSERT(size() == 24);
   // Serialize the values from the member values into the stack buffer b.
-  std::copy_n(file_id_.begin(), 4, &b[0]);
-  std::copy_n(cache_version_id_.begin(), 4, &b[4]);
+  std::copy(file_id_.begin(), file_id_.end(), &b[0]);
+  std::copy(cache_version_id_.begin(), cache_version_id_.end(), &b[4]);
   serializeUint32(header_size_, &b[8]);
   serializeUint64(body_size_, &b[12]);
   serializeUint32(trailer_size_, &b[20]);
