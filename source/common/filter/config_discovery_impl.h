@@ -309,6 +309,8 @@ public:
   const std::string& lastTypeUrl() { return last_type_url_; }
   const std::string& lastVersionInfo() { return last_version_info_; }
   const std::string& lastFactoryName() { return last_factory_name_; }
+  const SystemTime& lastUpdated() { return last_updated_; }
+
   void incrementConflictCounter();
 
 private:
@@ -329,6 +331,7 @@ private:
   std::string last_type_url_;
   std::string last_version_info_;
   std::string last_factory_name_;
+  SystemTime last_updated_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
@@ -376,12 +379,6 @@ public:
   virtual std::tuple<ProtobufTypes::MessagePtr, std::string>
   getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
              Server::Configuration::ServerFactoryContext& factory_context) const PURE;
-  virtual void
-  storeFilterConfigs(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-                     const std::string& last_type_url, const std::string& last_version_info,
-                     const SystemTime& last_updated) PURE;
-  virtual void removeFilterConfigs(const std::string& last_type_url,
-                                   const std::string& filter_config_name) PURE;
 
 protected:
   std::shared_ptr<FilterConfigSubscription> getSubscription(
@@ -395,9 +392,42 @@ protected:
                                          absl::string_view type_url) const;
   void validateProtoConfigTypeUrl(const std::string& type_url,
                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
+  virtual const std::string getConfigDumpType() const PURE;
 
 private:
+  void setupEcdsConfigDumpCallbacks(Server::Admin& admin) {
+    if (config_tracker_entry_ == nullptr) {
+      config_tracker_entry_ = admin.getConfigTracker().add(
+          getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpEcdsFilterConfigs(name_matcher);
+          });
+    }
+  }
+
+  ProtobufTypes::MessagePtr dumpEcdsFilterConfigs(const Matchers::StringMatcher& name_matcher) {
+    auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
+    for (const auto& subscription : subscriptions_) {
+      const auto& ecds_filter = subscription.second.lock();
+      if (!name_matcher.match(ecds_filter->name())) {
+        continue;
+      }
+      // Put the filter info into a typed extension proto.
+      envoy::config::core::v3::TypedExtensionConfig filter_config;
+      filter_config.set_name(ecds_filter->name());
+      filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
+      // Set up the config dump proto.
+      auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
+      filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+      filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
+      TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
+                                            *(filter_config_dump.mutable_last_updated()));
+    }
+    return config_dump;
+  }
+
+
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   friend class FilterConfigSubscription;
 };
 
@@ -415,9 +445,6 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
       bool last_filter_in_filter_chain, const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
-    // Setup the ECDS config dump call backs.
-    setupEcdsConfigDumpCallbacks(server_context.admin());
-
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
     subscription_stat_prefix =
@@ -501,44 +528,7 @@ protected:
     return message;
   }
 
-  void storeFilterConfigs(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
-                          const std::string& last_type_url, const std::string& last_version_info,
-                          const SystemTime& last_updated) override {
-    const std::string subscription_id = absl::StrCat(last_type_url, ".", filter_config.name());
-    // Remove the old config if existing.
-    auto it = filter_config_store_.find(subscription_id);
-    if (it != filter_config_store_.end()) {
-      filter_config_store_.erase(it);
-    }
-    // Add the filter config.
-    struct FilterConfigData filter_config_data;
-    filter_config_data.last_version_info_ = last_version_info;
-    filter_config_data.last_updated_ = last_updated;
-    filter_config_data.filter_config_ = filter_config;
-    filter_config_store_.insert({subscription_id, filter_config_data});
-  }
-
-  void removeFilterConfigs(const std::string& last_type_url,
-                           const std::string& filter_config_name) override {
-    const std::string subscription_id = absl::StrCat(last_type_url, ".", filter_config_name);
-    auto it = filter_config_store_.find(subscription_id);
-    if (it != filter_config_store_.end()) {
-      filter_config_store_.erase(it);
-    }
-  }
-
-  virtual const std::string getConfigDumpType() const PURE;
-
 private:
-  // Data structure to hold data related to filter configuration.
-  struct FilterConfigData {
-    std::string last_version_info_;
-    SystemTime last_updated_;
-    envoy::config::core::v3::TypedExtensionConfig filter_config_;
-  };
-  absl::flat_hash_map<std::string, struct FilterConfigData> filter_config_store_;
-  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-
   std::unique_ptr<DynamicFilterConfigProviderImpl<FactoryCb>> createFilterConfigProviderImpl(
       FilterConfigSubscriptionSharedPtr& subscription,
       const absl::flat_hash_set<std::string>& require_type_urls,
@@ -549,31 +539,6 @@ private:
     return std::make_unique<DynamicFilterConfigImpl>(
         subscription, require_type_urls, server_context, factory_context, std::move(default_config),
         last_filter_in_filter_chain, filter_chain_type, stat_prefix, listener_filter_matcher);
-  }
-
-  void setupEcdsConfigDumpCallbacks(Server::Admin& admin) {
-    if (config_tracker_entry_ == nullptr) {
-      config_tracker_entry_ = admin.getConfigTracker().add(
-          getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpEcdsFilterConfigs(name_matcher);
-          });
-    }
-  }
-
-  ProtobufTypes::MessagePtr dumpEcdsFilterConfigs(const Matchers::StringMatcher& name_matcher) {
-    auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
-    for (const auto& ecds_data : filter_config_store_) {
-      const auto& ecds_filter = ecds_data.second;
-      if (!name_matcher.match(ecds_filter.filter_config_.name())) {
-        continue;
-      }
-      auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-      filter_config_dump.mutable_ecds_filter()->PackFrom(ecds_filter.filter_config_);
-      filter_config_dump.set_version_info(ecds_filter.last_version_info_);
-      TimestampUtil::systemClockToTimestamp(ecds_filter.last_updated_,
-                                            *(filter_config_dump.mutable_last_updated()));
-    }
-    return config_dump;
   }
 };
 

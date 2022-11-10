@@ -131,9 +131,7 @@ void FilterConfigSubscription::onConfigUpdate(
   last_type_url_ = type_url;
   last_version_info_ = version_info;
   last_factory_name_ = factory_name;
-  filter_config_provider_manager_.storeFilterConfigs(filter_config, last_type_url_,
-                                                     last_version_info_,
-                                                     factory_context_.timeSource().systemTime());
+  last_updated_ = factory_context_.timeSource().systemTime();
 }
 
 void FilterConfigSubscription::onConfigUpdate(
@@ -149,12 +147,12 @@ void FilterConfigSubscription::onConfigUpdate(
         },
         [this]() { stats_.config_reload_.inc(); });
 
-    filter_config_provider_manager_.removeFilterConfigs(last_type_url_, filter_config_name_);
     last_config_hash_ = 0;
     last_config_ = nullptr;
     last_type_url_ = "";
     last_version_info_ = "";
     last_factory_name_ = "";
+    last_updated_ = factory_context_.timeSource().systemTime();
   } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
@@ -181,6 +179,9 @@ void FilterConfigSubscription::incrementConflictCounter() { stats_.config_confli
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImplBase::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
     Server::Configuration::ServerFactoryContext& server_context, const std::string& stat_prefix) {
+  // There are ECDS filters configured. Setup ECDS config dump call backs.
+  setupEcdsConfigDumpCallbacks(server_context.admin());
+
   // FilterConfigSubscriptions are unique based on their config source and filter config name
   // combination.
   // TODO(https://github.com/envoyproxy/envoy/issues/11967) Hash collision can cause subscription
