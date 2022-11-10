@@ -88,7 +88,7 @@ public:
   ProtocolState currentState() const { return state_; }
 
   /**
-   * Consumes whole passthrough data without the body start.
+   * Consumes whole passthrough data without the message start portion.
    * @param buffer a buffer containing whole passthrough data
    * @throw Envoy Exception if thrown by the underlying Protocol
    */
