@@ -1,0 +1,5 @@
+FROM mosnio/envoy-go-extension:latest
+COPY ./envoy-go-filter-samples/envoy-yaml_skip_validate /etc/envoy.yaml
+COPY ./envoy-go-filter-samples/libgolang.so /usr/local/envoy-go-extension/libgolang.so
+RUN chmod go+r /etc/envoy.yaml
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "--service-cluster", "proxy"]
