@@ -317,11 +317,14 @@ void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   const uint64_t status_code = Http::Utility::getResponseStatus(message->headers());
 
-  // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
-  // codes. A Forbidden response is sent to the client if the filter has not been configured with
-  // failure_mode_allow.
-  if (Http::CodeUtility::is5xx(status_code)) {
-    return std::make_unique<Response>(errorResponse());
+  if (!Runtime::runtimeFeatureEnabled(
+    "envoy.reloadable_features.ext_authz_http_service_5xx_is_denied_instead_of_error")) {
+      // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
+      // codes. A Forbidden response is sent to the client if the filter has not been configured with
+      // failure_mode_allow.
+      if (Http::CodeUtility::is5xx(status_code)) {
+        return std::make_unique<Response>(errorResponse());
+    }
   }
 
   // Extract headers-to-remove from the storage header coming from the

@@ -2042,6 +2042,91 @@ TEST_P(HttpFilterTestParam, DeniedResponseWith403) {
                     .value());
 }
 
+// Test that a denied response results in the connection closing with a 5xx response to the client.
+TEST_P(HttpFilterTestParam, DeniedResponseWith5xx) {
+  InSequence s;
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {":status", "500"},
+    {"content-length", "3"},
+    {"content-type", "text/plain"},
+    {"foo", "bar"}};
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+    .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+          EXPECT_EQ(headers.getStatusValue(),
+                    std::to_string(enumToInt(Http::Code::InternalServerError)));
+        }));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
+    .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+      EXPECT_EQ(data.toString(), "foo");
+    }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::InternalServerError;
+  response.body = std::string{"foo"};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.denied")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_5xx")
+                    .value());
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_500")
+                    .value());
+}
+
+// Test that a error response results in the connection closing with a 403 response to the client.
+TEST_P(HttpFilterTestParam, ErrorWithResponse5xx) {
+  InSequence s;
+
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {":status", "403"}};
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::InternalServerError;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+}
+
 // Verify that authz response memory is not used after free.
 TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   InSequence s;

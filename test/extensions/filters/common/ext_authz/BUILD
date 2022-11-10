@@ -46,6 +46,7 @@ envoy_cc_test(
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],

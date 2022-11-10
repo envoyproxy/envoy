@@ -12,6 +12,7 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -513,6 +514,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
                      TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
+
 // Verify client response headers when the authorization server denies the request and
 // allowed_client_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
@@ -546,8 +548,12 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
-// Test the client when a call to authorization server returns a 5xx error status.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
+// Test the client when a call to authorization server returns a 5xx error status and runtime guard is set to false
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxErrorWhenRuntimeGuardFalse) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ext_authz_http_service_5xx_is_denied_instead_of_error",
+        "false"}});
   Http::ResponseMessagePtr check_response(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   envoy::service::auth::v3::CheckRequest request;
@@ -557,6 +563,23 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_->onSuccess(async_request_, std::move(check_response));
+}
+
+// Test the client when a call to authorization server returns a 5xx 
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
+  const auto expected_body = std::string{"test"};
+  const auto expected_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "500", false}, {"foo", "bar", false}, {"x-foobar", "bar", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Denied, Http::Code::InternalServerError, expected_body, expected_headers);
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+  client_->onSuccess(async_request_,
+                     TestCommon::makeMessageResponse(expected_headers, expected_body));
 }
 
 // Test the client when the request is canceled.
