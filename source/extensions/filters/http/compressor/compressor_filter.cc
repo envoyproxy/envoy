@@ -11,6 +11,8 @@ namespace Compressor {
 
 namespace {
 
+using envoy::extensions::filters::http::compressor::v3::CompressorPerRoute;
+
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_encoding_handle(Http::CustomHeaders::get().AcceptEncoding);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
@@ -610,8 +612,20 @@ bool CompressorFilter::compressionEnabled(
   const CompressorPerRouteFilterConfig* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
           decoder_callbacks_);
-  return per_route_config ? per_route_config->response_compression_enabled()
-                          : config.compressionEnabled();
+  if (per_route_config) {
+    switch (per_route_config->config().override_case()) {
+    case CompressorPerRoute::kDisabled:
+      return false;
+    case CompressorPerRoute::kOverrides:
+      if (per_route_config->config().overrides().has_response_direction_config()) {
+        return true;
+      }
+      break;
+    case CompressorPerRoute::OVERRIDE_NOT_SET:
+      ASSERT(false, "CompressorPerRoute::override not set. Ignoring.");
+    }
+  }
+  return config.compressionEnabled();
 }
 
 } // namespace Compressor

@@ -14,8 +14,9 @@ namespace Compressor {
  * Config registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */
 class CompressorFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::compressor::v3::Compressor,
-    envoy::extensions::filters::http::compressor::v3::CompressorPerRoute> {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::http::compressor::v3::Compressor,
+          envoy::extensions::filters::http::compressor::v3::CompressorPerRoute> {
 public:
   CompressorFilterFactory() : FactoryBase("envoy.filters.http.compressor") {}
 

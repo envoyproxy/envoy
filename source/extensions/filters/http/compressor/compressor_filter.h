@@ -164,12 +164,13 @@ class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig 
 public:
   CompressorPerRouteFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config)
-      : response_compression_enabled_(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, response_compression_enabled, true)) {}
-  bool response_compression_enabled() const { return response_compression_enabled_; }
+      : config_(config) {}
+  const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config() const {
+    return config_;
+  }
 
 private:
-  const bool response_compression_enabled_;
+  const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute config_;
 };
 
 /**

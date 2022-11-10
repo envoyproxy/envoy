@@ -15,6 +15,7 @@ namespace HttpFilters {
 namespace Compressor {
 namespace {
 
+using envoy::extensions::filters::http::compressor::v3::CompressorPerRoute;
 using testing::NiceMock;
 using testing::Return;
 
@@ -194,20 +195,20 @@ struct EnablementParams {
 class CompresorFilterEnablementTest : public CompressorFilterTest,
                                       public testing::WithParamInterface<EnablementParams> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    CompresorFilterEnablementTest, CompresorFilterEnablementTest,
-    testing::ValuesIn<EnablementParams>({// no per-route config, so runtime key controls
-                                         {true, kNone, true},
-                                         {false, kNone, false},
-                                         // enabled by empty per-route config
-                                         {true, kEmpty, true},
-                                         {false, kEmpty, true},
-                                         // enabled by per-route config
-                                         {true, kEnabled, true},
-                                         {false, kEnabled, true},
-                                         // disabled by per-route config
-                                         {true, kDisabled, false},
-                                         {false, kDisabled, false}}));
+INSTANTIATE_TEST_SUITE_P(CompresorFilterEnablementTest, CompresorFilterEnablementTest,
+                         testing::ValuesIn<EnablementParams>(
+                             {// no per-route config, so runtime flag controls
+                              {true, kNone, true},
+                              {false, kNone, false},
+                              // empty CompressorPerRoute.overrides, so runtime flag controls
+                              {true, kEmpty, true},
+                              {false, kEmpty, false},
+                              // enabled by CompressorPerRoute.overrides
+                              {true, kEnabled, true},
+                              {false, kEnabled, true},
+                              // disabled by CompressorPerRoute.disabled
+                              {true, kDisabled, false},
+                              {false, kDisabled, false}}));
 
 // common_config.enabled should enable/disable compression, unless a CompressorPerRoute config
 // overrides it.
@@ -233,23 +234,24 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
   response_stats_prefix_ = "response.";
   ON_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
       .WillByDefault(Return(GetParam().runtime_enabled));
-  envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route_proto;
+  CompressorPerRoute per_route_proto;
   bool use_per_route_proto = true;
   switch (GetParam().per_route_enabled) {
   case kNone:
     use_per_route_proto = false;
     break;
   case kEmpty:
+    per_route_proto.mutable_overrides();
     break;
   case kEnabled:
-    per_route_proto.mutable_response_compression_enabled()->set_value(true);
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
     break;
   case kDisabled:
-    per_route_proto.mutable_response_compression_enabled()->set_value(false);
+    per_route_proto.set_disabled(true);
     break;
   }
+  CompressorPerRouteFilterConfig per_route_config(per_route_proto);
   if (use_per_route_proto) {
-    CompressorPerRouteFilterConfig per_route_config(per_route_proto);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(Return(&per_route_config));
   }

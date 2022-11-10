@@ -1,9 +1,9 @@
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
-#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "google/protobuf/any.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -12,8 +12,8 @@
 
 namespace Envoy {
 
-using Envoy::ProtobufWkt::Any;
 using Envoy::Protobuf::MapPair;
+using Envoy::ProtobufWkt::Any;
 
 class CompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Event::SimulatedTimeSystem,
@@ -395,28 +395,84 @@ TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
                                                       {"content-type", "application/json"}});
 }
 
-TEST_P(CompressorIntegrationTest, PerRoute) {
+// Enable filter, then disable per-route.
+TEST_P(CompressorIntegrationTest, PerRouteDisable) {
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
     auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
     auto* route = vh->mutable_routes()->Mutable(0);
     route->mutable_match()->set_path("/nocompress");
     envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
-    per_route.mutable_response_compression_enabled()->set_value(false);
+    per_route.set_disabled(true);
     Any cfg_any;
     ASSERT_TRUE(cfg_any.PackFrom(per_route));
     route->mutable_typed_per_filter_config()->insert(
         MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
   });
-  initializeFilter(default_config);
+  initializeFilter(R"EOF(
+      name: envoy.filters.http.compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        compressor_library:
+          name: testlib
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+        response_direction_config:
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: foo_key
+            content_type:
+              - text/html
+              - application/json
+    )EOF");
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                         {":path", "/nocompress"},
-                                                         {":scheme", "http"},
-                                                         {":authority", "host"},
-                                                         {"accept-encoding", "deflate, gzip"}},
-                          Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                          {"content-length", "40"},
-                                                          {"content-type", "text/xml"}});
+                                                           {":path", "/nocompress"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, gzip"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "40"},
+                                                            {"content-type", "text/xml"}});
+}
+
+// Disable filter, then enable per-route.
+TEST_P(CompressorIntegrationTest, PerRouteEnable) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/nocompress");
+    envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+    per_route.mutable_overrides()->mutable_response_direction_config();
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(per_route));
+    route->mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+  });
+  initializeFilter(R"EOF(
+      name: envoy.filters.http.compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        compressor_library:
+          name: testlib
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+        response_direction_config:
+          common_config:
+            enabled:
+              default_value: false
+              runtime_key: foo_key
+            content_type:
+              - text/html
+              - application/json
+    )EOF");
+  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                           {":path", "/nocompress"},
+                                                           {":scheme", "http"},
+                                                           {":authority", "host"},
+                                                           {"accept-encoding", "deflate, gzip"}},
+                            Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                            {"content-length", "40"},
+                                                            {"content-type", "text/xml"}});
 }
 
 } // namespace Envoy
-
