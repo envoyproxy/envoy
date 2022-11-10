@@ -1049,7 +1049,7 @@ public:
   /**
    * @return ClusterTrafficStats& strongly named stats for this cluster.
    */
-  virtual LazyInitStats<ClusterTrafficStats>& upstreamStats() const PURE;
+  virtual LazyInitStats<ClusterTrafficStats>& trafficStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic

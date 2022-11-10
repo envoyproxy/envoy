@@ -151,7 +151,7 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(LazyInitStats<ClusterTrafficStats>&, upstreamStats, (), (const));
+  MOCK_METHOD(LazyInitStats<ClusterTrafficStats>&, trafficStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));

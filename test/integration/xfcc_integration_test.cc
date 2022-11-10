@@ -928,8 +928,8 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     }
   };
 
-  // Since ClusterInfo::upstreamStats() are lazy-init, we need to update any stat for a cluster's
-  // upstreamStats() to trigger creation of the cluster upstreamStats.
+  // Since ClusterInfo::trafficStats() are lazy-init, we need to update any stat for a cluster's
+  // trafficStats() to trigger creation of the cluster upstreamStats.
   absl::Notification n;
   test_server_->server().dispatcher().post([&]() {
     test_server_->server()
@@ -938,7 +938,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
         .getCluster("cluster_0")
         ->get()
         .info()
-        ->upstreamStats()
+        ->trafficStats()
         ->upstream_cx_active_.inc();
     n.Notify();
   });
