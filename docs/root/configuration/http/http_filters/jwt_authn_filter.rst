@@ -74,23 +74,23 @@ In addition to the ``name`` field, which specifies the HTTP header name, the ``f
 .. code-block:: yaml
 
     from_headers:
-      - name: bespoke
+      - name: x-jwt-header
         value_prefix: jwt_value
 
 
-The above will cause the jwt_authn filter to look for the JWT in the ``bespoke`` header, following the tag ``jwt_value``.
+The above will cause the jwt_authn filter to look for the JWT in the ``x-jwt-header`` header, following the tag ``jwt_value``.
 Any non-JWT characters (i.e., anything _other than_ alphanumerics, `_`, `-`, and `.`) will be skipped,
 and all following, contiguous, JWT-legal chars will be taken as the JWT.
 
 This means all of the following will return a JWT of ``eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk``:
 
-.. code-block:: text
+.. code-block:: yaml
 
-    bespoke: jwt_value=eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk
+    x-jwt-header: jwt_value=eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk
 
-    bespoke: {"jwt_value": "eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk"}
+    x-jwt-header: {"jwt_value": "eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk"}
 
-    bespoke: beta:true,jwt_value:"eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk",trace=1234
+    x-jwt-header: beta:true,jwt_value:"eyJFbnZveSI6ICJyb2NrcyJ9.e30.c2lnbmVk",trace=1234
 
 
 The header ``name`` may be ``Authorization``.
