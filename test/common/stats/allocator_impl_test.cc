@@ -40,7 +40,7 @@ protected:
   }
 
   SymbolTableImpl symbol_table_;
-  // Decleare the pool before the allocator because the allocator could contain
+  // Declare the pool before the allocator because the allocator could contain
   // a TestSinkPredicates object whose lifetime should be bounded by that of the pool.
   StatNamePool pool_;
   AllocatorImpl alloc_;
