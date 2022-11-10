@@ -1,7 +1,5 @@
 #include "source/extensions/http/early_header_mutation/regex_mutation/config.h"
 
-#include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.h"
-
 #include "source/common/config/utility.h"
 
 namespace Envoy {

@@ -466,7 +466,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       throw EnvoyException(fmt::format("Early header mutation extension could not be created: '{}'",
                                        extension_config.name()));
     }
-    early_header_mutation_extensions_.push_back(extension);
+    early_header_mutation_extensions_.push_back(std::move(extension));
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers

@@ -239,6 +239,7 @@ envoy_cc_library(
     deps = [
         ":date_provider_lib",
         "//envoy/config:config_provider_interface",
+        "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",

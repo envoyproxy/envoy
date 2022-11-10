@@ -17,7 +17,6 @@ envoy_cc_library(
         "//envoy/http:early_header_mutation_interface",
         "//source/common/common:regex_lib",
         "@envoy_api//envoy/extensions/http/early_header_mutation/regex_mutation/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/http/v3:pkg_cc_proto",
     ],
 )
 

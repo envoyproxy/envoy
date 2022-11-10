@@ -6,7 +6,6 @@
 #include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.h"
 #include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.validate.h"
 #include "envoy/http/early_header_mutation.h"
-#include "envoy/type/http/v3/header_mutation.pb.h"
 
 #include "source/common/common/regex.h"
 

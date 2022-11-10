@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.h"
+#include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.validate.h"
 
 #include "source/extensions/http/early_header_mutation/regex_mutation/regex_mutation.h"
 
