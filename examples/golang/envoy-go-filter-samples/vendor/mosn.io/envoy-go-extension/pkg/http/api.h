@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-typedef struct {
+typedef struct { // NOLINT(modernize-use-using)
   unsigned long long int configId;
   int phase;
 } httpRequest;
