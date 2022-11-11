@@ -626,6 +626,8 @@ public:
               pathWithEscapedSlashesAction, (), (const));
   MOCK_METHOD(const std::vector<Http::OriginalIPDetectionSharedPtr>&, originalIpDetectionExtensions,
               (), (const));
+  MOCK_METHOD(const std::vector<Http::EarlyHeaderMutationPtr>&, earlyHeaderMutationExtensions, (),
+              (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator,
