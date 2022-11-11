@@ -312,6 +312,8 @@ public:
     store_.scopes_.push_back(scope);
   }
 
+  virtual ScopeSharedPtr makeScope(StatName name);
+
  private:
   StatNameStorage prefix_;
   IsolatedStoreImpl& store_;

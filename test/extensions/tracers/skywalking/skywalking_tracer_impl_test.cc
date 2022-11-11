@@ -104,7 +104,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
 
-    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    EXPECT_EQ(1U, factory_context.store_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {
@@ -126,7 +126,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
 
-    EXPECT_EQ(2U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    EXPECT_EQ(2U, factory_context.store_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {

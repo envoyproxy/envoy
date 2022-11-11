@@ -50,10 +50,13 @@ ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name) {
 
 ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
-  ScopeSharedPtr scope = std::make_shared<IsolatedScopeImpl>(
-      StatName(prefix_name_storage.get()), store_);
+  ScopeSharedPtr scope = makeScope(StatName(prefix_name_storage.get()));
   addScopeToStore(scope);
   return scope;
+}
+
+ScopeSharedPtr IsolatedScopeImpl::makeScope(StatName name) {
+  return std::make_shared<IsolatedScopeImpl>(name, store_);
 }
 
 } // namespace Stats

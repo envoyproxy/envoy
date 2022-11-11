@@ -151,6 +151,43 @@ public:
   absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;
 };
 
+class TestScope : public IsolatedScopeImpl {
+ public:
+  TestScope(const std::string& prefix, TestStore& store);
+  TestScope(StatName prefix, TestStore& store);
+
+  // Override the Stats::Store methods for name-based lookup of stats, to use
+  // and update the string-maps in this class. Note that IsolatedStoreImpl
+  // does not support deletion of stats, so we only have to track additions
+  // to keep the maps up-to-date.
+  //
+  // Stats::Scope
+  Counter& counterFromString(const std::string& name) override;
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
+  Counter& counterFromStatNameWithTags(const StatName& stat_name,
+                                       StatNameTagVectorOptConstRef tags) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
+                                           StatNameTagVectorOptConstRef tags,
+                                           Histogram::Unit unit) override;
+  /*
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    store_.histogram_values_map_[histogram.name()].push_back(value);
+  }
+  */
+
+  //ScopeSharedPtr createScope(const std::string& name) override;
+  //ScopeSharedPtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr makeScope(StatName name) override;
+
+  TestStore& store() override { return store_; }
+
+private:
+  TestStore& store_;
+};
+
 // Compares the memory consumed against an exact expected value, but only on
 // canonical platforms, or when the expected value is zero. Canonical platforms
 // currently include only for 'release' tests in ci. On other platforms an info

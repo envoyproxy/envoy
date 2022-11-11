@@ -144,103 +144,112 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-class TestScope : public IsolatedScopeImpl {
- public:
-  TestScope(const std::string& prefix, TestStore& store)
-      : IsolatedScopeImpl(prefix, store),
-        store_(store) {}
-  TestScope(StatName prefix, TestStore& store)
-      : IsolatedScopeImpl(prefix, store),
-        store_(store) {}
+TestScope::TestScope(const std::string& prefix, TestStore& store)
+    : IsolatedScopeImpl(prefix, store),
+      store_(store) {}
+TestScope::TestScope(StatName prefix, TestStore& store)
+    : IsolatedScopeImpl(prefix, store),
+      store_(store) {}
 
-  // Override the Stats::Store methods for name-based lookup of stats, to use
-  // and update the string-maps in this class. Note that IsolatedStoreImpl
-  // does not support deletion of stats, so we only have to track additions
-  // to keep the maps up-to-date.
-  //
-  // Stats::Scope
-  Counter& counterFromString(const std::string& name) override {
-    Counter*& counter_ref = store_.counter_map_[name];
-    if (counter_ref == nullptr) {
-      counter_ref = &IsolatedScopeImpl::counterFromString(name);
-    }
-    return *counter_ref;
+// Override the Stats::Store methods for name-based lookup of stats, to use
+// and update the string-maps in this class. Note that IsolatedStoreImpl
+// does not support deletion of stats, so we only have to track additions
+// to keep the maps up-to-date.
+//
+// Stats::Scope
+Counter& TestScope::counterFromString(const std::string& name) {
+  Counter*& counter_ref = store_.counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedScopeImpl::counterFromString(name);
   }
+  return *counter_ref;
+}
 
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    Gauge*& gauge_ref = store_.gauge_map_[name];
-    if (gauge_ref == nullptr) {
-      gauge_ref = &IsolatedScopeImpl::gaugeFromString(name, import_mode);
-    }
-    return *gauge_ref;
+Gauge& TestScope::gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
+  Gauge*& gauge_ref = store_.gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedScopeImpl::gaugeFromString(name, import_mode);
   }
+  return *gauge_ref;
+}
 
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    Histogram*& histogram_ref = store_.histogram_map_[name];
-    if (histogram_ref == nullptr) {
-      histogram_ref = &IsolatedScopeImpl::histogramFromString(name, unit);
-    }
-    return *histogram_ref;
+Histogram& TestScope::histogramFromString(const std::string& name, Histogram::Unit unit) {
+  Histogram*& histogram_ref = store_.histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedScopeImpl::histogramFromString(name, unit);
   }
+  return *histogram_ref;
+}
 
-  Counter& counterFromStatNameWithTags(const StatName& stat_name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    std::string name = symbolTable().toString(stat_name);
-    Counter*& counter_ref = store_.counter_map_[name];
-    if (counter_ref == nullptr) {
-      counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
-    } else {
-      // Ensures StatNames with the same string representation are specified
-      // consistently using symbolic/dynamic components on every access.
-      ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-             "stat name specification");
-    }
-    return *counter_ref;
+Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
+                                     StatNameTagVectorOptConstRef tags) {
+  std::string name = symbolTable().toString(stat_name);
+  Counter*& counter_ref = store_.counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
+  } else {
+    // Ensures StatNames with the same string representation are specified
+    // consistently using symbolic/dynamic components on every access.
+    ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+           "stat name specification");
   }
+  return *counter_ref;
+}
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    std::string name = symbolTable().toString(stat_name);
-    Gauge*& gauge_ref = store_.gauge_map_[name];
-    if (gauge_ref == nullptr) {
-      gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
-    } else {
-      ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-             "stat name specification");
-    }
-    return *gauge_ref;
+Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
+                                            StatNameTagVectorOptConstRef tags,
+                                            Gauge::ImportMode import_mode) {
+  std::string name = symbolTable().toString(stat_name);
+  Gauge*& gauge_ref = store_.gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+  } else {
+    ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+           "stat name specification");
   }
+  return *gauge_ref;
+}
 
-  Histogram& histogramFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    std::string name = symbolTable().toString(stat_name);
-    Histogram*& histogram_ref = store_.histogram_map_[name];
-    if (histogram_ref == nullptr) {
-      histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
-    } else {
-      ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-             "stat name specification");
-    }
-    return *histogram_ref;
+Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
+                                                    StatNameTagVectorOptConstRef tags,
+                                                    Histogram::Unit unit) {
+  std::string name = symbolTable().toString(stat_name);
+  Histogram*& histogram_ref = store_.histogram_map_[name];
+  if (histogram_ref == nullptr) {
+    histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
+  } else {
+    ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
+           "stat name specification");
   }
+  return *histogram_ref;
+}
 
-  /*
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    store_.histogram_values_map_[histogram.name()].push_back(value);
-  }
-  */
+/*ScopeSharedPtr TestScope::scopeFromStatName(StatName name) {
+  ScopeSharedPtr scope = std::make_shared<TestScope>(name, store_);
+  addScopeToStore(scope);
+  return scope;
+  }*/
 
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    ScopeSharedPtr scope = std::make_shared<TestScope>(name, store_);
-    addScopeToStore(scope);
-    return scope;
-  }
+/*
+ScopeSharedPtr TestScope::createScope(const std::string& name) {
+  StatNameManagedStorage name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return scopeFromStatName(name_storage.statName());
+}
+*/
 
-  TestStore& store() override { return store_; }
+/*
+ScopeSharedPtr TestScope::scopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
+  ScopeSharedPtr scope = std::make_shared<TestScope>(
+      StatName(prefix_name_storage.get()), store_);
+  addScopeToStore(scope);
+  return scope;
+}
+*/
 
-private:
-  TestStore& store_;
-};
+ScopeSharedPtr TestScope::makeScope(StatName name) {
+  return std::make_shared<TestScope>(name, store_);
+}
 
 TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {
   setDefaultScope(std::make_shared<TestScope>("", *this));

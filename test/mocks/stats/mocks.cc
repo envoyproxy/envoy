@@ -73,7 +73,36 @@ MockSink::~MockSink() = default;
 MockSinkPredicates::MockSinkPredicates() = default;
 MockSinkPredicates::~MockSinkPredicates() = default;
 
+MockScope::MockScope(StatName prefix, MockStore& store) : TestUtil::TestScope(prefix, store), mock_store_(store) {}
+
+ScopeSharedPtr MockScope::makeScope(StatName prefix) {
+  return std::make_shared<MockScope>(prefix, mock_store_);
+}
+
+Counter& MockScope::counterFromStatNameWithTags(const StatName& name,
+                                     StatNameTagVectorOptConstRef) {
+  // We always just respond with the mocked counter, so the tags don't matter.
+  return mock_store_.counter(symbolTable().toString(name));
+}
+Gauge& MockScope::gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                 Gauge::ImportMode import_mode) {
+  // We always just respond with the mocked gauge, so the tags don't matter.
+  return mock_store_.gauge(symbolTable().toString(name), import_mode);
+}
+Histogram& MockScope::histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                         Histogram::Unit unit) {
+  return mock_store_.histogram(symbolTable().toString(name), unit);
+}
+TextReadout& MockScope::textReadoutFromStatNameWithTags(const StatName& name,
+                                             StatNameTagVectorOptConstRef) {
+  // We always just respond with the mocked counter, so the tags don't matter.
+  return mock_store_.textReadout(symbolTable().toString(name));
+}
+
+
 MockStore::MockStore() {
+  setDefaultScope(std::make_shared<MockScope>(StatName(), *this));
+
   //ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   //ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
   /*ON_CALL(*this, histogram(_, _))
@@ -92,6 +121,7 @@ MockStore::MockStore() {
         }));*/
 }
 MockStore::~MockStore() = default;
+
 
 MockIsolatedStatsStore::MockIsolatedStatsStore() = default;
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;

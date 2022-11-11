@@ -273,6 +273,48 @@ public:
   MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
 };
 
+class MockStore;
+
+class MockScope : public TestUtil::TestScope {
+ public:
+  MockScope(StatName prefix, MockStore& store);
+
+  ScopeSharedPtr makeScope(StatName name) override;
+
+  /*
+  ScopeSharedPtr createScope(const std::string& name) override {
+    return ScopeSharedPtr(createScope_(name));
+  }
+  ScopeSharedPtr scopeFromStatName(StatName name) override {
+    return createScope(symbolTable().toString(name));
+    }*/
+
+  MOCK_METHOD(Counter&, counter, (const std::string&));
+  MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
+  MOCK_METHOD(Scope*, createScope_, (const std::string& name));
+  MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
+  MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
+  MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
+  MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
+  MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+
+  MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
+  MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
+  MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
+  MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const));
+
+  Counter& counterFromStatNameWithTags(const StatName& name,
+                                       StatNameTagVectorOptConstRef) override;
+  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                   Gauge::ImportMode import_mode) override;
+  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
+                                           Histogram::Unit unit) override;
+  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
+                                               StatNameTagVectorOptConstRef) override;
+
+  MockStore& mock_store_;
+};
+
 class MockStore : public TestUtil::TestStore {
 public:
   MockStore();
@@ -292,53 +334,11 @@ public:
   //MOCK_METHOD(NullCounterImpl&, nullCounter, ());
   //MOCK_METHOD(NullGaugeImpl&, nullGauge, ());
 
-#if 0
-  ScopeSharedPtr createScope(const std::string& name) override {
-    return ScopeSharedPtr(createScope_(name));
-  }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    return createScope(symbolTable().toString(name));
-  }
-
-  MOCK_METHOD(Counter&, counter, (const std::string&));
-  MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
-  MOCK_METHOD(Scope*, createScope_, (const std::string& name));
-  MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
-  MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
-  MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
-  MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
-  MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
-
-  MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
-  MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
-  MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
-  MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const));
-
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef) override {
-    // We always just respond with the mocked counter, so the tags don't matter.
-    return counter(symbol_table_->toString(name));
-  }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
-                                   Gauge::ImportMode import_mode) override {
-    // We always just respond with the mocked gauge, so the tags don't matter.
-    return gauge(symbol_table_->toString(name), import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef,
-                                           Histogram::Unit unit) override {
-    return histogram(symbol_table_->toString(name), unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef) override {
-    // We always just respond with the mocked counter, so the tags don't matter.
-    return textReadout(symbol_table_->toString(name));
-  }
-#endif
-
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
+  std::shared_ptr<MockScope> default_scope_;
 };
 
 /**

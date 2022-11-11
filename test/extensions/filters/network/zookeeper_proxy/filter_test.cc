@@ -496,7 +496,7 @@ public:
 
   Stats::HistogramOptConstRef findHistogram(const std::string& name) {
     Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
-    return scope_.findHistogram(storage.statName());
+    return scope_.rootScope()->findHistogram(storage.statName());
   }
 
   Stats::TestUtil::TestStore scope_;
