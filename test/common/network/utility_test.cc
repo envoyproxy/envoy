@@ -177,10 +177,10 @@ TEST(NetworkUtility, ParseInternetAddress) {
   StatusOr<Interface> ifc = getLocalNetworkInterface();
   if (ifc.ok()) {
     EXPECT_EQ(
-        absl::StrCat("[fe80::1%", ifc->name, "]:0"),
+        absl::StrCat("[fe80::1%", ifc->if_index, "]:0"),
         Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->name))->asString());
     EXPECT_EQ(
-        absl::StrCat("[fe80::1%", ifc->name, "]:0"),
+        absl::StrCat("[fe80::1%", ifc->if_index, "]:0"),
         Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index))->asString());
     EXPECT_NE(*Utility::parseInternetAddressNoThrow("fe80::1"),
               *Utility::parseInternetAddressNoThrow(absl::StrCat("fe80::1%", ifc->if_index)));
