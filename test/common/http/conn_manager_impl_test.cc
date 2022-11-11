@@ -1,7 +1,7 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
+#include "test/mocks/http/early_header_mutation.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
-#include "test/mocks/http/early_header_mutation.h"
 
 using testing::_;
 using testing::An;
