@@ -18,7 +18,9 @@ namespace FileSystemHttpCache {
 /**
  * CacheFileFixedBlock represents a minimal header block on the cache entry file; it
  * uses a struct that is required to be packed, and explicit byte order, to ensure
- * consistency.
+ * consistency. (It is not *expected* that a cache file will be handled by different
+ * machines, but it costs little to accommodate it, and can simplify issue
+ * investigation if the file format doesn't vary.)
  *
  * This data is serialized as a flat object rather than protobuf serialization because it
  * needs to be at the start of the file for efficient read, but write after the rest of the
