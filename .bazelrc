@@ -167,6 +167,8 @@ build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
 # Coverage options
 coverage --config=coverage
 coverage --build_tests_only
+coverage --experimental_use_llvm_covmap
+coverage --test_env=VERBOSE_COVERAGE=1
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
@@ -182,7 +184,6 @@ build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
 build:coverage --strategy=TestRunner=sandboxed,local
 build:coverage --strategy=CoverageReport=sandboxed,local
-build:coverage --experimental_use_llvm_covmap
 build:coverage --collect_code_coverage
 build:coverage --test_tag_filters=-nocoverage
 build:coverage --instrumentation_filter="//source(?!/common/quic/platform)[/:],//envoy[/:],//contrib(?!/.*/test)[/:]"
