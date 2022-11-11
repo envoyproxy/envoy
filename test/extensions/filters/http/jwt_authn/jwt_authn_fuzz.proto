@@ -19,7 +19,7 @@ message JwtAuthnFuzzInput {
   // per_route
   envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig per_route = 4;
 
-  // the selector for the fitler state
+  // the selector for the filter state
   string filter_state_selector = 6;
 
   bool force_jwt_expired = 7;
