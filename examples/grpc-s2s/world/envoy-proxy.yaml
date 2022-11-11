@@ -22,13 +22,13 @@ static_resources:
                   prefix: "/"
                   grpc: {}
                 route:
-                  cluster: greet_service
+                  cluster: world_service
          http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: greet_service
+  - name: world_service
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:
@@ -43,5 +43,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: greet-service
-                port_value: 8081
+                address: world-service
+                port_value: 8082

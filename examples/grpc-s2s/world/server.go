@@ -39,7 +39,7 @@ func updateServiceHealth(
 }
 
 func main() {
-	port := flag.Int("port", 8081, "grpc port")
+	port := flag.Int("port", 8082 "grpc port")
 
 	flag.Parse()
 
