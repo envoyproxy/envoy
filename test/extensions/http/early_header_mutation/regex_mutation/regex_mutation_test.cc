@@ -15,6 +15,8 @@ using ProtoRegexMutation =
     envoy::extensions::http::early_header_mutation::regex_mutation::v3::RegexMutation;
 
 TEST(RegexMutationTest, Basic) {
+  ScopedInjectableLoader<Regex::Engine> engine{std::make_unique<Regex::GoogleReEngine>()};
+
   const std::string config = R"EOF(
   header_mutations:
     - header: "foo"
@@ -83,6 +85,8 @@ TEST(RegexMutationTest, Basic) {
 }
 
 TEST(RegexMutationTest, MutateSameHeader) {
+  ScopedInjectableLoader<Regex::Engine> engine{std::make_unique<Regex::GoogleReEngine>()};
+
   const std::string config = R"EOF(
   header_mutations:
     - header: "foo"
