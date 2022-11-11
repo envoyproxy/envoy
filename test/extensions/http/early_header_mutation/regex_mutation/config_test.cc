@@ -30,20 +30,17 @@ TEST(FactoryTest, FactoryTest) {
     - header: "foo"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "foo"
         substitution: "bar"
     - header: "foo"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "bar"
         substitution: "qux"
     - header: "foo"
       rename: "bar"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^(.*)$"
         substitution: "\\1"
   )EOF";

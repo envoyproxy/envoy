@@ -21,26 +21,22 @@ TEST(RegexMutationTest, Basic) {
       rename: "bar"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "foo"
         substitution: "bar"
     - header: "baz"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^baz$"
         substitution: "qux"
     - header: "sub-group"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^(abcd)(efg)$"
         substitution: "\\2O_O\\1"
     - header: ":method"
       rename: "add-header"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: ".*"
         substitution: "add-header-value"
   )EOF";
@@ -92,20 +88,17 @@ TEST(RegexMutationTest, MutateSameHeader) {
     - header: "foo"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "foo"
         substitution: "bar"
     - header: "foo"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "bar"
         substitution: "qux"
     - header: "foo"
       rename: "bar"
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^(.*)$"
         substitution: "\\1"
   )EOF";

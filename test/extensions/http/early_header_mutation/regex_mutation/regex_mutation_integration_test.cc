@@ -53,7 +53,6 @@ TEST_P(RegexMutationIntegrationTest, TestRegexMutation) {
       rename: ":path"          # Try to reset path.
       regex_rewrite:
         pattern:
-          google_re2: {}
           regex: "^reset-path$"
         substitution: "/prefix"
   )EOF";
