@@ -393,11 +393,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "libipp-crypto",
         project_desc = "Intel® Integrated Performance Primitives Cryptography",
         project_url = "https://github.com/intel/ipp-crypto",
-        version = "2021.5",
-        sha256 = "0b277548c59e6bfe489e634d622b54be3708086fc006a441d39922c2d6d43f0d",
+        version = "2021.6",
+        sha256 = "632cc5ba54413eeab575682619c05d247e9b7f2fc58ea3e5f4a02bdcab3e6b78",
         strip_prefix = "ipp-crypto-ippcp_{version}",
         urls = ["https://github.com/intel/ipp-crypto/archive/ippcp_{version}.tar.gz"],
-        release_date = "2021-12-21",
+        release_date = "2022-08-09",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
@@ -1015,13 +1015,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "OpenCensus C++",
         project_desc = "OpenCensus tracing library",
         project_url = "https://github.com/census-instrumentation/opencensus-cpp",
-        version = "ba631066779a534267fdb1321b19850eb2b0c000",
-        sha256 = "f239a40803f6e2e42b57c9e68771b0990c4ca8b2d76b440073cdf14f4211ad26",
+        version = "f68a2d0ea43eb61a4b7889f09987294c4f94d436",
+        sha256 = "b5fd69da558d08480e254c7e2a91e23a88ec8b72d9aec1a6c2329d7560a61744",
         strip_prefix = "opencensus-cpp-{version}",
         urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.opencensus"],
-        release_date = "2020-10-08",
+        release_date = "2022-09-20",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/census-instrumentation/opencensus-cpp/blob/{version}/LICENSE",
@@ -1176,6 +1176,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Note: the llvm/clang version should match the version specifed in:
+        #  - .github/workflows/codeql-daily.yml
+        #  - .github/workflows/codeql-push.yml
+        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
         version = "14.0.0",
         sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
         # Only allow peeking at fuzzer related files for now.

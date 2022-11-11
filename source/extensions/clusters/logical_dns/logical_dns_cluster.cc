@@ -1,4 +1,4 @@
-#include "source/common/upstream/logical_dns_cluster.h"
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
 #include <chrono>
 #include <list>
