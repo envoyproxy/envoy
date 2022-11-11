@@ -21,7 +21,7 @@ public:
   virtual std::unique_ptr<quic::ProofSource>
   createQuicProofSource(Network::Socket& listen_socket,
                         Network::FilterChainManager& filter_chain_manager,
-                        Server::ListenerStats& listener_stats) PURE;
+                        Server::ListenerStats& listener_stats, TimeSource& time_source) PURE;
 };
 
 } // namespace Quic

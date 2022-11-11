@@ -1128,7 +1128,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = lb_->chooseHost(context);
+  HostConstSharedPtr logical_host = chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1507,7 +1507,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+      override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1617,7 +1618,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1721,10 +1722,33 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
   }
 }
 
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->chooseHost(context);
+}
+
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->peekAnotherHost(context);
+}
+
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1920,7 +1944,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
                                         ssl_context_manager_, outlier_event_logger, added_via_api,
                                         added_via_api
                                             ? validation_context_.dynamicValidationVisitor()

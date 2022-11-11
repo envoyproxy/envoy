@@ -486,3 +486,20 @@ envoy_benchmark_test(
     name = "config_impl_benchmark_test",
     benchmark_binary = "config_impl_speed_test",
 )
+
+envoy_cc_benchmark_binary(
+    name = "header_formatter_speed_test",
+    srcs = ["header_formatter_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/router:router_lib",
+        "//test/common/stream_info:test_util",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "header_formatter_benchmark_test",
+    benchmark_binary = "header_formatter_speed_test",
+)

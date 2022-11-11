@@ -51,7 +51,6 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/eds.h"
 #include "source/common/upstream/health_checker_impl.h"
-#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
