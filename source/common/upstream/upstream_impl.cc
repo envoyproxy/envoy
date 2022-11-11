@@ -1418,16 +1418,14 @@ void ClusterImplBase::onPreInitComplete() {
 void ClusterImplBase::onInitDone() {
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
-      uint64_t health_check_count = 0;
       for (auto& host : host_set->hosts()) {
         if (host->disableActiveHealthCheck()) {
           continue;
         }
-        ++health_check_count;
+        ++pending_initialize_health_checks_;
       }
-      pending_initialize_health_checks_ += health_check_count;
     }
-    ENVOY_LOG(debug, "Clsuter onInitDone pending initialize health checks count {}",
+    ENVOY_LOG(debug, "Cluster onInitDone pending initialize health check count {}",
               pending_initialize_health_checks_);
 
     // TODO(mattklein123): Remove this callback when done.
