@@ -1,50 +1,29 @@
 version: "3.8"
-
 services:
 
-  # Requires the build of the stubs first
-  grpc-server:
-    image: envoyproxy/example-kv-server
-    build:
-      context: server
-    ports:
-    - "8081:8081"
-    networks:
-      envoymesh:
-        aliases:
-        - kv-backend-service
+  #client:
 
-  grpc-server-proxy:
+  envoy-hello:
     build:
       context: .
-      dockerfile: Dockerfile-server
-    networks:
-      envoymesh:
-        aliases:
-        - kv-backend-proxy
+      dockerfile: Dockerfile-envoy-hello
     ports:
-    - "8811:8811"
+    - "${PORT_PROXY:-10000}:8080"
 
-  # Requires the build of the stubs first
-  grpc-client:
-    image: envoyproxy/example-kv-client
-    build:
-      context: client
-    environment:
-    - CLIENT_PROXY=http://kv-client-proxy:9911
-    networks:
-    - envoymesh
-
-  grpc-client-proxy:
+  hello:
     build:
       context: .
-      dockerfile: Dockerfile-client
-    networks:
-      envoymesh:
-        aliases:
-        - kv-client-proxy
-    ports:
-    - "9911:9911"
+      dockerfile: Dockerfile-hello
+    command: ["/bin/server", "-world-addr=envoy-world:8080"]
 
-networks:
-  envoymesh: {}
+  envoy-world:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy-world
+
+  world:
+    build:
+      context: .
+      dockerfile: Dockerfile-world
+    command: ["/bin/server"]
+

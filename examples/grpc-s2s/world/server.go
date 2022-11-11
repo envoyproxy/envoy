@@ -23,7 +23,6 @@ func (s *worldService) Greet(
 	in *service.WorldRequest,
 ) (*service.WorldResponse, error) {
 	log.Println("World: Received request")
-	// TODO call world service here
 	return &service.WorldResponse{Reply: "world"}, nil
 }
 
@@ -39,8 +38,7 @@ func updateServiceHealth(
 }
 
 func main() {
-	port := flag.Int("port", 8082 "grpc port")
-
+	port := flag.Int("port", 8082, "grpc port")
 	flag.Parse()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))

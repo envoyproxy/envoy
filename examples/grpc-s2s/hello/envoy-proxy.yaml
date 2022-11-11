@@ -22,13 +22,13 @@ static_resources:
                   prefix: "/"
                   grpc: {}
                 route:
-                  cluster: greet_service
-         http_filters:
+                  cluster: hello
+          http_filters:
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
-  - name: greet_service
+  - name: hello
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:
@@ -37,11 +37,11 @@ static_resources:
         explicit_http_config:
           http2_protocol_options: {}
     load_assignment:
-      cluster_name: greet_service
+      cluster_name: hello
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: greet-service
+                address: hello
                 port_value: 8081
