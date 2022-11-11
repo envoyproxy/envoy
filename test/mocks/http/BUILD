@@ -135,3 +135,12 @@ envoy_cc_mock(
         "//envoy/http:stream_reset_handler_interface",
     ],
 )
+
+envoy_cc_mock(
+    name = "early_header_mutation_mock",
+    srcs = ["early_header_mutation.cc"],
+    hdrs = ["early_header_mutation.h"],
+    deps = [
+        "//envoy/http:early_header_mutation_interface",
+    ],
+)

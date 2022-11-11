@@ -81,7 +81,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 
   if (!config.earlyHeaderMutationExtensions().empty()) {
     for (const auto& extension : config.earlyHeaderMutationExtensions()) {
-      extension->mutate(request_headers);
+      if (!extension->mutate(request_headers)) {
+        break;
+      }
     }
   }
 
