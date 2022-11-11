@@ -122,5 +122,11 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: http
+  change: |
+    added support of :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>` to the HTTP connection manager.
+- area: http
+  change: |
+    added support of :ref:`regex mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.regex_mutation.v3.RegexMutation>` for HCM :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>`.
 
 deprecated:
