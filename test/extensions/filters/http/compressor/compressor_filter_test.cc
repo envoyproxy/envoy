@@ -184,7 +184,7 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-enum PerRouteConfig { kNone, kEmpty, kEnabled, kDisabled };
+enum PerRouteConfig { None, Empty, Enabled, Disabled };
 
 struct EnablementParams {
   bool runtime_enabled;
@@ -198,17 +198,17 @@ class CompresorFilterEnablementTest : public CompressorFilterTest,
 INSTANTIATE_TEST_SUITE_P(CompresorFilterEnablementTest, CompresorFilterEnablementTest,
                          testing::ValuesIn<EnablementParams>(
                              {// no per-route config, so runtime flag controls
-                              {true, kNone, true},
-                              {false, kNone, false},
+                              {true, None, true},
+                              {false, None, false},
                               // empty CompressorPerRoute.overrides, so runtime flag controls
-                              {true, kEmpty, true},
-                              {false, kEmpty, false},
+                              {true, Empty, true},
+                              {false, Empty, false},
                               // enabled by CompressorPerRoute.overrides
-                              {true, kEnabled, true},
-                              {false, kEnabled, true},
+                              {true, Enabled, true},
+                              {false, Enabled, true},
                               // disabled by CompressorPerRoute.disabled
-                              {true, kDisabled, false},
-                              {false, kDisabled, false}}));
+                              {true, Disabled, false},
+                              {false, Disabled, false}}));
 
 // common_config.enabled should enable/disable compression, unless a CompressorPerRoute config
 // overrides it.
@@ -237,16 +237,16 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
   CompressorPerRoute per_route_proto;
   bool use_per_route_proto = true;
   switch (GetParam().per_route_enabled) {
-  case kNone:
+  case None:
     use_per_route_proto = false;
     break;
-  case kEmpty:
+  case Empty:
     per_route_proto.mutable_overrides();
     break;
-  case kEnabled:
+  case Enabled:
     per_route_proto.mutable_overrides()->mutable_response_direction_config();
     break;
-  case kDisabled:
+  case Disabled:
     per_route_proto.set_disabled(true);
     break;
   }
