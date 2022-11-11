@@ -145,7 +145,7 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
-void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
+void QuicFilterManagerConnectionImpl::onWriteEventDone() {
   if (!inDelayedClose()) {
     if (close_type_during_initialize_.has_value()) {
       ASSERT(!Runtime::runtimeFeatureEnabled(

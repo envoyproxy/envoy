@@ -114,14 +114,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicServerSession::Initialize() {
   quic::QuicServerSessionBase::Initialize();
   initialized_ = true;
-  quic_connection_->setEnvoyConnection(*this);
-}
-
-void EnvoyQuicServerSession::OnCanWrite() {
-  quic::QuicServerSessionBase::OnCanWrite();
-  // Do not update delay close state according to connection level packet egress because that is
-  // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
-  maybeApplyDelayClosePolicy();
+  quic_connection_->setEnvoyConnection(*this, *this);
 }
 
 bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }

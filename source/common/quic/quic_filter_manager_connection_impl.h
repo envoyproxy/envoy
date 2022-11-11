@@ -28,7 +28,8 @@ class QuicNetworkConnectionTest;
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
-                                        public SendBufferMonitor {
+                                        public SendBufferMonitor,
+                                        public QuicWriteEventCallback {
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
@@ -140,8 +141,8 @@ public:
   // streams, and run watermark check.
   void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override;
 
-  // Called after each write when a previous connection close call is postponed.
-  void maybeApplyDelayClosePolicy();
+  // QuicWriteEventCallback
+  void onWriteEventDone() override;
 
   uint64_t bytesToSend() { return bytes_to_send_; }
 

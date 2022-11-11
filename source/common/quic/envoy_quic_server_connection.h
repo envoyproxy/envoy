@@ -26,6 +26,7 @@ public:
   // quic::QuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+  void OnCanWrite() override;
 
   bool deferSend() const { return defer_send_; }
 

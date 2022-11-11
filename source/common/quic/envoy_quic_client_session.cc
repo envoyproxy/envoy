@@ -102,12 +102,7 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
   initialized_ = true;
-  network_connection_->setEnvoyConnection(*this);
-}
-
-void EnvoyQuicClientSession::OnCanWrite() {
-  quic::QuicSpdyClientSession::OnCanWrite();
-  maybeApplyDelayClosePolicy();
+  network_connection_->setEnvoyConnection(*this, *this);
 }
 
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
