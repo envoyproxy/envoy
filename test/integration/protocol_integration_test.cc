@@ -3926,12 +3926,21 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
                                      {":path", "/test/long/url"},
                                      {":scheme", "/admin http"},
                                      {":authority", "sni.lyft.com"}});
+
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+    return;
+  }
+#else
   if (downstreamProtocol() == Http::CodecType::HTTP2 &&
       GetParam().http2_implementation == Http2Impl::Nghttp2) {
     ASSERT_TRUE(response->waitForReset());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
     return;
   }
+#endif
   // Other HTTP codecs accept the bad scheme but the Envoy should replace it with a valid one.
   waitForNextUpstreamRequest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
