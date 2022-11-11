@@ -131,30 +131,11 @@ public:
   bool isValid() const;
 
 private:
-  /**
-   * sets the fileId, a fixed value used to identify that this is a cache file.
-   * This is private so only the unit test can call it, as the file ID should be
-   * a compile-time constant in ordinary use.
-   * @param id The file ID to set.
-   */
-  void setFileId(std::array<char, 4> id) { file_id_ = id; }
-
-  /**
-   * sets the cacheVersionId, a value that should be consistent between versions
-   * of the file cache implementation.
-   * This is private so only the unit test can call it, as the version ID should be
-   * a compile-time constant in ordinary use.
-   * @param id The cache version ID to set.
-   */
-  void setCacheVersionId(std::array<char, 4> id) { cache_version_id_ = id; }
-
   std::array<char, 4> file_id_;
   std::array<char, 4> cache_version_id_;
   size_t header_size_;
   size_t trailer_size_;
   size_t body_size_;
-
-  friend class CacheFileFixedBlockTest;
 };
 
 } // namespace FileSystemHttpCache
