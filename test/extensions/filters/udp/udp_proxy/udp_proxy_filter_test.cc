@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -1128,6 +1129,12 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     GTEST_SKIP();
   }
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                 const struct addrinfo* hints, struct addrinfo** res) {
+        Api::OsSysCallsImpl real;
+        return real.getaddrinfo(node, service, hints, res);
+      }));
 
   InSequence s;
 
