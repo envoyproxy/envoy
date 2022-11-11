@@ -54,7 +54,7 @@ public:
    * bodySize serializes to an 8-byte uint.
    * @return the size in bytes.
    */
-  static constexpr size_t size() { return sizeof(uint32_t) * 4 + sizeof(uint64_t); }
+  static constexpr uint32_t size() { return sizeof(uint32_t) * 4 + sizeof(uint64_t); }
 
   /**
    * fileId is a compile-time fixed value used to identify that this is a cache file.
@@ -74,55 +74,55 @@ public:
    * the size of the serialized proto message capturing headers and metadata.
    * @return the size in bytes.
    */
-  size_t headerSize() const { return header_size_; }
-
-  /**
-   * the size of the serialized proto message capturing trailers.
-   * @return the size in bytes.
-   */
-  size_t trailerSize() const { return trailer_size_; }
+  uint32_t headerSize() const { return header_size_; }
 
   /**
    * the size of the http body of the cache entry.
    * @return the size in bytes.
    */
-  size_t bodySize() const { return body_size_; }
+  uint64_t bodySize() const { return body_size_; }
+
+  /**
+   * the size of the serialized proto message capturing trailers.
+   * @return the size in bytes.
+   */
+  uint32_t trailerSize() const { return trailer_size_; }
 
   /**
    * sets the size of the serialized http headers, plus key and metadata, in the header block.
    * @param sz The size of the serialized headers, key and metadata.
    */
-  void setHeadersSize(size_t sz) { header_size_ = sz; }
+  void setHeadersSize(uint32_t sz) { header_size_ = sz; }
 
   /**
    * sets the size of the serialized trailers in the header block.
    * @param sz The size of the serialized trailers.
    */
-  void setTrailersSize(size_t sz) { trailer_size_ = sz; }
+  void setTrailersSize(uint32_t sz) { trailer_size_ = sz; }
 
   /**
    * sets the size of the serialized body in the header block.
    * @param sz The size of the body data.
    */
-  void setBodySize(size_t sz) { body_size_ = sz; }
+  void setBodySize(uint64_t sz) { body_size_ = sz; }
 
   /**
    * the offset from the start of the file to the start of the serialized headers proto.
    * @return the offset in bytes.
    */
-  static off_t offsetToHeaders() { return size(); }
+  static uint32_t offsetToHeaders() { return size(); }
 
   /**
    * the offset from the start of the file to the start of the body data.
    * @return the offset in bytes.
    */
-  off_t offsetToBody() const { return offsetToHeaders() + headerSize(); }
+  uint32_t offsetToBody() const { return offsetToHeaders() + headerSize(); }
 
   /**
    * the offset from the start of the file to the start of the serialized trailers proto.
    * @return the offset in bytes.
    */
-  off_t offsetToTrailers() const { return offsetToBody() + bodySize(); }
+  uint64_t offsetToTrailers() const { return offsetToBody() + bodySize(); }
 
   /**
    * is this a valid cache file header block for the current code version?
@@ -133,9 +133,9 @@ public:
 private:
   std::array<char, 4> file_id_;
   std::array<char, 4> cache_version_id_;
-  size_t header_size_;
-  size_t trailer_size_;
-  size_t body_size_;
+  uint32_t header_size_;
+  uint64_t body_size_;
+  uint32_t trailer_size_;
 };
 
 } // namespace FileSystemHttpCache
