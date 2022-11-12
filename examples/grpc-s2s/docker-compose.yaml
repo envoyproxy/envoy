@@ -9,6 +9,7 @@ services:
       dockerfile: Dockerfile-envoy-hello
     ports:
     - "${PORT_PROXY:-10000}:8080"
+    - 9090:9090
 
   hello:
     build:
@@ -20,10 +21,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-envoy-world
+    ports:
+    - "${PORT_PROXY:-10000}:8080"
+    - 9090:9090
 
   world:
     build:
       context: .
       dockerfile: Dockerfile-world
     command: ["/bin/server"]
-

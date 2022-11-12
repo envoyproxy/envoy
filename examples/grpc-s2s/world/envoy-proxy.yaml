@@ -36,11 +36,24 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 50
+    health_checks:
+      - timeout: "1s"
+        interval: "5s"
+        unhealthy_threshold: 5
+        healthy_threshold: 5
+        grpc_health_check:
+          service_name: "World"
+          authority: ""
+          initial_metadata: []
     load_assignment:
       cluster_name: world
       endpoints:
       - lb_endpoints:
         - endpoint:
+            health_check_config:
             address:
               socket_address:
                 address: world

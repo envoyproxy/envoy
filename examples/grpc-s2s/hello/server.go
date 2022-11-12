@@ -91,8 +91,8 @@ func main() {
 	updateServiceHealth(
 		healthServer,
 		service.Hello_ServiceDesc.ServiceName,
-		//healthsvc.HealthCheckResponse_SERVING,
-		healthsvc.HealthCheckResponse_NOT_SERVING,
+		healthsvc.HealthCheckResponse_SERVING,
+		//healthsvc.HealthCheckResponse_NOT_SERVING,
 	)
 	log.Printf("starting grpc on :%d\n", *port)
 	gs.Serve(lis)

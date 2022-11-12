@@ -36,6 +36,9 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 50
     health_checks:
       - timeout: "1s"
         interval: "5s"
@@ -54,3 +57,8 @@ static_resources:
               socket_address:
                 address: hello
                 port_value: 8081
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9090
