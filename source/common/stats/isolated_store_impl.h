@@ -279,11 +279,17 @@ public:
     return store_.text_readouts_.find(name);
   }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return store_.counters_.iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.gauges_.iterate(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.histograms_.iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override {
+    return store_.counters_.iterate(iterFilter(fn));
+  }
+  bool iterate(const IterateFn<Gauge>& fn) const override {
+    return store_.gauges_.iterate(iterFilter(fn));
+  }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return store_.histograms_.iterate(iterFilter(fn));
+  }
   bool iterate(const IterateFn<TextReadout>& fn) const override {
-    return store_.text_readouts_.iterate(fn);
+    return store_.text_readouts_.iterate(iterFilter(fn));
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -315,6 +321,26 @@ public:
   virtual ScopeSharedPtr makeScope(StatName name);
 
  private:
+  template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {
+    // We determine here what's in the scope by looking at name
+    // prefixes. Strictly speaking this is not correct, as a stat name can be in
+    // different scopes. But there is no data in `ScopePrefixer` to resurrect
+    // actual membership of a stat in a scope, so we go by name matching. Note
+    // that `ScopePrefixer` is not used in `ThreadLocalStore`, which has
+    // accurate maps describing which stats are in which scopes.
+    //
+    // TODO(jmarantz): In the scope of this limited implementation, it would be
+    // faster to match on the StatName prefix. This would be possible if
+    // SymbolTable exposed a split() method.
+    std::string prefix_str = constSymbolTable().toString(prefix_.statName());
+    if (!prefix_str.empty() && !absl::EndsWith(prefix_str, ".")) {
+      prefix_str += ".";
+    }
+    return [fn, prefix_str](const RefcountPtr<StatType>& stat) -> bool {
+      return !absl::StartsWith(stat->name(), prefix_str) || fn(stat);
+    };
+  }
+
   StatNameStorage prefix_;
   IsolatedStoreImpl& store_;
 };

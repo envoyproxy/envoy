@@ -145,6 +145,7 @@ public:
  private:
   friend class TestScope;
 
+  // The Store keeps a flat map of all the counters in all scopes.
   absl::flat_hash_map<std::string, Counter*> counter_map_;
   absl::flat_hash_map<std::string, Gauge*> gauge_map_;
   absl::flat_hash_map<std::string, Histogram*> histogram_map_;
@@ -196,6 +197,12 @@ private:
 
   TestStore& store_;
   const std::string prefix_str_;
+
+  // Each Scope keeps its own maps.
+  /*  absl::flat_hash_map<std::string, Counter*> counter_map_;
+  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
+  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
+  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;*/
 };
 
 // Compares the memory consumed against an exact expected value, but only on
