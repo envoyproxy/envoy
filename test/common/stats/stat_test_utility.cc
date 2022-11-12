@@ -146,10 +146,12 @@ MemoryTest::Mode MemoryTest::mode() {
 
 TestScope::TestScope(const std::string& prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store),
-      store_(store) {}
+      store_(store),
+      prefix_str_(addDot(prefix)) {}
 TestScope::TestScope(StatName prefix, TestStore& store)
     : IsolatedScopeImpl(prefix, store),
-      store_(store) {}
+      store_(store),
+      prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
 
 // Override the Stats::Store methods for name-based lookup of stats, to use
 // and update the string-maps in this class. Note that IsolatedStoreImpl
@@ -157,41 +159,52 @@ TestScope::TestScope(StatName prefix, TestStore& store)
 // to keep the maps up-to-date.
 //
 // Stats::Scope
-Counter& TestScope::counterFromString(const std::string& name) {
+Counter& TestScope::counterFromString(const std::string& leaf_name) {
+  std::string name = prefix_str_ + leaf_name;
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
-    counter_ref = &IsolatedScopeImpl::counterFromString(name);
+    counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
   }
   return *counter_ref;
 }
 
-Gauge& TestScope::gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
+Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMode import_mode) {
+  std::string name = prefix_str_ + leaf_name;
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
-    gauge_ref = &IsolatedScopeImpl::gaugeFromString(name, import_mode);
+    gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
   }
   return *gauge_ref;
 }
 
-Histogram& TestScope::histogramFromString(const std::string& name, Histogram::Unit unit) {
+Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogram::Unit unit) {
+  std::string name = prefix_str_ + leaf_name;
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
-    histogram_ref = &IsolatedScopeImpl::histogramFromString(name, unit);
+    histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);
   }
   return *histogram_ref;
 }
 
+void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name) {
+  // Ensures StatNames with the same string representation are specified
+  // consistently using symbolic/dynamic components on every access.
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix(), stat_name});
+  StatName joined_stat_name(joined.get());
+  ASSERT(ref_stat_name == joined_stat_name, absl::StrCat(
+      "Inconsistent dynamic vs symbolic stat name specification: ref_stat_name=",
+      symbolTable().toString(ref_stat_name), " stat_name=",
+      symbolTable().toString(joined_stat_name)));
+}
+
 Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
                                      StatNameTagVectorOptConstRef tags) {
-  std::string name = symbolTable().toString(stat_name);
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
   } else {
-    // Ensures StatNames with the same string representation are specified
-    // consistently using symbolic/dynamic components on every access.
-    ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+    verifyConsistency(counter_ref->statName(), stat_name);
   }
   return *counter_ref;
 }
@@ -199,13 +212,12 @@ Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
 Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
                                             StatNameTagVectorOptConstRef tags,
                                             Gauge::ImportMode import_mode) {
-  std::string name = symbolTable().toString(stat_name);
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
   } else {
-    ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+    verifyConsistency(gauge_ref->statName(), stat_name);
   }
   return *gauge_ref;
 }
@@ -213,13 +225,12 @@ Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
 Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
                                                     StatNameTagVectorOptConstRef tags,
                                                     Histogram::Unit unit) {
-  std::string name = symbolTable().toString(stat_name);
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
   } else {
-    ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-           "stat name specification");
+    verifyConsistency(histogram_ref->statName(), stat_name);
   }
   return *histogram_ref;
 }

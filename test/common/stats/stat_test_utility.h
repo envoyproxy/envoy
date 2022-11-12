@@ -185,7 +185,17 @@ class TestScope : public IsolatedScopeImpl {
   TestStore& store() override { return store_; }
 
 private:
+  static std::string addDot(const std::string& prefix) {
+    if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
+      return prefix;
+    }
+    return prefix + ".";
+  }
+
+  void verifyConsistency(StatName ref_stat_name, StatName stat_name);
+
   TestStore& store_;
+  const std::string prefix_str_;
 };
 
 // Compares the memory consumed against an exact expected value, but only on

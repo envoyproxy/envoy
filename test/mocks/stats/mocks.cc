@@ -101,11 +101,12 @@ TextReadout& MockScope::textReadoutFromStatNameWithTags(const StatName& name,
 
 
 MockStore::MockStore() {
-  setDefaultScope(std::make_shared<MockScope>(StatName(), *this));
+  StatNameManagedStorage name_storage("", symbolTable());
+  setDefaultScope(std::make_shared<MockScope>(name_storage.statName(), *this));
 
-  //ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
-  //ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
-  /*ON_CALL(*this, histogram(_, _))
+  ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
+  ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
+  ON_CALL(*this, histogram(_, _))
       .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
         auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
         histogram->name_ = name;
@@ -115,10 +116,12 @@ MockStore::MockStore() {
         return *histogram;
         }));
 
-  ON_CALL(*this, histogramFromString(_, _))
+  /*
+  ON_CALL(*this, histogram(_, _))
       .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
         return TestUtil::TestStore::histogramFromString(name, unit);
-        }));*/
+        }));
+  */
 }
 MockStore::~MockStore() = default;
 

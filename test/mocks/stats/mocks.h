@@ -289,14 +289,15 @@ class MockScope : public TestUtil::TestScope {
     return createScope(symbolTable().toString(name));
     }*/
 
-  MOCK_METHOD(Counter&, counter, (const std::string&));
-  MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
   MOCK_METHOD(Scope*, createScope_, (const std::string& name));
-  MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
-  MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
-  MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
-  MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
-  MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+
+  //MOCK_METHOD(Counter&, counter, (const std::string&));
+  //MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
+  //MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
+  //MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
+  //MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
+  //MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
+  //MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
