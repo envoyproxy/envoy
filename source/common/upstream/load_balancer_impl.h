@@ -357,6 +357,10 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
+  // If locality weight aware routing is enabled.
+  const bool locality_weighted_balancing_{};
+
+  // Config for zone aware routing.
   const uint32_t routing_enabled_;
   const uint64_t min_cluster_size_;
   const bool fail_traffic_on_panic_;
