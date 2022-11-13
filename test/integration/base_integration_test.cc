@@ -305,9 +305,11 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       absl::string_view destination_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enableHalfClose(), options, source_address);
+                                                enableHalfClose(), options, source_address,
+                                                destination_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -330,6 +332,34 @@ void BaseIntegrationTest::setUpstreamAddress(
   auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
   socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
+}
+
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen) {
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([&]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
+  for (auto& listener : listeners) {
+    if (listener.get().name() == listener_name) {
+      for (auto& socket_factory : listener.get().listenSocketFactories()) {
+        auto socket = socket_factory->getListenSocket(0);
+        if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,

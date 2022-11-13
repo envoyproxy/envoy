@@ -872,24 +872,6 @@ TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
                             "ipv4_compat: 0.0.0.0:13333");
 }
 
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "0.0.0.0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -928,24 +910,6 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
     address:
       socket_address:
         address: "::0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "::1"
         port_value: 13333
         ipv4_compat: true
     filter_chains:
@@ -2071,6 +2035,302 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentNumberOfSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTransparentChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+transparent: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithFreeBindChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+freebind: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpFastOpenQueueLengthChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 10
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 20
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
+  // Add and initialize foo listener.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  // Add new listener bar with same address as foo, but with different socket options
+  const std::string listener_updated = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "Listener foo: reuse port cannot be changed during an update";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+#endif
+
+// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
+// listener update success.
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
