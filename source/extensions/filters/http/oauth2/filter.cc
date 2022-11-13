@@ -454,9 +454,7 @@ void OAuth2Filter::finishFlow(std::chrono::seconds expires_in) {
   absl::Base64Escape(pre_encoded_token, &encoded_token);
 
   // We use HTTP Only cookies for the HMAC and Expiry.
-  int64_t max_age =
-      std::chrono::duration_cast<std::chrono::seconds>(new_expires - time_source_.systemTime())
-          .count();
+  int64_t max_age = expires_in.count();
   const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
   const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
 
