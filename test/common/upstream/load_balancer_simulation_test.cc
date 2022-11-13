@@ -72,7 +72,6 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   Stats::IsolatedStoreImpl stats_store;
   ClusterStatNames stat_names(stats_store.symbolTable());
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store, stat_names)};
-  stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   Random::RandomGeneratorImpl random;

@@ -292,20 +292,24 @@ FilterStatus PayloadToMetadataFilter::messageBegin(MessageMetadataSharedPtr meta
   }
 
   ENVOY_LOG(trace, "{} rules matched", matched_rule_ids_.size());
+  if (!matched_rule_ids_.empty()) {
+    metadata_ = metadata;
+  }
   return FilterStatus::Continue;
 }
 
 FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
   if (!matched_rule_ids_.empty()) {
-    ASSERT(!decoder_);
-    handler_ = std::make_unique<TrieMatchHandler>(*this, config_->trieRoot());
-    transport_ = createTransport(decoder_callbacks_->downstreamTransportType());
-    protocol_ = createProtocol(decoder_callbacks_->downstreamProtocolType());
-    decoder_ = std::make_unique<Decoder>(*transport_, *protocol_, *handler_);
+    TrieMatchHandler handler(*this, config_->trieRoot());
+    ProtocolPtr protocol = createProtocol(decoder_callbacks_->downstreamProtocolType());
 
-    bool underflow = false;
-    decoder_->onData(data, underflow);
-    ASSERT(handler_->isComplete() || underflow);
+    // TODO(kuochunghsu): avoid copying payload https://github.com/envoyproxy/envoy/issues/23901
+    Buffer::OwnedImpl data_copy;
+    data_copy.add(data);
+
+    DecoderStateMachinePtr state_machine =
+        std::make_unique<DecoderStateMachine>(*protocol, metadata_, handler, handler);
+    state_machine->runPassthroughData(data_copy);
 
     finalizeDynamicMetadata();
   }
