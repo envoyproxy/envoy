@@ -22,7 +22,6 @@ enum class LoadBalancerType {
   RingHash,
   OriginalDst,
   Maglev,
-  DeterministicAperture,
   ClusterProvided,
   LoadBalancingPolicyConfig
 };

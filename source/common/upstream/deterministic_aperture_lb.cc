@@ -146,5 +146,16 @@ std::pair<size_t, size_t> DeterministicApertureLoadBalancer::Ring::pick2() const
   return {first, second};
 }
 
+ThreadAwareLoadBalancerPtr DeterministicApertureLoadBalancerFactory::create(
+    const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, TimeSource& time_source) {
+  (void)time_source;
+  return std::make_unique<DeterministicApertureLoadBalancer>(
+      priority_set, cluster_info.stats(), cluster_info.statsScope(), runtime, random,
+      cluster_info.lbDeterministicApertureConfig(), cluster_info.lbConfig());
+}
+
+REGISTER_FACTORY(DeterministicApertureLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
+
 } // namespace Upstream
 } // namespace Envoy

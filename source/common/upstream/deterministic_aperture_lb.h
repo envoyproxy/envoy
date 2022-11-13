@@ -154,5 +154,30 @@ private:
   RingHashLoadBalancerStats ring_stats_;
 };
 
+class DeterministicApertureLoadBalancerFactory : public TypedLoadBalancerFactory {
+public:
+  // Upstream::TypedLoadBalancerFactory
+  std::string name() const override {
+    return "envoy.load_balancing_policies.deterministic_aperture";
+  }
+
+  /**
+   * @return ThreadAwareLoadBalancerPtr a new thread-aware load balancer.
+   *
+   * @param cluster_info supplies the cluster info.
+   * @param priority_set supplies the priority set.
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @param time_source supplies the time source.
+   */
+  virtual ThreadAwareLoadBalancerPtr
+  create(const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
+         Random::RandomGenerator& random, TimeSource& time_source) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>();
+  }
+};
+
 } // namespace Upstream
 } // namespace Envoy

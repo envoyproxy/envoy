@@ -1056,9 +1056,6 @@ ClusterInfoImpl::ClusterInfoImpl(
     case envoy::config::cluster::v3::Cluster::MAGLEV:
       lb_type_ = LoadBalancerType::Maglev;
       break;
-    case envoy::config::cluster::v3::Cluster::DETERMINISTIC_APERTURE:
-      lb_type_ = LoadBalancerType::DeterministicAperture;
-      break;
     case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
       if (config.has_lb_subset_config()) {
         throw EnvoyException(
@@ -1800,7 +1797,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   for (auto& entry : hosts_per_locality) {
     if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
       per_locality.emplace_back(entry.second);
-      if (locality_weighted_lb) {
+      if (locality_weighted_lb && locality_weights_map.size()) {
         locality_weights->emplace_back(locality_weights_map[entry.first]);
       }
     }

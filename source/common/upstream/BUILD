@@ -511,7 +511,6 @@ envoy_cc_library(
     srcs = ["subset_lb.cc"],
     hdrs = ["subset_lb.h"],
     deps = [
-        ":deterministic_aperture_lb_lib",
         ":load_balancer_lib",
         ":maglev_lb_lib",
         ":ring_hash_lb_lib",

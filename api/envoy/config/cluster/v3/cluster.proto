@@ -117,8 +117,6 @@ message Cluster {
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
     // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
-
-    DETERMINISTIC_APERTURE = 8;
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
@@ -524,26 +522,6 @@ message Cluster {
     google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
   }
 
-  // Deterministic Aperture load balancing is designed to conserve connections between Envoy and
-  // backend instances. This is achieved by dividing the backends uniformly among participating peers.
-  // This way, we avoid a complete mesh of connections between Envoy and backends. The participating
-  // Envoy peers are placed on a ring that is conceptually laid on top of the Ring Hash of backends
-  // to determine their overlaps. By using the ring overlaps as a mechanism to divide the backends,
-  // the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
-  // uniform random distribution to select a backend from the range of overlapping backends. This
-  // along with P2C ensures uniform load distribution.
-
-  message DeterministicApertureLbConfig {
-    // Hash ring configuration for the internal ring for endpoints.
-    RingHashLbConfig ring_config = 1;
-
-    // Index of this peer (0 indexed).
-    uint32 peer_index = 2;
-
-    // Total number of peers participating in the algorithm (that share the outer ring).
-    uint32 total_peers = 3;
-  }
-
   // Specific configuration for the
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
@@ -573,6 +551,25 @@ message Cluster {
     // The port to override for the original dst address. This port
     // will take precedence over filter state and header override ports
     google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
+  }
+
+  // Deterministic Aperture load balancing is designed to conserve connections between Envoy and
+  // backend instances. This is achieved by dividing the backends uniformly among participating peers.
+  // This way, we avoid a complete mesh of connections between Envoy and backends. The participating
+  // Envoy peers are placed on a ring that is conceptually laid on top of the Ring Hash of backends
+  // to determine their overlaps. By using the ring overlaps as a mechanism to divide the backends,
+  // the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
+  // uniform random distribution to select a backend from the range of overlapping backends. This
+  // along with P2C ensures uniform load distribution.
+  message DeterministicApertureLbConfig {
+    // Hash ring configuration for the internal ring for endpoints.
+    RingHashLbConfig ring_config = 1;
+
+    // Index of this peer (0 indexed).
+    uint32 peer_index = 2;
+
+    // Total number of peers participating in the algorithm (that share the outer ring).
+    uint32 total_peers = 3;
   }
 
   // Common configuration for all load balancer implementations.

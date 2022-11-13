@@ -40,7 +40,6 @@
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/deterministic_aperture_lb.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/maglev_lb.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
@@ -882,50 +881,6 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes. For RingHash/Maglev don't create the LB here if subset balancing is enabled,
   // because the thread_aware_lb_ field takes precedence over the subset lb).
-  if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
-    switch (cluster_reference.info()->lbType()) {
-    case LoadBalancerType::RingHash: {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
-
-      break;
-    }
-    case LoadBalancerType::Maglev: {
-      cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-          cluster_reference.info()->statsScope(), runtime_, random_,
-          cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
-
-      break;
-    }
-    case LoadBalancerType::DeterministicAperture: {
-      cluster_entry_it->second->thread_aware_lb_ =
-          std::make_unique<DeterministicApertureLoadBalancer>(
-              cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-              cluster_reference.info()->statsScope(), runtime_, random_,
-              cluster_reference.info()->lbDeterministicApertureConfig(),
-              cluster_reference.info()->lbConfig());
-
-      break;
-    }
-    default:
-      break;
-    }
-  }
-  if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
-    cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
-  } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    const auto& policy = cluster_reference.info()->loadBalancingPolicy();
-    TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
-    RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
-    cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-                                 cluster_reference.info()->statsScope(), runtime_, random_, policy);
-  }
-
-  /*
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
@@ -949,7 +904,6 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
         typed_lb_factory->create(*cluster_reference.info(), cluster_reference.prioritySet(),
                                  runtime_, random_, time_source_);
   }
-  */
 
   updateClusterCounts();
   return result;
@@ -1563,8 +1517,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(),
-        cluster->lbDeterministicApertureConfig(), cluster->lbConfig(),
+        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
         parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
@@ -1595,7 +1548,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::LoadBalancingPolicyConfig:
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev:
-    case LoadBalancerType::DeterministicAperture:
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
       lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
