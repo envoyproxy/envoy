@@ -588,7 +588,7 @@ void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseIn
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
   RuntimeStats stats{
-    ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
+      ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 

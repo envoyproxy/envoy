@@ -145,7 +145,7 @@ public:
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
   std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
 
- private:
+private:
   friend class TestScope;
 
   // The Store keeps a flat map of all the counters in all scopes.
@@ -156,7 +156,7 @@ public:
 };
 
 class TestScope : public IsolatedScopeImpl {
- public:
+public:
   TestScope(const std::string& prefix, TestStore& store);
   TestScope(StatName prefix, TestStore& store);
 
@@ -177,8 +177,8 @@ class TestScope : public IsolatedScopeImpl {
                                            StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
 
-  //ScopeSharedPtr createScope(const std::string& name) override;
-  //ScopeSharedPtr scopeFromStatName(StatName name) override;
+  // ScopeSharedPtr createScope(const std::string& name) override;
+  // ScopeSharedPtr scopeFromStatName(StatName name) override;
   ScopeSharedPtr makeScope(StatName name) override;
 
   TestStore& store() override { return store_; }

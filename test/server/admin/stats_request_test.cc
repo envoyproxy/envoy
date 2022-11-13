@@ -105,7 +105,8 @@ TEST_F(StatsRequestTest, OneGauge) {
 }
 
 TEST_F(StatsRequestTest, OneHistogram) {
-  store_.rootScope()->histogramFromStatName(makeStatName("foo"), Stats::Histogram::Unit::Milliseconds);
+  store_.rootScope()->histogramFromStatName(makeStatName("foo"),
+                                            Stats::Histogram::Unit::Milliseconds);
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::All)));
   EXPECT_EQ(1, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Histograms)));
   EXPECT_EQ(0, iterateChunks(*makeRequest(false, StatsFormat::Text, StatsType::Counters)));

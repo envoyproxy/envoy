@@ -11,8 +11,8 @@ namespace {
 class StatTestUtilityTest : public testing::Test {
 protected:
   StatTestUtilityTest()
-      : test_store_(symbol_table_), test_scope_(test_store_.rootScope()),
-        dynamic_(symbol_table_), symbolic_(symbol_table_) {}
+      : test_store_(symbol_table_), test_scope_(test_store_.rootScope()), dynamic_(symbol_table_),
+        symbolic_(symbol_table_) {}
 
   SymbolTableImpl symbol_table_;
   TestUtil::TestStore test_store_;

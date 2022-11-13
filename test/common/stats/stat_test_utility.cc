@@ -145,12 +145,9 @@ MemoryTest::Mode MemoryTest::mode() {
 }
 
 TestScope::TestScope(const std::string& prefix, TestStore& store)
-    : IsolatedScopeImpl(prefix, store),
-      store_(store),
-      prefix_str_(addDot(prefix)) {}
+    : IsolatedScopeImpl(prefix, store), store_(store), prefix_str_(addDot(prefix)) {}
 TestScope::TestScope(StatName prefix, TestStore& store)
-    : IsolatedScopeImpl(prefix, store),
-      store_(store),
+    : IsolatedScopeImpl(prefix, store), store_(store),
       prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
 
 // Override the Stats::Store methods for name-based lookup of stats, to use
@@ -164,7 +161,7 @@ Counter& TestScope::counterFromString(const std::string& leaf_name) {
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
-    //store_.counter_map_[name] = counter_ref;
+    // store_.counter_map_[name] = counter_ref;
   }
   return *counter_ref;
 }
@@ -174,7 +171,7 @@ Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMod
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
-    //store_.gauge_map_[name] = gauge_ref;
+    // store_.gauge_map_[name] = gauge_ref;
   }
   return *gauge_ref;
 }
@@ -184,7 +181,7 @@ Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogra
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);
-    //store_.histogram_map_[name] = histogram_ref;
+    // store_.histogram_map_[name] = histogram_ref;
   }
   return *histogram_ref;
 }
@@ -194,19 +191,19 @@ void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name) {
   // consistently using symbolic/dynamic components on every access.
   SymbolTable::StoragePtr joined = symbolTable().join({prefix(), stat_name});
   StatName joined_stat_name(joined.get());
-  ASSERT(ref_stat_name == joined_stat_name, absl::StrCat(
-      "Inconsistent dynamic vs symbolic stat name specification: ref_stat_name=",
-      symbolTable().toString(ref_stat_name), " stat_name=",
-      symbolTable().toString(joined_stat_name)));
+  ASSERT(ref_stat_name == joined_stat_name,
+         absl::StrCat("Inconsistent dynamic vs symbolic stat name specification: ref_stat_name=",
+                      symbolTable().toString(ref_stat_name),
+                      " stat_name=", symbolTable().toString(joined_stat_name)));
 }
 
 Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
-                                     StatNameTagVectorOptConstRef tags) {
+                                                StatNameTagVectorOptConstRef tags) {
   std::string name = prefix_str_ + symbolTable().toString(stat_name);
   Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
     counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
-    //store_.counter_map_[name] = counter_ref;
+    // store_.counter_map_[name] = counter_ref;
   } else {
     verifyConsistency(counter_ref->statName(), stat_name);
   }
@@ -220,7 +217,7 @@ Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
   Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
     gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
-    //store_.gauge_map_[name] = gauge_ref;
+    // store_.gauge_map_[name] = gauge_ref;
   } else {
     verifyConsistency(gauge_ref->statName(), stat_name);
   }
@@ -234,7 +231,7 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
   Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
     histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
-    //store_.histogram_map_[name] = histogram_ref;
+    // store_.histogram_map_[name] = histogram_ref;
   } else {
     verifyConsistency(histogram_ref->statName(), stat_name);
   }

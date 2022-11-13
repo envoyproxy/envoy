@@ -130,9 +130,9 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(symbol_table_),
-                    store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
-                    scope_(*store_->rootScope()) {
+  HistogramTest()
+      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
+        scope_(*store_->rootScope()) {
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -766,8 +766,7 @@ class ThreadLocalStoreNoMocksTestBase : public testing::Test {
 public:
   ThreadLocalStoreNoMocksTestBase()
       : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
-        scope_(*store_->rootScope()),
-        pool_(symbol_table_) {}
+        scope_(*store_->rootScope()), pool_(symbol_table_) {}
   ~ThreadLocalStoreNoMocksTestBase() override {
     if (store_ != nullptr) {
       store_->shutdownThreading();
@@ -805,8 +804,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 =
-      scope_.histogramFromStatName(makeStatName("h1"), Histogram::Unit::Unspecified);
+  Histogram& h1 = scope_.histogramFromStatName(makeStatName("h1"), Histogram::Unit::Unspecified);
   Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"), Histogram::Unit::Unspecified);
   store_->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -952,8 +950,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = scope_.counterFromString("lowercase_counter");
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
-  Gauge& lowercase_gauge =
-      scope_.gaugeFromString("lowercase_gauge", Gauge::ImportMode::Accumulate);
+  Gauge& lowercase_gauge = scope_.gaugeFromString("lowercase_gauge", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
   Histogram& lowercase_histogram =
       scope_.histogramFromString("lowercase_histogram", Histogram::Unit::Unspecified);
@@ -969,8 +966,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   uppercase_counter.inc();
   EXPECT_EQ(uppercase_counter.value(), 0);
 
-  Gauge& uppercase_gauge =
-      scope_.gaugeFromString("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
+  Gauge& uppercase_gauge = scope_.gaugeFromString("uppercase_GAUGE", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(uppercase_gauge.name(), "");
   uppercase_gauge.inc();
   EXPECT_EQ(uppercase_gauge.value(), 0);
@@ -1351,8 +1347,8 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 
 class StatsThreadLocalStoreTestNoFixture : public testing::Test {
 protected:
-  StatsThreadLocalStoreTestNoFixture() : alloc_(symbol_table_), store_(alloc_),
-                                         scope_(*store_.rootScope()) {
+  StatsThreadLocalStoreTestNoFixture()
+      : alloc_(symbol_table_), store_(alloc_), scope_(*store_.rootScope()) {
     store_.addSink(sink_);
 
     // Use a tag producer that will produce tags.

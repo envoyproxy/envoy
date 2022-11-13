@@ -161,7 +161,7 @@ private:
 };
 
 class IsolatedStoreProvider {
- protected:
+protected:
   Stats::IsolatedStoreImpl stats_store_;
 };
 

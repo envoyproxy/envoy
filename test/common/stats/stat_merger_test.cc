@@ -17,8 +17,8 @@ class StatMergerTest : public testing::Test {
 public:
   StatMergerTest()
       : stat_merger_(store_), scope_(*store_.rootScope()),
-        whywassixafraidofseven_(scope_.gaugeFromString(
-            "whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
+        whywassixafraidofseven_(
+            scope_.gaugeFromString("whywassixafraidofseven", Gauge::ImportMode::Accumulate)) {
     whywassixafraidofseven_.set(678);
   }
 

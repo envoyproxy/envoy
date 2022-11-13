@@ -60,11 +60,12 @@ MockClusterInfo::MockClusterInfo()
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
       stats_(ClusterInfoImpl::generateStats(*stats_store_.rootScope(), stat_names_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
-      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(*load_report_stats_store_.rootScope(),
-                                                                  cluster_load_report_stat_names_)),
+      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(
+          *load_report_stats_store_.rootScope(), cluster_load_report_stat_names_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
           ClusterInfoImpl::generateRequestResponseSizeStats(
-              *request_response_size_stats_store_.rootScope(), cluster_request_response_size_stat_names_))),
+              *request_response_size_stats_store_.rootScope(),
+              cluster_request_response_size_stat_names_))),
       timeout_budget_stats_(
           std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
               *timeout_budget_stats_store_.rootScope(), cluster_timeout_budget_stat_names_))),

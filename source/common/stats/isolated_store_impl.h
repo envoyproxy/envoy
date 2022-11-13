@@ -211,14 +211,18 @@ public:
 
   bool iterate(const IterateFn<Counter>& fn) const override { return default_scope_->iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return default_scope_->iterate(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return default_scope_->iterate(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return default_scope_->iterate(fn); }
- protected:
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    return default_scope_->iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    return default_scope_->iterate(fn);
+  }
+
+protected:
   void setDefaultScope(const Stats::ScopeSharedPtr& scope);
 
 private:
   friend class IsolatedScopeImpl;
-
 
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
@@ -237,14 +241,12 @@ private:
 class IsolatedScopeImpl : public Scope {
 public:
   IsolatedScopeImpl(const std::string& prefix, IsolatedStoreImpl& store)
-      : prefix_(prefix, store.symbolTable()), store_(store) { }
+      : prefix_(prefix, store.symbolTable()), store_(store) {}
 
   IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
-      : prefix_(prefix, store.symbolTable()), store_(store) { }
+      : prefix_(prefix, store.symbolTable()), store_(store) {}
 
-  ~IsolatedScopeImpl() {
-    prefix_.free(symbolTable());
-  }
+  ~IsolatedScopeImpl() { prefix_.free(symbolTable()); }
 
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -264,8 +266,8 @@ public:
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
-  //NullCounterImpl& nullCounter(const std::string&) override { return store_.null_counter_; }
-  //NullGaugeImpl& nullGauge(const std::string&) override { return store_.null_gauge_; }
+  // NullCounterImpl& nullCounter(const std::string&) override { return store_.null_counter_; }
+  // NullGaugeImpl& nullGauge(const std::string&) override { return store_.null_gauge_; }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
@@ -279,7 +281,9 @@ public:
         store_.text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
     return text_readout;
   }
-  CounterOptConstRef findCounter(StatName name) const override { return store_.counters_.find(name); }
+  CounterOptConstRef findCounter(StatName name) const override {
+    return store_.counters_.find(name);
+  }
   GaugeOptConstRef findGauge(StatName name) const override { return store_.gauges_.find(name); }
   HistogramOptConstRef findHistogram(StatName name) const override {
     return store_.histograms_.find(name);
@@ -321,15 +325,12 @@ public:
   StatName prefix() const override { return prefix_.statName(); }
   IsolatedStoreImpl& store() override { return store_; }
 
-
- protected:
-  void addScopeToStore(const ScopeSharedPtr& scope) {
-    store_.scopes_.push_back(scope);
-  }
+protected:
+  void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
 
   virtual ScopeSharedPtr makeScope(StatName name);
 
- private:
+private:
   template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
     // prefixes. Strictly speaking this is not correct, as a stat name can be in

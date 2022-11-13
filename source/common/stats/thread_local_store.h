@@ -321,7 +321,7 @@ private:
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopeSharedPtr createScope(const std::string& name) override;
-    //return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
+    // return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     //}
     ScopeSharedPtr scopeFromStatName(StatName name) override;
     /*
@@ -350,7 +350,7 @@ private:
       return textReadoutFromStatName(storage.statName());
     }
 
-    //NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
+    // NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
@@ -523,7 +523,7 @@ private:
         [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
   }
 
-  //StatName prefix() const override { return StatName(); }
+  // StatName prefix() const override { return StatName(); }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();
