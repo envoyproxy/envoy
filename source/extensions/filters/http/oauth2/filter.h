@@ -85,6 +85,7 @@ private:
 #define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
   COUNTER(oauth_unauthorized_rq)                                                                   \
   COUNTER(oauth_failure)                                                                           \
+  COUNTER(oauth_passthrough)                                                                       \
   COUNTER(oauth_success)
 
 /**

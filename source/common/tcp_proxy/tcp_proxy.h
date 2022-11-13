@@ -193,7 +193,7 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
@@ -248,7 +248,7 @@ public:
     return shared_config_->idleTimeout();
   }
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
-    return shared_config_->maxDownstreamConnectinDuration();
+    return shared_config_->maxDownstreamConnectionDuration();
   }
   // Return nullptr if there is no tunneling config.
   TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {

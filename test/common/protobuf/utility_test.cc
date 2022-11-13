@@ -1672,6 +1672,13 @@ TEST(DurationUtilTest, OutOfRange) {
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
   }
+  {
+    ProtobufWkt::Duration duration;
+    constexpr int64_t kMaxInt64Nanoseconds =
+        std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+    duration.set_seconds(kMaxInt64Nanoseconds + 1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
 }
 
 // Verify WIP accounting of the file based annotations. This test uses the strict validator to test
