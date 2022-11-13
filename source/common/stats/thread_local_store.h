@@ -189,11 +189,12 @@ public:
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+#endif
+
   CounterOptConstRef findCounter(StatName name) const override;
   GaugeOptConstRef findGauge(StatName name) const override;
   HistogramOptConstRef findHistogram(StatName name) const override;
   TextReadoutOptConstRef findTextReadout(StatName name) const override;
-#endif
 
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }

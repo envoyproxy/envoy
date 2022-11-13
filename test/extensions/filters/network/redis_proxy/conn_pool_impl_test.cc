@@ -295,7 +295,7 @@ public:
 
   MOCK_METHOD(Common::Redis::Client::Client*, create_, (Upstream::HostConstSharedPtr host));
 
-  Stats::MockStore store_;
+  NiceMock<Stats::MockStore> store_;
   const std::string cluster_name_{"fake_cluster"};
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;

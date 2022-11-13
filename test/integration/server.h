@@ -325,6 +325,8 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadoutFromString(name);
   }
+#endif
+
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
@@ -341,7 +343,6 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.findTextReadout(name);
   }
-#endif
 
   // Stats::Store
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }

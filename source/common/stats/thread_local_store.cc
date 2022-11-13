@@ -476,7 +476,6 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
-#if 0
 CounterOptConstRef ThreadLocalStoreImpl::findCounter(StatName name) const {
   CounterOptConstRef found_counter;
   iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
@@ -514,7 +513,6 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::findTextReadout(StatName name) cons
   });
   return found_text_readout;
 }
-#endif
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(

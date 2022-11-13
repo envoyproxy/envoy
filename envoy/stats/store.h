@@ -85,6 +85,31 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a counter within the scope's namespace, if it exists.
+   */
+  virtual CounterOptConstRef findCounter(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a gauge within the scope's namespace, if it exists.
+   */
+  virtual GaugeOptConstRef findGauge(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a histogram within the scope's namespace, if it
+   * exists.
+   */
+  virtual HistogramOptConstRef findHistogram(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a reference to a text readout within the scope's namespace, if it exists.
+   */
+  virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
+
+  /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
    * potentially hold on to a mutex that will deadlock if the passed in functors try to create
    * or delete a stat.
