@@ -500,8 +500,8 @@ protected:
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+      if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
       } else {
         return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
       }
@@ -526,7 +526,7 @@ protected:
     void dumpState(std::ostream& os, int indent_level) const override;
 
     RequestDecoder* request_decoder_{};
-    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    absl::variant<RequestHeaderMapSharedPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
