@@ -197,9 +197,13 @@ public:
 
 class DubboCodecFactoryConfig : public CodecFactoryConfig {
 public:
+  // CodecFactoryConfig
   CodecFactoryPtr createFactory(const Protobuf::Message& config,
                                 Envoy::Server::Configuration::FactoryContext& context) override;
-
+  FilterFactoryPtr filterFactory(const Protobuf::Message&,
+                                 Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
   std::string name() const override { return "envoy.generic_proxy.codecs.dubbo"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoConfig>();
