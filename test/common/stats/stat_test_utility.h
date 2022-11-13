@@ -135,6 +135,9 @@ public:
   TextReadout& textReadout(const std::string& name) {
     return rootScope()->textReadoutFromString(name);
   }
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    histogram_values_map_[histogram.name()].push_back(value);
+  }
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;
@@ -173,11 +176,6 @@ class TestScope : public IsolatedScopeImpl {
   Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
                                            StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-  /*
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    store_.histogram_values_map_[histogram.name()].push_back(value);
-  }
-  */
 
   //ScopeSharedPtr createScope(const std::string& name) override;
   //ScopeSharedPtr scopeFromStatName(StatName name) override;
