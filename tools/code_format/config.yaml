@@ -290,7 +290,10 @@ unsorted_flags:
 # https://github.com/envoyproxy/envoy/issues/9953
 # PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
 visibility_excludes:
+- source/extensions/clusters/strict_dns/
+- source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
+- source/extensions/clusters/logical_dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD

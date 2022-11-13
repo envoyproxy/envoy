@@ -31,7 +31,9 @@ public:
   void set(Http::RequestHeaderMap& request_headers, bool force) override;
   void setInResponse(Http::ResponseHeaderMap& response_headers,
                      const Http::RequestHeaderMap& request_headers) override;
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap& request_headers) const override;
+  absl::optional<absl::string_view>
+  get(const Http::RequestHeaderMap& request_headers) const override;
+  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap& request_headers) const override;
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap& request_headers) override;
   void setTraceReason(Http::RequestHeaderMap& request_headers, Tracing::Reason status) override;
   bool useRequestIdForTraceSampling() const override { return use_request_id_for_trace_sampling_; }
