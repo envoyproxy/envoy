@@ -266,8 +266,6 @@ public:
     gauge.mergeImportMode(import_mode);
     return gauge;
   }
-  // NullCounterImpl& nullCounter(const std::string&) override { return store_.null_counter_; }
-  // NullGaugeImpl& nullGauge(const std::string&) override { return store_.null_gauge_; }
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     TagUtility::TagStatNameJoiner joiner(prefix(), name, tags, symbolTable());
