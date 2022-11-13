@@ -118,12 +118,11 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+void RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
     NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&, bool) {
   // Treat any redirection error response from a Redis server as success.
   current_request_ = nullptr;
   handleSuccess();
-  return true;
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {

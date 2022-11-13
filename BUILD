@@ -58,3 +58,10 @@ package_group(
         "//examples/...",
     ],
 )
+
+package_group(
+    name = "mobile_library",
+    packages = [
+        "//mobile/...",
+    ],
+)

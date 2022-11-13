@@ -140,8 +140,8 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_FALSE(filter->callbacks_->informationalHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->responseHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->http1StreamEncoderOptions().has_value());
-  EXPECT_EQ(&filter->callbacks_->tracingConfig(),
-            &router_filter_interface_.callbacks_.tracingConfig());
+  EXPECT_EQ(&filter->callbacks_->tracingConfig().value().get(),
+            &router_filter_interface_.callbacks_.tracingConfig().value().get());
   EXPECT_EQ(filter->callbacks_->clusterInfo(), router_filter_interface_.callbacks_.clusterInfo());
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());

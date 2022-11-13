@@ -12,6 +12,25 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+// Returns a Key with the vary header added to custom_fields.
+// It is an error to call this with headers that don't include vary.
+// Returns nullopt if the vary headers in the response are not
+// compatible with the VaryAllowList in the LookupRequest.
+absl::optional<Key> variedRequestKey(const LookupRequest& request,
+                                     const Http::ResponseHeaderMap& response_headers) {
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeaderUtils::getVaryValues(response_headers);
+  ASSERT(!vary_header_values.empty());
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+      request.varyAllowList(), vary_header_values, request.requestHeaders());
+  if (!vary_identifier.has_value()) {
+    return absl::nullopt;
+  }
+  Key varied_request_key = request.key();
+  varied_request_key.add_custom_fields(vary_identifier.value());
+  return varied_request_key;
+}
+
 class SimpleLookupContext : public LookupContext {
 public:
   SimpleLookupContext(SimpleHttpCache& cache, LookupRequest&& request)
@@ -143,21 +162,30 @@ const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUp
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
-                                    const ResponseMetadata& metadata) {
+                                    const ResponseMetadata& metadata,
+                                    std::function<void(bool)> on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
-
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
+    on_complete(false);
     return;
   }
-  auto& entry = iter->second;
-
-  // TODO(tangsaidi) handle Vary header updates properly
-  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
-    return;
+  if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
+    absl::optional<Key> varied_key =
+        variedRequestKey(simple_lookup_context.request(), *iter->second.response_headers_);
+    if (!varied_key.has_value()) {
+      on_complete(false);
+      return;
+    }
+    iter = map_.find(varied_key.value());
+    if (iter == map_.end() || !iter->second.response_headers_) {
+      on_complete(false);
+      return;
+    }
   }
+  Entry& entry = iter->second;
 
   // Assumptions:
   // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
@@ -188,6 +216,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         return Http::HeaderMap::Iterate::Continue;
       });
   entry.metadata_ = metadata;
+  on_complete(true);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -226,19 +255,11 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeaderUtils::getVaryValues(*response_headers);
-  ASSERT(!vary_header_values.empty());
-
-  Key varied_request_key = request.key();
-  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
-      request.varyAllowList(), vary_header_values, request.requestHeaders());
-  if (!vary_identifier.has_value()) {
-    // The vary allow list has changed and has made the vary header of this
-    // cached value not cacheable.
+  absl::optional<Key> varied_key = variedRequestKey(request, *response_headers);
+  if (!varied_key.has_value()) {
     return SimpleHttpCache::Entry{};
   }
-  varied_request_key.add_custom_fields(vary_identifier.value());
+  Key& varied_request_key = varied_key.value();
 
   auto iter = map_.find(varied_request_key);
   if (iter == map_.end()) {

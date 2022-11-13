@@ -39,9 +39,9 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/maglev_lb.h"
-#include "source/common/upstream/original_dst_cluster.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 #include "source/common/upstream/ring_hash_lb.h"
 #include "source/common/upstream/subset_lb.h"
@@ -898,12 +898,11 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
-    const auto& policy = cluster_reference.info()->loadBalancingPolicy();
     TypedLoadBalancerFactory* typed_lb_factory = cluster_reference.info()->loadBalancerFactory();
     RELEASE_ASSERT(typed_lb_factory != nullptr, "ClusterInfo should contain a valid factory");
     cluster_entry_it->second->thread_aware_lb_ =
-        typed_lb_factory->create(cluster_reference.prioritySet(), cluster_reference.info()->stats(),
-                                 cluster_reference.info()->statsScope(), runtime_, random_, policy);
+        typed_lb_factory->create(*cluster_reference.info(), cluster_reference.prioritySet(),
+                                 runtime_, random_, time_source_);
   }
 
   updateClusterCounts();
@@ -1129,7 +1128,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = lb_->chooseHost(context);
+  HostConstSharedPtr logical_host = chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1183,7 +1182,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    lb_ = lb_factory_->create();
+    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }
 
@@ -1508,7 +1507,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+      override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -1551,7 +1551,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Maglev:
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create();
+      lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
       break;
     }
     }
@@ -1618,7 +1618,7 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
@@ -1722,10 +1722,33 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
   }
 }
 
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->chooseHost(context);
+}
+
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->peekAnotherHost(context);
+}
+
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
@@ -1921,7 +1944,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
                                         ssl_context_manager_, outlier_event_logger, added_via_api,
                                         added_via_api
                                             ? validation_context_.dynamicValidationVisitor()

@@ -52,9 +52,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     QuicStatNames& quic_stat_names, OptRef<Http::HttpServerPropertiesCache> rtt_cache,
     Stats::Scope& scope,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
-    : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit,
-                                      std::make_shared<QuicSslConnectionInfo>(*this)),
+    : QuicFilterManagerConnectionImpl(
+          *connection, connection->connection_id(), dispatcher, send_buffer_limit,
+          std::make_shared<QuicSslConnectionInfo>(*this),
+          std::make_unique<StreamInfo::StreamInfoImpl>(
+              dispatcher.timeSource(),
+              connection->connectionSocket()->connectionInfoProviderSharedPtr())),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),

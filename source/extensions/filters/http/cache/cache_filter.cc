@@ -567,7 +567,8 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata);
+    cache_.updateHeaders(*lookup_, response_headers, metadata,
+                         [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     insert_status_ = InsertStatus::HeaderUpdate;
   }
 
