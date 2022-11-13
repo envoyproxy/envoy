@@ -233,7 +233,7 @@ public:
 private:
   friend class OAuth2Test;
 
-  void finishFlow();
+  void finishFlow(std::chrono::seconds expires_in);
 
   std::shared_ptr<CookieValidator> validator_;
 
@@ -242,7 +242,6 @@ private:
   std::string access_token_; // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
-  SystemTime new_expires_;
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};

@@ -416,15 +416,14 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
   id_token_ = id_token;
   refresh_token_ = refresh_token;
 
-  new_expires_ = time_source_.systemTime() + expires_in;
-
-  finishFlow();
+  finishFlow(expires_in);
 }
 
-void OAuth2Filter::finishFlow() {
+void OAuth2Filter::finishFlow(std::chrono::seconds expires_in) {
   std::string token_payload;
+  auto new_expires = time_source_.systemTime() + expires_in;
   std::string new_expires_str = std::to_string(
-      std::chrono::duration_cast<std::chrono::seconds>(new_expires_.time_since_epoch()).count());
+      std::chrono::duration_cast<std::chrono::seconds>(new_expires.time_since_epoch()).count());
   if (config_->forwardBearerToken()) {
     token_payload = absl::StrCat(host_, new_expires_str, access_token_, id_token_, refresh_token_);
   } else {
@@ -442,7 +441,7 @@ void OAuth2Filter::finishFlow() {
 
   // We use HTTP Only cookies for the HMAC and Expiry.
   int64_t max_age =
-      std::chrono::duration_cast<std::chrono::seconds>(new_expires_ - time_source_.systemTime())
+      std::chrono::duration_cast<std::chrono::seconds>(new_expires - time_source_.systemTime())
           .count();
   const std::string cookie_tail = fmt::format(CookieTailFormatString, max_age);
   const std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, max_age);
