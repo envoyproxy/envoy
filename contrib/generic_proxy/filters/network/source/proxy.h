@@ -251,8 +251,7 @@ class Filter : public Envoy::Network::ReadFilter,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
                public RequestDecoderCallback {
 public:
-  Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
-      : config_(std::move(config)), context_(context) {
+  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {
     decoder_ = config_->codecFactory().requestDecoder();
     decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -291,8 +290,6 @@ public:
     return callbacks_->connection();
   }
 
-  Server::Configuration::FactoryContext& factoryContext() { return context_; }
-
   void newDownstreamRequest(RequestPtr request);
   void deferredStream(ActiveStream& stream);
 
@@ -318,8 +315,6 @@ private:
   MessageCreatorPtr creator_;
 
   Buffer::OwnedImpl response_buffer_;
-
-  Server::Configuration::FactoryContext& context_;
 
   std::list<ActiveStreamPtr> active_streams_;
 };

@@ -261,7 +261,7 @@ public:
         .WillOnce(
             Invoke([this](RequestDecoderCallback& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_, factory_context_);
+    filter_ = std::make_shared<Filter>(filter_config_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -375,11 +375,6 @@ TEST_F(FilterTest, GetConnection) {
   initializeFilter();
 
   EXPECT_EQ(&(filter_callbacks_.connection_), &filter_->connection());
-}
-
-TEST_F(FilterTest, GetFactoryContext) {
-  initializeFilter();
-  EXPECT_EQ(&factory_context_, &filter_->factoryContext());
 }
 
 TEST_F(FilterTest, NewStreamAndResetStream) {

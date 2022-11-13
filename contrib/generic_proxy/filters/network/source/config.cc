@@ -21,9 +21,9 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
 
   const auto config =
       std::make_shared<FilterConfig>(proto_config, context, *route_config_provider_manager);
-  return [route_config_provider_manager, config,
-          &context](Envoy::Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<Filter>(config, context));
+  return [route_config_provider_manager,
+          config](Envoy::Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(std::make_shared<Filter>(config));
   };
 }
 
