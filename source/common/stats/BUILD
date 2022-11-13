@@ -140,17 +140,6 @@ envoy_cc_library(
     ],
 )
 
-#envoy_cc_library(
-#    name = "scope_prefixer_lib",
-#    srcs = ["scope_prefixer.cc"],
-#    hdrs = ["scope_prefixer.h"],
-#    deps = [
-#        ":symbol_table_lib",
-#        ":utility_lib",
-#        "//envoy/stats:stats_interface",
-#    ],
-#)
-
 envoy_cc_library(
     name = "stat_merger_lib",
     srcs = ["stat_merger.cc"],
@@ -254,7 +243,6 @@ envoy_cc_library(
         ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
-        # ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",

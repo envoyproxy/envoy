@@ -44,8 +44,8 @@ void IsolatedStoreImpl::setDefaultScope(const Stats::ScopeSharedPtr& scope) {
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
 
 ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name) {
-  StatNameManagedStorage name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(name_storage.statName());
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return scopeFromStatName(stat_name_storage.statName());
 }
 
 ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name) {

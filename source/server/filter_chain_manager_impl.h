@@ -160,7 +160,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
+  Stats::Scope& serverScope() override { return server_.stats(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;

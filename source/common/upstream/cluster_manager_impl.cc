@@ -290,7 +290,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(*stats.rootScope())),
+      cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters",
@@ -379,25 +379,25 @@ ClusterManagerImpl::ClusterManagerImpl(
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                           dyn_resources.ads_config(), *stats.rootScope(), false)
+                                                           dyn_resources.ads_config(), stats, false)
                 ->createUncachedRawAsyncClient(),
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators));
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                           dyn_resources.ads_config(), *stats.rootScope(), false)
+                                                           dyn_resources.ads_config(), stats, false)
                 ->createUncachedRawAsyncClient(),
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            random_, *stats_.rootScope(),
+            random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             std::move(custom_config_validators));
       }
@@ -410,13 +410,13 @@ ClusterManagerImpl::ClusterManagerImpl(
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                           dyn_resources.ads_config(), *stats.rootScope(), false)
+                                                           dyn_resources.ads_config(), stats, false)
                 ->createUncachedRawAsyncClient(),
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
@@ -424,12 +424,12 @@ ClusterManagerImpl::ClusterManagerImpl(
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                           dyn_resources.ads_config(), *stats.rootScope(), false)
+                                                           dyn_resources.ads_config(), stats, false)
                 ->createUncachedRawAsyncClient(),
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            random_, *stats_.rootScope(),
+            random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
@@ -508,9 +508,9 @@ void ClusterManagerImpl::initializeSecondaryClusters(
 
     Config::Utility::checkTransportVersion(load_stats_config);
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, *stats_.rootScope(),
+        local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
-                                                       *stats_.rootScope(), false)
+                                                       stats_, false)
             ->createUncachedRawAsyncClient(),
         dispatcher_);
   }
@@ -1225,7 +1225,7 @@ ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a way
   // to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this, *stats_.rootScope(),
+  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this, stats_,
                                     validation_visitor);
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
@@ -1858,7 +1858,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info);
+        quic_stat_names_, stats_, *quic_info);
 #else
     (void)quic_info;
     // Should be blocked by configuration checking at an earlier point.
@@ -1895,7 +1895,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     }
     return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state,
-                                         quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info);
+                                         quic_stat_names_, {}, stats_, {}, *quic_info);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
@@ -1932,7 +1932,7 @@ ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource
                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
-  return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
+  return CdsApiImpl::create(cds_config, cds_resources_locator, cm, stats_,
                             validation_context_.dynamicValidationVisitor());
 }
 

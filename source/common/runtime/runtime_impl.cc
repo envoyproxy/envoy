@@ -581,15 +581,14 @@ void LoaderImpl::mergeValues(const absl::node_hash_map<std::string, std::string>
   loadNewSnapshot();
 }
 
-Stats::Scope& LoaderImpl::getRootScope() { return *store_.rootScope(); }
+Stats::Scope& LoaderImpl::getRootScope() { return store_; }
 
 void LoaderImpl::countDeprecatedFeatureUse() const { countDeprecatedFeatureUseInternal(stats_); }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
   RuntimeStats stats{
-    ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(*store.rootScope(), prefix),
-                      POOL_GAUGE_PREFIX(*store.rootScope(), prefix))};
+    ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 
