@@ -2,8 +2,6 @@
 
 #include "contrib/generic_proxy/filters/network/source/rds.h"
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
-#include "interface/codec.h"
-#include "proxy.h"
 
 namespace Envoy {
 namespace Extensions {
