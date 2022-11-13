@@ -1,0 +1,7 @@
+date: October 17, 2022
+
+bug_fixes:
+- area: lua
+  change: |
+    fixed a bug causing response headers set by a Lua script to not be sent in the response (https://github.com/envoyproxy/envoy/issues/22401).
+    This bug was introduced in Envoy v1.23.0.

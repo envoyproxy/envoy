@@ -102,9 +102,8 @@ public:
     use_lds_ = false;
     create_xds_upstream_ = true;
 
-    if (isUnified()) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      isUnified() ? "true" : "false");
 
     // Make the default cluster HTTP2.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

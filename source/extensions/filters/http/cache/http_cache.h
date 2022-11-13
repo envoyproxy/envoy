@@ -252,9 +252,13 @@ public:
   //
   // This is called when an expired cache entry is successfully validated, to
   // update the cache entry.
+  //
+  // The on_complete callback is called with true if the update is successful,
+  // false if the update was not performed.
   virtual void updateHeaders(const LookupContext& lookup_context,
                              const Http::ResponseHeaderMap& response_headers,
-                             const ResponseMetadata& metadata) PURE;
+                             const ResponseMetadata& metadata,
+                             std::function<void(bool)> on_complete) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

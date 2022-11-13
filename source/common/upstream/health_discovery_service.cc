@@ -114,7 +114,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
           // TODO(lilika): Add support for more granular options of
           // envoy::config::core::v3::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
+          if (host->coarseHealth() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {

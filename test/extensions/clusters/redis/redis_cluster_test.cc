@@ -14,7 +14,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -142,7 +141,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_, stats_store_, std::move(dns_resolver_),
+        server_context_, server_context_.cluster_manager_, stats_store_,
+        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
         ssl_context_manager_, std::move(outlier_event_logger), false, validation_visitor_);
 
     RedisClusterFactory factory = RedisClusterFactory();
@@ -639,7 +639,7 @@ protected:
         new NetworkFilters::Common::Redis::RespValue()};
     dummy_value->type(NetworkFilters::Common::Redis::RespType::Error);
     dummy_value->asString() = "dummy text";
-    EXPECT_TRUE(discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false));
+    discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false);
 
     RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
     EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());

@@ -19,6 +19,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -221,12 +222,25 @@ const std::string& OAuth2Filter::bearerPrefix() const {
 
 /**
  * primary cases:
- * 1) user is signing out
- * 2) /_oauth redirect
- * 3) user is authorized
- * 4) user is unauthorized
+ * 1) pass through header is matching
+ * 2) user is signing out
+ * 3) /_oauth redirect
+ * 4) user is authorized
+ * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Skip Filter and continue chain if a Passthrough header is matching
+  // Must be done before the sanitation of the authorization header,
+  // otherwise the authorization header might be altered or removed
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
+    for (const auto& matcher : config_->passThroughMatchers()) {
+      if (matcher.matchesHeaders(headers)) {
+        config_->stats().oauth_passthrough_.inc();
+        return Http::FilterHeadersStatus::Continue;
+      }
+    }
+  }
+
   // Sanitize the Authorization header, since we have no way to validate its content. Also,
   // if token forwarding is enabled, this header will be set based on what is on the HMAC cookie
   // before forwarding the request upstream.
@@ -376,13 +390,13 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
     }
     return true;
   }
-
-  for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher.matchesHeaders(headers)) {
-      return true;
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_header_passthrough_fix")) {
+    for (const auto& matcher : config_->passThroughMatchers()) {
+      if (matcher.matchesHeaders(headers)) {
+        return true;
+      }
     }
   }
-
   return false;
 }
 
