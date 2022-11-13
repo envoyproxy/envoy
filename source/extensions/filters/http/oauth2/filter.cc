@@ -329,13 +329,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     auto query_params = config_->authorizationQueryParams();
     query_params["redirect_uri"] = escaped_redirect_uri;
     query_params["state"] = escaped_state;
+    // Copy the authorization endpoint URL to replace its query params.
+    auto authorization_endpoint_url = config_->authorizationEndpointUrl();
     const std::string path_and_query_params = Http::Utility::replaceQueryString(
-        Http::HeaderString(config_->authorizationEndpointPathAndQueryParams()), query_params);
-    const std::string new_url = absl::StrCat(
-        config_->authorizationEndpointScheme(), "://", config_->authorizationEndpointHostAndPort(),
-        path_and_query_params, config_->encodedResourceQueryParams());
+        Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()), query_params);
+    authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
+    const std::string new_url = authorization_endpoint_url.toString();
 
-    response_headers->setLocation(new_url);
+    response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();

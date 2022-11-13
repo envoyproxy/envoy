@@ -371,6 +371,10 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   return true;
 }
 
+std::string Utility::Url::toString() const {
+  return absl::StrCat(scheme_, "://", host_and_port_, path_and_query_params_);
+}
+
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {

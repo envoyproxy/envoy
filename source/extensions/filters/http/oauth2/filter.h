@@ -134,15 +134,7 @@ public:
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
-  absl::string_view authorizationEndpointPathAndQueryParams() const {
-    return authorization_endpoint_url_.pathAndQueryParams();
-  }
-  absl::string_view authorizationEndpointHostAndPort() const {
-    return authorization_endpoint_url_.hostAndPort();
-  }
-  absl::string_view authorizationEndpointScheme() const {
-    return authorization_endpoint_url_.scheme();
-  }
+  const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const Http::Utility::QueryParams& authorizationQueryParams() const {
     return authorization_query_params_;
   }

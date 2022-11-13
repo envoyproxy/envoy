@@ -149,6 +149,13 @@ public:
   absl::string_view hostAndPort() const { return host_and_port_; }
   absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
 
+  void setPathAndQueryParams(absl::string_view path_and_query_params) {
+    path_and_query_params_ = path_and_query_params;
+  }
+
+  /** Returns the fully qualified URL as a string. */
+  std::string toString() const;
+
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
@@ -270,6 +277,20 @@ std::string stripQueryString(const HeaderString& path);
  *         portion from `path` remains unchanged.
  */
 std::string replaceQueryString(const HeaderString& path, const QueryParams& params);
+
+/**
+ * Replace the query string portion of a given URL with a new one.
+ *
+ * e.g. replaceQueryString("https://example.com/foo?key=1", {key:2}) -> "/foo?key=2"
+ *      replaceQueryString("/bar", {hello:there}) -> "/bar?hello=there"
+ *
+ * @param path the original path that may or may not contain an existing query string
+ * @param params the new params whose string representation should be formatted onto
+ *               the `path` above
+ * @return std::string the new path whose query string has been replaced by `params` and whose path
+ *         portion from `path` remains unchanged.
+ */
+std::string replaceQueryStringFromUrl(const Url& path, const QueryParams& params);
 
 /**
  * Parse a particular value out of a cookie
