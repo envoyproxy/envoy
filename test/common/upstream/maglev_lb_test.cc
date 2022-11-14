@@ -80,27 +80,6 @@ TEST_F(MaglevLoadBalancerTest, NoHost) {
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
 
-TEST_F(MaglevLoadBalancerTest, SelectOverrideHost) {
-  init(7);
-
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(testing::Return(Host::Health::Degraded));
-
-  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
-  EXPECT_CALL(context, overrideHostToSelect())
-      .WillOnce(testing::Return(absl::make_optional(expected_host)));
-
-  // Mock membership update and update host map shared pointer in the lb.
-  auto host_map = std::make_shared<HostMap>();
-  host_map->insert({"1.2.3.4", mock_host});
-  priority_set_.cross_priority_host_map_ = host_map;
-  host_set_.runCallbacks({}, {});
-
-  EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
-}
-
 // Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
 // cluster, the operation does not immediately reach the worker thread. There may be cases where the
 // thread aware load balancer is destructed, but the load balancer factory is still used in the

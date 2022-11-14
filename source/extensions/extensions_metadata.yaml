@@ -85,6 +85,16 @@ envoy.clusters.dynamic_forward_proxy:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.clusters.static:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.strict_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.clusters.original_dst:
   categories:
   - envoy.clusters
@@ -94,6 +104,11 @@ envoy.clusters.redis:
   categories:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.clusters.logical_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.compression.brotli.compressor:
   categories:

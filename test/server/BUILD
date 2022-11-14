@@ -54,6 +54,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
@@ -424,6 +425,7 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
