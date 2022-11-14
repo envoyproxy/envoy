@@ -238,29 +238,6 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-/*ScopeSharedPtr TestScope::scopeFromStatName(StatName name) {
-  ScopeSharedPtr scope = std::make_shared<TestScope>(name, store_);
-  addScopeToStore(scope);
-  return scope;
-  }*/
-
-/*
-ScopeSharedPtr TestScope::createScope(const std::string& name) {
-  StatNameManagedStorage name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(name_storage.statName());
-}
-*/
-
-/*
-ScopeSharedPtr TestScope::scopeFromStatName(StatName name) {
-  SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
-  ScopeSharedPtr scope = std::make_shared<TestScope>(
-      StatName(prefix_name_storage.get()), store_);
-  addScopeToStore(scope);
-  return scope;
-}
-*/
-
 ScopeSharedPtr TestScope::makeScope(StatName name) {
   return std::make_shared<TestScope>(name, store_);
 }

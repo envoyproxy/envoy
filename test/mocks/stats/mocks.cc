@@ -103,7 +103,9 @@ TextReadout& MockScope::textReadoutFromStatNameWithTags(const StatName& name,
 
 MockStore::MockStore() {
   StatNameManagedStorage name_storage("", symbolTable());
-  setDefaultScope(std::make_shared<MockScope>(name_storage.statName(), *this));
+  auto default_scope = std::make_shared<MockScope>(name_storage.statName(), *this);
+  default_scope_ = default_scope.get();
+  setDefaultScope(default_scope);
 
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
