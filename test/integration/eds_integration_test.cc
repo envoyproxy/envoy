@@ -55,6 +55,7 @@ public:
       eds_helper_.setEds({cluster_load_assignment});
     }
   }
+
   struct EndpointSettingOptions {
     uint32_t total_endpoints = 1;
     uint32_t healthy_endpoints = 0;
@@ -148,7 +149,6 @@ public:
       health_check->mutable_http_health_check()->set_path("/healthcheck");
       health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
     }
-    // setEndpoints(0, 0, 0, true, absl::nullopt, false);
     setEndpoints({/*total_endpoints=*/0}, true, false);
 
     if (cluster_modifier != nullptr) {
@@ -189,15 +189,7 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true);
 
-  //   struct EndpointSettingOptions final {
-  //   uint32_t total_endpoints = 1;
-  //   uint32_t healthy_endpoints = 0;
-  //   uint32_t degraded_endpoints = 0;
-  //   uint32_t disable_active_hc_endpoints = 0;
-  //   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
-  // };
-
-  // EndpointSettingOptions options;
+  // There is 1 total endpoint.
   setEndpoints(EndpointSettingOptions(), false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
