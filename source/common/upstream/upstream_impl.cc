@@ -1797,7 +1797,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   for (auto& entry : hosts_per_locality) {
     if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
       per_locality.emplace_back(entry.second);
-      if (locality_weighted_lb && locality_weights_map.size()) {
+      if (locality_weighted_lb && !locality_weights_map.empty()) {
         locality_weights->emplace_back(locality_weights_map[entry.first]);
       }
     }
