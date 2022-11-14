@@ -303,9 +303,6 @@ public:
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef) override;
 
-protected:
-  ScopeSharedPtr makeScope(StatName name) override;
-
   MockStore& mock_store_;
 };
 
@@ -325,13 +322,18 @@ public:
   MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
 
-  MockScope& mockScope() { return *default_scope_; }
+  MockScope& mockScope() {
+    MockScope* scope = dynamic_cast<MockScope*>(rootScope().get());
+    ASSERT(scope != nullptr);
+    return *scope;
+  }
+
+  ScopeSharedPtr makeScope(StatName name) override;
 
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
-  MockScope* default_scope_{};
 };
 
 /**

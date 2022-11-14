@@ -232,17 +232,13 @@ Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-ScopeSharedPtr TestScope::makeScope(StatName name) {
-  return std::make_shared<TestScope>(name, store_);
+ScopeSharedPtr TestStore::makeScope(StatName name) {
+  return std::make_shared<TestScope>(name, *this);
 }
 
-TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {
-  setDefaultScope(std::make_shared<TestScope>("", *this));
-}
+TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
 
-TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {
-  setDefaultScope(std::make_shared<TestScope>("", *this));
-}
+TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
 template <class StatType>
 using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;

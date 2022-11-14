@@ -62,7 +62,7 @@ protected:
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
-  NiceMock<Stats::MockIsolatedStatsStore>& mock_store_ = context_.server_factory_context_.store_;
+  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
   NiceMock<Grpc::MockAsyncClient>* mock_client_ptr_{nullptr};
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   NiceMock<Event::MockTimer>* timer_;
@@ -70,7 +70,7 @@ protected:
   std::string test_string = "ABCDEFGHIJKLMN";
   SkyWalkingTracerStatsSharedPtr tracing_stats_{
       std::make_shared<SkyWalkingTracerStats>(SkyWalkingTracerStats{
-          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_store_, "tracing.skywalking."))})};
+          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))})};
   TraceSegmentReporterPtr reporter_;
 };
 
@@ -115,10 +115,10 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
 
   reporter_->report(segment_context);
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Create a segment context with no previous span context.
   TracingContextPtr second_segment_context =
@@ -128,10 +128,10 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportTraceSegment) {
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   reporter_->report(second_segment_context);
 
-  EXPECT_EQ(2U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(2U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
 TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
@@ -148,10 +148,10 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
 
   reporter_->report(segment_context);
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Simulates a disconnected connection.
   EXPECT_CALL(*timer_, enableTimer(_, _));
@@ -163,20 +163,20 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithDefaultCache) {
     reporter_->report(segment_context);
   }
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(1024U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(1024U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Simulate the situation where the connection is re-established. The remaining segments in the
   // cache will be reported.
   EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
   timer_cb_();
 
-  EXPECT_EQ(1025U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(1024U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(1024U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1025U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(1024U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(1024U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
 TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
@@ -198,10 +198,10 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
 
   reporter_->report(segment_context);
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Simulates a disconnected connection.
   EXPECT_CALL(*timer_, enableTimer(_, _));
@@ -213,20 +213,20 @@ TEST_F(TraceSegmentReporterTest, TraceSegmentReporterReportWithCacheConfig) {
     reporter_->report(segment_context);
   }
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(7U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // Simulate the situation where the connection is re-established. The remaining segments in the
   // cache will be reported.
   EXPECT_CALL(*mock_client_ptr_, startRaw(_, _, _, _)).WillOnce(Return(mock_stream_ptr_.get()));
   timer_cb_();
 
-  EXPECT_EQ(4U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(7U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(3U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(4U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(7U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(3U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 }
 
 TEST_F(TraceSegmentReporterTest, CallAsyncCallbackAndNothingTodo) {

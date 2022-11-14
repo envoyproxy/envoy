@@ -76,10 +76,6 @@ MockSinkPredicates::~MockSinkPredicates() = default;
 MockScope::MockScope(StatName prefix, MockStore& store)
     : TestUtil::TestScope(prefix, store), mock_store_(store) {}
 
-ScopeSharedPtr MockScope::makeScope(StatName prefix) {
-  return std::make_shared<MockScope>(prefix, mock_store_);
-}
-
 Counter& MockScope::counterFromStatNameWithTags(const StatName& name,
                                                 StatNameTagVectorOptConstRef) {
   // We always just respond with the mocked counter, so the tags don't matter.
@@ -102,11 +98,6 @@ TextReadout& MockScope::textReadoutFromStatNameWithTags(const StatName& name,
 }
 
 MockStore::MockStore() {
-  StatNameManagedStorage name_storage("", symbolTable());
-  auto default_scope = std::make_shared<MockScope>(name_storage.statName(), *this);
-  default_scope_ = default_scope.get();
-  setDefaultScope(default_scope);
-
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));
   ON_CALL(*this, histogram(_, _))
@@ -118,15 +109,12 @@ MockStore::MockStore() {
         histograms_.emplace_back(histogram);
         return *histogram;
       }));
-
-  /*
-  ON_CALL(*this, histogram(_, _))
-      .WillByDefault(Invoke([this](const std::string& name, Histogram::Unit unit) -> Histogram& {
-        return TestUtil::TestStore::histogramFromString(name, unit);
-        }));
-  */
 }
 MockStore::~MockStore() = default;
+
+ScopeSharedPtr MockStore::makeScope(StatName prefix) {
+  return std::make_shared<MockScope>(prefix, *this);
+}
 
 MockIsolatedStatsStore::MockIsolatedStatsStore() = default;
 MockIsolatedStatsStore::~MockIsolatedStatsStore() = default;

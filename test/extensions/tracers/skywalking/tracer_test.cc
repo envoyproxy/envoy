@@ -61,12 +61,12 @@ protected:
   NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
       context_.server_factory_context_.api_.random_;
   Event::GlobalTimeSystem& mock_time_source_ = context_.server_factory_context_.time_system_;
-  NiceMock<Stats::MockIsolatedStatsStore>& mock_store_ = context_.server_factory_context_.store_;
+  NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.scope_;
   std::unique_ptr<NiceMock<Grpc::MockAsyncStream>> mock_stream_ptr_{nullptr};
   std::string test_string = "ABCDEFGHIJKLMN";
   SkyWalkingTracerStatsSharedPtr tracing_stats_{
       std::make_shared<SkyWalkingTracerStats>(SkyWalkingTracerStats{
-          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_store_, "tracing.skywalking."))})};
+          SKYWALKING_TRACER_STATS(POOL_COUNTER_PREFIX(mock_scope_, "tracing.skywalking."))})};
   TracerPtr tracer_;
 };
 
@@ -219,19 +219,19 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   }
 
   // When the child span ends, the data is not reported immediately, but the end time is set.
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   // When the first span in the current segment ends, the entire segment is reported.
   EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
   org_span->finishSpan();
 
-  EXPECT_EQ(1U, mock_store_.counter("tracing.skywalking.segments_sent").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_dropped").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.cache_flushed").value());
-  EXPECT_EQ(0U, mock_store_.counter("tracing.skywalking.segments_flushed").value());
+  EXPECT_EQ(1U, mock_scope_.counter("tracing.skywalking.segments_sent").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
+  EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
 
   {
     auto rpc_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");

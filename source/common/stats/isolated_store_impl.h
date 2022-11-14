@@ -140,8 +140,8 @@ public:
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  ScopeSharedPtr rootScope() override { return default_scope_; }
-  ConstScopeSharedPtr constRootScope() const override { return default_scope_; }
+  ScopeSharedPtr rootScope() override;
+  ConstScopeSharedPtr constRootScope() const override;
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override {
     // TODO(jmarantz): should we filter out gauges where
@@ -179,7 +179,7 @@ public:
     if (f_size != nullptr) {
       f_size(scopes_.size() + 1);
     }
-    f_stat(*default_scope_);
+    f_stat(*constRootScope());
     for (const ScopeSharedPtr& scope : scopes_) {
       f_stat(*scope);
     }
@@ -209,17 +209,17 @@ public:
   NullCounterImpl& nullCounter() override { return *null_counter_; }
   NullGaugeImpl& nullGauge() override { return *null_gauge_; }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return default_scope_->iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return default_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override { return constRootScope()->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override { return constRootScope()->iterate(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override {
-    return default_scope_->iterate(fn);
+    return constRootScope()->iterate(fn);
   }
   bool iterate(const IterateFn<TextReadout>& fn) const override {
-    return default_scope_->iterate(fn);
+    return constRootScope()->iterate(fn);
   }
 
 protected:
-  void setDefaultScope(const Stats::ScopeSharedPtr& scope);
+  virtual ScopeSharedPtr makeScope(StatName name);
 
 private:
   friend class IsolatedScopeImpl;
@@ -325,8 +325,6 @@ public:
 
 protected:
   void addScopeToStore(const ScopeSharedPtr& scope) { store_.scopes_.push_back(scope); }
-
-  virtual ScopeSharedPtr makeScope(StatName name);
 
 private:
   template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {

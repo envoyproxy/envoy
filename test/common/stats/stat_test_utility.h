@@ -145,6 +145,9 @@ public:
   HistogramOptConstRef findHistogramByString(const std::string& name) const;
   std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
 
+protected:
+  virtual ScopeSharedPtr makeScope(StatName name) override;
+
 private:
   friend class TestScope;
 
@@ -176,11 +179,6 @@ public:
   Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
                                            StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-
-  // ScopeSharedPtr createScope(const std::string& name) override;
-  // ScopeSharedPtr scopeFromStatName(StatName name) override;
-  ScopeSharedPtr makeScope(StatName name) override;
-
   TestStore& store() override { return store_; }
 
 private:

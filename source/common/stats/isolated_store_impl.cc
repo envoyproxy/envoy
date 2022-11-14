@@ -33,12 +33,18 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)) {
-  setDefaultScope(std::make_shared<IsolatedScopeImpl>("", *this));
+      null_gauge_(new NullGaugeImpl(symbol_table)) {}
+
+ScopeSharedPtr IsolatedStoreImpl::rootScope() {
+  if (default_scope_ == nullptr) {
+    StatNameManagedStorage name_storage("", symbolTable());
+    default_scope_ = makeScope(StatName(name_storage.statName()));
+  }
+  return default_scope_;
 }
 
-void IsolatedStoreImpl::setDefaultScope(const Stats::ScopeSharedPtr& scope) {
-  default_scope_ = scope;
+ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {
+  return const_cast<IsolatedStoreImpl*>(this)->rootScope();
 }
 
 IsolatedStoreImpl::~IsolatedStoreImpl() = default;
@@ -50,13 +56,13 @@ ScopeSharedPtr IsolatedScopeImpl::createScope(const std::string& name) {
 
 ScopeSharedPtr IsolatedScopeImpl::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr prefix_name_storage = symbolTable().join({prefix(), name});
-  ScopeSharedPtr scope = makeScope(StatName(prefix_name_storage.get()));
+  ScopeSharedPtr scope = store_.makeScope(StatName(prefix_name_storage.get()));
   addScopeToStore(scope);
   return scope;
 }
 
-ScopeSharedPtr IsolatedScopeImpl::makeScope(StatName name) {
-  return std::make_shared<IsolatedScopeImpl>(name, store_);
+ScopeSharedPtr IsolatedStoreImpl::makeScope(StatName name) {
+  return std::make_shared<IsolatedScopeImpl>(name, *this);
 }
 
 } // namespace Stats
