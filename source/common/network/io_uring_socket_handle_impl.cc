@@ -4,6 +4,10 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
+#include <sys/socket.h>
+#include <fcntl.h>
+
+#include "io_socket_handle_impl.h"
 #include "io_uring_socket_handle_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
@@ -11,6 +15,7 @@
 #include "source/common/io/io_uring.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -30,13 +35,19 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
       socket_v6only_(socket_v6only), domain_(domain) {
   if (is_server_socket) {
     io_uring_socket_type_ = IoUringSocketType::Server;
-    io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
-    io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_, true);
+    if (enable_server_socket_) {
+      io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
+      io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_, true);
+    }
   }
 }
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
+    if (io_uring_socket_type_ == IoUringSocketType::Client) {
+      shadow_io_handle_->close();
+      return;
+    }
     // The TLS slot has been shut down by this moment with IoUring wiped out, thus
     // better use this posix system call instead of IoUringSocketHandleImpl::close().
     ::close(fd_);
@@ -52,10 +63,36 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    ENVOY_LOG(trace, "close the client socket");
+    if (shadow_io_handle_ == nullptr) {
+      ::close(fd_);
+      SET_SOCKET_INVALID(fd_);
+      return Api::ioCallUint64ResultNoError();
+    }
+    SET_SOCKET_INVALID(fd_);
+    return shadow_io_handle_->close();
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server) {
+    if (!enable_server_socket_) {
+      if (shadow_io_handle_ == nullptr) {
+        ENVOY_LOG(trace, "close the server socket directly, fd = {}", fd_);
+        ::close(fd_);
+        SET_SOCKET_INVALID(fd_);
+        return Api::ioCallUint64ResultNoError();
+      }
+      ENVOY_LOG(trace, "close the server socket, fd = {}", fd_);
+      SET_SOCKET_INVALID(fd_);
+      return shadow_io_handle_->close(); 
+    }
+  }
+
   if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
-   io_uring_worker_.ref().closeSocket(fd_);
-   SET_SOCKET_INVALID(fd_);
-   return Api::ioCallUint64ResultNoError();
+    ENVOY_LOG(trace, "close the listen socket");
+    io_uring_worker_.ref().closeSocket(fd_);
+    SET_SOCKET_INVALID(fd_);
+    return Api::ioCallUint64ResultNoError();
   }
 
   auto& uring = io_uring_factory_.get().ref();
@@ -87,10 +124,19 @@ Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
 
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    return shadow_io_handle_->readv(max_length, slices, num_slice);
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    return shadow_io_handle_->readv(max_length, slices, num_slice);
+  }
+
   if (io_uring_socket_type_ == IoUringSocketType::Server) {
     ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
+
     if (read_param_ == absl::nullopt) {
-       return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                   IoSocketError::deleteIoError)};
     }
 
@@ -150,6 +196,20 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
+  ENVOY_LOG(trace, "read, fd = {}, socket type = {}", fd_, ioUringSocketTypeStr());
+
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    return shadow_io_handle_->read(buffer, max_length_opt);
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    ENVOY_LOG(trace, "fallback to IoSocketHandle");
+    auto ret = shadow_io_handle_->read(buffer, max_length_opt);
+    ENVOY_LOG(trace, "IoSocketHandle read return {}", ret.return_value_);
+    return ret;
+  }
+
   const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -167,6 +227,15 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                         uint64_t num_slice) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    return shadow_io_handle_->writev(slices, num_slice);
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    return shadow_io_handle_->writev(slices, num_slice);
+  }
+
   if (is_write_added_) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
@@ -215,6 +284,14 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    return shadow_io_handle_->write(buffer);
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    return shadow_io_handle_->write(buffer);
+  }
 
   // If buffer gets written and drained, the following writev will return bytes_already_wrote_
   // directly.
@@ -270,12 +347,12 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
     return nullptr;
   }
 
-  ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket");
+  ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket, connect fd = {}", accepted_socket_param_->fd_);
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Listen);
 
   *addr = accepted_socket_param_->remote_addr_;
   *addrlen = accepted_socket_param_->remote_addr_len_;
-  bool enable_server_socket = false;
+  bool enable_server_socket = true;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
                                                              accepted_socket_param_->fd_, socket_v6only_,
                                                              domain_, enable_server_socket);
@@ -288,6 +365,10 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    return shadow_io_handle_->connect(address);
+  }
+
   auto& uring = io_uring_factory_.get().ref();
   auto req = new Io::Request{*this, Io::RequestType::Connect};
   auto res = uring.prepareConnect(fd_, address, req);
@@ -367,20 +448,39 @@ Address::InstanceConstSharedPtr IoUringSocketHandleImpl::peerAddress() {
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
-void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
+void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
                                                   Event::FileReadyCb cb,
-                                                  Event::FileTriggerType, uint32_t) {
+                                                  Event::FileTriggerType trigger, uint32_t events) {
+  ENVOY_LOG(trace, "initialize file event fd = {}", fd_);
   io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
 
   if (io_uring_socket_type_ == IoUringSocketType::Listen) {
     //addAcceptRequest();
     //io_uring_factory_.get().ref().submit();
+    ENVOY_LOG(trace, "initialize file event for accept socket, fd = {}", fd_);
     io_uring_worker_.ref().addAcceptSocket(fd_, *this);
   } else if (io_uring_socket_type_ == IoUringSocketType::Server) {
-    io_uring_worker_.ref().enableSocket(fd_);
+    ENVOY_LOG(trace, "initialize file event for server socket, fd = {}", fd_);
+    if (enable_server_socket_) {
+      io_uring_worker_.ref().enableSocket(fd_);
+    } else {
+      ENVOY_LOG(trace, "fallback to IoSocketHandle for server socket");
+      int flags = fcntl(fd_, F_GETFL, 0);
+      ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+      shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+      shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
+      return;
+    }
   } else {
     ASSERT(io_uring_socket_type_ == IoUringSocketType::Unknown);
+    ENVOY_LOG(trace, "initialize file event for client socket, fd = {}", fd_);
+    ENVOY_LOG(trace, "fallback to IoSocketHandle for client socket");
     io_uring_socket_type_ = IoUringSocketType::Client;
+    int flags = fcntl(fd_, F_GETFL, 0);
+    ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+    shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+    shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
+    return;
   }
 
   cb_ = std::move(cb);
@@ -390,7 +490,19 @@ IoHandlePtr IoUringSocketHandleImpl::duplicate() { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-  if ((io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) && (events & Event::FileReadyType::Read)) {
+
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    shadow_io_handle_->activateFileEvents(events);
+    return;
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    ASSERT(shadow_io_handle_ != nullptr);
+    shadow_io_handle_->activateFileEvents(events);
+    return;
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
     if (events & Event::FileReadyType::Read) {
       io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
     }
@@ -413,6 +525,12 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   ENVOY_LOG(trace, "enable file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
 
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    ASSERT(shadow_io_handle_ != nullptr);
+    shadow_io_handle_->enableFileEvents(events);
+    return;
+  }
+
   if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
     if (!(events & Event::FileReadyType::Read)) {
       io_uring_worker_.ref().disableSocket(fd_);
@@ -422,19 +540,35 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
     return;
   }
 
-  // old code path.
-  if (events & Event::FileReadyType::Read) {
-    is_read_enabled_ = true;
-    addReadRequest();
-    cb_(Event::FileReadyType::Read);
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    shadow_io_handle_->enableFileEvents(events);
   } else {
-    is_read_enabled_ = false;
+    // old code path.
+    if (events & Event::FileReadyType::Read) {
+      is_read_enabled_ = true;
+      addReadRequest();
+      cb_(Event::FileReadyType::Read);
+    } else {
+      is_read_enabled_ = false;
+    }
   }
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-  io_uring_worker_.ref().disableSocket(fd_);
+  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
+    ASSERT(shadow_io_handle_ != nullptr);
+    shadow_io_handle_->resetFileEvents();
+    return;
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
+    io_uring_worker_.ref().disableSocket(fd_);
+  }
+
+  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+    shadow_io_handle_->resetFileEvents();
+  }
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
@@ -445,6 +579,8 @@ void IoUringSocketHandleImpl::addReadRequest() {
   if (!is_read_enabled_ || !SOCKET_VALID(fd_) || read_req_) {
     return;
   }
+
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Client);
 
   read_req_ = new Io::Request{*this, Io::RequestType::Read};
   read_req_->buf_ = std::make_unique<uint8_t[]>(read_buffer_size_);
@@ -516,7 +652,9 @@ absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
 
 void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
   accepted_socket_param_ = param;
+  ENVOY_LOG(trace, "before on accept socket");
   cb_(Event::FileReadyType::Read);
+  ENVOY_LOG(trace, "after on accept socket");
 
   // After accept the socet, the accepted_socket_param expected to be cleanup.
   ASSERT(accepted_socket_param_ == absl::nullopt);
@@ -579,6 +717,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
           });
       read_buf_.addBufferFragment(*fragment);
     }
+    ENVOY_LOG(trace, "old path: calling callback on read event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
     cb_(Event::FileReadyType::Read);
     break;
   }
@@ -588,6 +727,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
       return;
     }
 
+    ENVOY_LOG(trace, "old path: calling callback on connect event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
     cb_(Event::FileReadyType::Write);
     addReadRequest();
     break;
@@ -601,6 +741,7 @@ void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
 
     bytes_already_wrote_ = result;
     is_write_added_ = false;
+    ENVOY_LOG(trace, "old path: calling callback on write event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
     cb_(Event::FileReadyType::Write);
     break;
   }

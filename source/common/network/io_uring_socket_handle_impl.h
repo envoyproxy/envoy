@@ -119,6 +119,9 @@ private:
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};
   IoUringSocketType io_uring_socket_type_{IoUringSocketType::Unknown};
+
+  std::unique_ptr<IoHandle> shadow_io_handle_;
+  bool enable_server_socket_{false};
 };
 
 } // namespace Network
