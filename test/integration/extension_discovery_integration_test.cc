@@ -306,8 +306,8 @@ public:
     ecds_stream_->sendGrpcMessage(response);
   }
 
-  void sendXdsResponse2(const std::string& name, const std::string& version,
-                        const uint32_t drain_bytes) {
+  void sendListenerFilterEcdsResponse(const std::string& name, const std::string& version,
+                                      const uint32_t drain_bytes) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
@@ -865,7 +865,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessConfigDump) {
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
   sendXdsResponse("foo", "1", denyPrivateConfig());
-  sendXdsResponse2("bar", "2", 7);
+  sendListenerFilterEcdsResponse("bar", "2", 7);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
