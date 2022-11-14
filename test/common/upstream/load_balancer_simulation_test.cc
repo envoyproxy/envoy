@@ -104,7 +104,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public testing::Test {
+class DISABLED_SimulationTest : public testing::Test { // NOLINT(readability-identifier-naming)
 public:
   DISABLED_SimulationTest()
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {

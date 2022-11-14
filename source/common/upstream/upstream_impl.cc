@@ -834,7 +834,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 
 ClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
                                                    const ClusterTrafficStatNames& stat_names) {
-  return ClusterTrafficStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -845,13 +845,13 @@ ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStat
 ClusterLoadReportStats
 ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope,
                                          const ClusterLoadReportStatNames& stat_names) {
-  return ClusterLoadReportStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterTimeoutBudgetStats
 ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
                                             const ClusterTimeoutBudgetStatNames& stat_names) {
-  return ClusterTimeoutBudgetStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 // Implements the FactoryContext interface required by network filters.
