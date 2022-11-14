@@ -16,8 +16,6 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
-using testing::AllOf;
-
 constexpr char test_header_proto[] = R"(
   key:
     host: "banana"
@@ -100,32 +98,28 @@ TEST(CacheFileHeaderProtoUtil, SerializedStringFromProto) {
   EXPECT_EQ(serialized, serialized_through_helper);
 }
 
-MATCHER_P2(HasKeyValue, key, value, "") {
-  Http::HeaderMap::GetResult values = arg->get(Http::LowerCaseString{key});
-  for (size_t i = 0; i < values.size(); i++) {
-    if (values[i]->value() == value) {
-      return true;
-    }
-  }
-  return false;
-}
-
 TEST(CacheFileHeaderProtoUtil, HeadersFromHeaderProto) {
   CacheFileHeader header_proto;
   TestUtility::loadFromYaml(test_header_proto, header_proto);
   Http::ResponseHeaderMapPtr headers = headersFromHeaderProto(header_proto);
-  EXPECT_THAT(headers, AllOf(HasKeyValue("test_header", "test_value"),
-                             HasKeyValue("second_header", "second_value"),
-                             HasKeyValue("second_header", "additional_value")));
+  Http::TestResponseHeaderMapImpl expected{
+      {"test_header", "test_value"},
+      {"second_header", "second_value"},
+      {"second_header", "additional_value"},
+  };
+  EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected));
 }
 
 TEST(CacheFileHeaderProtoUtil, TrailersFromTrailerProto) {
   CacheFileTrailer trailer_proto;
   TestUtility::loadFromYaml(test_trailer_proto, trailer_proto);
-  auto trailers = trailersFromTrailerProto(trailer_proto);
-  EXPECT_THAT(trailers, AllOf(HasKeyValue("test_trailer", "test_value"),
-                              HasKeyValue("second_trailer", "second_value"),
-                              HasKeyValue("second_trailer", "additional_value")));
+  Http::ResponseTrailerMapPtr trailers = trailersFromTrailerProto(trailer_proto);
+  Http::TestResponseTrailerMapImpl expected{
+      {"test_trailer", "test_value"},
+      {"second_trailer", "second_value"},
+      {"second_trailer", "additional_value"},
+  };
+  EXPECT_THAT(trailers, HeaderMapEqualIgnoreOrder(&expected));
 }
 
 TEST(CacheFileHeaderProtoUtil, MetadataFromHeaderProto) {
