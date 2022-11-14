@@ -45,6 +45,13 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
+  // There is case the socket will be closed directly without initialize any event.
+  if (io_uring_socket_type_ == IoUringSocketType::Unknown) {
+    ::close(fd_);
+    SET_SOCKET_INVALID(fd_);
+    return Api::ioCallUint64ResultNoError();
+  }
+
   if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
    io_uring_worker_.ref().closeSocket(fd_);
    SET_SOCKET_INVALID(fd_);
@@ -78,6 +85,8 @@ bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
   if (io_uring_socket_type_ == IoUringSocketType::Server) {
     ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
     if (read_param_ == absl::nullopt) {
@@ -140,6 +149,7 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -156,6 +166,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                         uint64_t num_slice) {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   if (is_write_added_) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
@@ -203,6 +214,8 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
   // If buffer gets written and drained, the following writev will return bytes_already_wrote_
   // directly.
   if (bytes_already_wrote_ > 0) {
@@ -258,6 +271,8 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   }
 
   ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket");
+  ASSERT(io_uring_socket_type_ == IoUringSocketType::Listen);
+
   *addr = accepted_socket_param_->remote_addr_;
   *addrlen = accepted_socket_param_->remote_addr_len_;
   bool enable_server_socket = false;
@@ -363,6 +378,9 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
     io_uring_worker_.ref().addAcceptSocket(fd_, *this);
   } else if (io_uring_socket_type_ == IoUringSocketType::Server) {
     io_uring_worker_.ref().enableSocket(fd_);
+  } else {
+    ASSERT(io_uring_socket_type_ == IoUringSocketType::Unknown);
+    io_uring_socket_type_ = IoUringSocketType::Client;
   }
 
   cb_ = std::move(cb);
@@ -371,7 +389,8 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
 IoHandlePtr IoUringSocketHandleImpl::duplicate() { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
-  if ((io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) && events & Event::FileReadyType::Read) {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+  if ((io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) && (events & Event::FileReadyType::Read)) {
     if (events & Event::FileReadyType::Read) {
       io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
     }
@@ -392,6 +411,8 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   ENVOY_LOG(trace, "enable file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+
   if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
     if (!(events & Event::FileReadyType::Read)) {
       io_uring_worker_.ref().disableSocket(fd_);
@@ -412,6 +433,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   io_uring_worker_.ref().disableSocket(fd_);
 }
 
