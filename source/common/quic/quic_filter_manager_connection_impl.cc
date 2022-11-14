@@ -156,7 +156,7 @@ void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_a
     return;
   }
   if (has_sent_any_data && delayed_close_timer_ != nullptr) {
-    // Re-arm delay close timer if at least some bufferred data is flushed.
+    // Re-arm delay close timer if at least some buffered data is flushed.
     delayed_close_timer_->enableTimer(delayed_close_timeout_);
   }
 }

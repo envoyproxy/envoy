@@ -569,7 +569,7 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
                                  Event::Dispatcher::RunType::NonBlock);
   // Another write event with updated flow control window should unblock the stream and flush some
   // stream data and update the timer. But it shouldn't close connection because there should still
-  // be data bufferred.
+  // be data buffered.
   quic::QuicWindowUpdateFrame window_update(quic::kInvalidControlFrameId, stream->id(),
                                             quic::kDefaultFlowControlSendWindow + 1);
   stream->OnWindowUpdateFrame(window_update);
