@@ -357,7 +357,7 @@ private:
 
 class GrpcAccessLoggerCacheTest : public testing::Test {
 public:
-  GrpcAccessLoggerCacheTest() : logger_cache_(async_client_manager_, store_, tls_) {}
+  GrpcAccessLoggerCacheTest() : logger_cache_(async_client_manager_, scope_, tls_) {}
 
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
@@ -375,7 +375,7 @@ public:
   Grpc::MockAsyncClientManager async_client_manager_;
   Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncClientFactory* factory_ = nullptr;
-  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
   MockGrpcAccessLoggerCache logger_cache_;
 };
 
