@@ -44,13 +44,15 @@ CacheFileTrailer makeCacheFileTrailerProto(const Http::ResponseTrailerMap& respo
   return file_trailer;
 }
 
-size_t headerProtoSize(const CacheFileHeader& proto) { return proto.SerializeAsString().size(); }
+size_t headerProtoSize(const CacheFileHeader& proto) { return proto.ByteSizeLong(); }
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto) {
+  // TODO(ravenblack): consider proto.SerializeToOStream and an ostream impl to Buffer.
   return Buffer::OwnedImpl{proto.SerializeAsString()};
 }
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto) {
+  // TODO(ravenblack): consider proto.SerializeToOStream and an ostream impl to Buffer.
   return Buffer::OwnedImpl{proto.SerializeAsString()};
 }
 
