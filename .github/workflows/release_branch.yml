@@ -12,10 +12,10 @@ jobs:
         - envoy
         - envoy-distroless
         tag:
+        - v1.24-latest
         - v1.23-latest
         - v1.22-latest
         - v1.21-latest
-        - v1.20-latest
     runs-on: ubuntu-latest
     if: github.repository_owner == 'envoyproxy'
     continue-on-error: true
