@@ -172,6 +172,8 @@ protected:
   virtual const quic::QuicConnection* quicConnection() const PURE;
   virtual quic::QuicConnection* quicConnection() PURE;
 
+  void maybeUpdateDelayCloseTimer(bool has_sent_any_data);
+
   void maybeHandleCloseDuringInitialize();
 
   QuicNetworkConnection* network_connection_{nullptr};

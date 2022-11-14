@@ -105,6 +105,13 @@ void EnvoyQuicClientSession::Initialize() {
   network_connection_->setEnvoyConnection(*this, *this);
 }
 
+void EnvoyQuicClientSession::OnCanWrite() {
+  uint64_t old_bytes_to_send = bytesToSend();
+  quic::QuicSpdyClientSession::OnCanWrite();
+  const bool has_sent_any_data = bytesToSend() != old_bytes_to_send;
+  maybeUpdateDelayCloseTimer(has_sent_any_data);
+}
+
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   ENVOY_CONN_LOG(debug, "HTTP/3 GOAWAY received", *this);
   quic::QuicSpdyClientSession::OnHttp3GoAway(stream_id);

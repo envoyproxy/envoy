@@ -72,6 +72,7 @@ public:
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
+  void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
