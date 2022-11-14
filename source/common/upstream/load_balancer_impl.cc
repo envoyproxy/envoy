@@ -766,14 +766,15 @@ void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
   for (const auto& host : hosts) {
     // Host enters slow start if only it has transitioned into healthy state.
     if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
+      auto host_last_hc_pass_time =
+          host->lastHcPassTime() ? host->lastHcPassTime().value() : current_time;
+      auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+          current_time - host_last_hc_pass_time);
       // If there is no active HC enabled or HC has not run, start slow start window from current
       // time.
       if (!host->lastHcPassTime()) {
         host->setLastHcPassTime(std::move(current_time));
       }
-      auto host_last_hc_pass_time = host->lastHcPassTime().value();
-      auto in_healthy_state_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-          current_time - host_last_hc_pass_time);
       // Check if host existence time is within slow start window.
       if (host_last_hc_pass_time > latest_host_added_time_ &&
           in_healthy_state_duration <= slow_start_window_) {
