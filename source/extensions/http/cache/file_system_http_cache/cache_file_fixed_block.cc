@@ -25,7 +25,7 @@ constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
 
 CacheFileFixedBlock::CacheFileFixedBlock()
     : file_id_(ExpectedFileId), cache_version_id_(ExpectedCacheVersionId), header_size_(0),
-      body_size_(0), trailer_size_(0) {}
+      trailer_size_(0), body_size_(0) {}
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   // The string view should be the size of the buffer, and
@@ -38,8 +38,8 @@ void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
   std::copy(s.begin(), s.begin() + 4, file_id_.begin());
   std::copy(s.begin() + 4, s.begin() + 8, cache_version_id_.begin());
   header_size_ = absl::big_endian::Load32(&s[8]);
-  body_size_ = absl::big_endian::Load64(&s[12]);
-  trailer_size_ = absl::big_endian::Load32(&s[20]);
+  trailer_size_ = absl::big_endian::Load32(&s[12]);
+  body_size_ = absl::big_endian::Load64(&s[16]);
 }
 
 void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
@@ -53,8 +53,8 @@ void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
   std::copy(file_id_.begin(), file_id_.end(), &b[0]);
   std::copy(cache_version_id_.begin(), cache_version_id_.end(), &b[4]);
   absl::big_endian::Store32(&b[8], header_size_);
-  absl::big_endian::Store64(&b[12], body_size_);
-  absl::big_endian::Store32(&b[20], trailer_size_);
+  absl::big_endian::Store32(&b[12], trailer_size_);
+  absl::big_endian::Store64(&b[16], body_size_);
   // Append that buffer into the target buffer object.
   buffer.add(absl::string_view{b, size()});
 }

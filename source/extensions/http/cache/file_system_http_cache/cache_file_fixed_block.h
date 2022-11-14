@@ -95,16 +95,16 @@ public:
   void setHeadersSize(uint32_t sz) { header_size_ = sz; }
 
   /**
-   * sets the size of the serialized trailers in the header block.
-   * @param sz The size of the serialized trailers.
-   */
-  void setTrailersSize(uint32_t sz) { trailer_size_ = sz; }
-
-  /**
    * sets the size of the serialized body in the header block.
    * @param sz The size of the body data.
    */
   void setBodySize(uint64_t sz) { body_size_ = sz; }
+
+  /**
+   * sets the size of the serialized trailers in the header block.
+   * @param sz The size of the serialized trailers.
+   */
+  void setTrailersSize(uint32_t sz) { trailer_size_ = sz; }
 
   /**
    * the offset from the start of the file to the start of the serialized headers proto.
@@ -134,8 +134,8 @@ private:
   std::array<char, 4> file_id_;
   std::array<char, 4> cache_version_id_;
   uint32_t header_size_;
-  uint64_t body_size_;
   uint32_t trailer_size_;
+  uint64_t body_size_;
 };
 
 } // namespace FileSystemHttpCache

@@ -64,8 +64,11 @@ TEST_F(CacheFileFixedBlockTest, ReturnsCorrectOffsets) {
 
 TEST_F(CacheFileFixedBlockTest, SerializesAndDeserializesCorrectly) {
   CacheFileFixedBlock block;
+  // A body size that doesn't fit in a uint32, to ensure large numbers also serialize.
+  constexpr uint64_t billion = 1000 * 1000 * 1000;
+  constexpr uint64_t large_body_size = 10 * billion;
   block.setHeadersSize(100);
-  block.setBodySize(10000000000);
+  block.setBodySize(large_body_size);
   block.setTrailersSize(10);
   CacheFileFixedBlock block2;
   Buffer::OwnedImpl buf;
@@ -74,9 +77,9 @@ TEST_F(CacheFileFixedBlockTest, SerializesAndDeserializesCorrectly) {
   EXPECT_TRUE(block2.isValid());
   EXPECT_EQ(block2.offsetToHeaders(), CacheFileFixedBlock::size());
   EXPECT_EQ(block2.offsetToBody(), CacheFileFixedBlock::size() + 100);
-  EXPECT_EQ(block2.offsetToTrailers(), CacheFileFixedBlock::size() + 10000000000 + 100);
+  EXPECT_EQ(block2.offsetToTrailers(), CacheFileFixedBlock::size() + large_body_size + 100);
   EXPECT_EQ(block2.headerSize(), 100);
-  EXPECT_EQ(block2.bodySize(), 10000000000);
+  EXPECT_EQ(block2.bodySize(), large_body_size);
   EXPECT_EQ(block2.trailerSize(), 10);
 }
 
