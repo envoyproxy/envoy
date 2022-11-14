@@ -88,14 +88,15 @@ public:
   };
 
   void enable() override {
+    ENVOY_LOG(debug, "enable the socket, fd = {}", fd_);
     is_disabled_ = false;
     if (pending_result_ != absl::nullopt) {
-      ENVOY_LOG(debug, "push the pending read result");
+      ENVOY_LOG(trace, "inject the pending read result, fd = {}, pending_result_ = {}, pending_buf_size = {}", fd_, pending_result_.value(), pending_read_buf_.length());
       parent_.injectCompletion(*this, RequestType::Read, pending_result_.value());
       pending_result_ = absl::nullopt;
+    } else {
+      submitRequest();
     }
-
-    submitRequest();
   };
 
   void disable() override {
@@ -103,14 +104,14 @@ public:
   };
 
   void onRead(int32_t result) override {
-    ENVOY_LOG(debug, "onRead with result {}, fd = {}", result, fd_);
+    ENVOY_LOG(trace, "onRead with result {}, fd = {}", result, fd_);
     read_req_ = nullptr;
 
     if (result <= 0) {
       ASSERT(pending_read_buf_.length() == 0);
 
       if (result == -ECANCELED) {
-        ENVOY_LOG(debug, "read request canceled, fd = {}", fd_);
+        ENVOY_LOG(trace, "read request canceled, fd = {}", fd_);
         if (is_closing_ && cancel_req_ == nullptr) {
           close_req_ = parent_.submitCloseRequest(*this);
         }
@@ -124,6 +125,7 @@ public:
       }
 
       if (is_disabled_) {
+        ENVOY_LOG(trace, "socket is disabled, pending the nagetive result, fd = {}", fd_);
         pending_result_ = result;
         return;
       }
@@ -133,17 +135,20 @@ public:
       return;
     }
 
-    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-        iouring_read_buf_.release(), result,
-        [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
-          delete[] reinterpret_cast<const uint8_t*>(data);
-          delete this_fragment;
-        });
-    ASSERT(iouring_read_buf_ == nullptr);
-    pending_read_buf_.addBufferFragment(*fragment);
+    // If iouring_read_buf_ is nullptr, it means there is pending data.
+    if (iouring_read_buf_ != nullptr) {
+      Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+          iouring_read_buf_.release(), result,
+          [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
+            delete[] reinterpret_cast<const uint8_t*>(data);
+            delete this_fragment;
+          });
+      ASSERT(iouring_read_buf_ == nullptr);
+      pending_read_buf_.addBufferFragment(*fragment);
+    }
 
     if (is_disabled_) {
-      ENVOY_LOG(debug, "server socket disabled");
+      ENVOY_LOG(trace, "socket is disabled, pending the result, fd = {}, pending_buffer size = {}", fd_, pending_read_buf_.length());
       pending_result_ = result;
       return;
     }
