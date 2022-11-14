@@ -210,8 +210,9 @@ bool PostgresFilter::onSSLRequest() {
     // Wait until 'S' has been transmitted.
     if (bytes >= 1) {
       if (!read_callbacks_->connection().startSecureTransport()) {
-        ENVOY_CONN_LOG(info, "postgres_proxy: cannot enable secure transport. Check configuration.",
-                       read_callbacks_->connection());
+        ENVOY_CONN_LOG(
+            info, "postgres_proxy: cannot enable downstream secure transport. Check configuration.",
+            read_callbacks_->connection());
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       } else {
         // Unsubscribe the callback.
@@ -251,24 +252,41 @@ void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
   ASSERT(config_->upstream_ssl_ !=
          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE);
   if (!upstream_agreed) {
+    ENVOY_CONN_LOG(info,
+                   "postgres_proxy: upstream server rejected request to establish SSL connection.",
+                   read_callbacks_->connection());
+
     config_->stats_.sessions_upstream_ssl_failed_.inc();
     if (config_->upstream_ssl_ ==
         envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE) {
       read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      ENVOY_CONN_LOG(
+          info, "postgres_proxy: clear-text connection to upstream is not allowed. Terminating.",
+          read_callbacks_->connection());
       return;
     }
+    ENVOY_CONN_LOG(info, "postgres_proxy: continuing to upstream in clear-text, without SSL.",
+                   read_callbacks_->connection());
   } else {
-
     // Try to switch to secure channel upstream.
     if (read_callbacks_->startUpstreamSecureTransport()) {
       config_->stats_.sessions_upstream_ssl_success_.inc();
+      ENVOY_CONN_LOG(trace, "postgres_proxy: upstream SSL enabled.", read_callbacks_->connection());
     } else {
       config_->stats_.sessions_upstream_ssl_failed_.inc();
+      ENVOY_CONN_LOG(
+          info, "postgres_proxy: cannot enable upstream secure transport. Check configuration.",
+          read_callbacks_->connection());
       if (config_->upstream_ssl_ ==
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE) {
+        ENVOY_CONN_LOG(
+            info, "postgres_proxy: clear-text connection to upstream is not allowed. Terminating.",
+            read_callbacks_->connection());
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
         return;
       }
+      ENVOY_CONN_LOG(info, "postgres_proxy: continuing in clear-text, without SSL.",
+                     read_callbacks_->connection());
     }
   }
 

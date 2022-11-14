@@ -431,6 +431,8 @@ void DecoderImpl::decodeBackendStatements() {
 
 Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool frontend) {
   if (frontend) {
+    // No data from downstream is allowed when negotiating upstream SSL
+    // with the server.
     data.drain(data.length());
     state_ = State::OutOfSyncState;
     return Decoder::Result::ReadyForNext;
@@ -458,7 +460,6 @@ Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool fr
   }
 
   data.drain(data.length());
-  // data.add(temp_storage_.linearize(temp_storage_.length()), temp_storage_.length());
 
   callbacks_->encryptUpstream(upstreamSSL, temp_storage_);
 
