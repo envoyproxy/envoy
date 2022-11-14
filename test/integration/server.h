@@ -84,11 +84,6 @@ public:
     return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
   }
 
-  /*  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    Thread::LockGuard lock(lock_);
-    wrapped_scope_->deliverHistogramToSinks(histogram, value);
-    }*/
-
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
@@ -112,10 +107,6 @@ public:
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
   }
-
-  /*NullGaugeImpl& nullGauge(const std::string& str) override {
-    return wrapped_scope_->nullGauge(str);
-    }*/
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -279,54 +270,6 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-#if 0
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromStatNameWithTags(name, tags);
-  }
-  Counter& counterFromString(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromString(name);
-  }
-  ScopeSharedPtr createScope(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
-  }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
-  }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatNameWithTags(name, tags, unit);
-  }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromString(name);
-  }
-#endif
-
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);

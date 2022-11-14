@@ -51,7 +51,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   StatNameManagedStorage c1_name("c1", store_->symbolTable());
   c1.add(100);
-  auto found_counter = scope_->findCounter(c1_name.statName());
+  auto found_counter = store_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
   EXPECT_EQ(100, found_counter->get().value());
@@ -75,9 +75,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   // the store, which is arguably not in the scope. Investigate what the
   // behavior should be.
 
-  StatNameManagedStorage g1_name("g1", scope_->symbolTable());
+  StatNameManagedStorage g1_name("g1", store_->symbolTable());
   g1.set(100);
-  auto found_gauge = scope_->findGauge(g1_name.statName());
+  auto found_gauge = store_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
   EXPECT_EQ(100, found_gauge->get().value());
@@ -107,7 +107,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   // behavior should be.
 
   StatNameManagedStorage h1_name("h1", store_->symbolTable());
-  auto found_histogram = scope_->findHistogram(h1_name.statName());
+  auto found_histogram = store_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
 
@@ -122,9 +122,9 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store_->gauges().size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
-  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_->findCounter(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_->findGauge(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(store_->findHistogram(nonexistent_name.statName()), absl::nullopt);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
@@ -222,9 +222,9 @@ struct TestStats {
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
   TestStats test_stats{
-      ALL_TEST_STATS(POOL_COUNTER_PREFIX(*scope_, "test."), POOL_GAUGE_PREFIX(*scope_, "test."),
-                     POOL_HISTOGRAM_PREFIX(*scope_, "test."),
-                     POOL_TEXT_READOUT_PREFIX(*scope_, "test."), GENERATE_STATNAME_STRUCT)};
+      ALL_TEST_STATS(POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
+                     POOL_HISTOGRAM_PREFIX(*store_, "test."),
+                     POOL_TEXT_READOUT_PREFIX(*store_, "test."), GENERATE_STATNAME_STRUCT)};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());
