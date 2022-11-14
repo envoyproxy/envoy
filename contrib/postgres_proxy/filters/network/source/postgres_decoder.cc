@@ -440,7 +440,7 @@ Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool fr
 
   // This should be reply from the server indicating if it accepted
   // request to use SSL. It is only one character long packet, where
-  // 'S' means use SSL, 'N' means do not use.
+  // 'S' means use SSL, 'E' means do not use.
 
   // Indicate to the filter, the response and give the initial
   // packet temporarily buffered to be sent upstream.
