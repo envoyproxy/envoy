@@ -36,9 +36,9 @@
   * `using BarSharedPtr = std::shared_ptr<Bar>;`
   * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
-* `absl::optional<std::reference_wrapper<T>> has a helper class in envoy/common/optref.h, and is type aliased:
-  * `using FooOptRef = OptRef<T>;
-  * `using FooOptConstRef = OptRef<const T>;
+* `absl::optional<std::reference_wrapper<T>>` has a helper class in `envoy/common/optref.h`, and is type aliased:
+  * `using FooOptRef = OptRef<T>;`
+  * `using FooOptConstRef = OptRef<const T>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
