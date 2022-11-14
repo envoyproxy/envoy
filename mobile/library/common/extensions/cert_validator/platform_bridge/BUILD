@@ -3,11 +3,17 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
+
+envoy_proto_library(
+    name = "platform_bridge",
+    srcs = ["platform_bridge.proto"],
+)
 
 envoy_cc_library(
     name = "c_types_lib",
@@ -27,6 +33,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":c_types_lib",
+        ":platform_bridge_cc_proto",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
     ],
 )

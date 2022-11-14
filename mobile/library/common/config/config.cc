@@ -86,6 +86,8 @@ const char* platform_cert_validation_context_template = R"(
 - &validation_context
   custom_validator_config:
     name: "envoy_mobile.cert_validator.platform_bridge_cert_validator"
+    typed_config:
+      "@type": type.googleapis.com/envoy_mobile.extensions.cert_validator.platform_bridge.PlatformBridgeCertValidator
   trust_chain_verification: *trust_chain_verification
 )";
 
