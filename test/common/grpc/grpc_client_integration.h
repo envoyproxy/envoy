@@ -127,12 +127,12 @@ public:
   SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
 
-class EdsModeDeltaSotwIntegrationParamTest
+class MultiplexedDeltaSotwIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, EdsUpdateMode>> {
 public:
-  ~EdsModeDeltaSotwIntegrationParamTest() override = default;
+  ~MultiplexedDeltaSotwIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, EdsUpdateMode>>& p) {
