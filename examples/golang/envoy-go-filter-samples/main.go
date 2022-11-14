@@ -1,9 +1,8 @@
 package main
 
 import (
-	"envoy-go-filter-samples/simple"
-
-	"mosn.io/envoy-go-extension/pkg/http"
+	"github.com/envoyproxy/envoy/examples/golang/envoy-go-filter-samples/pkg/http"
+	"github.com/envoyproxy/envoy/examples/golang/envoy-go-filter-samples/pkg/plugins/simple"
 )
 
 func init() {

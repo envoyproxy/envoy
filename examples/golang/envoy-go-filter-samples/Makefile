@@ -1,6 +1,5 @@
-
 BUILD_IMAGE  = golang:1.14.13
-PROJECT_NAME = mosn.io/envoy-go-extension
+PROJECT_NAME = envoy-go-extension
 
 build-local:
 	go build \

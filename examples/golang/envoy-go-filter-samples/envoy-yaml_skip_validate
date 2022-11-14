@@ -4,7 +4,7 @@ bootstrap_extensions:
 - name: envoy.bootstrap.dso
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.dso.v3.dso
-    so_id: mosn
+    so_id: simple
     so_path: "/usr/local/envoy-go-extension/libgolang.so"
 
 static_resources:
@@ -27,7 +27,7 @@ static_resources:
           - name: envoy.filters.http.golang
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3.Config
-              so_id: mosn
+              so_id: simple
               plugin_name: simple
           - name: envoy.filters.http.router
             typed_config:

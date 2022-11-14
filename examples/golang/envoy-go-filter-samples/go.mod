@@ -1,7 +1,5 @@
-module envoy-go-filter-samples
+module github.com/envoyproxy/envoy/examples/golang/envoy-go-filter-samples
 
-go 1.17
+go 1.14
 
-require mosn.io/envoy-go-extension v0.0.0-20221029053559-cbc49d983bb7
-
-require google.golang.org/protobuf v1.28.1 // indirect
+require google.golang.org/protobuf v1.28.1
