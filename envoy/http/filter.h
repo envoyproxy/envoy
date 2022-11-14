@@ -172,7 +172,7 @@ enum class FilterMetadataStatus {
  * Return codes for onLocalReply filter invocations.
  */
 enum class LocalErrorStatus {
-  // Continue sending the local reply after onLocalError has been sent to all filters.
+  // Continue sending the local reply after onLocalReply has been sent to all filters.
   Continue,
 
   // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
@@ -358,9 +358,9 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
-   * @return tracing configuration.
+   * @return tracing configuration if present.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * @return the ScopeTrackedObject for this stream.
@@ -781,7 +781,7 @@ public:
    * from onLocalReply, as that has the potential for looping.
    *
    * @param data data associated with the sendLocalReply call.
-   * @param LocalErrorStatus the action to take after onLocalError completes.
+   * @param LocalErrorStatus the action to take after onLocalReply completes.
    */
   virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
     return LocalErrorStatus::Continue;

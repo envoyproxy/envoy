@@ -98,6 +98,8 @@ private:
   void writeFieldBeginInternal(Buffer::Instance& buffer, FieldType field_type, int16_t field_id,
                                absl::optional<CompactFieldType> field_type_override);
 
+  static void validateFieldId(int32_t id);
+
   std::stack<int16_t> last_field_id_stack_{};
   int16_t last_field_id_{0};
 

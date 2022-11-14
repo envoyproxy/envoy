@@ -296,6 +296,8 @@ envoy_cc_test_binary(
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
     ],
 )
 
@@ -589,6 +591,8 @@ envoy_cc_test_library(
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:add_invalid_data_filter_lib",
@@ -871,6 +875,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -1063,6 +1068,7 @@ envoy_cc_test(
         "//envoy/registry",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1675,13 +1681,6 @@ envoy_cc_test_library(
 envoy_cc_fuzz_test(
     name = "h2_capture_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
-    corpus = "h2_corpus",
-    deps = [":h2_fuzz_lib"],
-)
-
-envoy_cc_fuzz_test(
-    name = "h2_wrapped_capture_fuzz_test",
-    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
     corpus = "h2_corpus",
     deps = [":h2_fuzz_lib"],
 )

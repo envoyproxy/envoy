@@ -982,7 +982,16 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
-  return ListenerMessageUtil::filterChainOnlyChange(config_, config);
+
+  if (ListenerMessageUtil::filterChainOnlyChange(config_, config)) {
+    // We need to calculate the reuse port's default value then ensure whether it is changed or not.
+    // Since reuse port's default value isn't the YAML bool field default value. When
+    // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
+    // default value to do the comparison.
+    return reuse_port_ == getReusePortOrDefault(parent_.server_, config, socket_type_);
+  }
+
+  return false;
 }
 
 ListenerImplPtr
@@ -1058,6 +1067,10 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
+bool ListenerImpl::socketOptionsEqual(const ListenerImpl& other) const {
+  return ListenerMessageUtil::socketOptionsEqual(config_, other.config_);
+}
+
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
     return false;
@@ -1083,6 +1096,13 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
+  // Skip the duplicate address check if this is the case of a listener update with new socket
+  // options.
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
+      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+    return false;
+  }
+
   if (socket_type_ != other.socket_type_) {
     return false;
   }
@@ -1114,6 +1134,26 @@ void ListenerImpl::closeAllSockets() {
   for (auto& socket_factory : socket_factories_) {
     socket_factory->closeAllSockets();
   }
+}
+
+bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
+                                             const envoy::config::listener::v3::Listener& rhs) {
+  if ((PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, transparent, false) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, transparent, false)) ||
+      (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, freebind, false) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, freebind, false)) ||
+      (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, tcp_fast_open_queue_length, 0) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, tcp_fast_open_queue_length, 0))) {
+    return false;
+  }
+
+  return std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
+                    rhs.socket_options().begin(), rhs.socket_options().end(),
+                    [](const ::envoy::config::core::v3::SocketOption& option,
+                       const ::envoy::config::core::v3::SocketOption& other_option) {
+                      Protobuf::util::MessageDifferencer differencer;
+                      return differencer.Compare(option, other_option);
+                    });
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

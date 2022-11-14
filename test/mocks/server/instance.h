@@ -59,7 +59,6 @@ public:
   MOCK_METHOD(DrainManager&, drainManager, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, failHealthcheck, (bool fail));
-  MOCK_METHOD(void, exportStatsToChild, (envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD(bool, healthCheckFailed, ());
   MOCK_METHOD(HotRestart&, hotRestart, ());
   MOCK_METHOD(Init::Manager&, initManager, ());

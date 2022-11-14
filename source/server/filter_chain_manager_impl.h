@@ -100,6 +100,15 @@ private:
   std::atomic<bool> is_draining_{false};
 };
 
+using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainBaseAction : public Matcher::Action {
+public:
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
+};
+
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
@@ -213,8 +222,8 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
-  const Network::FilterChain*
-  findFilterChain(const Network::ConnectionSocket& socket) const override;
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
+                                              const StreamInfo::StreamInfo& info) const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -240,8 +249,8 @@ public:
 
 private:
   void convertIPsToTries();
-  const Network::FilterChain*
-  findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                          const StreamInfo::StreamInfo& info) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
@@ -395,6 +404,9 @@ private:
 
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
+
+  // Index filter chains by name, used by the matcher actions.
+  FilterChainsByName filter_chains_by_name_;
 };
 } // namespace Server
 } // namespace Envoy

@@ -73,6 +73,8 @@ public:
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString GrpcEncoding{"grpc-encoding"};
+  const LowerCaseString GrpcMessageEncoding{"grpc-message-encoding"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
   const LowerCaseString IfModifiedSince{"if-modified-since"};
