@@ -1,13 +1,5 @@
 #include "source/common/network/address_impl.h"
 
-#ifndef WIN32
-#include <net/if.h>
-
-#else
-#include <winsock2.h>
-#include <iphlpapi.h>
-#endif
-
 #include <array>
 #include <cstdint>
 #include <string>
