@@ -22,9 +22,9 @@ public:
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = &decoder;
-    stats_gatherer_->add_stream_info(request_decoder_->streamInfoSharedPtr());
-    stats_gatherer_->set_access_log_handlers(request_decoder_->accessLogHandlers());
-    stats_gatherer_->set_time_source(&connection()->dispatcher().timeSource());
+    stats_gatherer_->addStreamInfo(request_decoder_->streamInfoSharedPtr());
+    stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
+    stats_gatherer_->setTimeSource(&connection()->dispatcher().timeSource());
   }
 
   // Http::StreamEncoder

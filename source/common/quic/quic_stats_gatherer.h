@@ -9,10 +9,6 @@
 
 #include "quiche/quic/core/quic_ack_listener_interface.h"
 
-using Envoy::Http::RequestHeaderMap;
-using Envoy::Http::ResponseHeaderMap;
-using Envoy::Http::ResponseTrailerMap;
-
 namespace Envoy {
 namespace Quic {
 
@@ -20,20 +16,20 @@ class QuicStatsGatherer : public quic::QuicAckListenerInterface {
 public:
   void OnPacketAcked(int acked_bytes, quic::QuicTime::Delta delta_largest_observed) override;
   void OnPacketRetransmitted(int /* retransmitted_bytes */) override {}
-  void AddBytesSent(uint64_t bytes_sent, bool end_stream) {
+  void addBytesSent(uint64_t bytes_sent, bool end_stream) {
     bytes_outstanding_ += bytes_sent;
     fin_sent_ = end_stream;
   }
-  void DoDeferredLog();
-  void add_stream_info(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
+  void doDeferredLog();
+  void addStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
     if (stream_info != nullptr) {
       stream_info_.push_back(stream_info);
     }
   }
-  void set_access_log_handlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
+  void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
-  void set_time_source(Envoy::TimeSource* time_source) { time_source_ = time_source; }
+  void setTimeSource(Envoy::TimeSource* time_source) { time_source_ = time_source; }
 
 private:
   uint64_t bytes_outstanding_ = 0;

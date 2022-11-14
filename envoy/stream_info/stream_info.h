@@ -777,7 +777,7 @@ public:
   /**
    * @param deferredLoggingInfo request/response info for deferred logging.
    */
-  virtual void setDeferredLoggingInfo(const DeferredLoggingInfo deferredLoggingInfo) PURE;
+  virtual void setDeferredLoggingInfo(const DeferredLoggingInfo deferred_logging_info) PURE;
 
   /**
    * @return request/response info for deferred logging.

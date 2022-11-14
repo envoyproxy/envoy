@@ -59,7 +59,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(envoyHeadersToHttp2HeaderBlock(headers), end_stream, nullptr);
-    stats_gatherer_->AddBytesSent(bytes_sent, end_stream);
+    stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
 
@@ -98,7 +98,7 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), false);
     result = WriteBodySlices(span, end_stream);
-    stats_gatherer_->AddBytesSent(result.bytes_consumed, end_stream);
+    stats_gatherer_->addBytesSent(result.bytes_consumed, end_stream);
   }
   // QUIC stream must take all.
   if (result.bytes_consumed == 0 && has_data) {
@@ -128,7 +128,7 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteTrailers(envoyHeadersToHttp2HeaderBlock(trailers), nullptr);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode trailers.");
-    stats_gatherer_->AddBytesSent(bytes_sent, true);
+    stats_gatherer_->addBytesSent(bytes_sent, true);
   }
   onLocalEndStream();
 }

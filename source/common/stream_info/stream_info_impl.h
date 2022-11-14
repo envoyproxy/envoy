@@ -231,9 +231,9 @@ struct StreamInfoImpl : public StreamInfo {
     return virtual_cluster_name_;
   }
 
-  void setDeferredLoggingInfo(DeferredLoggingInfo deferredLoggingInfo) override {
+  void setDeferredLoggingInfo(DeferredLoggingInfo deferred_logging_info) override {
     deferred_logging_info_ =
-        absl::make_optional<DeferredLoggingInfo>(std::move(deferredLoggingInfo));
+        absl::make_optional<DeferredLoggingInfo>(std::move(deferred_logging_info));
   }
   const absl::optional<DeferredLoggingInfo>& deferredLoggingInfo() const override {
     return deferred_logging_info_;
