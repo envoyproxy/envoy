@@ -81,6 +81,7 @@ void IoUringAcceptSocket::close() {
 }
 
 void IoUringAcceptSocket::enable() {
+  ENVOY_LOG(debug, "enable accept socket, fd = {}", fd_);
   is_disabled_ = false;
   if (is_pending_accept_) {
     is_pending_accept_ = false;
@@ -91,7 +92,7 @@ void IoUringAcceptSocket::enable() {
 void IoUringAcceptSocket::disable() {
   if (accept_req_ != nullptr) {
     if (cancel_req_ == nullptr) {
-      ENVOY_LOG(debug, "submit cancel request for the accept since disable");
+      ENVOY_LOG(debug, "submit cancel request for the accept since disable, fd = {}", fd_);
       cancel_req_ = parent_.submitCancelRequest(*this, accept_req_);
     }
   }
@@ -213,12 +214,14 @@ void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uin
 }
 
 void IoUringWorkerImpl::closeSocket(os_fd_t fd) {
+  ENVOY_LOG(debug, "close socket, fd = {}", fd);
   auto socket_iter = sockets_.find(fd);
   ASSERT(socket_iter != sockets_.end());
   socket_iter->second->close();
 }
 
 std::unique_ptr<IoUringSocket> IoUringWorkerImpl::removeSocket(os_fd_t fd) {
+  ENVOY_LOG(debug, "remove socket, fd = {}", fd);
   auto socket_iter = sockets_.find(fd);
   ASSERT(socket_iter != sockets_.end());
   auto socket = std::move(socket_iter->second);
@@ -260,6 +263,7 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
     res = io_uring_impl_.prepareCancel(request_to_cancel, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
   }
+  io_uring_impl_.submit();
   return req;
 }
 
