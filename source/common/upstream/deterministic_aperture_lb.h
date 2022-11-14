@@ -170,7 +170,7 @@ public:
    * @param random supplies the random generator.
    * @param time_source supplies the time source.
    */
-  virtual ThreadAwareLoadBalancerPtr
+  ThreadAwareLoadBalancerPtr
   create(const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
          Random::RandomGenerator& random, TimeSource& time_source) override;
 
