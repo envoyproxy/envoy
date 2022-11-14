@@ -60,7 +60,7 @@ envoy_cc_test(
         "postgres_integration_test.cc",
     ],
     data = [
-        "postgres_test_config.yaml",
+        "postgres_test_config.yaml-template",
         "//test/config/integration/certs",
     ],
     deps = [

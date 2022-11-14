@@ -28,16 +28,16 @@ public:
   using SSLConfig = std::tuple<const absl::string_view, const absl::string_view>;
 
   std::string postgresConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config) {
-    std::string main_config =
-        fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-                        "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml")),
-                    Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-                    Network::Test::getLoopbackAddressString(GetParam()),
-                    std::get<1>(upstream_ssl_config), // upstream SSL transport socket
-                    Network::Test::getAnyAddressString(GetParam()),
-                    std::get<0>(downstream_ssl_config),  // downstream SSL termination
-                    std::get<0>(upstream_ssl_config),    // upstream_SSL option
-                    std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
+    std::string main_config = fmt::format(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
+        Network::Test::getLoopbackAddressString(GetParam()),
+        std::get<1>(upstream_ssl_config), // upstream SSL transport socket
+        Network::Test::getAnyAddressString(GetParam()),
+        std::get<0>(downstream_ssl_config),  // downstream SSL termination
+        std::get<0>(upstream_ssl_config),    // upstream_SSL option
+        std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
 
     return main_config;
   }
