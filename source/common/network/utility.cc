@@ -103,9 +103,9 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
   const auto scope_pos = ip_address.rfind('%');
-  // Even though it would be nice to do any IPv6 parsing only with the getaddrinfo at the moment
-  // Windows parsing is slightly different in behavior than other platforms. For this reason we use
-  // the inet_pton for any parsing that does not contain the zone id.
+  // TODO(#23952): Even though it would be nice to do any IPv6 parsing only with the getaddrinfo at
+  // the moment Windows parsing is slightly different in behavior than other platforms. For this
+  // reason we use the inet_pton for any parsing that does not contain the zone id.
   if (scope_pos == std::string::npos) {
     // Parse IPv6 with no scope.
     if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) != 1) {
