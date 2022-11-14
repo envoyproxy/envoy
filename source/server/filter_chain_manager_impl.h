@@ -103,7 +103,7 @@ private:
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
 using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
 
-class FilterChainBaseAction : public virtual Matcher::Action {
+class FilterChainBaseAction : public Matcher::Action {
 public:
   virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                           const StreamInfo::StreamInfo& info) const PURE;

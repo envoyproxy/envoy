@@ -12,8 +12,8 @@ namespace Matching {
 namespace Actions {
 namespace FormatString {
 
-const Network::FilterChain* Action::get(const Server::FilterChainsByName& filter_chains_by_name,
-                                        const StreamInfo::StreamInfo& info) const {
+const Network::FilterChain* ActionImpl::get(const Server::FilterChainsByName& filter_chains_by_name,
+                                            const StreamInfo::StreamInfo& info) const {
   const std::string name =
       formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
                          *Http::StaticEmptyHeaders::get().response_headers,
@@ -34,7 +34,7 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
           proto_config, validator);
   Formatter::FormatterConstSharedPtr formatter =
       Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context);
-  return [formatter]() { return std::make_unique<Action>(formatter); };
+  return [formatter]() { return std::make_unique<ActionImpl>(formatter); };
 }
 
 REGISTER_FACTORY(ActionFactory, Matcher::ActionFactory<Server::FilterChainActionFactoryContext>);

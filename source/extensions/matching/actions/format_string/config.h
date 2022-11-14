@@ -15,10 +15,10 @@ namespace Matching {
 namespace Actions {
 namespace FormatString {
 
-class Action : public Server::FilterChainBaseAction,
-               public Matcher::ActionBase<envoy::config::core::v3::SubstitutionFormatString> {
+class ActionImpl : public Matcher::ActionBase<envoy::config::core::v3::SubstitutionFormatString,
+                                              Server::FilterChainBaseAction> {
 public:
-  Action(const Formatter::FormatterConstSharedPtr& formatter) : formatter_(formatter) {}
+  ActionImpl(const Formatter::FormatterConstSharedPtr& formatter) : formatter_(formatter) {}
   const Network::FilterChain* get(const Server::FilterChainsByName& filter_chains_by_name,
                                   const StreamInfo::StreamInfo& info) const override;
 

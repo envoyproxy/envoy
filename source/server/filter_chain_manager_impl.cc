@@ -31,8 +31,8 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
                          Network::Utility::parseInternetAddress("255.255.255.255"));
 }
 
-struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue>,
-                               public FilterChainBaseAction {
+struct FilterChainNameAction
+    : public Matcher::ActionBase<ProtobufWkt::StringValue, FilterChainBaseAction> {
   explicit FilterChainNameAction(const std::string& name) : name_(name) {}
   const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                   const StreamInfo::StreamInfo&) const override {

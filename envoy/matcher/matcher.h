@@ -72,7 +72,7 @@ public:
    */
   template <class T> const T& getTyped() const {
     ASSERT(dynamic_cast<const T*>(this) != nullptr);
-    return dynamic_cast<const T&>(*this);
+    return static_cast<const T&>(*this);
   }
 };
 
