@@ -29,7 +29,6 @@ open class EngineBuilder: NSObject {
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
-  private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2ExtendKeepaliveTimeout: Bool = false
@@ -252,18 +251,6 @@ open class EngineBuilder: NSObject {
   public func enablePlatformCertificateValidation(
     _ enablePlatformCertificateValidation: Bool) -> Self {
     self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
-    return self
-  }
-
-  /// Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
-  /// to use IPv6. Note this is an experimental option and should be enabled with caution.
-  ///
-  /// - parameter forceIPv6: whether to force connections to use IPv6.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func forceIPv6(_ forceIPv6: Bool) -> Self {
-    self.forceIPv6 = forceIPv6
     return self
   }
 
@@ -533,7 +520,6 @@ open class EngineBuilder: NSObject {
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
-      forceIPv6: self.forceIPv6,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,

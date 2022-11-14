@@ -362,7 +362,6 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
-@property (nonatomic, assign) BOOL forceIPv6;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
 @property (nonatomic, assign) BOOL h2ExtendKeepaliveTimeout;
@@ -400,7 +399,6 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
-                                        forceIPv6:(BOOL)forceIPv6
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
