@@ -408,13 +408,15 @@ private:
     auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
     for (const auto& subscription : subscriptions_) {
       const auto& ecds_filter = subscription.second.lock();
-      if (!name_matcher.match(ecds_filter->name())) {
+      if (!ecds_filter || !name_matcher.match(ecds_filter->name())) {
         continue;
       }
       // Put the filter info into a typed extension proto.
       envoy::config::core::v3::TypedExtensionConfig filter_config;
       filter_config.set_name(ecds_filter->name());
-      filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
+      if (ecds_filter->lastConfig()) {
+        filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
+      }
       // Set up the config dump proto.
       auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
       filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
