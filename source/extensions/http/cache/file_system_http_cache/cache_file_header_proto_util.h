@@ -14,16 +14,15 @@ namespace FileSystemHttpCache {
 
 /**
  * Update an existing CacheFileHeader with new values from an updateHeaders operation.
- * - Retains the order of existing header fields if they have only one value.
- * - If an existing header had more than one value, the first one's order is retained,
- *   others are moved to the end of the headers.
- * - If a header existed in the original but not in the replacement, it persists.
- *   (see rfc9111 regarding 304 responses to explain why this is the case.)
- * - Ignores content-length, content-range, etag and vary headers.
- * @param entry the CacheFileHeader to be updated.
- * @param response a CacheFileHeader generated from the updateHeaders parameters.
+ * See applyHeaderUpdate in cache_entry_utils.h for details of merge behavior.
+ * @param entry_header the CacheFileHeader from the entry to be updated.
+ * @param response_headers the http headers from the updateHeaders call.
+ * @param response_metadata the metadata from the updateHeaders call.
+ * @return the merged CacheFileHeader.
  */
-void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry, const CacheFileHeader& response);
+CacheFileHeader mergeProtoWithHeadersAndMetadata(const CacheFileHeader& entry_headers,
+                                                 const Http::ResponseHeaderMap& response_headers,
+                                                 const ResponseMetadata& response_metadata);
 
 /**
  * Create a CacheFileHeader message from response headers, metadata and key.

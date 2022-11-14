@@ -8,62 +8,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-namespace {
 
-const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate() {
-  CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<Http::LowerCaseString>,
-      // Content range should not be changed upon validation
-      Http::Headers::get().ContentRange,
-
-      // Headers that describe the body content should never be updated.
-      Http::Headers::get().ContentLength,
-
-      // It does not make sense for this level of the code to be updating the ETag, when
-      // presumably the cached_response_headers reflect this specific ETag.
-      Http::CustomHeaders::get().Etag,
-
-      // We don't update the cached response on a Vary; we just delete it
-      // entirely. So don't bother copying over the Vary header.
-      Http::CustomHeaders::get().Vary);
-}
-} // namespace
-
-void updateProtoFromHeadersAndMetadata(CacheFileHeader& entry, const CacheFileHeader& response) {
-  *entry.mutable_metadata_response_time() = response.metadata_response_time();
-  absl::flat_hash_set<Http::LowerCaseString> updated_header_fields;
-  for (const auto& incoming_response_header : response.headers()) {
-    Http::LowerCaseString key{incoming_response_header.key()};
-    if (headersNotToUpdate().contains(key)) {
-      continue;
-    }
-    if (!updated_header_fields.contains(key)) {
-      auto it = entry.mutable_headers()->begin();
-      while (it != entry.mutable_headers()->end() && Http::LowerCaseString{it->key()} != key) {
-        ++it;
-      }
-      if (it == entry.mutable_headers()->end()) {
-        auto h = entry.add_headers();
-        h->set_key(key.get());
-        h->set_value(incoming_response_header.value());
-      } else {
-        it->set_value(incoming_response_header.value());
-        ++it;
-        while (it != entry.mutable_headers()->end()) {
-          if (Http::LowerCaseString{it->key()} == key) {
-            it = entry.mutable_headers()->erase(it);
-          } else {
-            ++it;
-          }
-        }
-      }
-      updated_header_fields.insert(key);
-    } else {
-      auto h = entry.add_headers();
-      h->set_key(key.get());
-      h->set_value(incoming_response_header.value());
-    }
-  }
+CacheFileHeader mergeProtoWithHeadersAndMetadata(const CacheFileHeader& entry_headers,
+                                                 const Http::ResponseHeaderMap& response_headers,
+                                                 const ResponseMetadata& response_metadata) {
+  Http::ResponseHeaderMapPtr merge_headers = headersFromHeaderProto(entry_headers);
+  applyHeaderUpdate(response_headers, *merge_headers);
+  return makeCacheFileHeaderProto(entry_headers.key(), *merge_headers, response_metadata);
 }
 
 CacheFileHeader makeCacheFileHeaderProto(const Key& key,

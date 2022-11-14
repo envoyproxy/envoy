@@ -54,7 +54,7 @@ TEST(CacheFileHeaderProtoUtil, MakeCacheFileHeaderProtoFromHeadersAndMetadata) {
   CacheFileHeader result = makeCacheFileHeaderProto(key, headers, metadata);
   CacheFileHeader expected;
   TestUtility::loadFromYaml(test_header_proto, expected);
-  EXPECT_THAT(result, ProtoEq(expected));
+  EXPECT_THAT(result, ProtoEqIgnoreRepeatedFieldOrdering(expected));
 }
 
 TEST(CacheFileHeaderProtoUtil, MakeCacheFileTrailerProto) {
@@ -66,7 +66,7 @@ TEST(CacheFileHeaderProtoUtil, MakeCacheFileTrailerProto) {
   CacheFileTrailer result = makeCacheFileTrailerProto(trailers);
   CacheFileTrailer expected;
   TestUtility::loadFromYaml(test_trailer_proto, expected);
-  EXPECT_THAT(result, ProtoEq(expected));
+  EXPECT_THAT(result, ProtoEqIgnoreRepeatedFieldOrdering(expected));
 }
 
 TEST(CacheFileHeaderProtoUtil, HeaderProtoSize) {
@@ -113,7 +113,7 @@ MATCHER_P2(HasKeyValue, key, value, "") {
 TEST(CacheFileHeaderProtoUtil, HeadersFromHeaderProto) {
   CacheFileHeader header_proto;
   TestUtility::loadFromYaml(test_header_proto, header_proto);
-  auto headers = headersFromHeaderProto(header_proto);
+  Http::ResponseHeaderMapPtr headers = headersFromHeaderProto(header_proto);
   EXPECT_THAT(headers, AllOf(HasKeyValue("test_header", "test_value"),
                              HasKeyValue("second_header", "second_value"),
                              HasKeyValue("second_header", "additional_value")));
@@ -140,36 +140,21 @@ TEST(CacheFileHeaderProtoUtil, MakeCacheFileHeaderProtoFromBuffer) {
   TestUtility::loadFromYaml(test_header_proto, header_proto);
   Buffer::OwnedImpl buffer = bufferFromProto(header_proto);
   CacheFileHeader header_proto_from_buffer = makeCacheFileHeaderProto(buffer);
-  EXPECT_THAT(header_proto, ProtoEq(header_proto_from_buffer));
+  EXPECT_THAT(header_proto, ProtoEqIgnoreRepeatedFieldOrdering(header_proto_from_buffer));
 }
 
 TEST(CacheFileHeaderProtoUtil, UpdateProtoFromHeadersAndMetadata) {
   CacheFileHeader header_proto;
   TestUtility::loadFromYaml(test_header_proto, header_proto);
-  CacheFileHeader new_header_proto;
-  TestUtility::loadFromYaml(R"(
-    key:
-      host: "banana"
-    metadata_response_time:
-      seconds: 12345
-    headers:
-    - key: "second_header"
-      value: "new_second_value"
-    - key: "second_header"
-      value: "additional_second_value"
-    - key: "third_header"
-      value: "third_value"
-    - key: "etag"
-      value: "should_be_ignored"
-    - key: "content-length"
-      value: "should_be_ignored"
-    - key: "content-range"
-      value: "should_be_ignored"
-    - key: "vary"
-      value: "should_be_ignored"
-  )",
-                            new_header_proto);
-  updateProtoFromHeadersAndMetadata(header_proto, new_header_proto);
+  Http::TestResponseHeaderMapImpl new_headers{
+      {"second_header", "new_second_value"},
+      {"second_header", "additional_second_value"},
+      {"third_header", "third_value"},
+      {"etag", "should_be_ignored"},
+  };
+  ResponseMetadata new_metadata{Envoy::SystemTime{std::chrono::seconds{12345}}};
+  CacheFileHeader result_header_proto =
+      mergeProtoWithHeadersAndMetadata(header_proto, new_headers, new_metadata);
   CacheFileHeader expected_header_proto;
   TestUtility::loadFromYaml(R"(
     key:
@@ -193,7 +178,7 @@ TEST(CacheFileHeaderProtoUtil, UpdateProtoFromHeadersAndMetadata) {
     # ignored keys should have been discarded.
   )",
                             expected_header_proto);
-  EXPECT_THAT(header_proto, ProtoEq(expected_header_proto));
+  EXPECT_THAT(result_header_proto, ProtoEqIgnoreRepeatedFieldOrdering(expected_header_proto));
 }
 
 } // namespace
