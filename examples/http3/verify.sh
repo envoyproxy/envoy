@@ -23,26 +23,26 @@ responds_with_header \
 run_log "Test HTTP/2 downstream to HTTP/3 upstream"
 responds_with_header \
     "HTTP/2 404" \
-    "http://localhost:${PORT_PROXY_HTTP}/downstream-http1-to-upstream-http3" \
+    "http://localhost:${PORT_PROXY_HTTP}/downstream-http2-to-upstream-http3" \
     --http2-prior-knowledge -ki
 
-run_log "Test HTTP/2 downstream to HTTP/3 upstream"
+run_log "Test HTTP/1 downstream to HTTP/3 upstream"
 responds_with_header \
     "HTTP/1.1 404" \
-    "http://localhost:${PORT_PROXY_HTTP}/downstream-http2-to-upstream-http3" \
+    "http://localhost:${PORT_PROXY_HTTP}/downstream-http1-to-upstream-http3" \
     -ki
 
-run_log "Check Total HTTP/3 connections stats"
+run_log "Check total ingress HTTP/3 connections stats"
 responds_with \
     "http.ingress_http.downstream_cx_http3_total: 2" \
     http://localhost:${PORT_ADMIN}/stats?filter=downstream_cx_http3_total
 
-run_log "Check Total HTTP/2 connections stats"
+run_log "Check total ingress HTTP/2 connections stats"
 responds_with \
     "http.ingress_http.downstream_cx_http2_total: 1" \
     http://localhost:${PORT_ADMIN}/stats?filter=downstream_cx_http2_total
 
-run_log "Check Total HTTP/1.1 connections stats"
+run_log "Check total ingress HTTP/1.1 connections stats"
 responds_with \
     "http.ingress_http.downstream_cx_http1_total: 1" \
     http://localhost:${PORT_ADMIN}/stats?filter=downstream_cx_http1_total
