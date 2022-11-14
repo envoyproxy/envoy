@@ -35,7 +35,7 @@ public:
 
     PostgresFilterConfig::PostgresFilterConfigOptions config_options{
         stat_prefix_, true, false,
-        envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
+        envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_DISABLE};
 
     config_ = std::make_shared<PostgresFilterConfig>(config_options, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
@@ -400,7 +400,7 @@ TEST_F(PostgresFilterTest, UpstreamSSL) {
 
   // Configure upstream SSL to be disabled. encryptUpstream must not be called.
   filter_->getConfig()->upstream_ssl_ =
-      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE;
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_DISABLE;
   ASSERT_FALSE(filter_->shouldEncryptUpstream());
   ASSERT_DEATH(filter_->encryptUpstream(true, data_), ".*");
   ASSERT_DEATH(filter_->encryptUpstream(false, data_), ".*");
@@ -409,7 +409,7 @@ TEST_F(PostgresFilterTest, UpstreamSSL) {
   // converting upstream transport socket to secure mode fails, the filter should bump
   // proper stats and close the connection to downstream client.
   filter_->getConfig()->upstream_ssl_ =
-      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_REQUIRE;
   ASSERT_TRUE(filter_->shouldEncryptUpstream());
   // Simulate that upstream server agreed for SSL and conversion of upstream Transport socket was
   // successful.
@@ -432,7 +432,7 @@ TEST_F(PostgresFilterTest, UpstreamSSL) {
   // converting upstream transport socket to secure mode fails, the filter continues with
   // connection without encryption.
   filter_->getConfig()->upstream_ssl_ =
-      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::PREFER;
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_PREFER;
   ASSERT_TRUE(filter_->shouldEncryptUpstream());
   // Simulate that upstream server agreed for SSL and conversion of upstream Transport socket was
   // successful.

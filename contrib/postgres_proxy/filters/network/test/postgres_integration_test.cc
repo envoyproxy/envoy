@@ -288,7 +288,7 @@ class UpstreamSSLDisabledPostgresIntegrationTest : public UpstreamSSLBaseIntegra
 public:
   // Disable downstream SSL and upstream SSL.
   UpstreamSSLDisabledPostgresIntegrationTest()
-      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: DISABLE", "")) {}
+      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: SSL_DISABLE", "")) {}
 };
 
 // Verify that postgres filter does not send any additional messages when
@@ -318,11 +318,11 @@ TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Base class for parameterized tests with REQUIRE option for upstream SSL.
+// Base class for parameterized tests with SSL_REQUIRE option for upstream SSL.
 class UpstreamSSLRequirePostgresIntegrationTest : public UpstreamSSLBaseIntegrationTest {
 public:
   UpstreamSSLRequirePostgresIntegrationTest()
-      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: REQUIRE",
+      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: SSL_REQUIRE",
                                                        R"EOF(transport_socket:
       name: "starttls"
       typed_config:
@@ -416,11 +416,11 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLRequirePostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Base class for parameterized tests when upstream SSL is PREFER.
+// Base class for parameterized tests when upstream SSL is SSL_PREFER.
 class UpstreamSSLPreferPostgresIntegrationTest : public UpstreamSSLBaseIntegrationTest {
 public:
   UpstreamSSLPreferPostgresIntegrationTest()
-      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: PREFER",
+      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: SSL_PREFER",
                                                        R"EOF(transport_socket:
       name: "starttls"
       typed_config:
@@ -479,7 +479,7 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerAgreesForSSLTest) {
 
 // Test verifies that postgres filter continues in clear-text
 // when upstream server does not agree for upstream SSL and
-// upstream SSL configuration is PREFER.
+// upstream SSL configuration is SSL_PREFER.
 TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerDeniesSSLTest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
@@ -518,7 +518,7 @@ TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerDeniesSSLTest) {
 }
 
 // Test verifies that postgres filter continues transaction in clear-text when
-// upstream server sends unknown reply when negotiating SSL with PREFER setting
+// upstream server sends unknown reply when negotiating SSL with SSL_PREFER setting
 // for upstream SSL. Internally the postgres filter should move to out-of-sync mode
 // and just pass packets without parsing them.
 TEST_P(UpstreamSSLPreferPostgresIntegrationTest, ServerSendsWrongReplySSLTest) {

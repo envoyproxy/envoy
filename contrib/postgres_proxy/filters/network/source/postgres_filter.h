@@ -78,7 +78,8 @@ public:
   bool enable_sql_parsing_{true};
   bool terminate_ssl_{false};
   envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
-      upstream_ssl_;
+      upstream_ssl_{
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_DISABLE};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 
