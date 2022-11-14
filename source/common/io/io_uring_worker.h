@@ -35,9 +35,9 @@ private:
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
   os_fd_t connection_fd_{INVALID_SOCKET};
 
-  Request* accept_req_;
-  Request* cancel_req_;
-  Request* close_req_;
+  Request* accept_req_{nullptr};
+  Request* cancel_req_{nullptr};
+  Request* close_req_{nullptr};
 
   bool is_disabled_{false};
   bool is_pending_accept_{false};
@@ -182,9 +182,9 @@ private:
   bool is_disabled_{false};
   bool is_closing_{false};
 
-  Request* read_req_;
-  Request* cancel_req_;
-  Request* close_req_;
+  Request* read_req_{nullptr};
+  Request* cancel_req_{nullptr};
+  Request* close_req_{nullptr};
 };
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
