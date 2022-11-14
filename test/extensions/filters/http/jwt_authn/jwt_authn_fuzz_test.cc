@@ -130,6 +130,8 @@ DEFINE_PROTO_FUZZER(const JwtAuthnFuzzInput& input) {
     if (input.filter_on_destroy()) {
       filter->onDestroy();
     }
+
+    fuzzer.reset();
   }
 }
 
