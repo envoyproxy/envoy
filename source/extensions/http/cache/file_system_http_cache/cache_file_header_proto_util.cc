@@ -76,10 +76,8 @@ Http::ResponseTrailerMapPtr trailersFromTrailerProto(const CacheFileTrailer& tra
 
 ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
   ResponseMetadata metadata;
-  SystemTime epoch_time;
-  metadata.response_time_ =
-      epoch_time + std::chrono::milliseconds(Protobuf::util::TimeUtil::TimestampToMilliseconds(
-                       header.metadata_response_time()));
+  metadata.response_time_ = SystemTime{std::chrono::milliseconds(
+      Protobuf::util::TimeUtil::TimestampToMilliseconds(header.metadata_response_time()))};
   return metadata;
 }
 
