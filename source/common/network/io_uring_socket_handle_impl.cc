@@ -27,8 +27,9 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
                                                  absl::optional<int> domain,
                                                  bool is_server_socket)
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
-      socket_v6only_(socket_v6only), domain_(domain), is_server_socket_(is_server_socket) {
-  if (is_server_socket_) {
+      socket_v6only_(socket_v6only), domain_(domain) {
+  if (is_server_socket) {
+    io_uring_socket_type_ = IoUringSocketType::Server;
     io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
     io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_, true);
   }
@@ -44,7 +45,7 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
-  if (is_listen_socket_ || is_server_socket_) {
+  if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
    io_uring_worker_.ref().closeSocket(fd_);
    SET_SOCKET_INVALID(fd_);
    return Api::ioCallUint64ResultNoError();
@@ -77,7 +78,7 @@ bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 
 Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
-  if (is_server_socket_) {
+  if (io_uring_socket_type_ == IoUringSocketType::Server) {
     ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
     if (read_param_ == absl::nullopt) {
        return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
@@ -246,7 +247,8 @@ Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstShared
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::listen(int backlog) {
-  is_listen_socket_ = true;
+  ASSERT(io_uring_socket_type_ == IoUringSocketType::Unknown);
+  io_uring_socket_type_ = IoUringSocketType::Listen;
   return Api::OsSysCallsSingleton::get().listen(fd_, backlog);
 }
 
@@ -258,7 +260,7 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket");
   *addr = accepted_socket_param_->remote_addr_;
   *addrlen = accepted_socket_param_->remote_addr_len_;
-  bool enable_server_socket = true;
+  bool enable_server_socket = false;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
                                                              accepted_socket_param_->fd_, socket_v6only_,
                                                              domain_, enable_server_socket);
@@ -355,13 +357,11 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
                                                   Event::FileTriggerType, uint32_t) {
   io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
 
-  if (is_listen_socket_) {
+  if (io_uring_socket_type_ == IoUringSocketType::Listen) {
     //addAcceptRequest();
     //io_uring_factory_.get().ref().submit();
     io_uring_worker_.ref().addAcceptSocket(fd_, *this);
-  }
-
-  if (is_server_socket_) {
+  } else if (io_uring_socket_type_ == IoUringSocketType::Server) {
     io_uring_worker_.ref().enableSocket(fd_);
   }
 
@@ -371,7 +371,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher&,
 IoHandlePtr IoUringSocketHandleImpl::duplicate() { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
-  if ((is_listen_socket_ || is_server_socket_) && events & Event::FileReadyType::Read) {
+  if ((io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) && events & Event::FileReadyType::Read) {
     if (events & Event::FileReadyType::Read) {
       io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
     }
@@ -383,7 +383,7 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
 
   // old code path.
   if (events & Event::FileReadyType::Write) {
-    if (!is_server_socket_) {
+    if (io_uring_socket_type_ != IoUringSocketType::Server) {
       addReadRequest();
     }
     cb_(Event::FileReadyType::Write);
@@ -391,8 +391,8 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
 }
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
-  ENVOY_LOG(trace, "enable file events {}, fd = {}, is_server_socket = {}", events, fd_, is_server_socket_);
-  if (is_listen_socket_ || is_server_socket_) {
+  ENVOY_LOG(trace, "enable file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
+  if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
     if (!(events & Event::FileReadyType::Read)) {
       io_uring_worker_.ref().disableSocket(fd_);
     } else {

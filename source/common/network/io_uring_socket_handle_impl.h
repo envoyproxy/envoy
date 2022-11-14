@@ -16,6 +16,13 @@ class IoUringSocketHandleImpl;
 using IoUringSocketHandleImplOptRef =
     absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
 
+enum class IoUringSocketType {
+  Unknown,
+  Listen,
+  Server,
+  Client,
+};
+
 /**
  * IoHandle derivative for sockets.
  */
@@ -80,6 +87,19 @@ public:
 private:
   void addReadRequest();
 
+  std::string ioUringSocketTypeStr() {
+    switch (io_uring_socket_type_) {
+      case IoUringSocketType::Unknown:
+        return "Unknown";
+      case IoUringSocketType::Client:
+        return "Client";
+      case IoUringSocketType::Server:
+        return "Server";
+      case IoUringSocketType::Listen:
+        return "Listen";
+    }
+  }
+
   const uint32_t read_buffer_size_;
   Io::IoUringFactory& io_uring_factory_;
   OptRef<Io::IoUringWorker> io_uring_worker_{absl::nullopt};
@@ -98,8 +118,7 @@ private:
 
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};
-  bool is_listen_socket_{false};
-  bool is_server_socket_{false};
+  IoUringSocketType io_uring_socket_type_{IoUringSocketType::Unknown};
 };
 
 } // namespace Network
