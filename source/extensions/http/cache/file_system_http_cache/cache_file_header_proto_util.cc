@@ -25,7 +25,7 @@ CacheFileHeader makeCacheFileHeaderProto(const Key& key,
   TimestampUtil::systemClockToTimestamp(metadata.response_time_,
                                         *file_header.mutable_metadata_response_time());
   response_headers.iterate([&file_header](const Http::HeaderEntry& header) {
-    auto h = file_header.add_headers();
+    CacheFileHeader::Header* h = file_header.add_headers();
     h->set_key(std::string{header.key().getStringView()});
     h->set_value(std::string{header.value().getStringView()});
     return Http::HeaderMap::Iterate::Continue;
@@ -36,7 +36,7 @@ CacheFileHeader makeCacheFileHeaderProto(const Key& key,
 CacheFileTrailer makeCacheFileTrailerProto(const Http::ResponseTrailerMap& response_trailers) {
   CacheFileTrailer file_trailer;
   response_trailers.iterate([&file_trailer](const Http::HeaderEntry& trailer) {
-    auto t = file_trailer.add_trailers();
+    CacheFileTrailer::Trailer* t = file_trailer.add_trailers();
     t->set_key(std::string{trailer.key().getStringView()});
     t->set_value(std::string{trailer.value().getStringView()});
     return Http::HeaderMap::Iterate::Continue;
@@ -59,16 +59,16 @@ std::string serializedStringFromProto(const CacheFileHeader& proto) {
 }
 
 Http::ResponseHeaderMapPtr headersFromHeaderProto(const CacheFileHeader& header) {
-  auto headers = Http::ResponseHeaderMapImpl::create();
-  for (const auto& h : header.headers()) {
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  for (const CacheFileHeader::Header& h : header.headers()) {
     headers->addCopy(Http::LowerCaseString(h.key()), h.value());
   }
   return headers;
 }
 
 Http::ResponseTrailerMapPtr trailersFromTrailerProto(const CacheFileTrailer& trailer) {
-  auto trailers = Http::ResponseTrailerMapImpl::create();
-  for (const auto& t : trailer.trailers()) {
+  Http::ResponseTrailerMapPtr trailers = Http::ResponseTrailerMapImpl::create();
+  for (const CacheFileTrailer::Trailer& t : trailer.trailers()) {
     trailers->addCopy(Http::LowerCaseString(t.key()), t.value());
   }
   return trailers;

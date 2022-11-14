@@ -125,7 +125,7 @@ TEST(CacheFileHeaderProtoUtil, TrailersFromTrailerProto) {
 TEST(CacheFileHeaderProtoUtil, MetadataFromHeaderProto) {
   CacheFileHeader header_proto;
   TestUtility::loadFromYaml(test_header_proto, header_proto);
-  auto metadata = metadataFromHeaderProto(header_proto);
+  ResponseMetadata metadata = metadataFromHeaderProto(header_proto);
   EXPECT_EQ(metadata.response_time_, Envoy::SystemTime{std::chrono::seconds{1234}});
 }
 
