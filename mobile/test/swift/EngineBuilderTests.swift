@@ -137,20 +137,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testForceIPv6AddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with force IPv6")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.forceIPv6)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .forceIPv6(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -472,7 +458,6 @@ final class EngineBuilderTests: XCTestCase {
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
       enablePlatformCertificateValidation: false,
-      forceIPv6: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
       h2ExtendKeepaliveTimeout: true,
@@ -566,7 +551,6 @@ final class EngineBuilderTests: XCTestCase {
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
       enablePlatformCertificateValidation: true,
-      forceIPv6: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
       h2ExtendKeepaliveTimeout: false,
@@ -627,7 +611,6 @@ final class EngineBuilderTests: XCTestCase {
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,
       enablePlatformCertificateValidation: true,
-      forceIPv6: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
       h2ExtendKeepaliveTimeout: false,
