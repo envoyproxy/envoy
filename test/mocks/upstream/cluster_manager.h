@@ -56,7 +56,14 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
-  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
+    return cluster_config_update_stat_names_;
+  }
+  const ClusterEndpointStatNames& clusterEndpointStatNames() const override {
+    return cluster_endpoint_stat_names_;
+  }
+  const ClusterLbStatNames& clusterLbStatNames() const override { return cluster_lb_stat_names_; }
   const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
     return cluster_load_report_stat_names_;
   }
@@ -88,7 +95,10 @@ public:
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  ClusterStatNames cluster_stat_names_;
+  ClusterTrafficStatNames cluster_stat_names_;
+  ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
+  ClusterLbStatNames cluster_lb_stat_names_;
+  ClusterEndpointStatNames cluster_endpoint_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;

@@ -120,7 +120,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   }
 
   if (!cluster_rebuilt) {
-    parent_.info_->stats().update_no_rebuild_.inc();
+    parent_.info_->configUpdateStats().update_no_rebuild_.inc();
   }
 
   // If we didn't setup to initialize when our first round of health checking is complete, just
@@ -178,7 +178,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
       PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
   if (stale_after_ms > 0) {
     // Stat to track how often we receive valid assignment_timeout in response.
-    info_->stats().assignment_timeout_received_.inc();
+    info_->configUpdateStats().assignment_timeout_received_.inc();
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
 
@@ -260,7 +260,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
-    info_->stats().update_empty_.inc();
+    info_->configUpdateStats().update_empty_.inc();
     onPreInitComplete();
     return false;
   }
@@ -286,7 +286,7 @@ void EdsClusterImpl::onAssignmentTimeout() {
   std::vector<Config::DecodedResourceRef> resource_refs = {*decoded_resource};
   onConfigUpdate(resource_refs, "");
   // Stat to track how often we end up with stale assignments.
-  info_->stats().assignment_stale_.inc();
+  info_->configUpdateStats().assignment_stale_.inc();
 }
 
 void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
