@@ -31,7 +31,7 @@ private:
   IoUringHandler& io_uring_handler_;
   IoUringWorker& parent_;
 
-  struct sockaddr remote_addr_;
+  sockaddr_storage remote_addr_;
   socklen_t remote_addr_len_{sizeof(remote_addr_)};
   os_fd_t connection_fd_{INVALID_SOCKET};
 
@@ -214,7 +214,7 @@ public:
   std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) override;
   IoUring& get() override;
 
-  Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+  Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
                                socklen_t* remote_addr_len) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;

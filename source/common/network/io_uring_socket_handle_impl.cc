@@ -56,6 +56,7 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
+  ENVOY_LOG(debug, "close, fd = {}", fd_);
   // There is case the socket will be closed directly without initialize any event.
   if (io_uring_socket_type_ == IoUringSocketType::Unknown) {
     ::close(fd_);
@@ -333,6 +334,7 @@ bool IoUringSocketHandleImpl::supportsMmsg() const { PANIC("not implemented"); }
 bool IoUringSocketHandleImpl::supportsUdpGro() const { PANIC("not implemented"); }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::bind(Address::InstanceConstSharedPtr address) {
+  ENVOY_LOG(trace, "bind to address {}", address->asString());
   return Api::OsSysCallsSingleton::get().bind(fd_, address->sockAddr(), address->sockAddrLen());
 }
 
@@ -347,10 +349,14 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
     return nullptr;
   }
 
-  ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket, connect fd = {}", accepted_socket_param_->fd_);
+  ENVOY_LOG(debug, "IoUringSocketHandleImpl accept the socket, connect fd = {}, remote address = {}",
+    accepted_socket_param_->fd_,
+    Network::Address::addressFromSockAddrOrThrow(*accepted_socket_param_->remote_addr_,
+                                                  accepted_socket_param_->remote_addr_len_, false)->asString());
   ASSERT(io_uring_socket_type_ == IoUringSocketType::Listen);
 
-  *addr = accepted_socket_param_->remote_addr_;
+  //*addr = *reinterpret_cast<struct sockaddr*>(accepted_socket_param_->remote_addr_);
+  memcpy(reinterpret_cast<void *>(addr), reinterpret_cast<void *>(accepted_socket_param_->remote_addr_), accepted_socket_param_->remote_addr_len_);
   *addrlen = accepted_socket_param_->remote_addr_len_;
   bool enable_server_socket = true;
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
@@ -556,6 +562,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::resetFileEvents() {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+  ENVOY_LOG(trace, "reset file, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
   if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
     ASSERT(shadow_io_handle_ != nullptr);
     shadow_io_handle_->resetFileEvents();

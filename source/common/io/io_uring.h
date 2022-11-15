@@ -151,7 +151,7 @@ struct Request {
 
 struct AcceptedSocketParam {
   os_fd_t fd_;
-  struct sockaddr& remote_addr_;
+  sockaddr_storage* remote_addr_;
   socklen_t remote_addr_len_;
 };
 
@@ -192,7 +192,7 @@ public:
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
 
-  virtual Request* submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+  virtual Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
                                          socklen_t* remote_addr_len) PURE;
   virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;

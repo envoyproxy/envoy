@@ -1,6 +1,7 @@
 #include "source/common/io/io_uring_worker.h"
 #include "io_uring.h"
 #include "io_uring_impl.h"
+#include <sys/socket.h>
 
 namespace Envoy {
 namespace Io {
@@ -23,9 +24,12 @@ void IoUringAcceptSocket::onAccept(int32_t result) {
     return;
   }
 
-  ENVOY_LOG(debug, "New socket accepted");
   connection_fd_ = result;
-  AcceptedSocketParam param{connection_fd_, remote_addr_, remote_addr_len_};
+
+  ENVOY_LOG(debug, "New socket accepted, address = {}, connect fd = {}",
+    Network::Address::addressFromSockAddrOrThrow(remote_addr_, remote_addr_len_, false)->asString(), connection_fd_);
+
+  AcceptedSocketParam param{connection_fd_, &remote_addr_, remote_addr_len_};
   io_uring_handler_.onAcceptSocket(param);
   accept_req_ = parent_.submitAcceptRequest(*this, &remote_addr_, &remote_addr_len_);
 }
@@ -233,17 +237,18 @@ Event::Dispatcher& IoUringWorkerImpl::dispatcher() {
   return dispatcher_;
 }
 
-Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, struct sockaddr* remote_addr,
+Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
                                          socklen_t* remote_addr_len) {
   ENVOY_LOG(trace, "submit accept request, fd = {}", socket.fd());
   Request* req = new Request();
   req->type_ = RequestType::Accept;
   req->io_uring_socket_ = socket;
-  auto res = io_uring_impl_.prepareAccept(socket.fd(), remote_addr, remote_addr_len, req);
+  *remote_addr_len = sizeof(sockaddr_storage);
+  auto res = io_uring_impl_.prepareAccept(socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     io_uring_impl_.submit();
-    res = io_uring_impl_.prepareAccept(socket.fd(), remote_addr, remote_addr_len, req);
+    res = io_uring_impl_.prepareAccept(socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
   ENVOY_LOG(debug, "Submit new accept request");
