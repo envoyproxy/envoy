@@ -60,7 +60,11 @@ public:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config)
       : QuicTransportSocketFactoryBase(store, "server"), config_(std::move(config)),
-        enable_early_data_(enable_early_data) {}
+        enable_early_data_(enable_early_data) {
+    // TODO(RyanTheOptimist): support TLS client authentication.
+    RELEASE_ASSERT(!config_->requireClientCertificate(),
+                   "TLS Client Authentication is not supported over QUIC");
+  }
 
   // Network::DownstreamTransportSocketFactory
   Network::TransportSocketPtr createDownstreamTransportSocket() const override {
