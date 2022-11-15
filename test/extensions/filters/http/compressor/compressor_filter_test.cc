@@ -184,12 +184,12 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-enum PerRouteConfig { None, Empty, Enabled, Disabled };
+enum class PerRouteConfig { None, Empty, Enabled, Disabled };
 
 struct EnablementParams {
-  bool runtime_enabled;
-  PerRouteConfig per_route_enabled;
-  bool expect_compression;
+  bool runtime_enabled_;
+  PerRouteConfig per_route_enabled_;
+  bool expect_compression_;
 };
 
 class CompresorFilterEnablementTest : public CompressorFilterTest,
@@ -198,17 +198,17 @@ class CompresorFilterEnablementTest : public CompressorFilterTest,
 INSTANTIATE_TEST_SUITE_P(CompresorFilterEnablementTest, CompresorFilterEnablementTest,
                          testing::ValuesIn<EnablementParams>(
                              {// no per-route config, so runtime flag controls
-                              {true, None, true},
-                              {false, None, false},
+                              {true, PerRouteConfig::None, true},
+                              {false, PerRouteConfig::None, false},
                               // empty CompressorPerRoute.overrides, so runtime flag controls
-                              {true, Empty, true},
-                              {false, Empty, false},
+                              {true, PerRouteConfig::Empty, true},
+                              {false, PerRouteConfig::Empty, false},
                               // enabled by CompressorPerRoute.overrides
-                              {true, Enabled, true},
-                              {false, Enabled, true},
+                              {true, PerRouteConfig::Enabled, true},
+                              {false, PerRouteConfig::Enabled, true},
                               // disabled by CompressorPerRoute.disabled
-                              {true, Disabled, false},
-                              {false, Disabled, false}}));
+                              {true, PerRouteConfig::Disabled, false},
+                              {false, PerRouteConfig::Disabled, false}}));
 
 // common_config.enabled should enable/disable compression, unless a CompressorPerRoute config
 // overrides it.
@@ -233,20 +233,20 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
 )EOF");
   response_stats_prefix_ = "response.";
   ON_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
-      .WillByDefault(Return(GetParam().runtime_enabled));
+      .WillByDefault(Return(GetParam().runtime_enabled_));
   CompressorPerRoute per_route_proto;
   bool use_per_route_proto = true;
-  switch (GetParam().per_route_enabled) {
-  case None:
+  switch (GetParam().per_route_enabled_) {
+  case PerRouteConfig::None:
     use_per_route_proto = false;
     break;
-  case Empty:
+  case PerRouteConfig::Empty:
     per_route_proto.mutable_overrides();
     break;
-  case Enabled:
+  case PerRouteConfig::Enabled:
     per_route_proto.mutable_overrides()->mutable_response_direction_config();
     break;
-  case Disabled:
+  case PerRouteConfig::Disabled:
     per_route_proto.set_disabled(true);
     break;
   }
@@ -258,8 +258,8 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
 
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
-  doResponse(headers, GetParam().expect_compression);
-  EXPECT_EQ(headers.has("vary"), GetParam().expect_compression);
+  doResponse(headers, GetParam().expect_compression_);
+  EXPECT_EQ(headers.has("vary"), GetParam().expect_compression_);
 }
 
 // Default config values.

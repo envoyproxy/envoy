@@ -73,11 +73,11 @@ public:
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
+    Http::HeaderMap::GetResult content_encoding =
+        response->headers().get(Http::CustomHeaders::get().ContentEncoding);
+    ASSERT_FALSE(content_encoding.empty());
     EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
-              response->headers()
-                  .get(Http::CustomHeaders::get().ContentEncoding)[0]
-                  ->value()
-                  .getStringView());
+              content_encoding[0]->value().getStringView());
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
               response->headers().getTransferEncodingValue());
 
@@ -440,7 +440,7 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
     auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
     auto* route = vh->mutable_routes()->Mutable(0);
-    route->mutable_match()->set_path("/nocompress");
+    route->mutable_match()->set_path("/compress");
     envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
     per_route.mutable_overrides()->mutable_response_direction_config();
     Any cfg_any;
@@ -462,17 +462,16 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
               default_value: false
               runtime_key: foo_key
             content_type:
-              - text/html
-              - application/json
+              - text/xml
     )EOF");
-  doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                           {":path", "/nocompress"},
-                                                           {":scheme", "http"},
-                                                           {":authority", "host"},
-                                                           {"accept-encoding", "deflate, gzip"}},
-                            Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                            {"content-length", "40"},
-                                                            {"content-type", "text/xml"}});
+  doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                         {":path", "/compress"},
+                                                         {":scheme", "http"},
+                                                         {":authority", "host"},
+                                                         {"accept-encoding", "deflate, gzip"}},
+                          Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                          {"content-length", "40"},
+                                                          {"content-type", "text/xml"}});
 }
 
 } // namespace Envoy
