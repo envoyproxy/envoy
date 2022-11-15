@@ -88,8 +88,7 @@ public:
         ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
   }
 
-  Http::TestRequestHeaderMapImpl
-  run(const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init) {
+  Http::TestRequestHeaderMapImpl run() {
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
@@ -107,7 +106,7 @@ public:
           return nullptr;
         }));
 
-    Http::TestRequestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
@@ -142,15 +141,15 @@ public:
 };
 
 TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
-  TestScopedRuntime tsr;
-  tsr.mergeValues({{"envoy.reloadable_features.allow_upstream-filters", "true"},
-                   {"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
   HttpFilter add_header_filter;
   add_header_filter.set_name("add-header-filter");
   HttpFilter codec_filter;
   codec_filter.set_name("envoy.filters.http.upstream_codec");
   init({add_header_filter, codec_filter});
-  auto headers = run({});
+  auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
 }
 } // namespace

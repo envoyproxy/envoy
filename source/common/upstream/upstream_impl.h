@@ -840,7 +840,7 @@ public:
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager,
                          bool only_create_if_configured) const override {
-    if (!only_create_if_configured || has_custom_http_filters_) {
+    if (!only_create_if_configured || has_configured_http_filters_) {
       Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
       return true;
     }
@@ -939,7 +939,8 @@ private:
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
-  bool has_custom_http_filters_{false};
+  // true iff the cluster proto specified upstream http filters.
+  bool has_configured_http_filters_{false};
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

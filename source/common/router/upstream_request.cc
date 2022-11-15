@@ -125,15 +125,19 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
       parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
       *parent_.cluster(), *this);
+  // Attempt to create custom cluster-specified filter chain
   bool created = parent_.cluster()->createFilterChain(*filter_manager_,
                                                       /*only_create_if_configured=*/true);
   if (!created) {
+    // Attempt to create custom router-specified filter chain.
     created = parent_.config().createFilterChain(*filter_manager_, false);
   }
   if (!created) {
+    // Neither cluster nor router have a custom filter chain; add the default
+    // cluster filter chain, which only consists of the codec filter.
     created = parent_.cluster()->createFilterChain(*filter_manager_, false);
   }
-  // The cluster will always create a codec filter, which sets the upstream
+  // There will always be a codec filter present, which sets the upstream
   // interface. Fast-fail any tests that don't set up mocks correctly.
   ASSERT(created && upstream_interface_.has_value());
 }

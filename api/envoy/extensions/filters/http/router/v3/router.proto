@@ -91,6 +91,9 @@ message Router {
   // for more details.
   bool suppress_grpc_request_failure_code_stats = 7;
 
+  // .. note::
+  //   Upstream HTTP filters are currently in alpha.
+  //
   // Optional HTTP filters for the upstream filter chain.
   //
   // These filters will be applied for all requests that pass through the router.

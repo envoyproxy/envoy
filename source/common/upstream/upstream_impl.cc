@@ -1133,7 +1133,7 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
-    has_custom_http_filters_ = !http_filters.empty();
+    has_configured_http_filters_ = !http_filters.empty();
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
