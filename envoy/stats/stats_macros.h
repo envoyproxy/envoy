@@ -181,8 +181,6 @@ template <typename StatsStructType> struct LazyInitStats {
   StatsStructType* operator->() { return internal_stats_.get(ctor_); }
   StatsStructType& operator*() { return *internal_stats_.get(ctor_); }
 
-  inline Stats::Scope& statsScope() { return scope_; }
-
   Stats::Scope& scope_;
   std::function<StatsStructType*()> ctor_;
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
