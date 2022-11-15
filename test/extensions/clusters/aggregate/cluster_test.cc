@@ -138,13 +138,8 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
-<<<<<<< HEAD
   Upstream::ClusterTrafficStatNames stat_names_;
   LazyInitStats<Upstream::ClusterTrafficStats> stats_;
-=======
-  Upstream::ClusterTrafficStatNames stat_names_;
-  Upstream::ClusterTrafficStats stats_;
->>>>>>> main
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{

@@ -375,7 +375,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
 <<<<<<< HEAD
-  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -385,7 +385,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   // because there's a busy client.
   advanceTimeAndRun(2);
 <<<<<<< HEAD
-  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -404,7 +404,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
 <<<<<<< HEAD
-  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -414,7 +414,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   // because there's nothing to drain.
   advanceTimeAndRun(2);
 <<<<<<< HEAD
-  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -428,7 +428,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
   // that is already draining.
   advanceTimeAndRun(max_connection_duration_ + 1);
 <<<<<<< HEAD
-  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -444,7 +444,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
   // client that is already closed.
   advanceTimeAndRun(max_connection_duration_ + 1);
 <<<<<<< HEAD
-  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->>upstream_cx_max_duration_reached_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 =======
   EXPECT_EQ(0, pool_.host()->cluster().trafficStats()->upstream_cx_max_duration_reached_.value());
 >>>>>>> main
@@ -590,7 +590,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
 
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
 <<<<<<< HEAD
-  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->>upstream_rq_0rtt_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 =======
   EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 >>>>>>> main
@@ -603,7 +603,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, ConnectedZeroRttSendsEarlyData) {
 
   CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*connecting capacity*/);
 <<<<<<< HEAD
-  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->>upstream_rq_0rtt_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 =======
   EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 >>>>>>> main
@@ -629,7 +629,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimi
 
   CHECK_STATE(1 /*active*/, 0 /*pending*/, concurrent_streams_ - 1 /*connecting capacity*/);
 <<<<<<< HEAD
-  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->>upstream_rq_0rtt_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 =======
   EXPECT_EQ(1, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 >>>>>>> main
@@ -638,7 +638,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, EarlyDataStreamsReachConcurrentStreamLimi
   EXPECT_EQ(nullptr, pool_.newStreamImpl(context_, /*can_send_early_data=*/true));
   CHECK_STATE(2 /*active*/, 0 /*pending*/, concurrent_streams_ - 2 /*connecting capacity*/);
 <<<<<<< HEAD
-  EXPECT_EQ(2, pool_.host()->cluster().trafficStats()->>upstream_rq_0rtt_.value());
+  EXPECT_EQ(2, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 =======
   EXPECT_EQ(2, pool_.host()->cluster().trafficStats()->upstream_rq_0rtt_.value());
 >>>>>>> main

@@ -164,11 +164,7 @@ protected:
   }
 
   void onIdleTimeout() {
-<<<<<<< HEAD
-    host_->cluster().trafficStats()->>upstream_cx_idle_timeout_.inc();
-=======
     host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
->>>>>>> main
     close();
   }
 

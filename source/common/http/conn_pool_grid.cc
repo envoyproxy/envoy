@@ -382,11 +382,7 @@ HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusT
 bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
 
 void ConnectivityGrid::markHttp3Broken() {
-<<<<<<< HEAD
-  host_->cluster().trafficStats()->>upstream_http3_broken_.inc();
-=======
   host_->cluster().trafficStats()->upstream_http3_broken_.inc();
->>>>>>> main
   getHttp3StatusTracker().markHttp3Broken();
 }
 

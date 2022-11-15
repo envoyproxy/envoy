@@ -66,13 +66,8 @@ public:
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
-<<<<<<< HEAD
-  ClusterLbStatNames lb_stat_names_{stats_store_.symbolTable()};
-  ClusterLbStats stats_{lb_stat_names_, stats_store_};
-=======
   ClusterLbStatNames stat_names_{stats_store_.symbolTable()};
   ClusterLbStats stats_{stat_names_, stats_store_};
->>>>>>> main
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;

@@ -106,7 +106,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
 <<<<<<< HEAD
-  if (cluster_.info()->trafficStats()->>upstream_cx_total_.used()) {
+  if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
 =======
   if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
 >>>>>>> main

@@ -83,9 +83,9 @@ public:
     ON_CALL(retry_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_retry_step));
     ON_CALL(success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
 <<<<<<< HEAD
-    cluster_info_->trafficStats()->>upstream_rq_timeout_.add(timeout_step);
-    cluster_info_->trafficStats()->>upstream_rq_per_try_timeout_.add(timeout_retry_step);
-    cluster_info_->trafficStats()->>upstream_rq_pending_overflow_.add(rejected_step);
+    cluster_info_->trafficStats()->upstream_rq_timeout_.add(timeout_step);
+    cluster_info_->trafficStats()->upstream_rq_per_try_timeout_.add(timeout_retry_step);
+    cluster_info_->trafficStats()->upstream_rq_pending_overflow_.add(rejected_step);
 =======
     cluster_info_->trafficStats()->upstream_rq_timeout_.add(timeout_step);
     cluster_info_->trafficStats()->upstream_rq_per_try_timeout_.add(timeout_retry_step);

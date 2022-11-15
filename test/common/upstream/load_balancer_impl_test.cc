@@ -77,20 +77,12 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-<<<<<<< HEAD
-      : lb_stat_names_(stats_store_.symbolTable()), stats_(lb_stat_names_, stats_store_) {
-=======
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
->>>>>>> main
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-<<<<<<< HEAD
-  ClusterLbStatNames lb_stat_names_;
-=======
   ClusterLbStatNames stat_names_;
->>>>>>> main
   ClusterLbStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;

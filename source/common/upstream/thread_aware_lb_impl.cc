@@ -191,7 +191,7 @@ double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverload
   // and alert the user if that's the case.
 
 <<<<<<< HEAD
-  const uint32_t overall_active = host.cluster().trafficStats()->>upstream_rq_active_.value();
+  const uint32_t overall_active = host.cluster().trafficStats()->upstream_rq_active_.value();
 =======
   const uint32_t overall_active = host.cluster().trafficStats()->upstream_rq_active_.value();
 >>>>>>> main

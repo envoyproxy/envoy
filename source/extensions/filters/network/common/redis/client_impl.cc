@@ -77,15 +77,9 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
       scope_(scope), is_transaction_client_(is_transaction_client) {
-<<<<<<< HEAD
-  host->cluster().trafficStats()->>upstream_cx_total_.inc();
-  host->stats().cx_total_.inc();
-  host->cluster().trafficStats()->>upstream_cx_active_.inc();
-=======
   host->cluster().trafficStats()->upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().trafficStats()->upstream_cx_active_.inc();
->>>>>>> main
   host->stats().cx_active_.inc();
   connect_or_op_timer_->enableTimer(host->cluster().connectTimeout());
 }
@@ -93,11 +87,7 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
 ClientImpl::~ClientImpl() {
   ASSERT(pending_requests_.empty());
   ASSERT(connection_->state() == Network::Connection::State::Closed);
-<<<<<<< HEAD
-  host_->cluster().trafficStats()->>upstream_cx_active_.dec();
-=======
   host_->cluster().trafficStats()->upstream_cx_active_.dec();
->>>>>>> main
   host_->stats().cx_active_.dec();
 }
 
@@ -151,17 +141,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
 void ClientImpl::onConnectOrOpTimeout() {
   putOutlierEvent(Upstream::Outlier::Result::LocalOriginTimeout);
   if (connected_) {
-<<<<<<< HEAD
-    host_->cluster().trafficStats()->>upstream_rq_timeout_.inc();
-    host_->stats().rq_timeout_.inc();
-  } else {
-    host_->cluster().trafficStats()->>upstream_cx_connect_timeout_.inc();
-=======
     host_->cluster().trafficStats()->upstream_rq_timeout_.inc();
     host_->stats().rq_timeout_.inc();
   } else {
     host_->cluster().trafficStats()->upstream_cx_connect_timeout_.inc();
->>>>>>> main
     host_->stats().cx_connect_fail_.inc();
   }
 
@@ -173,11 +156,7 @@ void ClientImpl::onData(Buffer::Instance& data) {
     decoder_->decode(data);
   } catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
-<<<<<<< HEAD
-    host_->cluster().trafficStats()->>upstream_cx_protocol_error_.inc();
-=======
     host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
->>>>>>> main
     host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -206,11 +185,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
       if (!request.canceled_) {
         request.callbacks_.onFailure();
       } else {
-<<<<<<< HEAD
-        host_->cluster().trafficStats()->>upstream_rq_cancelled_.inc();
-=======
         host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
->>>>>>> main
       }
       pending_requests_.pop_front();
     }
@@ -223,11 +198,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 
   if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
-<<<<<<< HEAD
-    host_->cluster().trafficStats()->>upstream_cx_connect_fail_.inc();
-=======
     host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
->>>>>>> main
     host_->stats().cx_connect_fail_.inc();
   }
 }
@@ -250,11 +221,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   // result in closing the connection.
   pending_requests_.pop_front();
   if (canceled) {
-<<<<<<< HEAD
-    host_->cluster().trafficStats()->>upstream_rq_cancelled_.inc();
-=======
     host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
->>>>>>> main
   } else if (config_.enableRedirection() && !is_transaction_client_ &&
              (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
@@ -296,24 +263,14 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& 
     command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
         parent_.scope_, command_, parent_.time_source_);
   }
-<<<<<<< HEAD
-  parent.host_->cluster().trafficStats()->>upstream_rq_total_.inc();
-  parent.host_->stats().rq_total_.inc();
-  parent.host_->cluster().trafficStats()->>upstream_rq_active_.inc();
-=======
   parent.host_->cluster().trafficStats()->upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
   parent.host_->cluster().trafficStats()->upstream_rq_active_.inc();
->>>>>>> main
   parent.host_->stats().rq_active_.inc();
 }
 
 ClientImpl::PendingRequest::~PendingRequest() {
-<<<<<<< HEAD
-  parent_.host_->cluster().trafficStats()->>upstream_rq_active_.dec();
-=======
   parent_.host_->cluster().trafficStats()->upstream_rq_active_.dec();
->>>>>>> main
   parent_.host_->stats().rq_active_.dec();
 }
 

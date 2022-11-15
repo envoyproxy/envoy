@@ -420,11 +420,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
   EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
-<<<<<<< HEAD
-  cluster.info()->trafficStats()->>upstream_rq_total_.inc();
-=======
   cluster.info()->trafficStats()->upstream_rq_total_.inc();
->>>>>>> main
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -725,8 +721,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
     EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+    EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
   }
 
   // Re-resolve the DNS name with only one record, we should have 1 host.
@@ -739,8 +735,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+    EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
   }
 }
 
@@ -841,11 +837,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
 
-<<<<<<< HEAD
-  cluster.info()->trafficStats()->>upstream_rq_total_.inc();
-=======
   cluster.info()->trafficStats()->upstream_rq_total_.inc();
->>>>>>> main
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -1946,11 +1938,7 @@ TEST_F(StaticClusterImplTest, AltStatName) {
                             std::move(scope), false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
-<<<<<<< HEAD
-  cluster.info()->trafficStats()->>upstream_rq_total_.inc();
-=======
   cluster.info()->trafficStats()->upstream_rq_total_.inc();
->>>>>>> main
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
 }
 
@@ -2271,8 +2259,6 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
   EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
-<<<<<<< HEAD
-=======
 }
 
 TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
@@ -2327,8 +2313,8 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   // The endpoint with disabled active health check is considered healthy.
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   // Perform a health check for the second host, and then the initialization is finished.
   EXPECT_CALL(initialized, ready());
@@ -2337,7 +2323,6 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
->>>>>>> main
 }
 
 TEST_F(StaticClusterImplTest, UrlConfig) {

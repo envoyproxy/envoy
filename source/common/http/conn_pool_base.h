@@ -130,11 +130,11 @@ public:
     codec_client_->addConnectionCallbacks(*this);
     codec_client_->setConnectionStats(
 <<<<<<< HEAD
-        {parent_.host()->cluster().trafficStats()->>upstream_cx_rx_bytes_total_,
-         parent_.host()->cluster().trafficStats()->>upstream_cx_rx_bytes_buffered_,
-         parent_.host()->cluster().trafficStats()->>upstream_cx_tx_bytes_total_,
-         parent_.host()->cluster().trafficStats()->>upstream_cx_tx_bytes_buffered_,
-         &parent_.host()->cluster().trafficStats()->>bind_errors_, nullptr});
+        {parent_.host()->cluster().trafficStats()->upstream_cx_rx_bytes_total_,
+         parent_.host()->cluster().trafficStats()->upstream_cx_rx_bytes_buffered_,
+         parent_.host()->cluster().trafficStats()->upstream_cx_tx_bytes_total_,
+         parent_.host()->cluster().trafficStats()->upstream_cx_tx_bytes_buffered_,
+         &parent_.host()->cluster().trafficStats()->bind_errors_, nullptr});
 =======
         {parent_.host()->cluster().trafficStats()->upstream_cx_rx_bytes_total_,
          parent_.host()->cluster().trafficStats()->upstream_cx_rx_bytes_buffered_,

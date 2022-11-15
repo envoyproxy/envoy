@@ -328,11 +328,7 @@ public:
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
-<<<<<<< HEAD
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
-=======
-  const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
->>>>>>> main
   const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
     return cluster_config_update_stat_names_;
   }
@@ -792,11 +788,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
-<<<<<<< HEAD
   ClusterTrafficStatNames cluster_stat_names_;
-=======
-  ClusterTrafficStatNames cluster_stat_names_;
->>>>>>> main
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
   ClusterLbStatNames cluster_lb_stat_names_;
   ClusterEndpointStatNames cluster_endpoint_stat_names_;

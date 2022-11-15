@@ -26,11 +26,11 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
 <<<<<<< HEAD
-  connection_->setConnectionStats({host->cluster().trafficStats()->>upstream_cx_rx_bytes_total_,
-                                   host->cluster().trafficStats()->>upstream_cx_rx_bytes_buffered_,
-                                   host->cluster().trafficStats()->>upstream_cx_tx_bytes_total_,
-                                   host->cluster().trafficStats()->>upstream_cx_tx_bytes_buffered_,
-                                   &host->cluster().trafficStats()->>bind_errors_, nullptr});
+  connection_->setConnectionStats({host->cluster().trafficStats()->upstream_cx_rx_bytes_total_,
+                                   host->cluster().trafficStats()->upstream_cx_rx_bytes_buffered_,
+                                   host->cluster().trafficStats()->upstream_cx_tx_bytes_total_,
+                                   host->cluster().trafficStats()->upstream_cx_tx_bytes_buffered_,
+                                   &host->cluster().trafficStats()->bind_errors_, nullptr});
 =======
   connection_->setConnectionStats({host->cluster().trafficStats()->upstream_cx_rx_bytes_total_,
                                    host->cluster().trafficStats()->upstream_cx_rx_bytes_buffered_,

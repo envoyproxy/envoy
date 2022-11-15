@@ -198,7 +198,7 @@ void UpstreamRequest::cleanUp() {
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
 <<<<<<< HEAD
-    parent_.cluster()->trafficStats()->>upstream_flow_control_drained_total_.inc();
+    parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
 =======
     parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
 >>>>>>> main
@@ -758,7 +758,7 @@ UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() {
 
 void UpstreamRequest::onStreamMaxDurationReached() {
 <<<<<<< HEAD
-  upstream_host_->cluster().trafficStats()->>upstream_rq_max_duration_reached_.inc();
+  upstream_host_->cluster().trafficStats()->upstream_rq_max_duration_reached_.inc();
 =======
   upstream_host_->cluster().trafficStats()->upstream_rq_max_duration_reached_.inc();
 >>>>>>> main
@@ -789,7 +789,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
 <<<<<<< HEAD
-  parent_.parent_.cluster()->trafficStats()->>upstream_flow_control_paused_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
 =======
   parent_.parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
 >>>>>>> main
@@ -802,7 +802,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
   // One source of connection blockage has buffer available. Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
 <<<<<<< HEAD
-  parent_.parent_.cluster()->trafficStats()->>upstream_flow_control_resumed_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
 =======
   parent_.parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
 >>>>>>> main
@@ -821,7 +821,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
 <<<<<<< HEAD
-  parent_.cluster()->trafficStats()->>upstream_flow_control_backed_up_total_.inc();
+  parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
 =======
   parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
 >>>>>>> main
@@ -841,7 +841,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
 <<<<<<< HEAD
-  parent_.cluster()->trafficStats()->>upstream_flow_control_drained_total_.inc();
+  parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
 =======
   parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
 >>>>>>> main
