@@ -25,6 +25,7 @@ envoy_extension_cc_test_library(
         "//source/extensions/filters/http/custom_response:policy_interface",
         "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
         "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",
     ],
@@ -42,13 +43,11 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/custom_response:config",
         "//source/extensions/filters/http/custom_response:custom_response_filter",
         "//source/extensions/filters/http/custom_response:factory",
-        "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
         "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
+        "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",
     ],
 )
 
@@ -73,8 +72,6 @@ envoy_extension_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",
     ],
 )
 
@@ -102,8 +99,7 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/local_response_policy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/custom_response/redirect_policy/v3:pkg_cc_proto",
     ],
 )
