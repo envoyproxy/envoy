@@ -711,30 +711,27 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 4);
 }
 
-// // // Verifies that the request body is included in the CheckRequest when the downstream protocol
-// is
-// // // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 2048);
 }
 
-// // // Verifies that the request body is included in the CheckRequest when the downstream protocol
-// is
-// // // HTTP/2.
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 4);
 }
 
-// // // Verifies that the request body is included in the CheckRequest when the downstream protocol
-// is
-// // // HTTP/2 and the size of the request body is larger than max_request_bytes.
+// Verifies that the request body is included in the CheckRequest when the downstream protocol is
+// HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 2048);
 }
 
-// // Verifies that the original request headers will be added and appended when the authorization
-// // server returns headers_to_add, response_headers_to_add, and headers_to_append in OkResponse
-// // message.
+// Verifies that the original request headers will be added and appended when the authorization
+// server returns headers_to_add, response_headers_to_add, and headers_to_append in OkResponse
+// message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecType::HTTP1, 4,

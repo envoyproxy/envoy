@@ -207,17 +207,11 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
       continue;
     }
 
-    // path header: override in case a specific path prefix has been configured
-    if (key == Http::Headers::get().Path) {
-      if (!config_->pathPrefix().empty()) {
-        headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
-      } else {
-        headers->addCopy(key, header.second);
-      }
-      continue;
+    if (key == Http::Headers::get().Path && !config_->pathPrefix().empty()) {
+      headers->addCopy(key, absl::StrCat(config_->pathPrefix(), header.second));
+    } else {
+      headers->addCopy(key, header.second);
     }
-
-    headers->addCopy(key, header.second);
   }
 
   config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);

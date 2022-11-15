@@ -102,6 +102,11 @@ public:
       ExceptionUtil::throwEnvoyException("Invalid duplicate configuration for allowed_headers.");
     }
 
+    // An unset request_headers_matchers_ means that all client request headers are allowed through
+    // to the authz server; this is to preserve backwards compatibility when introducing
+    // allowlisting of request headers for gRPC authz servers. Pre-existing support is for
+    // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
+    // Method, Path and Host).
     if (config.has_grpc_service() && config.has_allowed_headers()) {
       request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
           config.allowed_headers(), false);

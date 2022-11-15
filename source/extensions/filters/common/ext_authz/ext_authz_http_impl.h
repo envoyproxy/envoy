@@ -95,7 +95,7 @@ private:
   static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 
-  MatcherSharedPtr request_header_matchers_;
+  const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
   const MatcherSharedPtr client_header_on_success_matchers_;
   const MatcherSharedPtr to_dynamic_metadata_matchers_;

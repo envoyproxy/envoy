@@ -140,16 +140,7 @@ void CheckRequestUtils::setHttpRequest(
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
       const std::string key(e.key().getStringView());
 
-      if (request_header_matchers != nullptr) {
-        if (request_header_matchers->matches(key)) {
-          if (mutable_headers->find(key) == mutable_headers->end()) {
-            (*mutable_headers)[key] = std::string(e.value().getStringView());
-          } else {
-            // Merge duplicate headers.
-            (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
-          }
-        }
-      } else {
+      if (request_header_matchers == nullptr || request_header_matchers->matches(key)) {
         if (mutable_headers->find(key) == mutable_headers->end()) {
           (*mutable_headers)[key] = std::string(e.value().getStringView());
         } else {
