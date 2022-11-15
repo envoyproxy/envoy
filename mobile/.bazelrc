@@ -106,17 +106,6 @@ build:release-common --config=sizeopt
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
 
-# Flags for release builds targeting iOS
-build:release-ios --config=ios
-build:release-ios --config=release-common
-build:release-ios --compilation_mode=opt
-
-# Flags for release builds targeting Android or the JVM
-# Release does not use the option --define=logger=android
-build:release-android --define=include_ifaddrs=true
-build:release-android --config=release-common
-build:release-android --compilation_mode=opt
-
 # Instrument Envoy Mobile's C++ code for coverage
 build:coverage --instrumentation_filter="//library/common[/:]"
 
