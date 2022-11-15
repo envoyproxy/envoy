@@ -721,8 +721,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
     EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+    EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
   }
 
   // Re-resolve the DNS name with only one record, we should have 1 host.
@@ -735,8 +735,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-    EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+    EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
   }
 }
 
@@ -2313,8 +2313,8 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   // The endpoint with disabled active health check is considered healthy.
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   // Perform a health check for the second host, and then the initialization is finished.
   EXPECT_CALL(initialized, ready());
