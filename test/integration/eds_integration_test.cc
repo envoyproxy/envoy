@@ -56,31 +56,44 @@ public:
     }
   }
 
+  struct EndpointSettingOptions {
+    uint32_t total_endpoints = 1;
+    uint32_t healthy_endpoints = 0;
+    uint32_t degraded_endpoints = 0;
+    uint32_t disable_active_hc_endpoints = 0;
+    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
+  };
+
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
-  void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
-                    uint32_t degraded_endpoints, bool remaining_unhealthy = true,
-                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+  void setEndpoints(const EndpointSettingOptions& endpoint_setting, bool remaining_unhealthy = true,
                     bool await_update = true) {
-    ASSERT(total_endpoints >= healthy_endpoints + degraded_endpoints);
+    ASSERT(endpoint_setting.total_endpoints >=
+           endpoint_setting.healthy_endpoints + endpoint_setting.degraded_endpoints);
+    ASSERT(endpoint_setting.total_endpoints >= endpoint_setting.disable_active_hc_endpoints);
     envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
-    if (overprovisioning_factor.has_value()) {
+    if (endpoint_setting.overprovisioning_factor.has_value()) {
       cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
-          overprovisioning_factor.value());
+          endpoint_setting.overprovisioning_factor.value());
     }
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
 
-    for (uint32_t i = 0; i < total_endpoints; ++i) {
+    for (uint32_t i = 0; i < endpoint_setting.total_endpoints; ++i) {
       auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
       setUpstreamAddress(i, *endpoint);
       // First N endpoints are degraded, next M are healthy and the remaining endpoints are
       // unhealthy or unknown depending on remaining_unhealthy.
-      if (i < degraded_endpoints) {
+      if (i < endpoint_setting.degraded_endpoints) {
         endpoint->set_health_status(envoy::config::core::v3::DEGRADED);
-      } else if (i >= healthy_endpoints + degraded_endpoints) {
+      } else if (i >= endpoint_setting.healthy_endpoints + endpoint_setting.degraded_endpoints) {
         endpoint->set_health_status(remaining_unhealthy ? envoy::config::core::v3::UNHEALTHY
                                                         : envoy::config::core::v3::UNKNOWN);
+      }
+      if (i < endpoint_setting.disable_active_hc_endpoints) {
+        endpoint->mutable_endpoint()
+            ->mutable_health_check_config()
+            ->set_disable_active_health_check(true);
       }
     }
 
@@ -136,7 +149,7 @@ public:
       health_check->mutable_http_health_check()->set_path("/healthcheck");
       health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
     }
-    setEndpoints(0, 0, 0, true, absl::nullopt, false);
+    setEndpoints({/*total_endpoints=*/0}, true, false);
 
     if (cluster_modifier != nullptr) {
       cluster_modifier(cluster_);
@@ -175,7 +188,9 @@ TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   codec_client_type_ = envoy::type::v3::HTTP2;
   initializeTest(true);
-  setEndpoints(1, 0, 0, false);
+
+  // There is 1 total endpoint.
+  setEndpoints(EndpointSettingOptions(), false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
@@ -219,11 +234,51 @@ TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
   fake_upstream_connection.reset();
 }
 
+TEST_P(EdsIntegrationTest, EndpointDisableActiveHCFlag) {
+  initializeTest(true);
+  EndpointSettingOptions options;
+
+  // Total 1 endpoints with all active health check enabled.
+  setEndpoints(options, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Disable Active Healthy Check for the host. EDS Unknown is considered as healthy
+  options.disable_active_hc_endpoints = 1;
+  setEndpoints(options, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Set the host as unhealthy through EDS.
+  setEndpoints(options, true);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Set host as healthy through EDS.
+  options.healthy_endpoints = 1;
+  setEndpoints(options, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Clear out the host and verify the host is gone.
+  setEndpoints({/*total_endpoints=*/0});
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+}
+
 // Verify that a host stabilized via active health checking which is first removed from EDS and
 // then fails health checking is removed.
 TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   initializeTest(true);
-  setEndpoints(1, 0, 0, false);
+  EndpointSettingOptions options;
+  setEndpoints(options, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
@@ -234,7 +289,8 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 
   // Clear out the host and verify the host is still healthy.
-  setEndpoints(0, 0, 0);
+  options.total_endpoints = 0;
+  setEndpoints(options);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
@@ -253,7 +309,8 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   initializeTest(true, [](envoy::config::cluster::v3::Cluster& cluster) {
     cluster.set_ignore_health_on_host_removal(true);
   });
-  setEndpoints(1, 0, 0, false);
+  EndpointSettingOptions options;
+  setEndpoints(options, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
@@ -266,7 +323,8 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
 
   // Clear out the host before the health check finishes (regardless of success/error/timeout) and
   // ensure that warming_clusters goes to 0 to avoid a permanent warming state.
-  setEndpoints(0, 0, 0, true, absl::nullopt, false);
+  options.total_endpoints = 0;
+  setEndpoints(options, true, false);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
@@ -276,7 +334,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
 
   // Endpoints are initially excluded.
   initializeTest(true);
-  setEndpoints(1, 0, 0, false);
+  setEndpoints(EndpointSettingOptions(), false);
 
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
@@ -298,7 +356,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
 
   // Endpoints are initially excluded.
   initializeTest(true);
-  setEndpoints(1, 0, 0, false);
+  setEndpoints(EndpointSettingOptions(), false);
 
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
@@ -316,32 +374,40 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
 // Validate that health status updates are consumed from EDS.
 TEST_P(EdsIntegrationTest, HealthUpdate) {
   initializeTest(false);
+  EndpointSettingOptions options;
   // Initial state, no cluster members.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // 2/2 healthy endpoints.
-  setEndpoints(2, 2, 0);
+  options.total_endpoints = 2;
+  options.healthy_endpoints = 2;
+  setEndpoints(options);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Drop to 0/2 healthy endpoints.
-  setEndpoints(2, 0, 0);
+  options.healthy_endpoints = 0;
+  setEndpoints(options);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Increase to 1/2 healthy endpoints.
-  setEndpoints(2, 1, 0);
+  options.healthy_endpoints = 1;
+  setEndpoints(options);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Add host and modify health to 2/3 healthy endpoints.
-  setEndpoints(3, 2, 0);
+  options.total_endpoints = 3;
+  options.healthy_endpoints = 2;
+  setEndpoints(options);
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Modify health to 2/3 healthy and 1/3 degraded.
-  setEndpoints(3, 2, 1);
+  options.degraded_endpoints = 1;
+  setEndpoints(options);
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
@@ -352,7 +418,10 @@ TEST_P(EdsIntegrationTest, HealthUpdate) {
 TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   initializeTest(false);
   // Default overprovisioning factor.
-  setEndpoints(4, 4, 0);
+  EndpointSettingOptions options;
+  options.total_endpoints = 4;
+  options.healthy_endpoints = 4;
+  setEndpoints(options);
   auto get_and_compare = [this](const uint32_t expected_factor) {
     const auto& cluster_map = test_server_->server().clusterManager().clusters();
     EXPECT_EQ(1, cluster_map.active_clusters_.size());
@@ -366,7 +435,8 @@ TEST_P(EdsIntegrationTest, OverprovisioningFactorUpdate) {
   get_and_compare(Envoy::Upstream::kDefaultOverProvisioningFactor);
 
   // Use new overprovisioning factor 200.
-  setEndpoints(4, 4, 0, true, 200);
+  options.overprovisioning_factor = 200;
+  setEndpoints(options);
   get_and_compare(200);
 }
 
@@ -426,7 +496,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   cleanupUpstreamAndDownstream();
 
   // 2/2 healthy endpoints.
-  setEndpoints(2, 2, 0);
+  setEndpoints({/*total_endpoint*/ 2, /*healthy_endpoints*/ 2});
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
                                                 downstream_protocol_, version_, "foo.com");

@@ -113,9 +113,15 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: health_check
+  change: |
+    added an optional bool flag :ref:`disable_active_health_check <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check>` to disable the active health check for the endpoint.
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: matching
+  change: |
+    support filter chain selection based on the dynamic metadata and the filter state using :ref:`formatter actions <extension_envoy.matching.actions.format_string>`.
 - area: redis
   change: |
     extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.

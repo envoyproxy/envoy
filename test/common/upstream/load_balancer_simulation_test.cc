@@ -70,16 +70,15 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
       {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
-  ClusterStatNames stat_names(stats_store.symbolTable());
-  ClusterStats stats{ClusterInfoImpl::generateStats(stats_store, stat_names)};
-  stats.max_host_weight_.set(weight);
+  ClusterLbStatNames stat_names(stats_store.symbolTable());
+  ClusterLbStats lb_stats{stat_names, stats_store};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   Random::RandomGeneratorImpl random;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config,
+      priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
       *time_source};
 
   absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
@@ -105,11 +104,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public testing::Test {
+class DISABLED_SimulationTest : public testing::Test { // NOLINT(readability-identifier-naming)
 public:
   DISABLED_SimulationTest()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -247,8 +245,8 @@ public:
   NiceMock<MockTimeSystem> time_source_;
   Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 

@@ -1321,3 +1321,10 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.matching.actions.format_string:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.config.core.v3.SubstitutionFormatString

@@ -58,8 +58,7 @@ class RingHashLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                  public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
 
   void init() {
     lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
@@ -76,8 +75,8 @@ public:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
