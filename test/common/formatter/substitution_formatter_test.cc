@@ -826,7 +826,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter upstream_format("STREAM_UNIQUE_ID");
+    StreamInfoFormatter upstream_format("STREAM_ID");
 
     StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
     EXPECT_CALL(stream_info, getStreamIdProvider())

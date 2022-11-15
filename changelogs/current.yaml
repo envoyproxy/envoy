@@ -99,7 +99,7 @@ new_features:
     support to flush TCP log entries periodly according to the configured :ref:`inteval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`.
 - area: access_log
   change: |
-    added support for :ref:`%STREAM_UNIQUE_ID% <config_access_log_format_stream_unique_id>` for stream unique identifier.
+    added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.

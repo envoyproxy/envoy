@@ -232,7 +232,7 @@ public:
     }
 
     // Clear connection unique id which is not deterministic.
-    log_entry->mutable_common_properties()->clear_stream_unique_id();
+    log_entry->mutable_common_properties()->clear_stream_id();
 
     EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
                                         /*ignore_repeated_field_ordering=*/false));

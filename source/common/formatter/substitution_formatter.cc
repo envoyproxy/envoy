@@ -1513,7 +1513,7 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return result;
                                   });
                             }}},
-                          {"STREAM_UNIQUE_ID",
+                          {"STREAM_ID",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
                               return std::make_unique<StreamInfoStringFieldExtractor>(

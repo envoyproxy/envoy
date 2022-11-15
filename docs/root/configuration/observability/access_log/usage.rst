@@ -590,9 +590,9 @@ The following command operators are supported:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
-.. _config_access_log_format_stream_unique_id:
+.. _config_access_log_format_stream_id:
 
-%STREAM_UNIQUE_ID%
+%STREAM_ID%
   An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
   cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
   Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.

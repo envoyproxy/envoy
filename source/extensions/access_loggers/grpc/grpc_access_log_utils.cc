@@ -323,7 +323,7 @@ void Utility::extractCommonAccessLogProperties(
 
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
-    common_access_log.set_stream_unique_id(std::string(provider->toStringView().value_or("")));
+    common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
   }
 }
 
