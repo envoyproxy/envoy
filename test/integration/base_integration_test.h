@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/str_format.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -24,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
