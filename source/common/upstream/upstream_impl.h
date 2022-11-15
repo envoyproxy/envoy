@@ -710,13 +710,8 @@ public:
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
-<<<<<<< HEAD
   static LazyInitStats<ClusterTrafficStats>
   generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& cluster_stat_names);
-=======
-  static ClusterTrafficStats generateStats(Stats::Scope& scope,
-                                           const ClusterTrafficStatNames& cluster_stat_names);
->>>>>>> main
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
@@ -920,11 +915,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-<<<<<<< HEAD
   mutable LazyInitStats<ClusterTrafficStats> traffic_stats_;
-=======
-  mutable ClusterTrafficStats stats_;
->>>>>>> main
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

@@ -171,11 +171,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     if (!isPrematureResponseError(status) ||
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
-<<<<<<< HEAD
       host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
-=======
-      host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
->>>>>>> main
       protocol_error_ = true;
     }
     close();

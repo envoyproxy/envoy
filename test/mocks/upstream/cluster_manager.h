@@ -56,11 +56,7 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
-<<<<<<< HEAD
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
-=======
-  const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
->>>>>>> main
   const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
     return cluster_config_update_stat_names_;
   }
