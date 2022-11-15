@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/str_format.h"
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -26,6 +25,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
