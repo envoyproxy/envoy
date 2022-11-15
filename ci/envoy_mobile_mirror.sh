@@ -2,13 +2,11 @@
 
 set -e
 
-#ENVOY_SRCDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)
 CHECKOUT_DIR=envoy-mobile
-#MAIN_BRANCH="refs/heads/main"
 ENVOY_MOBILE_MAIN_BRANCH="main"
 
 echo "Cloning..."
-git clone git@github.com:envoyproxy/envoy-mobile "$CHECKOUT_DIR" -b "${ENVOY_MOBILE_MAIN_BRANCH}"
+git clone https://github.com/envoyproxy/envoy-mobile.git
 
 git -C "$CHECKOUT_DIR" config user.name "envoy-filter-example(Azure Pipelines)"
 git -C "$CHECKOUT_DIR" config user.email envoy-filter-example@users.noreply.github.com
