@@ -1633,6 +1633,7 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2142,6 +2143,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
+
   setMaxRequestHeadersKb(96);
   setMaxRequestHeadersCount(20005);
 
@@ -3907,7 +3909,12 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 #ifdef NDEBUG
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.
-TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
+  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
