@@ -96,7 +96,6 @@ void BaseClientIntegrationTest::initialize() {
   });
 
   stream_ = (*stream_prototype_).start(explicit_flow_control_);
-  std::string host(fake_upstreams_[0]->localAddress()->asStringView());
   HttpTestUtility::addDefaultHeaders(default_request_headers_);
   default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
