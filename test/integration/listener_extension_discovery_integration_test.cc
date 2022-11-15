@@ -17,6 +17,12 @@ enum class ListenerMatcherType { NULLMATCHER, ANYMATCHER, NOTANYMATCHER };
 
 constexpr absl::string_view EcdsClusterName = "ecds_cluster";
 constexpr absl::string_view Ecds2ClusterName = "ecds2_cluster";
+constexpr absl::string_view expected_types[] = {
+    "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+    "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
+    "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
+    "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+    "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
 class ListenerExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                                   public BaseIntegrationTest {
@@ -220,6 +226,22 @@ public:
     const std::string expected_data = data_.substr(drain_bytes, std::string::npos);
     EXPECT_EQ(expected_data, received_data);
     tcp_client->close();
+  }
+
+  // Verify ECDS config dump data.
+  bool
+  verifyConfigDumpData(envoy::config::core::v3::TypedExtensionConfig filter_config,
+                       test::integration::filters::TestTcpListenerFilterConfig listener_config) {
+    // There is no ordering. i.e, either foo or bar could be the 1st in the config dump.
+    if (filter_config.name() == "foo") {
+      EXPECT_EQ(3, listener_config.drain_bytes());
+      return true;
+    } else if (filter_config.name() == "bar") {
+      EXPECT_EQ(4, listener_config.drain_bytes());
+      return true;
+    } else {
+      return false;
+    }
   }
 
   // Utilities used for config dump.
@@ -554,7 +576,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
   ecds_connection_.reset();
 }
 
-// ECDS filter config dump test.
+// Basic ECDS config dump test with one filter.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false);
@@ -566,7 +588,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   sendXdsResponse(filter_name_, "1", 5);
   test_server_->waitForCounterGe(
       "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
-  sendDataVerifyResults(5);
 
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
@@ -574,12 +595,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   EXPECT_EQ("application/json", contentType(response));
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
-  const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
-
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
@@ -590,9 +605,10 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
 
-  // .. and that we can unpack one of the entries.
+  // With /config_dump, the response has the format: EcdsConfigDump.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
   config_dump.configs(2).UnpackTo(&ecds_config_dump);
+  EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   EXPECT_EQ("foo", filter_config.name());
@@ -601,21 +617,37 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
   EXPECT_EQ(5, listener_config.drain_bytes());
 }
 
-static bool
-verifyConfigDumpData(envoy::config::core::v3::TypedExtensionConfig filter_config,
-                     test::integration::filters::TestTcpListenerFilterConfig listener_config) {
-  // There is no ordering. i.e, either foo or bar could be the 1st in the config dump.
-  if (filter_config.name() == "foo") {
-    EXPECT_EQ(3, listener_config.drain_bytes());
-    return true;
-  } else if (filter_config.name() == "bar") {
-    EXPECT_EQ(4, listener_config.drain_bytes());
-    return true;
-  } else {
-    return false;
-  }
+// ECDS config dump test with the filter configuration being removed by TTL expired.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemovedByTtl) {
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter(filter_name_, false, false);
+  initialize();
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Send config update with TTL 1s.
+  sendXdsResponse(filter_name_, "1", 5, true);
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 1);
+  // Wait for configuration expired.
+  test_server_->waitForCounterGe(
+      "extension_config_discovery.tcp_listener_filter." + filter_name_ + ".config_reload", 2);
+
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?resource=ecds_filters", response));
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  // With /config_dump?resource=ecds_filters, the response has the format: EcdsFilterConfig.
+  envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
+  config_dump.configs(0).UnpackTo(&ecds_msg);
+  EXPECT_EQ("", ecds_msg.version_info());
+  envoy::config::core::v3::TypedExtensionConfig filter_config;
+  EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
+  EXPECT_EQ("foo", filter_config.name());
+  // Verify ECDS config dump doesn't have the filter configuration.
+  EXPECT_EQ(false, filter_config.has_typed_config());
 }
 
+// ECDS config dump test with two filters.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameWithConfigDump) {
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
@@ -634,38 +666,28 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameW
   // Verify ECDS config dump are working correctly.
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
-
-  std::cout << response->body();
-
   EXPECT_EQ("application/json", contentType(response));
   Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
-  const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.EcdsConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
-                                        "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
-
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
     index++;
   }
 
-  // Validate we can parse as proto.
   envoy::admin::v3::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
   EXPECT_EQ(5, config_dump.configs_size());
-
-  // .. and that we can unpack one of the entries.
   envoy::admin::v3::EcdsConfigDump ecds_config_dump;
   config_dump.configs(2).UnpackTo(&ecds_config_dump);
   envoy::config::core::v3::TypedExtensionConfig filter_config;
   test::integration::filters::TestTcpListenerFilterConfig listener_config;
-  // Verify the first filter is dumped as expected.
+  // Verify the first filter.
+  EXPECT_EQ("1", ecds_config_dump.ecds_filters(0).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(0).ecds_filter().UnpackTo(&filter_config));
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
-  // Verify the second filter is dumped as expected.
+  // Verify the second filter.
+  EXPECT_EQ("1", ecds_config_dump.ecds_filters(1).version_info());
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
