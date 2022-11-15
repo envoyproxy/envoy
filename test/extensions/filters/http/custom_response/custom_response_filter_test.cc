@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
 
 #include "source/extensions/filters/http/custom_response/config.h"
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
@@ -44,12 +43,12 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  NiceMock<::Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<::Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 
   std::unique_ptr<CustomResponseFilter> filter_;
   std::shared_ptr<FilterConfig> config_;
-  Http::TestResponseHeaderMapImpl default_headers_{
+  ::Envoy::Http::TestResponseHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 };
 
@@ -58,15 +57,16 @@ TEST_F(CustomResponseFilterTest, LocalData) {
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestRequestHeaderMapImpl request_headers{};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "401"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(static_cast<Http::Code>(499), "not allowed", _, _, _));
+              sendLocalReply(static_cast<::Envoy::Http::Code>(499), "not allowed", _, _, _));
   ON_CALL(encoder_callbacks_.stream_info_, getRequestHeaders())
       .WillByDefault(Return(&request_headers));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
-            Http::FilterHeadersStatus::StopIteration);
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 TEST_F(CustomResponseFilterTest, RemoteData) {
@@ -74,12 +74,13 @@ TEST_F(CustomResponseFilterTest, RemoteData) {
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
-  Http::TestRequestHeaderMapImpl request_headers{};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_));
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
-            Http::FilterHeadersStatus::StopIteration);
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 TEST_F(CustomResponseFilterTest, NoMatcherInConfig) {
@@ -87,10 +88,12 @@ TEST_F(CustomResponseFilterTest, NoMatcherInConfig) {
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
-  Http::TestRequestHeaderMapImpl request_headers{};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(filter_->encodeHeaders(response_headers, true), Http::FilterHeadersStatus::Continue);
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(CustomResponseFilterTest, MatchNotFound) {
@@ -98,10 +101,12 @@ TEST_F(CustomResponseFilterTest, MatchNotFound) {
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  Http::TestRequestHeaderMapImpl request_headers{};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
-  EXPECT_EQ(filter_->encodeHeaders(response_headers, true), Http::FilterHeadersStatus::Continue);
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
@@ -111,18 +116,19 @@ TEST_F(CustomResponseFilterTest, DontChangeStatusCode) {
       action:
         name: action
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
           body:
             inline_string: "not allowed"
 )EOF");
   setupFilterAndCallback();
 
   setServerName("server1.example.foo");
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  Http::TestRequestHeaderMapImpl request_headers{};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers, false), Http::FilterHeadersStatus::Continue);
+  ::Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers, false),
+            ::Envoy::Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(filter_->encodeHeaders(response_headers, true),
-            Http::FilterHeadersStatus::StopIteration);
+            ::Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ("200", response_headers.getStatusValue());
 }
 

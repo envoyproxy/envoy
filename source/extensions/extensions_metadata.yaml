@@ -1335,3 +1335,17 @@ envoy.matching.actions.format_string:
   status: alpha
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.http.custom_response.redirect_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.redirect_policy.v3.CustomResponse
+envoy.http.custom_response.local_response_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy

@@ -19,7 +19,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/htt
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Local Response Policiy for Custom Response]
+// [#protodoc-title: Local Response Policy for Custom Response]
 // [#extension: envoy.http.custom_response.local_response_policy]
 
 // Custom response policy to serve a locally stored response to the

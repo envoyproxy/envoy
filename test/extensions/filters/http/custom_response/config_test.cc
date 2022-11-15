@@ -1,7 +1,5 @@
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.validate.h"
 
 #include "source/extensions/filters/http/custom_response/config.h"
 #include "source/extensions/filters/http/custom_response/factory.h"
@@ -26,8 +24,9 @@ TEST(CustomResponseFilterConfigTest, CustomResponseFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context, messageValidationVisitor());
   CustomResponseFilterFactory factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(filter_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
+  ::Envoy::Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(filter_config, "stats", context);
+  ::Envoy::Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
