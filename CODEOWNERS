@@ -164,6 +164,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
+# format string matching
+/*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @antoniovicente
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa

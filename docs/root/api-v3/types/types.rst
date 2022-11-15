@@ -12,6 +12,7 @@ Types
   ../type/v3/http_status.proto
   ../type/http/v3/cookie.proto
   ../type/metadata/v3/metadata.proto
+  ../type/matcher/v3/filter_state.proto
   ../type/matcher/v3/metadata.proto
   ../type/matcher/v3/node.proto
   ../type/matcher/v3/number.proto
