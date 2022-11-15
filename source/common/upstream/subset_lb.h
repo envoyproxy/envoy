@@ -30,7 +30,7 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-      ClusterLbStats& lb_stats, Stats::Scope& scope, Runtime::Loader& runtime,
+      ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
       Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,

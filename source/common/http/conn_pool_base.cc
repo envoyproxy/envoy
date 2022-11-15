@@ -99,7 +99,11 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
+<<<<<<< HEAD
+  parent_.host()->cluster().trafficStats()->>upstream_cx_close_notify_.inc();
+=======
   parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
+>>>>>>> main
   if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
@@ -160,16 +164,27 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   switch (reason) {
   case StreamResetReason::ConnectionTermination:
   case StreamResetReason::ConnectionFailure:
+<<<<<<< HEAD
+    parent_.host()->cluster().trafficStats()->>upstream_rq_pending_failure_eject_.inc();
+=======
     parent_.host()->cluster().trafficStats()->upstream_rq_pending_failure_eject_.inc();
+>>>>>>> main
     closed_with_active_rq_ = true;
     break;
   case StreamResetReason::LocalReset:
   case StreamResetReason::ProtocolError:
   case StreamResetReason::OverloadManager:
+<<<<<<< HEAD
+    parent_.host()->cluster().trafficStats()->>upstream_rq_tx_reset_.inc();
+    break;
+  case StreamResetReason::RemoteReset:
+    parent_.host()->cluster().trafficStats()->>upstream_rq_rx_reset_.inc();
+=======
     parent_.host()->cluster().trafficStats()->upstream_rq_tx_reset_.inc();
     break;
   case StreamResetReason::RemoteReset:
     parent_.host()->cluster().trafficStats()->upstream_rq_rx_reset_.inc();
+>>>>>>> main
     break;
   case StreamResetReason::LocalRefusedStreamReset:
   case StreamResetReason::RemoteRefusedStreamReset:

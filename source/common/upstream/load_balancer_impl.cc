@@ -109,7 +109,11 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
 }
 
 LoadBalancerBase::LoadBalancerBase(
+<<<<<<< HEAD
     const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
+=======
+    const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
+>>>>>>> main
     Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : stats_(lb_stats), runtime_(runtime), random_(random),
@@ -351,8 +355,13 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
+<<<<<<< HEAD
     const PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+=======
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
+>>>>>>> main
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config),
       local_priority_set_(local_priority_set),
@@ -717,8 +726,13 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
+<<<<<<< HEAD
     const PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterLbStats& lb_stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
+=======
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
+    Runtime::Loader& runtime, Random::RandomGenerator& random,
+>>>>>>> main
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
     TimeSource& time_source)

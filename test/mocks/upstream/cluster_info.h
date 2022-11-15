@@ -151,7 +151,11 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
+<<<<<<< HEAD
   MOCK_METHOD(LazyInitStats<ClusterTrafficStats>&, trafficStats, (), (const));
+=======
+  MOCK_METHOD(ClusterTrafficStats&, trafficStats, (), (const));
+>>>>>>> main
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
@@ -199,7 +203,11 @@ public:
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  ClusterUpstreamStatNames upstream_stat_names_;
+<<<<<<< HEAD
+  ClusterTrafficStatNames upstream_stat_names_;
+=======
+  ClusterTrafficStatNames stat_names_;
+>>>>>>> main
   ClusterConfigUpdateStatNames config_update_stats_names_;
   ClusterLbStatNames lb_stat_names_;
   ClusterEndpointStatNames endpoint_stat_names_;
@@ -207,7 +215,11 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
+<<<<<<< HEAD
   LazyInitStats<ClusterTrafficStats> traffic_stats_;
+=======
+  ClusterTrafficStats stats_;
+>>>>>>> main
   ClusterConfigUpdateStats config_update_stats_;
   ClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;

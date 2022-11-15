@@ -169,8 +169,13 @@ class SubsetLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                public testing::TestWithParam<UpdateOrder> {
 public:
   SubsetLoadBalancerTest()
+<<<<<<< HEAD
       : scope_(stats_store_.createScope("testprefix")), lb_stat_names_(stats_store_.symbolTable()),
         stats_(lb_stat_names_, stats_store_) {
+=======
+      : scope_(stats_store_.createScope("testprefix")), stat_names_(stats_store_.symbolTable()),
+        stats_(stat_names_, stats_store_) {
+>>>>>>> main
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
@@ -527,7 +532,11 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_;
+<<<<<<< HEAD
   ClusterLbStatNames lb_stat_names_;
+=======
+  ClusterLbStatNames stat_names_;
+>>>>>>> main
   ClusterLbStats stats_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;

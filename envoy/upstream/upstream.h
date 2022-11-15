@@ -242,6 +242,16 @@ public:
    * connection pools no longer need this host.
    */
   virtual HostHandlePtr acquireHandle() const PURE;
+
+  /**
+   * @return true if active health check is disabled.
+   */
+  virtual bool disableActiveHealthCheck() const PURE;
+
+  /**
+   * Set true to disable active health check for the host.
+   */
+  virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -567,11 +577,8 @@ public:
 /**
  * All cluster config update related stats.
  * See https://github.com/envoyproxy/envoy/issues/23575 for details. Stats from ClusterInfo::stats()
- * will be split into subgroups "config-update", "lb", "endpoint" and "upstream", roughly based on
- * their semantics. This list of stats are separated from Cluster::stats() since they are "config
- * pipeline related".
- *
- * Each group of
+ * will be split into subgroups "config-update", "lb", "endpoint" and "the rest"(which are mainly
+ * upstream related), roughly based on their semantics.
  */
 #define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
@@ -617,7 +624,7 @@ public:
 /**
  * All cluster stats. @see stats_macros.h
  */
-#define ALL_CLUSTER_UPSTREAM_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)              \
+#define ALL_CLUSTER_TRAFFIC_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
   COUNTER(bind_errors)                                                                             \
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
@@ -748,10 +755,10 @@ MAKE_STAT_NAMES_STRUCT(ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
 MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
 
 /**
- * Struct definition for all cluster stats. @see stats_macros.h
+ * Struct definition for all cluster traffic stats. @see stats_macros.h
  */
-MAKE_STAT_NAMES_STRUCT(ClusterUpstreamStatNames, ALL_CLUSTER_UPSTREAM_STATS);
-MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterUpstreamStatNames, ALL_CLUSTER_UPSTREAM_STATS);
+MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1032,22 +1039,22 @@ public:
   virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
-   * @return ClusterConfigUpdateStats& strongly named config update stats for this cluster.
+   * @return ClusterConfigUpdateStats& config update stats for this cluster.
    */
   virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
 
   /**
-   * @return ClusterLbStats& strongly named stats for this cluster.
+   * @return ClusterLbStats& load-balancer-related stats for this cluster.
    */
   virtual ClusterLbStats& lbStats() const PURE;
 
   /**
-   * @return ClusterEndpointStats& strongly named stats for this cluster.
+   * @return ClusterEndpointStats& endpoint related stats for this cluster.
    */
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterTrafficStats& strongly named stats for this cluster.
+   * @return ClusterTrafficStats& all traffic related stats for this cluster.
    */
   virtual LazyInitStats<ClusterTrafficStats>& trafficStats() const PURE;
 
@@ -1058,7 +1065,7 @@ public:
   virtual Stats::Scope& statsScope() const PURE;
 
   /**
-   * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
+   * @return ClusterLoadReportStats& load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 

@@ -45,7 +45,11 @@ public:
 class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   MaglevLoadBalancerTest()
+<<<<<<< HEAD
       : lb_stat_names_(stats_store_.symbolTable()), stats_(lb_stat_names_, stats_store_) {}
+=======
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
+>>>>>>> main
 
   void createLb() {
     lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
@@ -64,7 +68,11 @@ public:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
+<<<<<<< HEAD
   ClusterLbStatNames lb_stat_names_;
+=======
+  ClusterLbStatNames stat_names_;
+>>>>>>> main
   ClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;

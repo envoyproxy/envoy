@@ -42,7 +42,11 @@ void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
   close_connection_ =
       HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
   if (close_connection_) {
+<<<<<<< HEAD
+    parent_.parent().host()->cluster().trafficStats()->>upstream_cx_close_notify_.inc();
+=======
     parent_.parent().host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
+>>>>>>> main
   }
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
@@ -76,7 +80,11 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
     : Envoy::Http::ActiveClient(parent, parent.host()->cluster().maxRequestsPerConnection(),
                                 /* effective_concurrent_stream_limit */ 1,
                                 /* configured_concurrent_stream_limit */ 1, data) {
+<<<<<<< HEAD
+  parent.host()->cluster().trafficStats()->>upstream_cx_http1_total_.inc();
+=======
   parent.host()->cluster().trafficStats()->upstream_cx_http1_total_.inc();
+>>>>>>> main
 }
 
 ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }

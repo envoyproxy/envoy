@@ -833,7 +833,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 }
 
 LazyInitStats<ClusterTrafficStats>
-ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterUpstreamStatNames& stat_names) {
+ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& stat_names) {
   return {scope, stat_names};
 }
 
@@ -845,13 +845,13 @@ ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStat
 ClusterLoadReportStats
 ClusterInfoImpl::generateLoadReportStats(Stats::Scope& scope,
                                          const ClusterLoadReportStatNames& stat_names) {
-  return ClusterLoadReportStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 ClusterTimeoutBudgetStats
 ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
                                             const ClusterTimeoutBudgetStatNames& stat_names) {
-  return ClusterTimeoutBudgetStats(stat_names, scope);
+  return {stat_names, scope};
 }
 
 // Implements the FactoryContext interface required by network filters.
@@ -1422,8 +1422,15 @@ void ClusterImplBase::onPreInitComplete() {
 void ClusterImplBase::onInitDone() {
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
-      pending_initialize_health_checks_ += host_set->hosts().size();
+      for (auto& host : host_set->hosts()) {
+        if (host->disableActiveHealthCheck()) {
+          continue;
+        }
+        ++pending_initialize_health_checks_;
+      }
     }
+    ENVOY_LOG(debug, "Cluster onInitDone pending initialize health check count {}",
+              pending_initialize_health_checks_);
 
     // TODO(mattklein123): Remove this callback when done.
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, HealthTransition) -> void {
@@ -1774,8 +1781,9 @@ void PriorityStateManager::updateClusterPrioritySet(
   for (const HostSharedPtr& host : *hosts) {
     // Take into consideration when a non-EDS cluster has active health checking, i.e. to mark all
     // the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and then fire
-    // update callbacks to start the health checking process.
-    if (health_checker_flag.has_value()) {
+    // update callbacks to start the health checking process. The endpoint with disabled active
+    // health check should not be set FAILED_ACTIVE_HC here.
+    if (health_checker_flag.has_value() && !host->disableActiveHealthCheck()) {
       host->healthFlagSet(health_checker_flag.value());
     }
     hosts_per_locality[host->locality()].push_back(host);
@@ -1856,6 +1864,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // Keep track of hosts for which locality is changed.
   absl::flat_hash_set<std::string> hosts_with_updated_locality_for_current_priority(
       current_priority_hosts.size());
+  // Keep track of hosts for which active health check flag is changed.
+  absl::flat_hash_set<std::string> hosts_with_active_health_check_flag_changed(
+      current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     // To match a new host with an existing host means comparing their addresses.
@@ -1882,7 +1893,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
     }
 
-    const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
+    const bool active_health_check_flag_changed =
+        (health_checker_ != nullptr && existing_host_found &&
+         existing_host->second->disableActiveHealthCheck() != host->disableActiveHealthCheck());
+    if (active_health_check_flag_changed) {
+      hosts_with_active_health_check_flag_changed.emplace(existing_host->first);
+    }
+    const bool skip_inplace_host_update =
+        health_check_address_changed || locality_changed || active_health_check_flag_changed;
 
     // When there is a match and we decided to do in-place update, we potentially update the
     // host's health check flag and metadata. Afterwards, the host is pushed back into the
@@ -1945,7 +1963,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
 
       // If we are depending on a health checker, we initialize to unhealthy.
-      if (health_checker_ != nullptr) {
+      if (health_checker_ != nullptr && !host->disableActiveHealthCheck()) {
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
         // If we want to exclude hosts until they have been health checked, mark them with
@@ -1997,12 +2015,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     erase_from = std::remove_if(
         current_priority_hosts.begin(), current_priority_hosts.end(),
         [&all_new_hosts, &new_hosts_for_current_priority,
-         &hosts_with_updated_locality_for_current_priority, &final_hosts,
+         &hosts_with_updated_locality_for_current_priority,
+         &hosts_with_active_health_check_flag_changed, &final_hosts,
          &max_host_weight](const HostSharedPtr& p) {
           // This host has already been added as a new host in the
           // new_hosts_for_current_priority. Return false here to make sure that host
           // reference with older locality gets cleaned up from the priority.
           if (hosts_with_updated_locality_for_current_priority.contains(p->address()->asString())) {
+            return false;
+          }
+
+          if (hosts_with_active_health_check_flag_changed.contains(p->address()->asString())) {
             return false;
           }
 
@@ -2017,8 +2040,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
             return false;
           }
 
-          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
+          // PENDING_DYNAMIC_REMOVAL doesn't apply for the host with disabled active
+          // health check, the host is removed immediately from this priority.
+          if ((!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+                 p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) &&
+              !p->disableActiveHealthCheck()) {
             if (p->weight() > max_host_weight) {
               max_host_weight = p->weight();
             }

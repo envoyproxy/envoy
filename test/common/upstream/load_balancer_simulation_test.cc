@@ -104,10 +104,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public testing::Test {
+class DISABLED_SimulationTest : public testing::Test { // NOLINT(readability-identifier-naming)
 public:
   DISABLED_SimulationTest()
-      : lb_stat_names_(stats_store_.symbolTable()), stats_(lb_stat_names_, stats_store_) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
@@ -245,7 +245,7 @@ public:
   NiceMock<MockTimeSystem> time_source_;
   Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterLbStatNames lb_stat_names_;
+  ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
