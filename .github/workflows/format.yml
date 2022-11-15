@@ -55,7 +55,7 @@ jobs:
       - name: 'Run DrString'
         env:
           DEVELOPER_DIR: /Applications/Xcode_14.0.app
-        run: ./bazelw run @DrString//:drstring check
+        run: bazel run @DrString//mobile:drstring check
   kotlinlint:
     name: kotlin_lint
     runs-on: macos-12
@@ -69,17 +69,17 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
+      - run: .mobile./mobile/cimac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Run Kotlin Lint (Detekt)'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          bazel build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
       - name: 'Run Kotlin Formatter (ktlint)'
         run: |
-          ./bazelw build kotlin_format
+          bazel build kotlin_format

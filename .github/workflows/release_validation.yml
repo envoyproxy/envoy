@@ -15,19 +15,19 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: ./ci/mac_ci_setup.sh
+      - run: .mobile./mobile/cimac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          bazel build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //:ios_xcframework
+            //mobile:ios_xcframework
         name: 'Build xcframework'
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
-      - run: unzip bazel-bin/library/swift/Envoy.xcframework.zip -d examples/swift/swiftpm/Packages || true
+      - run: unzip bazel-bin/mobile/library/swift/Envoy.xcframework.zip -d examples/swift/swiftpm/Packages || true
         name: 'Unzip xcframework'
       - run: xcodebuild -project examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=16.0"
         name: 'Build app'

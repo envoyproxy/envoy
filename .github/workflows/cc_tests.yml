@@ -23,9 +23,9 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: 'Run tests'
         run: |
-          ./bazelw test \
+          bazel test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //test/cc/...
+            //mobile/test/cc/...

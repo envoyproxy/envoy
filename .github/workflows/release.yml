@@ -22,22 +22,22 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh --android
+      - run: .mobile./mobile/cimac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           current_release_version=$(git describe --tag --abbrev=0)
-          ./bazelw build \
+          bazel build \
               --config=release-android \
               --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a \
               --define=pom_version="${current_release_version:1}" \
               $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
               --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-              //:android_dist
+              //mobile:android_dist
       - name: 'Tar artifacts'
-        run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
+        run: tar -czvf envoy_android_aar_sources.tar.gz bazel-bin/mobile/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-sources.jar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-javadoc.jar
       - uses: actions/upload-artifact@v2
         with:
           name: envoy_android_aar_sources
@@ -60,7 +60,7 @@ jobs:
       - name: Expand archive
         run: |
           tar -xvf envoy_android_aar_sources.tar.gz
-          mv bazel-bin/library/kotlin/io/envoyproxy/envoymobile/* .
+          mv bazel-bin/mobile/library/kotlin/io/envoyproxy/envoymobile/* .
       - name: 'Configure envoy-bot git user'
         run: |
           # Switch global user to be envoy-bot for deployment
@@ -116,18 +116,18 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: .mobile./mobile/cimac_ci_setup.sh
       - name: 'Build Envoy.xcframework'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          bazel build \
             --config=release-ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //:ios_xcframework
+            //mobile:ios_xcframework
       - name: 'Move Envoy.xcframework.zip'
-        run: mv bazel-bin/library/swift/Envoy.xcframework.zip .
+        run: mv bazel-bin/mobile/library/swift/Envoy.xcframework.zip .
       - uses: actions/upload-artifact@v2
         with:
           name: ios_framework
@@ -136,13 +136,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          bazel build \
             --output_groups=+swift_symbol_graph \
             --config=release-ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/swift:ios_lib
-          ./tools/docc.sh bazel-bin/library/swift/ios_lib.symbolgraph
+          ./tools/docc.sh bazel-bin/mobile/library/swift/ios_lib.symbolgraph
           zip -r Envoy.doccarchive.zip Envoy.doccarchive
       - uses: actions/upload-artifact@v2
         with:
