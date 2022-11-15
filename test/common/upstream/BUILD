@@ -72,7 +72,10 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
@@ -299,6 +302,8 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
     ],
 )
 
@@ -440,33 +445,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "logical_dns_cluster_test",
-    srcs = ["logical_dns_cluster_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:logical_dns_cluster_lib",
-        "//source/common/upstream:upstream_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:transport_socket_config_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:instance_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:cluster_manager_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -662,8 +640,8 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
-        "//source/common/upstream:static_cluster_lib",
-        "//source/common/upstream:strict_dns_cluster_lib",
+        "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http:config",

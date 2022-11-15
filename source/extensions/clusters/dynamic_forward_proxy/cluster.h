@@ -7,7 +7,7 @@
 #include "envoy/http/conn_pool.h"
 
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/logical_host.h"
+#include "source/extensions/clusters/common/logical_host.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
