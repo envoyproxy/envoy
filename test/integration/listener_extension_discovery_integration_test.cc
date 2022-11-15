@@ -656,7 +656,6 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameW
   initialize();
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
 
-  // Send 1st config update.
   sendXdsResponse("foo", "1", 3);
   sendXdsResponse("bar", "1", 4, false, true);
   test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
@@ -691,6 +690,39 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameW
   EXPECT_TRUE(ecds_config_dump.ecds_filters(1).ecds_filter().UnpackTo(&filter_config));
   filter_config.typed_config().UnpackTo(&listener_config);
   EXPECT_TRUE(verifyConfigDumpData(filter_config, listener_config));
+}
+
+// ECDS config dump test with specified resource and regex name search.
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithResourceAndRegex) {
+  two_connections_ = true;
+  on_server_init_function_ = [&]() { waitXdsStream(); };
+  addDynamicFilter("foo", true);
+  addDynamicFilter("bar", false, true, false, ListenerMatcherType::NULLMATCHER, true);
+  initialize();
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+
+  sendXdsResponse("foo", "1", 3);
+  sendXdsResponse("bar", "1", 4, false, true);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.foo.config_reload",
+                                 1);
+  test_server_->waitForCounterGe("extension_config_discovery.tcp_listener_filter.bar.config_reload",
+                                 1);
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200",
+            request("admin", "GET", "/config_dump?resource=ecds_filters&name_regex=.a.", response));
+
+  envoy::admin::v3::ConfigDump config_dump;
+  TestUtility::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(1, config_dump.configs_size());
+  envoy::admin::v3::EcdsConfigDump::EcdsFilterConfig ecds_msg;
+  config_dump.configs(0).UnpackTo(&ecds_msg);
+  EXPECT_EQ("1", ecds_msg.version_info());
+  envoy::config::core::v3::TypedExtensionConfig filter_config;
+  EXPECT_TRUE(ecds_msg.ecds_filter().UnpackTo(&filter_config));
+  EXPECT_EQ("bar", filter_config.name());
+  test::integration::filters::TestTcpListenerFilterConfig listener_config;
+  filter_config.typed_config().UnpackTo(&listener_config);
+  EXPECT_EQ(4, listener_config.drain_bytes());
 }
 
 } // namespace
