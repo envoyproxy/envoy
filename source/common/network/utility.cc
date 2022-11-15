@@ -121,7 +121,10 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
     // a name resolution service.
     hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
     hints.ai_family = AF_INET6;
-    // Hint that getaddrinfo() need not return a linked list of answers.
+    // Given that we don't specify a service but we use getaddrinfo() to only parse the node
+    // address, specifying the socket type allows to hint the getaddrinfo() to return only an
+    // element with the below socket type. The behavior though remains platform dependent and anyway
+    // we consume only the first element (if the call succeeds).
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = IPPROTO_UDP;
     const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
