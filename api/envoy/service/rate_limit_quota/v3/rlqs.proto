@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.service.rate_limit_quota.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/type/v3/ratelimit_strategy.proto";
 
 import "google/protobuf/duration.proto";
@@ -63,6 +64,7 @@ message RateLimitQuotaUsageReports {
   // .. note::
   //   Note that the first report sent for a ``BucketId`` indicates to the RLQS server that
   //   the RLQS client is subscribing for the future assignments for this ``BucketId``.
+  // [#next-free-field: 6]
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
@@ -78,6 +80,9 @@ message RateLimitQuotaUsageReports {
 
     // Requests throttled.
     uint64 num_requests_denied = 4;
+
+    // An optional info for the list of Envoy instances that send the usage report ``BucketQuotaUsage``.
+    repeated config.core.v3.Node nodes = 5;
   }
 
   // All quota requests must specify the domain. This enables sharing the quota
