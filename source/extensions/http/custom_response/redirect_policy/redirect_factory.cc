@@ -1,14 +1,18 @@
-#include "source/extensions/filters/http/custom_response/policies/redirect_factory.h"
+#include "source/extensions/http/custom_response/redirect_policy/redirect_factory.h"
 
 #include <memory>
 
-#include "source/extensions/filters/http/custom_response/policies/redirect_policy.h"
+#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
+#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.validate.h"
+
+#include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace CustomResponse {
-using RedirectPolicyProto = envoy::extensions::filters::http::custom_response::v3::RedirectPolicy;
+using RedirectPolicyProto =
+    envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
 
 ProtobufTypes::MessagePtr RedirectFactory::createEmptyConfigProto() {
   return std::make_unique<RedirectPolicyProto>();
@@ -16,7 +20,7 @@ ProtobufTypes::MessagePtr RedirectFactory::createEmptyConfigProto() {
 
 RedirectFactory::~RedirectFactory() = default;
 
-PolicySharedPtr
+Extensions::HttpFilters::CustomResponse::PolicySharedPtr
 RedirectFactory::createPolicy(const Protobuf::Message& config,
                               Envoy::Server::Configuration::ServerFactoryContext& context,
                               Stats::StatName stats_prefix) {
@@ -26,12 +30,12 @@ RedirectFactory::createPolicy(const Protobuf::Message& config,
 }
 
 std::string RedirectFactory::name() const {
-  return "envoy.extensions.filters.http.custom_response.redirect_policy";
+  return "envoy.extensions.http.custom_response.redirect_policy";
 }
 
 REGISTER_CUSTOM_RESPONSE_POLICY_FACTORY(RedirectFactory);
 
 } // namespace CustomResponse
-} // namespace HttpFilters
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

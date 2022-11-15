@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/common.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -22,8 +23,9 @@ using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
 using LocalResponsePolicyProto =
-    envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy;
-using RedirectPolicyProto = envoy::extensions::filters::http::custom_response::v3::RedirectPolicy;
+    envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
+using RedirectPolicyProto =
+    envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
@@ -133,15 +135,16 @@ public:
   }
 
 protected:
-  Http::TestResponseHeaderMapImpl unauthorized_response_{{":status", "401"},
-                                                         {"content-length", "0"}};
-  Http::TestResponseHeaderMapImpl gateway_error_response_{{":status", "502"},
+  ::Envoy::Http::TestResponseHeaderMapImpl unauthorized_response_{{":status", "401"},
+                                                                  {"content-length", "0"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl gateway_error_response_{{":status", "502"},
+                                                                   {"content-length", "0"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl okay_response_{{":status", "201"},
                                                           {"content-length", "0"}};
-  Http::TestResponseHeaderMapImpl okay_response_{{":status", "201"}, {"content-length", "0"}};
-  Http::TestResponseHeaderMapImpl internal_server_error_{{":status", "500"},
-                                                         {"content-length", "0"}};
+  ::Envoy::Http::TestResponseHeaderMapImpl internal_server_error_{{":status", "500"},
+                                                                  {"content-length", "0"}};
 
-  Envoy::Http::LowerCaseString test_header_key_{kTestHeaderKey};
+  ::Envoy::Http::LowerCaseString test_header_key_{kTestHeaderKey};
   CustomResponse custom_response_filter_config_;
   std::vector<std::string> filters_before_cer_;
   std::vector<std::string> filters_after_cer_;
@@ -172,8 +175,9 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
-  EXPECT_EQ("x-bar",
-            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "x-bar",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
 
 // Verify we get the correct remote custom response.
@@ -188,8 +192,9 @@ TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
-  EXPECT_EQ("x-bar2",
-            response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "x-bar2",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }
 
 // Verify we get the original response if the route is not found for the
@@ -235,8 +240,9 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
   // Verify we get the status code of the local config
   EXPECT_EQ("291", response->headers().getStatusValue());
-  EXPECT_EQ("y-foo2",
-            response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "y-foo2",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
 
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
   EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
@@ -248,8 +254,9 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
-  EXPECT_EQ("x-bar2",
-            response->headers().get(Http::LowerCaseString("foo2"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "x-bar2",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }
 
 // Verify that we don't pick a route specific config in the absence of an hcm
@@ -309,8 +316,9 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // Verify that we get the modified status value.
   EXPECT_EQ("499", response->headers().getStatusValue());
   EXPECT_EQ("not allowed", response->body());
-  EXPECT_EQ("x-bar",
-            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+  EXPECT_EQ(
+      "x-bar",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
 
   // Verify that 400_response policy cannot be triggered by the
   // gateway_error_response policy
@@ -530,7 +538,9 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
                                     });
 
   TestModifyRequestHeadersActionFactory factory;
-  Envoy::Registry::InjectFactory<ModifyRequestHeadersActionFactory> registration(factory);
+  Envoy::Registry::InjectFactory<
+      Extensions::Http::CustomResponse::ModifyRequestHeadersActionFactory>
+      registration(factory);
 
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -552,7 +562,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   default_request_headers_.setHost("some.route");
   auto response = sendRequestAndWaitForResponse(
       default_request_headers_, 0,
-      Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
+      ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
       std::chrono::minutes(20));
   EXPECT_EQ("220", response->headers().getStatusValue());
   EXPECT_EQ("Modify action response body", response->body());

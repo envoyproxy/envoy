@@ -1,14 +1,14 @@
-#include "source/extensions/filters/http/custom_response/policies/local_response_factory.h"
+#include "source/extensions/http/custom_response/local_response_policy/local_response_factory.h"
 
-#include "source/extensions/filters/http/custom_response/policies/local_response_policy.h"
+#include "source/extensions/http/custom_response/local_response_policy/local_response_policy.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace CustomResponse {
 
 using LocalResponsePolicyProto =
-    envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy;
+    envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
 
 ProtobufTypes::MessagePtr LocalResponseFactory::createEmptyConfigProto() {
   return std::make_unique<LocalResponsePolicyProto>();
@@ -16,7 +16,7 @@ ProtobufTypes::MessagePtr LocalResponseFactory::createEmptyConfigProto() {
 
 LocalResponseFactory::~LocalResponseFactory() = default;
 
-PolicySharedPtr
+Extensions::HttpFilters::CustomResponse::PolicySharedPtr
 LocalResponseFactory::createPolicy(const Protobuf::Message& config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,
                                    Stats::StatName) {
@@ -27,12 +27,12 @@ LocalResponseFactory::createPolicy(const Protobuf::Message& config,
 }
 
 std::string LocalResponseFactory::name() const {
-  return "envoy.extensions.filters.http.custom_response.local_response_policy";
+  return "envoy.extensions.http.custom_response.local_response_policy";
 }
 
 REGISTER_CUSTOM_RESPONSE_POLICY_FACTORY(LocalResponseFactory);
 
 } // namespace CustomResponse
-} // namespace HttpFilters
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

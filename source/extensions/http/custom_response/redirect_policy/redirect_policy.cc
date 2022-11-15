@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/custom_response/policies/redirect_policy.h"
+#include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
 #include "envoy/stream_info/filter_state.h"
 
@@ -9,9 +9,9 @@
 #include "source/extensions/filters/http/custom_response/custom_response_filter.h"
 
 namespace {
-bool schemeIsHttp(const Envoy::Http::RequestHeaderMap& downstream_headers,
+bool schemeIsHttp(const ::Envoy::Http::RequestHeaderMap& downstream_headers,
                   Envoy::OptRef<const Envoy::Network::Connection> connection) {
-  if (downstream_headers.getSchemeValue() == Envoy::Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.getSchemeValue() == ::Envoy::Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (connection.has_value() && !connection->ssl()) {
@@ -23,25 +23,26 @@ bool schemeIsHttp(const Envoy::Http::RequestHeaderMap& downstream_headers,
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace CustomResponse {
 
 RedirectPolicy::RedirectPolicy(
-    const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+    const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
     Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context)
     : stat_names_(context.scope().symbolTable()),
       stats_(stat_names_, context.scope(), stats_prefix), host_(config.host()),
       path_(config.path()), status_code_{config.has_status_code()
-                                             ? absl::optional<Http::Code>(static_cast<Http::Code>(
-                                                   config.status_code().value()))
-                                             : absl::optional<Http::Code>{}},
+                                             ? absl::optional<::Envoy::Http::Code>(
+                                                   static_cast<::Envoy::Http::Code>(
+                                                       config.status_code().value()))
+                                             : absl::optional<::Envoy::Http::Code>{}},
       response_header_parser_(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add())),
       request_header_parser_(
           Envoy::Router::HeaderParser::configure(config.request_headers_to_add())),
       modify_request_headers_action_(createModifyRequestHeadersAction(config, context)) {
-  Http::Utility::Url absolute_url;
-  std::string uri(absl::StrCat(host_, path_));
+  ::Envoy::Http::Utility::Url absolute_url;
+  const std::string uri(absl::StrCat(host_, path_));
   if (!absolute_url.initialize(uri, false)) {
     throw EnvoyException(
         absl::StrCat("Invalid uri specified for redirection for custom response: ", uri));
@@ -49,13 +50,13 @@ RedirectPolicy::RedirectPolicy(
 }
 
 std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestHeadersAction(
-    const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+    const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
     Envoy::Server::Configuration::ServerFactoryContext& context) {
   std::unique_ptr<ModifyRequestHeadersAction> action;
   if (config.has_modify_request_headers_action()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<ModifyRequestHeadersActionFactory>(
         config.modify_request_headers_action());
-    auto action_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+    const auto action_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         config.modify_request_headers_action().typed_config(), context.messageValidationVisitor(),
         factory);
     action = factory.createAction(*action_config, context);
@@ -63,9 +64,9 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   return action;
 }
 
-Http::FilterHeadersStatus
-RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
-                              CustomResponseFilter& custom_response_filter) const {
+::Envoy::Http::FilterHeadersStatus RedirectPolicy::encodeHeaders(
+    ::Envoy::Http::ResponseHeaderMap& headers, bool,
+    Extensions::HttpFilters::CustomResponse::CustomResponseFilter& custom_response_filter) const {
   // If filter state for custom response exists, it means this response is a
   // custom response. Apply the custom response mutations to the response from
   // the remote source and return.
@@ -76,9 +77,9 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   if (filter_state) {
     ENVOY_BUG(filter_state == this, "Policy filter state should be this policy.");
     //  Apply mutations if this is a non-error response. Else leave be.
-    auto const cr_code = Http::Utility::getResponseStatusOrNullopt(headers);
+    auto const cr_code = ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
     if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
-      return Http::FilterHeadersStatus::Continue;
+      return ::Envoy::Http::FilterHeadersStatus::Continue;
     }
     // Apply header mutations.
     response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
@@ -88,23 +89,23 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
       headers.setStatus(std::to_string(enumToInt(code)));
       encoder_callbacks->streamInfo().setResponseCode(static_cast<uint32_t>(code));
     }
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   // Modify the request headers & recreate stream.
   // TODO(pradeepcrao): Currently Custom Response is not compatible with sendLocalReply.
   if (custom_response_filter.onLocalRepplyCalled()) {
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
   auto downstream_headers = custom_response_filter.downstreamHeaders();
   RELEASE_ASSERT(downstream_headers != nullptr, "downstream_headers cannot be nullptr");
 
-  Http::Utility::Url absolute_url;
-  std::string uri(absl::StrCat(host_, path_));
+  ::Envoy::Http::Utility::Url absolute_url;
+  const std::string uri(absl::StrCat(host_, path_));
   if (!absolute_url.initialize(uri, false)) {
     IS_ENVOY_BUG(absl::StrCat("Redirect for custom response failed: invalid location {}",
                               absl::StrCat(host_, path_)));
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(*downstream_headers, decoder_callbacks->connection());
@@ -119,8 +120,9 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
         downstream_headers->setHost(original_host);
         downstream_headers->setPath(original_path);
         if (scheme_is_set) {
-          downstream_headers->setScheme(scheme_is_http ? Http::Headers::get().SchemeValues.Http
-                                                       : Http::Headers::get().SchemeValues.Https);
+          downstream_headers->setScheme(scheme_is_http
+                                            ? ::Envoy::Http::Headers::get().SchemeValues.Http
+                                            : ::Envoy::Http::Headers::get().SchemeValues.Https);
         }
       });
 
@@ -152,10 +154,10 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   if (!route) {
     stats_.custom_response_redirect_no_route_.inc();
     ENVOY_LOG(trace, "Redirect for custom response failed: no route found");
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
-  downstream_headers->setMethod(Http::Headers::get().MethodValues.Get);
-  downstream_headers->remove(Http::Headers::get().ContentLength);
+  downstream_headers->setMethod(::Envoy::Http::Headers::get().MethodValues.Get);
+  downstream_headers->remove(::Envoy::Http::Headers::get().ContentLength);
   encoder_callbacks->streamInfo().filterState()->setData(
       // TODO(pradeepcrao): Currently we don't have a mechanism to add readonly
       // objects to FilterState, even if they're immutable.
@@ -164,10 +166,10 @@ RedirectPolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
   restore_original_headers.cancel();
   decoder_callbacks->recreateStream(nullptr);
 
-  return Http::FilterHeadersStatus::StopIteration;
+  return ::Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
 } // namespace CustomResponse
-} // namespace HttpFilters
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

@@ -1,15 +1,16 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
+#include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.h"
+#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/extensions/filters/http/custom_response/policies/redirect_policy.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
+#include "source/extensions/http/custom_response/redirect_policy/redirect_policy.h"
 
-#include "test/integration/filters/common.h"
+// #include "test/integration/filters/common.h"
 
 #include "absl/strings/string_view.h"
 
@@ -35,7 +36,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: 4xx_action
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
               status_code: 499
               body:
                 inline_string: "not allowed"
@@ -76,7 +77,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: gateway_error_action
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 299
               host: "https://foo.example"
               path: "/gateway_error"
@@ -96,7 +97,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: 500_action
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 292
               host: "https://some.other.host"
               path: "/internal_server_error"
@@ -120,7 +121,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
           action:
             name: 520_action
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy
+              "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               host: "https://global/storage"
               path: "/internal_server_error"
               response_headers_to_add:
@@ -139,14 +140,16 @@ template <typename Policy> struct Traits {
 
 template <>
 inline const char*
-getTypeUrlHelper<envoy::extensions::filters::http::custom_response::v3::RedirectPolicy>() {
-  return "type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.RedirectPolicy";
+getTypeUrlHelper<envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy>() {
+  return "type.googleapis.com/"
+         "envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy";
 }
 
 template <>
-inline const char*
-getTypeUrlHelper<envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy>() {
-  return "type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.LocalResponsePolicy";
+inline const char* getTypeUrlHelper<
+    envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy>() {
+  return "type.googleapis.com/"
+         "envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy";
 }
 
 template <typename Policy>
@@ -169,11 +172,12 @@ void modifyPolicy(
 
 // Simulate filters that send local reply during either encode or decode based
 // on route specific config.
-class LocalReplyDuringDecodeIfNotCER : public Http::PassThroughFilter {
+class LocalReplyDuringDecodeIfNotCER : public ::Envoy::Http::PassThroughFilter {
 public:
   constexpr static char name[] = "local-reply-during-decode-if-not-cer";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+  ::Envoy::Http::FilterHeadersStatus decodeHeaders(::Envoy::Http::RequestHeaderMap&,
+                                                   bool) override {
 
     auto filter_state =
         decoder_callbacks_->streamInfo()
@@ -181,44 +185,49 @@ public:
             ->getDataReadOnly<Envoy::Extensions::HttpFilters::CustomResponse::Policy>(
                 "envoy.filters.http.custom_response");
     if (!filter_state) {
-      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
+      decoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
                                          absl::nullopt, "");
-      return Http::FilterHeadersStatus::StopIteration;
+      return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 };
 
-class LocalReplyDuringEncodeIfNotCER : public Http::PassThroughFilter {
+class LocalReplyDuringEncodeIfNotCER : public ::Envoy::Http::PassThroughFilter {
 public:
   constexpr static char name[] = "local-reply-during-encode-if-not-cer";
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+  ::Envoy::Http::FilterHeadersStatus encodeHeaders(::Envoy::Http::ResponseHeaderMap&,
+                                                   bool) override {
 
     auto filter_state = encoder_callbacks_->streamInfo()
                             .filterState()
                             ->getDataReadOnly<Extensions::HttpFilters::CustomResponse::Policy>(
                                 "envoy.filters.http.custom_response");
     if (!filter_state) {
-      encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
+      encoder_callbacks_->sendLocalReply(::Envoy::Http::Code::InternalServerError, "", nullptr,
                                          absl::nullopt, "");
-      return Http::FilterHeadersStatus::StopIteration;
+      return ::Envoy::Http::FilterHeadersStatus::StopIteration;
     }
-    return Http::FilterHeadersStatus::Continue;
+    return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
 };
 
-class TestModifyRequestHeadersAction : public ModifyRequestHeadersAction {
+class TestModifyRequestHeadersAction
+    : public Extensions::Http::CustomResponse::ModifyRequestHeadersAction {
 public:
   ~TestModifyRequestHeadersAction() override = default;
 
-  void modifyRequestHeaders(Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
-                            const RedirectPolicy& redirect_policy) override {
-    headers.setCopy(Http::LowerCaseString("x-envoy-cer-backend"), redirect_policy.host().substr(8));
+  void modifyRequestHeaders(
+      ::Envoy::Http::RequestHeaderMap& headers, Envoy::StreamInfo::StreamInfo&,
+      const Extensions::Http::CustomResponse::RedirectPolicy& redirect_policy) override {
+    headers.setCopy(::Envoy::Http::LowerCaseString("x-envoy-cer-backend"),
+                    redirect_policy.host().substr(8));
   };
 };
 
-class TestModifyRequestHeadersActionFactory : public ModifyRequestHeadersActionFactory {
+class TestModifyRequestHeadersActionFactory
+    : public Extensions::Http::CustomResponse::ModifyRequestHeadersActionFactory {
 public:
   ~TestModifyRequestHeadersActionFactory() override = default;
 
@@ -229,7 +238,7 @@ public:
 
   std::string name() const override { return "modify-request-headers-action"; }
 
-  std::unique_ptr<ModifyRequestHeadersAction>
+  std::unique_ptr<Extensions::Http::CustomResponse::ModifyRequestHeadersAction>
   createAction(const Protobuf::Message&,
                Envoy::Server::Configuration::ServerFactoryContext&) override {
     return std::make_unique<TestModifyRequestHeadersAction>();

@@ -19,7 +19,7 @@ class CustomResponseFilterFactory
       public Logger::Loggable<Logger::Id::filter> {
 public:
   CustomResponseFilterFactory() : FactoryBase(std::string(FilterName)) {}
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 

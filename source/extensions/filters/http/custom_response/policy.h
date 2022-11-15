@@ -67,7 +67,10 @@ protected:
 
 // Macro used to register factories for custom response policies
 #define REGISTER_CUSTOM_RESPONSE_POLICY_FACTORY(factory)                                           \
-  REGISTER_FACTORY(factory, Matcher::ActionFactory<CustomResponseActionFactoryContext>)
+  REGISTER_FACTORY(                                                                                \
+      factory,                                                                                     \
+      Matcher::ActionFactory<                                                                      \
+          ::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseActionFactoryContext>)
 
 } // namespace CustomResponse
 } // namespace HttpFilters

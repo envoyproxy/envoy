@@ -26,10 +26,6 @@ Http::FilterHeadersStatus CustomResponseFilter::decodeHeaders(Http::RequestHeade
       "envoy.filters.http.custom_response");
   if (!filter_state) {
     downstream_headers_ = &header_map;
-    const auto* per_route_settings =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-    config_to_use_ = per_route_settings ? static_cast<const FilterConfig*>(per_route_settings)
-                                        : static_cast<const FilterConfig*>(config_.get());
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -45,8 +41,14 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
     return filter_state->encodeHeaders(headers, end_stream, *this);
   }
 
+  // Check for route specific config.
+  const auto* per_route_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
+  const auto config_to_use = per_route_settings
+                                 ? static_cast<const FilterConfig*>(per_route_settings)
+                                 : static_cast<const FilterConfig*>(config_.get());
   // Check if any custom response policy applies to this response.
-  auto policy = config_to_use_->getPolicy(headers, encoder_callbacks_->streamInfo());
+  const auto policy = config_to_use->getPolicy(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
   if (!policy) {

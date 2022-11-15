@@ -1,4 +1,4 @@
-#include "source/extensions/filters/http/custom_response/policies/local_response_policy.h"
+#include "source/extensions/http/custom_response/local_response_policy/local_response_policy.h"
 
 #include "envoy/stream_info/filter_state.h"
 
@@ -14,10 +14,11 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace CustomResponse {
 LocalResponsePolicy::LocalResponsePolicy(
-    const envoy::extensions::filters::http::custom_response::v3::LocalResponsePolicy& config,
+    const envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy&
+        config,
     Server::Configuration::CommonFactoryContext& context)
     : local_body_{config.has_body() ? absl::optional<std::string>(Config::DataSource::read(
                                           config.body(), true, context.api()))
@@ -26,15 +27,16 @@ LocalResponsePolicy::LocalResponsePolicy(
                      ? Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                            config.body_format(), context)
                      : nullptr),
-      status_code_{config.has_status_code() ? absl::optional<Http::Code>(static_cast<Http::Code>(
-                                                  config.status_code().value()))
-                                            : absl::optional<Http::Code>{}},
+      status_code_{config.has_status_code()
+                       ? absl::optional<Envoy::Http::Code>(
+                             static_cast<Envoy::Http::Code>(config.status_code().value()))
+                       : absl::optional<Envoy::Http::Code>{}},
       header_parser_(Envoy::Router::HeaderParser::configure(config.response_headers_to_add())) {}
 
 // TODO(pradeepcrao): investigate if this code can be made common with
 // Envoy::LocalReply::BodyFormatter for consistent behavior.
-void LocalResponsePolicy::formatBody(const Http::RequestHeaderMap& request_headers,
-                                     const Http::ResponseHeaderMap& response_headers,
+void LocalResponsePolicy::formatBody(const Envoy::Http::RequestHeaderMap& request_headers,
+                                     const Envoy::Http::ResponseHeaderMap& response_headers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      std::string& body) const {
   if (local_body_.has_value()) {
@@ -43,44 +45,45 @@ void LocalResponsePolicy::formatBody(const Http::RequestHeaderMap& request_heade
 
   if (formatter_) {
     formatter_->format(request_headers, response_headers,
-                       *Http::StaticEmptyHeaders::get().response_trailers, stream_info, body);
+                       *Envoy::Http::StaticEmptyHeaders::get().response_trailers, stream_info,
+                       body);
   }
 }
 
-Http::FilterHeadersStatus
-LocalResponsePolicy::encodeHeaders(Http::ResponseHeaderMap& headers, bool,
-                                   CustomResponseFilter& custom_response_filter) const {
+Envoy::Http::FilterHeadersStatus LocalResponsePolicy::encodeHeaders(
+    Envoy::Http::ResponseHeaderMap& headers, bool,
+    Extensions::HttpFilters::CustomResponse::CustomResponseFilter& custom_response_filter) const {
   auto encoder_callbacks = custom_response_filter.encoderCallbacks();
   ENVOY_BUG(encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
                 "envoy.filters.http.custom_response") == nullptr,
             "Filter State should not be set when using the LocalResponse policy.");
   // Handle local body
   std::string body;
-  Http::Code code = getStatusCodeForLocalReply(headers);
+  Envoy::Http::Code code = getStatusCodeForLocalReply(headers);
   formatBody(encoder_callbacks->streamInfo().getRequestHeaders() == nullptr
-                 ? *Http::StaticEmptyHeaders::get().request_headers
+                 ? *Envoy::Http::StaticEmptyHeaders::get().request_headers
                  : *encoder_callbacks->streamInfo().getRequestHeaders(),
              headers, encoder_callbacks->streamInfo(), body);
 
-  const auto mutate_headers = [this, encoder_callbacks](Http::ResponseHeaderMap& headers) {
+  const auto mutate_headers = [this, encoder_callbacks](Envoy::Http::ResponseHeaderMap& headers) {
     header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
   };
   encoder_callbacks->sendLocalReply(code, body, mutate_headers, absl::nullopt, "");
-  return Http::FilterHeadersStatus::StopIteration;
+  return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::Code LocalResponsePolicy::getStatusCodeForLocalReply(
-    const Http::ResponseHeaderMap& response_headers) const {
-  Http::Code code = Http::Code::InternalServerError;
+Envoy::Http::Code LocalResponsePolicy::getStatusCodeForLocalReply(
+    const Envoy::Http::ResponseHeaderMap& response_headers) const {
+  Envoy::Http::Code code = Envoy::Http::Code::InternalServerError;
   if (status_code_.has_value()) {
     code = *status_code_;
-  } else if (auto current_code = Http::Utility::getResponseStatusOrNullopt(response_headers);
+  } else if (auto current_code = Envoy::Http::Utility::getResponseStatusOrNullopt(response_headers);
              current_code.has_value()) {
-    code = static_cast<Http::Code>(*current_code);
+    code = static_cast<Envoy::Http::Code>(*current_code);
   }
   return code;
 }
 } // namespace CustomResponse
-} // namespace HttpFilters
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

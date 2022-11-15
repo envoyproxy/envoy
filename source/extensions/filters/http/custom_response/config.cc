@@ -18,10 +18,11 @@ namespace CustomResponse {
 namespace {
 
 class CustomResponseMatchActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
+    : public Matcher::MatchTreeValidationVisitor<::Envoy::Http::HttpMatchingData> {
 public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<::Envoy::Http::HttpMatchingData>&,
+                             absl::string_view) override {
     return absl::OkStatus();
   }
 };
@@ -37,21 +38,21 @@ FilterConfig::FilterConfig(
   if (config.has_custom_response_matcher()) {
     CustomResponseMatchActionValidationVisitor validation_visitor;
     CustomResponseActionFactoryContext action_factory_context{context, stats_prefix_};
-    Matcher::MatchTreeFactory<Http::HttpMatchingData, CustomResponseActionFactoryContext> factory(
-        action_factory_context, context, validation_visitor);
+    Matcher::MatchTreeFactory<::Envoy::Http::HttpMatchingData, CustomResponseActionFactoryContext>
+        factory(action_factory_context, context, validation_visitor);
     matcher_ = factory.create(config.custom_response_matcher())();
   }
 }
 
-PolicySharedPtr FilterConfig::getPolicy(Http::ResponseHeaderMap& headers,
+PolicySharedPtr FilterConfig::getPolicy(::Envoy::Http::ResponseHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info) const {
   if (!matcher_) {
     return PolicySharedPtr{};
   }
 
-  Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
+  ::Envoy::Http::Matching::HttpMatchingDataImpl data(stream_info.downstreamAddressProvider());
   data.onResponseHeaders(headers);
-  auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+  auto match = Matcher::evaluateMatch<::Envoy::Http::HttpMatchingData>(*matcher_, data);
   if (!match.result_) {
     return PolicySharedPtr{};
   }

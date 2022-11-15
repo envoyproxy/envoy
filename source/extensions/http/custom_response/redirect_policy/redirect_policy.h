@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/policies.pb.validate.h"
+#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.h"
+#include "envoy/extensions/http/custom_response/redirect_policy/v3/redirect_policy.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -16,8 +16,12 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
-
 class CustomResponseFilter;
+} // namespace CustomResponse
+} // namespace HttpFilters
+
+namespace Http {
+namespace CustomResponse {
 class ModifyRequestHeadersAction;
 
 /**
@@ -33,22 +37,24 @@ MAKE_STAT_NAMES_STRUCT(CustomResponseRedirectStatNames, ALL_CUSTOM_RESPONSE_REDI
 MAKE_STATS_STRUCT(CustomResponseRedirectStats, CustomResponseRedirectStatNames,
                   ALL_CUSTOM_RESPONSE_REDIRECT_STATS);
 
-class RedirectPolicy : public Policy, public Logger::Loggable<Logger::Id::filter> {
+class RedirectPolicy : public Extensions::HttpFilters::CustomResponse::Policy,
+                       public Logger::Loggable<Logger::Id::filter> {
 
 public:
   explicit RedirectPolicy(
-      const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+      const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
       Stats::StatName stats_prefix, Envoy::Server::Configuration::ServerFactoryContext& context);
 
-  Envoy::Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool,
-                                                 CustomResponseFilter&) const override;
+  ::Envoy::Http::FilterHeadersStatus
+  encodeHeaders(::Envoy::Http::ResponseHeaderMap&, bool,
+                Extensions::HttpFilters::CustomResponse::CustomResponseFilter&) const override;
 
   const std::string& host() const { return host_; }
   const std::string& path() const { return path_; }
 
 private:
   std::unique_ptr<ModifyRequestHeadersAction> createModifyRequestHeadersAction(
-      const envoy::extensions::filters::http::custom_response::v3::RedirectPolicy& config,
+      const envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy& config,
       Envoy::Server::Configuration::ServerFactoryContext& context);
 
   const CustomResponseRedirectStatNames stat_names_;
@@ -58,7 +64,7 @@ private:
   const std::string host_;
   const std::string path_;
 
-  const absl::optional<Http::Code> status_code_;
+  const absl::optional<::Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> response_header_parser_;
   const std::unique_ptr<Envoy::Router::HeaderParser> request_header_parser_;
   const std::unique_ptr<ModifyRequestHeadersAction> modify_request_headers_action_;
@@ -67,7 +73,7 @@ private:
 class ModifyRequestHeadersAction {
 public:
   virtual ~ModifyRequestHeadersAction() = default;
-  virtual void modifyRequestHeaders(Envoy::Http::RequestHeaderMap& request_headers,
+  virtual void modifyRequestHeaders(::Envoy::Http::RequestHeaderMap& request_headers,
                                     Envoy::StreamInfo::StreamInfo& stream_info,
                                     const RedirectPolicy&) PURE;
 };
@@ -81,11 +87,11 @@ public:
                Envoy::Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override {
-    return "envoy.filters.http.custom_response.redirect_policy.modify_request_headers_action";
+    return "envoy.http.custom_response.redirect_policy.modify_request_headers_action";
   }
 };
 
 } // namespace CustomResponse
-} // namespace HttpFilters
+} // namespace Http
 } // namespace Extensions
 } // namespace Envoy

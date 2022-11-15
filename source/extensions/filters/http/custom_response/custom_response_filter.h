@@ -15,40 +15,40 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-class CustomResponseFilter : public Http::PassThroughFilter,
+class CustomResponseFilter : public ::Envoy::Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& header_map, bool) override;
+  ::Envoy::Http::FilterHeadersStatus decodeHeaders(::Envoy::Http::RequestHeaderMap& header_map,
+                                                   bool) override;
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+  ::Envoy::Http::FilterHeadersStatus encodeHeaders(::Envoy::Http::ResponseHeaderMap& headers,
+                                                   bool end_stream) override;
+  void setEncoderFilterCallbacks(::Envoy::Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
 
-  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+  void setDecoderFilterCallbacks(::Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   }
 
-  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData&) override {
+  ::Envoy::Http::LocalErrorStatus
+  onLocalReply(const ::Envoy::Http::StreamFilterBase::LocalReplyData&) override {
     on_local_reply_called_ = true;
-    return Http::LocalErrorStatus::Continue;
+    return ::Envoy::Http::LocalErrorStatus::Continue;
   }
 
-  Http::RequestHeaderMap* downstreamHeaders() { return downstream_headers_; }
-  Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
-  Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
+  ::Envoy::Http::RequestHeaderMap* downstreamHeaders() { return downstream_headers_; }
+  ::Envoy::Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
+  ::Envoy::Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
   bool onLocalRepplyCalled() const { return on_local_reply_called_; }
 
   ~CustomResponseFilter() override = default;
 
-  CustomResponseFilter(std::shared_ptr<FilterConfig> config)
-      : config_{std::move(config)}, config_to_use_{config_.get()} {}
+  CustomResponseFilter(std::shared_ptr<FilterConfig> config) : config_{std::move(config)} {}
 
 private:
   std::shared_ptr<FilterConfig> config_;
-  const FilterConfig* config_to_use_ = nullptr;
-  Http::RequestHeaderMap* downstream_headers_ = nullptr;
+  ::Envoy::Http::RequestHeaderMap* downstream_headers_ = nullptr;
   bool on_local_reply_called_ = false;
 };
 
