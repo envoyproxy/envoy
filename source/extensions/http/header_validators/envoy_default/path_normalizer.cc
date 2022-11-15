@@ -102,6 +102,7 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
     default:
       // This should never occur but it's here to make the compiler happy because of the extra
       // values added by protobuf.
+      ENVOY_BUG(false, "Unexpected path_with_escaped_slashes_action");
       break;
     }
   }
@@ -112,25 +113,33 @@ PathNormalizer::normalizeAndDecodeOctet(std::string::iterator iter,
 }
 
 /*
- * Find the start index of the previous segment within the path. The previous segment starts at the
- * first non-slash character after the preceding slash. For example:
+ * Find the start of the previous segment within the path. The start of the previous segment is the
+ * first non-slash character that directly follows a slash. For example:
  *
  *   path = "/hello/world/..";
- *                  ^    ^-- iterator
+ *           ^      ^    ^-- current argument
+ *           |      |-- start of previous segment (return value)
+ *           |-- begin argument
+ *
+ * Duplicate slashes that are encountered are ignored. For example:
+ *
+ * path = "/parent//child////..";
+ *                  ^       ^-- current argument
  *                  |-- start of previous segment
  *
- * The ``begin`` iterator is returned on error.
+ * The ``current`` argument must point to a slash character. The ``begin`` iterator must be the
+ * start of the path and it is returned on error.
  */
-std::string::iterator findStartOfPreviousSegment(std::string::iterator iter,
+std::string::iterator findStartOfPreviousSegment(std::string::iterator current,
                                                  std::string::iterator begin) {
   bool seen_segment_char = false;
-  for (; iter != begin; --iter) {
-    if (*iter == '/' && seen_segment_char) {
-      ++iter;
-      return iter;
+  for (; current != begin; --current) {
+    if (*current == '/' && seen_segment_char) {
+      ++current;
+      return current;
     }
 
-    if (*iter != '/' && !seen_segment_char) {
+    if (*current != '/' && !seen_segment_char) {
       seen_segment_char = true;
     }
   }
@@ -214,7 +223,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
   // SPELLCHECKER(on)
   {
     // pass 1: normalize and decode percent-encoded octets
-    auto result = decodePass(path);
+    const auto result = decodePass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
     }
@@ -224,7 +233,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   if (!config_.uri_path_normalization_options().skip_merging_slashes()) {
     // pass 2: merge duplicate slashes (if configured to do so)
-    auto result = mergeSlashesPass(path);
+    const auto result = mergeSlashesPass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
     }
@@ -234,7 +243,7 @@ PathNormalizer::normalizePathUri(RequestHeaderMap& header_map) const {
 
   {
     // pass 3: collapse dot and dot-dot segments
-    auto result = collapseDotSegmentsPass(path);
+    const auto result = collapseDotSegmentsPass(path);
     if (result.action() == PathNormalizationResult::Action::Reject) {
       return result;
     }
@@ -320,7 +329,7 @@ PathNormalizer::PathNormalizationResult PathNormalizer::mergeSlashesPass(std::st
         // Duplicate slash, merge it
         ++read;
       } else {
-        // Not a duplicate slash or we aren't configured to merge slashes, copy it
+        // Not a duplicate slash
         *write++ = *read++;
       }
     } else {

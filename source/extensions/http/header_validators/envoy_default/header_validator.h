@@ -136,7 +136,7 @@ protected:
   ::Envoy::Http::Protocol protocol_;
   StreamInfo::StreamInfo& stream_info_;
   const ::Envoy::Http::HeaderValues& header_values_;
-  PathNormalizer path_normalizer_;
+  const PathNormalizer path_normalizer_;
 };
 
 struct UhvResponseCodeDetailValues {
