@@ -193,8 +193,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 # File system based extensions
-/*/extensions/common/async_files @mattklein123 @ravenblack
-/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
+/*/extensions/common/async_files @mattklein123 @ravenblackx
+/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @mattklein123 @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
