@@ -1328,3 +1328,10 @@ envoy.filters.http.custom_response:
   status: wip
   type_urls:
   - envoy.extensions.filters.http.custom_response.v3.CustomResponse
+envoy.matching.actions.format_string:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.config.core.v3.SubstitutionFormatString

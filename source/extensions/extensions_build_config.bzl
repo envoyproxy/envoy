@@ -76,6 +76,12 @@ EXTENSIONS = {
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
 
     #
+    # Matching actions
+    #
+
+    "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+
+    #
     # HTTP filters
     #
 
@@ -382,6 +388,7 @@ EXTENSIONS = {
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:examples_library", "//:mobile_library"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library", "//:mobile_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
+MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
 
 # Set this variable to true to disable alwayslink for envoy_cc_library.
 # TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.
