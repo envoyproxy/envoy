@@ -100,7 +100,7 @@ private:
   const absl::optional<std::chrono::milliseconds> ttl_;
 
   // This is the metadata info under the Resource wrapper.
-  // It is intented to be consumed in the xds_config_tracker extension.
+  // It is intended to be consumed in the xds_config_tracker extension.
   const OptRef<const envoy::config::core::v3::Metadata> metadata_;
 };
 
