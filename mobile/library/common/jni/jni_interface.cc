@@ -1,5 +1,3 @@
-#include <ares.h>
-
 #include "library/common/api/c_types.h"
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"

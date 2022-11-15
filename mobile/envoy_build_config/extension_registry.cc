@@ -5,6 +5,7 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
@@ -35,6 +36,7 @@
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
+  Envoy::Upstream::forceRegisterStaticClusterFactory();
   Envoy::Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
   Envoy::Extensions::Compression::Brotli::Decompressor::
       forceRegisterBrotliDecompressorLibraryFactory();
