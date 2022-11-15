@@ -143,6 +143,11 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
+  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   envoy::config::metrics::v3::StatsMatcher stats_matcher;
   stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   config_helper_.addConfigModifier(
