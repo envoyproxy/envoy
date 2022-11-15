@@ -195,19 +195,17 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
-  // With https://github.com/envoyproxy/envoy/pull/23921 all the
-  // upstream_xxxx are lazy-inited.
-  // We need to trigger an inc on the ClusterInfo::trafficStats() to create the upstream stats.
+  // With https://github.com/envoyproxy/envoy/pull/23921 ClusterInfo::trafficStats is lazy init.
+  // We need to trigger creation of ClusterInfo::trafficStats() by calling the * operator.
   absl::Notification n;
   test_server_->server().dispatcher().post([&]() {
-    auto _ = *test_server_->server()
-                  .clusterManager()
-                  .clusters()
-                  .getCluster("cluster_1")
-                  ->get()
-                  .info()
-                  ->trafficStats();
-    (void)_;
+    (void)*test_server_->server()
+        .clusterManager()
+        .clusters()
+        .getCluster("cluster_1")
+        ->get()
+        .info()
+        ->trafficStats();
     n.Notify();
   });
   n.WaitForNotification();

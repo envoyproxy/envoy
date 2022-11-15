@@ -129,9 +129,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   initialize();
 
   BufferingStreamDecoderPtr response;
-  // With https://github.com/envoyproxy/envoy/pull/23921 all the
-  // upstream_xxxx are lazy-inited.
-  // We need to trigger an inc on the ClusterInfo::trafficStats() to create the upstream stats.
+  // With https://github.com/envoyproxy/envoy/pull/23921 ClusterInfo::trafficStats is lazy init.
+  // We need to trigger creation of ClusterInfo::trafficStats() by calling the * operator.
   absl::Notification n;
   test_server_->server().dispatcher().post([&]() {
     (void)*test_server_->server()
