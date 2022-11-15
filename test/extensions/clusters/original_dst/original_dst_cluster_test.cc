@@ -85,7 +85,8 @@ public:
         });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
-
+  // NOTE: the cm_.trafficStatNames() is referenced by the MockClusterInfo::trafficStats(), it
+  // should out live the MockClusterInfo object.
   NiceMock<MockClusterManager> cm_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;

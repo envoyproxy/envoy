@@ -53,7 +53,7 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      stat_names_(stats_store_.symbolTable()),
+      traffic_stats_names_(stats_store_.symbolTable()),
       config_update_stats_names_(stats_store_.symbolTable()),
       lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),
       cluster_load_report_stat_names_(stats_store_.symbolTable()),

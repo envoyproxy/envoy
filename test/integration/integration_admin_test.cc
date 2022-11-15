@@ -134,14 +134,13 @@ TEST_P(IntegrationAdminTest, Admin) {
   // We need to trigger an inc on the ClusterInfo::trafficStats() to create the upstream stats.
   absl::Notification n;
   test_server_->server().dispatcher().post([&]() {
-    test_server_->server()
+    (void)*test_server_->server()
         .clusterManager()
         .clusters()
         .getCluster("cluster_0")
         ->get()
         .info()
-        ->trafficStats()
-        ->bind_errors_.inc();
+        ->trafficStats();
     n.Notify();
   });
   n.WaitForNotification();

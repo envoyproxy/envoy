@@ -199,7 +199,7 @@ public:
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  ClusterTrafficStatNames stat_names_;
+  ClusterTrafficStatNames traffic_stats_names_;
   ClusterConfigUpdateStatNames config_update_stats_names_;
   ClusterLbStatNames lb_stat_names_;
   ClusterEndpointStatNames endpoint_stat_names_;
