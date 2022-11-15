@@ -238,8 +238,7 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,

@@ -1080,12 +1080,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "c6efbc4f790a274f1f4030cd8437683a321f23b8",
-        sha256 = "7911438519437af82356c76a9b96a8a61fcb3ee5c11ca7e6f190e4bca53c3cb0",
+        version = "8b0d15bda8fdeb80a40ef53b7932b0897025dc11",
+        sha256 = "b03b0c8e1c7d261ebb1865f9c9c7a3e6e14bc382203526e5bf767c7fed0f9c16",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-11-02",
+        release_date = "2022-11-10",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1176,6 +1176,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
+        # Note: the llvm/clang version should match the version specifed in:
+        #  - .github/workflows/codeql-daily.yml
+        #  - .github/workflows/codeql-push.yml
+        #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
         version = "14.0.0",
         sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
         # Only allow peeking at fuzzer related files for now.

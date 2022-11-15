@@ -91,6 +91,7 @@ envoy_cc_library(
         ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
+        ":host_utility_lib",
         "//envoy/api:api_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
@@ -246,7 +247,10 @@ envoy_cc_library(
     name = "host_utility_lib",
     srcs = ["host_utility.cc"],
     hdrs = ["host_utility.h"],
-    deps = ["//envoy/upstream:upstream_interface"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -485,8 +489,6 @@ envoy_cc_library(
         ":eds_lib",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
-        ":static_cluster_lib",
-        ":strict_dns_cluster_lib",
         ":upstream_includes",
         ":transport_socket_match_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -532,32 +534,6 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
-)
-
-envoy_cc_library(
-    name = "static_cluster_lib",
-    srcs = ["static_cluster.cc"],
-    hdrs = ["static_cluster.h"],
-    deps = [
-        ":cluster_factory_includes",
-        ":upstream_includes",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
-    name = "strict_dns_cluster_lib",
-    srcs = ["strict_dns_cluster.cc"],
-    hdrs = ["strict_dns_cluster.h"],
-    deps = [
-        ":cluster_factory_includes",
-        ":upstream_includes",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
