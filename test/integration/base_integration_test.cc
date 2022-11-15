@@ -25,7 +25,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
-#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
