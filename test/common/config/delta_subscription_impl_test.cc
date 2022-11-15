@@ -153,7 +153,8 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
     xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
         random, stats_store, rate_limit_settings, local_info, false,
-        std::make_unique<NiceMock<MockCustomConfigValidators>>());
+        std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   } else {
     xds_context = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,

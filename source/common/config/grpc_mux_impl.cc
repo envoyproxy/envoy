@@ -221,12 +221,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
 
-  // Processing point when DiscoveryResponse is received.
-  if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onConfigReceivedOrFailed(*message,
-                                                  ProcessingDetails(ProcessingState::RECEIVED));
-  }
-
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -297,7 +291,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Processing point when resources are successfully ingested.
     if (xds_config_tracker_.has_value()) {
-      xds_config_tracker_->onConfigIngested(type_url, resources);
+      xds_config_tracker_->onConfigAccepted(type_url, resources);
     }
   }
   END_TRY
@@ -312,8 +306,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     // Processing point when there is any exception during the parse and ingestion process.
     if (xds_config_tracker_.has_value()) {
-      xds_config_tracker_->onConfigReceivedOrFailed(
-          *message, ProcessingDetails(ProcessingState::FAILED, *error_detail));
+      xds_config_tracker_->onConfigRejected(*message, error_detail->message());
     }
   }
   previously_fetched_data_ = true;

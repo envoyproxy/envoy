@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
@@ -25,7 +26,8 @@ namespace Config {
 class OldDeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   OldDeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                            const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+                            const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                            XdsConfigTrackerOptRef xds_config_tracker);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -107,6 +109,7 @@ private:
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
   std::chrono::milliseconds init_fetch_timeout_;
 
   bool any_request_sent_yet_in_current_stream_{};

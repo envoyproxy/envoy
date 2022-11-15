@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -63,9 +62,9 @@ struct Watch {
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators& config_validators, XdsConfigTrackerOptRef xds_config_tracker)
+           CustomConfigValidators& config_validators)
       : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
-        config_validators_(config_validators), xds_config_tracker_(xds_config_tracker) {}
+        config_validators_(config_validators) {}
 
   // Adds 'callbacks' to the WatchMap, with every possible resource being watched.
   // (Use updateWatchInterest() to narrow it down to some specific names).
@@ -134,7 +133,6 @@ private:
   const bool use_namespace_matching_;
   const std::string type_url_;
   CustomConfigValidators& config_validators_;
-  XdsConfigTrackerOptRef xds_config_tracker_;
 };
 
 } // namespace Config

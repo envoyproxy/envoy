@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/delta_subscription_state.h"
@@ -42,8 +43,8 @@ protected:
       scoped_runtime.mergeValues({
           {"envoy.restart_features.explicit_wildcard_resource", "false"},
       });
-      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,
-                                                                       local_info_, dispatcher_);
+      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
+          type_url, callbacks_, local_info_, dispatcher_, XdsConfigTrackerOptRef());
     }
     updateSubscriptionInterest(initial_resources, {});
     auto cur_request = getNextRequestAckless();

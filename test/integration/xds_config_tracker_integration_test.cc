@@ -24,65 +24,59 @@ namespace {
 
 constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
 
+/**
+ * All stats for this xds tracker. @see stats_macros.h
+ */
+#define ALL_TEST_XDS_TRACKER_STATS(COUNTER)                                                        \
+  COUNTER(on_config_accepted)                                                                      \
+  COUNTER(on_config_rejected)
+
+/**
+ * Struct definition for stats. @see stats_macros.h
+ */
+struct TestXdsTrackerStats {
+  ALL_TEST_XDS_TRACKER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class TestXdsConfigTracker : public Config::XdsConfigTracker {
 public:
-  TestXdsConfigTracker() {
-    ReceiveCount = 0;
-    IngestedCount = 0;
-    FailureCount = 0;
+  TestXdsConfigTracker(Stats::Scope& scope) : stats_(generateStats("test_xds_tracker", scope)) {
     ErrorMessage = "";
   }
 
-  void onConfigIngested(const absl::string_view,
+  void onConfigAccepted(const absl::string_view,
                         const std::vector<Config::DecodedResourcePtr>&) override {
-    ++IngestedCount;
+    stats_.on_config_accepted_.inc();
   }
 
-  void onConfigIngested(const absl::string_view, const std::vector<Config::DecodedResourcePtr>&,
+  void onConfigAccepted(const absl::string_view,
+                        const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&,
                         const Protobuf::RepeatedPtrField<std::string>&) override {
-    ++IngestedCount;
+    stats_.on_config_accepted_.inc();
   }
 
-  void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DiscoveryResponse&,
-                                const Config::ProcessingDetails& process_details) override {
-    countState(process_details.state_);
-    if (process_details.state_ == Config::ProcessingState::FAILED) {
-      ErrorMessage = process_details.error_detail_.message();
-    }
+  void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse&,
+                        const absl::string_view error_detail) override {
+    stats_.on_config_rejected_.inc();
+    ErrorMessage = std::string(error_detail);
   }
 
-  void onConfigReceivedOrFailed(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
-                                const Config::ProcessingDetails& process_details) override {
-    countState(process_details.state_);
-    if (process_details.state_ == Config::ProcessingState::FAILED) {
-      ErrorMessage = process_details.error_detail_.message();
-    }
+  void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
+                        const absl::string_view error_detail) override {
+    stats_.on_config_rejected_.inc();
+    ErrorMessage = std::string(error_detail);
   }
 
-  static std::atomic<int> ReceiveCount;
-  static std::atomic<int> IngestedCount;
-  static std::atomic<int> FailureCount;
   static std::string ErrorMessage;
 
 private:
-  void countState(const Config::ProcessingState& state) {
-    switch (state) {
-    case Config::ProcessingState::RECEIVED:
-      ++ReceiveCount;
-      break;
-    case Config::ProcessingState::FAILED:
-      ++FailureCount;
-      break;
-    };
+  TestXdsTrackerStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return {ALL_TEST_XDS_TRACKER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
+  TestXdsTrackerStats stats_;
 };
 
-std::atomic<int> TestXdsConfigTracker::ReceiveCount;
-std::atomic<int> TestXdsConfigTracker::IngestedCount;
-std::atomic<int> TestXdsConfigTracker::FailureCount;
 std::string TestXdsConfigTracker::ErrorMessage;
-
-static std::map<std::string, envoy::service::discovery::v3::Resource> ResourcesMap;
 
 class TestXdsConfigTrackerFactory : public Config::XdsConfigTrackerFactory {
 public:
@@ -90,11 +84,13 @@ public:
     return std::make_unique<test::envoy::config::xds::TestXdsConfigTracker>();
   }
 
-  std::string name() const override { return "envoy.config.xds.test_xds_tracer"; };
+  std::string name() const override { return "envoy.config.xds.test_xds_tracker"; };
 
   Config::XdsConfigTrackerPtr createXdsConfigTracker(const ProtobufWkt::Any&,
-                                                     ProtobufMessage::ValidationVisitor&) override {
-    return std::make_unique<TestXdsConfigTracker>();
+                                                     ProtobufMessage::ValidationVisitor&,
+                                                     Event::Dispatcher&,
+                                                     Stats::Scope& stats) override {
+    return std::make_unique<TestXdsConfigTracker>(stats);
   }
 };
 
@@ -108,6 +104,12 @@ public:
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
+
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                       this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                          ? "true"
+                                          : "false");
 
     // Make the default cluster HTTP2.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -136,7 +138,8 @@ public:
       rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       auto* api_config_source = rtds_config->mutable_api_config_source();
       api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      api_config_source->set_api_type(this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+      api_config_source->set_api_type((this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                       this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                           ? envoy::config::core::v3::ApiConfigSource::GRPC
                                           : envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
       api_config_source->set_set_node_on_first_message_only(true);
@@ -166,7 +169,7 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     registerTestServerPorts({});
-    initial_load_success_ = test_server_->counter("runtime.load_success")->value();
+    initial_xds_update_ = test_server_->counter("test_xds_tracker.on_config_accepted")->value();
   }
 
   void acceptXdsConnection() {
@@ -176,43 +179,11 @@ public:
     xds_stream_->startGrpcStream();
   }
 
-  std::string getRuntimeKey(const std::string& key) {
-    auto response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "GET", "/runtime?format=json", "", downstreamProtocol(), version_);
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
-    if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
-    }
-    return "";
-  }
-
-  void waitforReceiveCount(const int expected_count) {
-    absl::MutexLock l(&lock_);
-    const auto reached_expected_count = [expected_count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-      return TestXdsConfigTracker::IngestedCount == expected_count;
-    };
-    timeSystem().waitFor(lock_, absl::Condition(&reached_expected_count),
-                         TestUtility::DefaultTimeout);
-  }
-
-  void waitforFailureCount(const int expected_count) {
-    absl::MutexLock l(&lock_);
-    const auto reached_expected_count = [expected_count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-      return TestXdsConfigTracker::FailureCount >= expected_count;
-    };
-    timeSystem().waitFor(lock_, absl::Condition(&reached_expected_count),
-                         TestUtility::DefaultTimeout);
-  }
-
-  absl::Mutex lock_;
-  uint32_t initial_load_success_{0};
+  uint32_t initial_xds_update_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsConfigTrackerIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         DELTA_SOTW_UNIFIED_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   TestXdsConfigTrackerFactory factory;
@@ -221,7 +192,6 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   initialize();
   acceptXdsConnection();
 
-  int current_ingested_count = TestXdsConfigTracker::IngestedCount;
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -232,14 +202,9 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
-  int expected_ingested_count = ++current_ingested_count;
-  waitforReceiveCount(expected_ingested_count);
-
-  EXPECT_EQ(expected_ingested_count, TestXdsConfigTracker::IngestedCount);
-  EXPECT_EQ(expected_ingested_count, TestXdsConfigTracker::ReceiveCount);
-  EXPECT_EQ("bar", getRuntimeKey("foo"));
-  EXPECT_EQ("meh", getRuntimeKey("baz"));
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", initial_xds_update_ + 1);
+  EXPECT_EQ(test_server_->counter("test_xds_tracker.on_config_accepted")->value(),
+            initial_xds_update_ + 1);
 }
 
 TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
@@ -282,7 +247,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
 
   // Message's TypeUrl != Resource's
   stream->sendGrpcMessage(discovery_response);
-  waitforFailureCount(1);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
   EXPECT_THAT(TestXdsConfigTracker::ErrorMessage,
               HasSubstr("does not match the message-wide type URL"));
 }

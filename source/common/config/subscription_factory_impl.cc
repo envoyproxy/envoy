@@ -88,7 +88,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_resources_delegate_, control_plane_id);
+            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
       } else {
         mux = std::make_shared<Config::GrpcMuxImpl>(
             local_info_,
@@ -117,8 +117,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+            xds_config_tracker_);
       } else {
         mux = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),

@@ -335,7 +335,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         bootstrap.xds_config_tracker_extension());
     xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
         bootstrap.xds_config_tracker_extension().typed_config(),
-        validation_context.dynamicValidationVisitor());
+        validation_context.dynamicValidationVisitor(), main_thread_dispatcher, stats);
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
@@ -397,7 +397,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()));
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -428,7 +428,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()),
+            xds_delegate_opt_ref, target_xds_authority);
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,

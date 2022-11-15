@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
-#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -128,8 +127,7 @@ TEST(WatchMapTest, Basic) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
 
   {
@@ -203,8 +201,7 @@ TEST(WatchMapTest, Overlap) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -267,9 +264,7 @@ TEST(WatchMapTest, Overlap) {
 // WatchMap defers deletes and doesn't crash.
 class SameWatchRemoval : public testing::Test {
 public:
-  SameWatchRemoval()
-      : watch_map_(false, "ClusterLoadAssignmentType", config_validators,
-                   XdsConfigTrackerOptRef()) {}
+  SameWatchRemoval() : watch_map_(false, "ClusterLoadAssignmentType", config_validators) {}
 
   void SetUp() override {
     envoy::config::endpoint::v3::ClusterLoadAssignment alice;
@@ -348,8 +343,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
 
@@ -406,8 +400,7 @@ TEST(WatchMapTest, UninterestingUpdate) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"alice"});
 
@@ -452,8 +445,7 @@ TEST(WatchMapTest, WatchingEverything) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   /*Watch* watch1 = */ watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   // watch1 never specifies any names, and so is treated as interested in everything.
@@ -490,8 +482,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);
@@ -525,8 +516,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
 
 TEST(WatchMapTest, OnConfigUpdateFailed) {
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   // calling on empty map doesn't break
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 
@@ -548,8 +538,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpGlobCollections) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz/*?some=thing&thing=some"});
 
@@ -594,8 +583,7 @@ TEST(WatchMapTest, OnConfigUpdateXdsTpSingletons) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(false, "ClusterLoadAssignmentType", config_validators);
   Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
   watch_map.updateWatchInterest(watch, {"xdstp://foo/bar/baz?some=thing&thing=some"});
 
@@ -636,8 +624,7 @@ TEST(WatchMapTest, OnConfigUpdateUsingNamespaces) {
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
   NiceMock<MockCustomConfigValidators> config_validators;
-  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators,
-                     XdsConfigTrackerOptRef());
+  WatchMap watch_map(true, "ClusterLoadAssignmentType", config_validators);
   Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
   Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
   Watch* watch3 = watch_map.addWatch(callbacks3, resource_decoder);

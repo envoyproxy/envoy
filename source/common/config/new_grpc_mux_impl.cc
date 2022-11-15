@@ -91,12 +91,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
 
-  // Processing point when DeltaDiscoveryResponse is received.
-  if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onConfigReceivedOrFailed(*message,
-                                                  ProcessingDetails(ProcessingState::RECEIVED));
-  }
-
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -121,8 +115,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   // Processing point to record error if there is any failure after the response is processed.
   if (xds_config_tracker_.has_value() &&
       ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    xds_config_tracker_->onConfigReceivedOrFailed(
-        *message, ProcessingDetails(ProcessingState::FAILED, ack.error_detail_));
+    xds_config_tracker_->onConfigRejected(*message, ack.error_detail_.message());
   }
   kickOffAck(ack);
   Memory::Utils::tryShrinkHeap();

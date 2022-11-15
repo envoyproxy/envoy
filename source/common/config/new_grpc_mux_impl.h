@@ -87,8 +87,8 @@ public:
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
                       CustomConfigValidators& config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker)
-        : watch_map_(use_namespace_matching, type_url, config_validators, xds_config_tracker),
-          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+        : watch_map_(use_namespace_matching, type_url, config_validators),
+          sub_state_(type_url, watch_map_, local_info, dispatcher, xds_config_tracker) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;

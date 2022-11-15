@@ -23,6 +23,7 @@ public:
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                         Event::Dispatcher& dispatcher,
                         OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsConfigTrackerOptRef xds_config_tracker,
                         XdsResourcesDelegateOptRef xds_resources_delegate,
                         const std::string& target_xds_authority);
   ~SotwSubscriptionState() override;
@@ -74,11 +75,12 @@ public:
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
                         OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsConfigTrackerOptRef xds_config_tracker,
                         XdsResourcesDelegateOptRef xds_resources_delegate,
                         const std::string& target_xds_authority) override {
     return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
-                                                   resource_decoder, xds_resources_delegate,
-                                                   target_xds_authority);
+                                                   resource_decoder, xds_config_tracker,
+                                                   xds_resources_delegate, target_xds_authority);
   }
 
 private:

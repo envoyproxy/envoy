@@ -66,7 +66,8 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_));
+          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(

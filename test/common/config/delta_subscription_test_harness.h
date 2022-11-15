@@ -52,7 +52,8 @@ public:
       xds_context_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
           random_, stats_store_, rate_limit_settings_, local_info_, false,
-          std::make_unique<NiceMock<MockCustomConfigValidators>>());
+          std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
     } else {
       xds_context_ = std::make_shared<NewGrpcMuxImpl>(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
