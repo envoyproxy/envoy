@@ -49,24 +49,6 @@ build:dbg-common --compilation_mode=dbg
 # Enable source map for debugging in IDEs
 build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 
-# Default flags for builds targeting iOS
-# Manual stamping is necessary in order to get versioning information in the iOS
-# static framework.
-# More information on stamping can be found here:
-# https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
-build:ios --define=manual_stamp=manual_stamp
-
-# Default flags for builds targeting Android
-build:android --define=logger=android --define=include_ifaddrs=true
-
-# Default flags for Android debug builds
-build:dbg-android --config=dbg-common
-build:dbg-android --config=android
-
-# Default flags for iOS debug builds
-build:dbg-ios --config=dbg-common
-build:dbg-ios --config=ios
-
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
 # https://github.com/bazelbuild/bazel/issues/6932

@@ -7,7 +7,7 @@ load(
     "xcode_schemes",
     "xcodeproj",
 )
-load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
+load("//mobile/bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
 
