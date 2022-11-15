@@ -58,7 +58,7 @@ See `ci/mac_ci_setup.sh` for the specific NDK version used during builds.
 iOS requirements
 ----------------
 
-- Xcode 14.0
+- Xcode 14.1
 - iOS 12.0 or later
 - Note: Requirements are listed in the :repo:`.bazelrc file <.bazelrc>` and CI scripts
 

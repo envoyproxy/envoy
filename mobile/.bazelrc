@@ -17,10 +17,10 @@ build --host_force_python=PY3
 build --macos_minimum_os=10.14
 build --ios_minimum_os=12.0
 build --ios_simulator_device="iPhone 13"
-build --ios_simulator_version=16.0
+build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=envoy/bazel/get_workspace_status
-build --xcode_version=14.0
+build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
