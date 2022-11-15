@@ -302,6 +302,8 @@ private:
   void createListenSocketFactory(ListenerImpl& listener);
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
+  void setupSocketFactoryForListener(ListenerImpl& new_listener,
+                                     const ListenerImpl& existing_listener);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.

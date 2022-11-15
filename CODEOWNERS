@@ -164,6 +164,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
+# format string matching
+/*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @antoniovicente
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -279,6 +281,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/clusters/static @UNOWNED @UNOWNED
+/*/extensions/clusters/strict_dns @UNOWNED @UNOWNED
 /*/extensions/clusters/original_dst @UNOWNED @UNOWNED
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
@@ -308,4 +312,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
-/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch
+/contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch
