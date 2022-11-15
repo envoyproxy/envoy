@@ -76,6 +76,12 @@ EXTENSIONS = {
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
 
     #
+    # Matching actions
+    #
+
+    "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+
+    #
     # HTTP filters
     #
 
