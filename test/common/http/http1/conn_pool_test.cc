@@ -199,8 +199,7 @@ struct ActiveTestRequest {
           Network::ConnectionEvent::Connected);
     }
     if (type != Type::Pending) {
-      EXPECT_EQ(current_rq_total + 1,
-                parent_.cluster_->traffic_stats_->upstream_rq_total_.value());
+      EXPECT_EQ(current_rq_total + 1, parent_.cluster_->traffic_stats_->upstream_rq_total_.value());
       EXPECT_EQ(active_rq_observed + 1,
                 parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default)
                     .requests()

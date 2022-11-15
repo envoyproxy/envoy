@@ -668,8 +668,7 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   upstream_connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
 
   EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1UL,
-            host_->cluster_.traffic_stats_->upstream_cx_destroy_local_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_local_with_active_rq_.value());
   EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
 }
 

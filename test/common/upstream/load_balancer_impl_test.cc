@@ -624,8 +624,8 @@ public:
       local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
-    lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(),
-                                                   stats_, runtime_, random_, common_config_,
+    lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
+                                                   runtime_, random_, common_config_,
                                                    round_robin_lb_config_, simTime());
   }
 
@@ -1945,14 +1945,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{priority_set_,
-                               nullptr,
-                               stats_,
-                               runtime_,
-                               random_,
-                               common_config_,
-                               least_request_lb_config_,
-                               simTime()};
+  LeastRequestLoadBalancer lb_{
+      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_,
+      simTime()};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -2025,10 +2020,10 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   // Creating various load balancer objects with different choice configs.
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
   // Verify correct number of choices.
@@ -2104,7 +2099,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(-1.0));
@@ -2158,7 +2153,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(0.0));
@@ -2205,7 +2200,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(lb_2));
@@ -2226,7 +2221,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
   simTime().advanceTimeWait(std::chrono::seconds(1));
 
@@ -2297,7 +2292,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(0.9);
 
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,    runtime_,
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
 
   simTime().advanceTimeWait(std::chrono::seconds(1));
