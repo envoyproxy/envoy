@@ -22,7 +22,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: .mobile./mobile/cimac_ci_setup.sh --android
+      - run: ./mobile/ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
         env:
@@ -116,7 +116,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: .mobile./mobile/cimac_ci_setup.sh
+        run: ./mobile/ci/mac_ci_setup.sh
       - name: 'Build Envoy.xcframework'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,7 +21,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ../mobile/ci/mac_ci_setup.sh --android
+        run: ./mobile/ci/mac_ci_setup.sh --android
       - name: 'Build envoy.aar distributable'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -45,10 +45,10 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ../mobile/ci/mac_ci_setup.sh --android
+      - run: ./mobile/ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Start simulator'
-        run: ../mobile/ci/mac_start_emulator.sh
+        run: ./mobile/ci/mac_start_emulator.sh
       # Return to using:
       #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -80,9 +80,9 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ../mobile/ci/mac_ci_setup.sh --android
+        run: ./mobile/ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ../mobile/ci/mac_start_emulator.sh
+        run: ./mobile/ci/mac_start_emulator.sh
       # Return to using:
       #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -114,9 +114,9 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ../mobile/ci/mac_ci_setup.sh --android
+        run: ./mobile/ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ../mobile/ci/mac_start_emulator.sh
+        run: ./mobile/ci/mac_start_emulator.sh
       # Return to using:
       #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
@@ -148,9 +148,9 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ../mobile/ci/mac_ci_setup.sh --android
+        run: ./mobile/ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ../mobile/ci/mac_start_emulator.sh
+        run: ./mobile/ci/mac_start_emulator.sh
       # Return to using:
       #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.

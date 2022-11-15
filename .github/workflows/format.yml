@@ -69,7 +69,7 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Run Kotlin Lint (Detekt)'
         env:

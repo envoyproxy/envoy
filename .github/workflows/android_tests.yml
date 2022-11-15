@@ -36,7 +36,7 @@ jobs:
           architecture: x64
       - name: 'Install dependencies'
         if: steps.check_context.outputs.run_tests == 'true'
-        run: .mobile./mobile/cimac_ci_setup.sh
+        run: ./mobile/ci/mac_ci_setup.sh
       - name: 'Run Kotlin library tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:
@@ -75,7 +75,7 @@ jobs:
           architecture: x64
       - name: 'Install dependencies'
         if: steps.check_context.outputs.run_tests == 'true'
-        run: .mobile./mobile/cimac_ci_setup.sh
+        run: ./mobile/ci/mac_ci_setup.sh
       - name: 'Run Java library tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:
@@ -124,7 +124,7 @@ jobs:
           architecture: x64
       - name: 'Install dependencies'
         if: steps.check_context.outputs.run_tests == 'true'
-        run: .mobile./mobile/cilinux_ci_setup.sh
+        run: .mobile./mobile/ci/linux_ci_setup.sh
       - name: 'Run Kotlin library integration tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:

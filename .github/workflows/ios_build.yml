@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -141,7 +141,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -176,7 +176,7 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: .mobile./mobile/cimac_ci_setup.sh
+      - run: ./mobile/ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

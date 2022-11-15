@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: .mobile./mobile/cimac_ci_setup.sh
+        run: ./mobile/ci/mac_ci_setup.sh
       - name: 'Run tests'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
