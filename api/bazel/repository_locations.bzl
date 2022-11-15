@@ -13,12 +13,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     com_envoyproxy_protoc_gen_validate = dict(
         project_name = "protoc-gen-validate (PGV)",
         project_desc = "protoc plugin to generate polyglot message validators",
-        project_url = "https://github.com/envoyproxy/protoc-gen-validate",
+        project_url = "https://github.com/bufbuild/protoc-gen-validate",
         version = "0.6.2",
         sha256 = "b02da533c77023238c556982507b9a71afc850478b637a7a13ec13f311efa5c0",
         release_date = "2021-10-21",
         strip_prefix = "protoc-gen-validate-{version}",
-        urls = ["https://github.com/envoyproxy/protoc-gen-validate/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/bufbuild/protoc-gen-validate/archive/v{version}.tar.gz"],
         use_category = ["api"],
         implied_untracked_deps = [
             "com_github_iancoleman_strcase",
