@@ -394,7 +394,7 @@ protected:
   using ConfigSubscriptionMap =
       absl::node_hash_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
 
-  ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
+  ConfigProviderManagerImplBase(OptRef<Server::Admin> admin, const std::string& config_name);
 
   const ConfigSubscriptionMap& configSubscriptions() const { return config_subscriptions_; }
 
