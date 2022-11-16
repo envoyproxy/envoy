@@ -40,9 +40,7 @@ struct TestXdsTrackerStats {
 
 class TestXdsConfigTracker : public Config::XdsConfigTracker {
 public:
-  TestXdsConfigTracker(Stats::Scope& scope) : stats_(generateStats("test_xds_tracker", scope)) {
-    ErrorMessage = "";
-  }
+  TestXdsConfigTracker(Stats::Scope& scope) : stats_(generateStats("test_xds_tracker", scope)) {}
 
   void onConfigAccepted(const absl::string_view,
                         const std::vector<Config::DecodedResourcePtr>&) override {
@@ -56,18 +54,14 @@ public:
   }
 
   void onConfigRejected(const envoy::service::discovery::v3::DiscoveryResponse&,
-                        const absl::string_view error_detail) override {
+                        const absl::string_view) override {
     stats_.on_config_rejected_.inc();
-    ErrorMessage = std::string(error_detail);
   }
 
   void onConfigRejected(const envoy::service::discovery::v3::DeltaDiscoveryResponse&,
-                        const absl::string_view error_detail) override {
+                        const absl::string_view) override {
     stats_.on_config_rejected_.inc();
-    ErrorMessage = std::string(error_detail);
   }
-
-  static std::string ErrorMessage;
 
 private:
   TestXdsTrackerStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -75,8 +69,6 @@ private:
   }
   TestXdsTrackerStats stats_;
 };
-
-std::string TestXdsConfigTracker::ErrorMessage;
 
 class TestXdsConfigTrackerFactory : public Config::XdsConfigTrackerFactory {
 public:
@@ -170,6 +162,7 @@ public:
     HttpIntegrationTest::initialize();
     registerTestServerPorts({});
     initial_xds_update_ = test_server_->counter("test_xds_tracker.on_config_accepted")->value();
+    initial_xds_reject_ = test_server_->counter("test_xds_tracker.on_config_rejected")->value();
   }
 
   void acceptXdsConnection() {
@@ -180,6 +173,7 @@ public:
   }
 
   uint32_t initial_xds_update_{0};
+  uint32_t initial_xds_reject_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsConfigTrackerIntegrationTest,
@@ -247,9 +241,9 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
 
   // Message's TypeUrl != Resource's
   stream->sendGrpcMessage(discovery_response);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
-  EXPECT_THAT(TestXdsConfigTracker::ErrorMessage,
-              HasSubstr("does not match the message-wide type URL"));
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", initial_xds_reject_ + 1);
+  EXPECT_EQ(test_server_->counter("test_xds_tracker.on_config_rejected")->value(),
+            initial_xds_reject_ + 1);
 }
 
 } // namespace
