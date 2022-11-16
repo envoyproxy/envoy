@@ -19,8 +19,8 @@ behavior_changes:
     this kind of update will be rejected. The runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
 - area: build
   change: |
-    moved the strict_dns, original_dst, and logical_dns clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
-    moved the static, strict_dns and original_dst clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+    moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: cache_filter

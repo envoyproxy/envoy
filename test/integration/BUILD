@@ -882,6 +882,7 @@ envoy_cc_test_library(
         "//source/common/config:api_version_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
