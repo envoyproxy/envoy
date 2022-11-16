@@ -39,8 +39,8 @@ EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addGrpcStatsDomain(const std::string& stats_domain) {
-  this->stats_domain_ = stats_domain;
+EngineBuilder& EngineBuilder::addGrpcStatsDomain(std::string stats_domain) {
+  this->stats_domain_ = std::move(stats_domain);
   return *this;
 }
 
@@ -71,8 +71,8 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder&
-EngineBuilder::addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames) {
-  this->dns_preresolve_hostnames_ = dns_preresolve_hostnames;
+EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
+  this->dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
   return *this;
 }
 
@@ -104,29 +104,29 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualClusters(const std::string& virtual_clusters) {
-  this->virtual_clusters_ = virtual_clusters;
+EngineBuilder& EngineBuilder::addVirtualClusters(std::string virtual_clusters) {
+  this->virtual_clusters_ = std::move(virtual_clusters);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addKeyValueStore(const std::string& name,
+EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
-  this->key_value_stores_[name] = key_value_store;
+  this->key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAppVersion(const std::string& app_version) {
-  this->app_version_ = app_version;
+EngineBuilder& EngineBuilder::setAppVersion(std::string app_version) {
+  this->app_version_ = std::move(app_version);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setAppId(const std::string& app_id) {
-  this->app_id_ = app_id;
+EngineBuilder& EngineBuilder::setAppId(std::string app_id) {
+  this->app_id_ = std::move(app_id);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDeviceOs(const std::string& device_os) {
-  this->device_os_ = device_os;
+EngineBuilder& EngineBuilder::setDeviceOs(std::string device_os) {
+  this->device_os_ = std::move(device_os);
   return *this;
 }
 
@@ -201,20 +201,20 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStringAccessor(const std::string& name,
+EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
-  string_accessors_[name] = accessor;
+  string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
-                                              const std::string& typed_config) {
-  native_filter_chain_.emplace_back(name, typed_config);
+EngineBuilder& EngineBuilder::addNativeFilter(std::string name,
+                                              std::string typed_config) {
+  native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addPlatformFilter(const std::string& name) {
-  platform_filters_.push_back(name);
+EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
+  platform_filters_.push_back(std::move(name));
   return *this;
 }
 

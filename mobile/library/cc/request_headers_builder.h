@@ -16,8 +16,8 @@ struct RetryPolicy;
 
 class RequestHeadersBuilder : public HeadersBuilder {
 public:
-  RequestHeadersBuilder(RequestMethod request_method, const std::string& scheme,
-                        const std::string& authority, const std::string& path);
+  RequestHeadersBuilder(RequestMethod request_method, std::string scheme,
+                        std::string authority, std::string path);
 
   RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
   RequestHeadersBuilder& addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol);
