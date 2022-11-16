@@ -139,18 +139,21 @@ message Config {
     OVERRIDE = 3;
   }
 
+  // library_id is a unique ID for a dynamic library file, must be unique globally.
+  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+
   // Dynamic library implementing the interface of
   // :ref:`StreamFilter <contrib.go_plugin_api.plugin.StreamFilter>`.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
-  string library = 1 [(validate.rules).string = {min_len: 1}];
+  string library_path = 2[(validate.rules).string = {min_len: 1}];
 
   // plugin_name is the name of the go plugin, which needs to be consistent with the name
   // registered in StreamFilterFactoryManager::RegisterStreamFactory.
-  string plugin_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string plugin_name = 3 [(validate.rules).string = {min_bytes: 1}];
 
   // plugin_config is the configuration of the go plugin, note that this configuration is
   // only parsed in the go plugin.
-  google.protobuf.Any plugin_config = 3;
+  google.protobuf.Any plugin_config = 4;
 
   // merge_policy is the merge policy configured by the go plugin.
   // go plugin configuration supports three dimensions: the virtual host’s typed_per_filter_config,
@@ -160,7 +163,7 @@ message Config {
   // MERGE_VIRTUALHOST_ROUTER: pass Virtual-Host and Router configuration into go plugin.
   // OVERRIDE: override according to Router > Virtual_host > Filter priority and pass the
   // configuration to the go plugin.
-  MergePolicy merge_policy = 4 [(validate.rules).enum = {defined_only: true}];
+  MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
 // [#not-implemented-hide:]
