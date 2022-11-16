@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -16,12 +18,12 @@ jobs:
         with:
           submodules: true
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: cd mobile && ./ci/mac_ci_setup.sh
       - name: 'Run tests'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw test \
+          cd mobile && ./bazelw test \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \

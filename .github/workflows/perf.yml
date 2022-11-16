@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -21,12 +23,12 @@ jobs:
         with:
           submodules: true
       - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile
+        run: git config --global --add safe.directory /__w/envoy/envoy
       - name: 'Build test binary'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          cd mobile && ./bazelw build \
             --config=sizeopt \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -48,16 +50,12 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - name: Add safe directory
-        run: |
-          git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile/envoy
-          git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile
       - name: 'Build test binary'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git checkout main && git pull origin main && git submodule update
-          ./bazelw build \
+          cd mobile && ./bazelw build \
             --config=sizeopt \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -91,4 +89,4 @@ jobs:
           zip -9 dist/main.zip dist/main.stripped
           zip -9 dist/current.zip dist/current.stripped
       - name: 'Test size regression'
-        run: ./ci/test_size_regression.sh dist/main.zip dist/current.zip
+        run: cd mobile && ./ci/test_size_regression.sh dist/main.zip dist/current.zip
