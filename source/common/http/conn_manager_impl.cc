@@ -279,7 +279,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
   if (codec_ && codec_->protocol() == Protocol::Http3 &&
-      !stream.filter_manager_.sawDownstreamReset()) {
+      !stream.filter_manager_.sawDownstreamReset() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
     stream.filter_manager_.streamInfo().setDeferredLoggingInfo(stream.deferredLoggingInfo());
   } else {
     stream.filter_manager_.log();

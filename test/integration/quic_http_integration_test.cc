@@ -1168,7 +1168,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
-  useAccessLog("%ROUNDTRIP_DURATION%");
+  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
@@ -1176,11 +1176,38 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
                                 /*response_size=*/0,
                                 /*upstream_index=*/0, TestUtility::DefaultTimeout);
   codec_client_->close();
-  EXPECT_GT(std::stoi(waitForAccessLog(access_log_name_)), 0);
+
+  std::string log = waitForAccessLog(access_log_name_);
+  std::string delimiter = ",";
+  std::string protocol = log.substr(0, log.find(delimiter));
+  std::string roundtrip_duration = log.substr(log.find(delimiter) + 1, log.length());
+  EXPECT_EQ(protocol, "HTTP/3");
+  EXPECT_GT(std::stoi(roundtrip_duration), 0);
+}
+
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
+                                    "false");
+  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
+                                default_response_headers_,
+                                /*response_size=*/0,
+                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
+  codec_client_->close();
+
+  // Do not flush client acks.
+  std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
+  std::string delimiter = ",";
+  std::string protocol = log.substr(0, log.find(delimiter));
+  std::string roundtrip_duration = log.substr(log.find(delimiter) + 1, log.length());
+  EXPECT_EQ(protocol, "HTTP/3");
+  EXPECT_EQ(roundtrip_duration, "-");
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
-  useAccessLog("%ROUNDTRIP_DURATION%");
+  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1188,7 +1215,13 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
   codec_client_->close();
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(response->complete());
-  EXPECT_EQ(waitForAccessLog(access_log_name_), "-");
+
+  std::string log = waitForAccessLog(access_log_name_);
+  std::string delimiter = ",";
+  std::string protocol = log.substr(0, log.find(delimiter));
+  std::string roundtrip_duration = log.substr(log.find(delimiter) + 1, log.length());
+  EXPECT_EQ(protocol, "HTTP/3");
+  EXPECT_EQ(roundtrip_duration, "-");
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
