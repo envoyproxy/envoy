@@ -17,18 +17,6 @@ def envoy_mobile_repositories():
     python_repos()
 
 def upstream_envoy_overrides():
-    # Workaround due to a Detekt version compatibility with protobuf: https://github.com/envoyproxy/envoy-mobile/issues/1869
-    http_archive(
-        name = "com_google_protobuf",
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy_mobile//bazel:protobuf.patch",
-        ],
-        sha256 = "d7371dc2d46fddac1af8cb27c0394554b068768fc79ecaf5be1a1863e8ff3392",
-        strip_prefix = "protobuf-3.16.0",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
-    )
-
     # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
@@ -36,19 +24,6 @@ def upstream_envoy_overrides():
         strip_prefix = "libevent-0d7d85c2083f7a4c9efe01c061486f332b576d28",
         sha256 = "549d34065eb2485dfad6c8de638caaa6616ed130eec36dd978f73b6bdd5af113",
         build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
-    )
-
-    # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
-    # Workaround for https://github.com/abseil/abseil-cpp/issues/326.
-    # TODO: Should be removed in https://github.com/envoyproxy/envoy-mobile/issues/136 once rules_android
-    # supports platform toolchains.
-    http_archive(
-        name = "com_google_absl",
-        patches = ["@envoy_mobile//bazel:abseil.patch"],
-        sha256 = "3a0bb3d2e6f53352526a8d1a7e7b5749c68cd07f2401766a404fb00d2853fa49",
-        strip_prefix = "abseil-cpp-4bbdb026899fea9f882a95cbd7d6a4adaf49b2dd",
-        # 2022-07-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/4bbdb026899fea9f882a95cbd7d6a4adaf49b2dd.tar.gz"],
     )
 
     # This should be kept in sync with Envoy itself, we just need to apply this patch

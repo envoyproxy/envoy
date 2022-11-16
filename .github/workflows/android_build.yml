@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -21,12 +23,12 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh --android
+        run: cd mobile && ./ci/mac_ci_setup.sh --android
       - name: 'Build envoy.aar distributable'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
@@ -45,12 +47,12 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh --android
+      - run: cd mobile && ./ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
+      #   cd mobile && ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start java app'
         env:
@@ -80,7 +82,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh --android
+        run: cd mobile && ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
@@ -114,7 +116,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh --android
+        run: cd mobile && ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
@@ -148,7 +150,7 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh --android
+        run: cd mobile && ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:

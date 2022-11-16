@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -26,13 +28,13 @@ jobs:
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: cd mobile && ./ci/mac_ci_setup.sh
       - name: 'Run swift library tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw test \
+          cd mobile && ./bazelw test \
             --experimental_ui_max_stdouterr_bytes=10485760 \
             --test_output=all \
             --config=ios \
@@ -59,13 +61,13 @@ jobs:
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
       - name: 'Install dependencies'
-        run: ./ci/mac_ci_setup.sh
+        run: cd mobile && ./ci/mac_ci_setup.sh
       - name: 'Run Objective-C library tests'
         if: steps.check_context.outputs.run_tests == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw test \
+          cd mobile && ./bazelw test \
             --test_output=all \
             --config=ios \
             --build_tests_only \
