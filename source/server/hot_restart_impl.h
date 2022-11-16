@@ -106,7 +106,7 @@ public:
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;
-  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) override;
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::Store& stats_store) override;
   void shutdown() override;
   uint32_t baseId() override;
   std::string version() override;

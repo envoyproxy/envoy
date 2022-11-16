@@ -129,7 +129,7 @@ absl::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdmi
 void HotRestartImpl::sendParentTerminateRequest() { as_child_.sendParentTerminateRequest(); }
 
 HotRestart::ServerStatsFromParent
-HotRestartImpl::mergeParentStatsIfAny(Stats::StoreRoot& stats_store) {
+HotRestartImpl::mergeParentStatsIfAny(Stats::Store& stats_store) {
   std::unique_ptr<envoy::HotRestartMessage> wrapper_msg = as_child_.getParentStats();
   ServerStatsFromParent response;
   // getParentStats() will happily and cleanly return nullptr if we have no parent.

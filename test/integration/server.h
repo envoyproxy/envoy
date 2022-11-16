@@ -69,43 +69,43 @@ namespace Stats {
  * This is a wrapper for Scopes for the TestIsolatedStoreImpl to ensure new scopes do
  * not interact with the store without grabbing the lock from TestIsolatedStoreImpl.
  */
-class TestScopeWrapper : public Scope {
+class TestScopeWrapper : public IsolatedScopeImpl {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
-      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, StatName prefix, IsolatedStoreImpl& store)
+      : IsolatedScopeImpl(prefix, store), lock_(lock) {}
 
   ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return IsolatedScopeImpl::createScope(name);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
+    return IsolatedScopeImpl::scopeFromStatName(name);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatNameWithTags(name, tags);
+    return IsolatedScopeImpl::counterFromStatNameWithTags(name, tags);
   }
 
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
+    return IsolatedScopeImpl::gaugeFromStatNameWithTags(name, tags, import_mode);
   }
 
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
+    return IsolatedScopeImpl::histogramFromStatNameWithTags(name, tags, unit);
   }
 
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
+    return IsolatedScopeImpl::textReadoutFromStatNameWithTags(name, tags);
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -127,40 +127,40 @@ public:
 
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->findCounter(name);
+    return IsolatedScopeImpl::findCounter(name);
   }
   GaugeOptConstRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->findGauge(name);
+    return IsolatedScopeImpl::findGauge(name);
   }
   HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->findHistogram(name);
+    return IsolatedScopeImpl::findHistogram(name);
   }
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->findTextReadout(name);
+    return IsolatedScopeImpl::findTextReadout(name);
   }
 
-  const SymbolTable& constSymbolTable() const override {
-    return wrapped_scope_->constSymbolTable();
+  bool iterate(const IterateFn<Counter>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedScopeImpl::iterate(fn);
   }
-  SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
-
-  bool iterate(const IterateFn<Counter>& fn) const override { return wrapped_scope_->iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return wrapped_scope_->iterate(fn); }
+  bool iterate(const IterateFn<Gauge>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedScopeImpl::iterate(fn);
+  }
   bool iterate(const IterateFn<Histogram>& fn) const override {
-    return wrapped_scope_->iterate(fn);
+    Thread::LockGuard lock(lock_);
+    return IsolatedScopeImpl::iterate(fn);
   }
   bool iterate(const IterateFn<TextReadout>& fn) const override {
-    return wrapped_scope_->iterate(fn);
+    Thread::LockGuard lock(lock_);
+    return IsolatedScopeImpl::iterate(fn);
   }
-  StatName prefix() const override { return wrapped_scope_->prefix(); }
-  Store& store() override { return wrapped_scope_->store(); }
 
 private:
   Thread::MutexBasicLockable& lock_;
-  ScopeSharedPtr wrapped_scope_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -268,107 +268,108 @@ private:
  * This is a variant of the isolated store that has locking across all operations so that it can
  * be used during the integration tests.
  */
-class TestIsolatedStoreImpl : public StoreRoot {
+class TestIsolatedStoreImpl : public IsolatedStoreImpl {
 public:
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.findCounter(name);
+    return IsolatedStoreImpl::findCounter(name);
   }
   GaugeOptConstRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.findGauge(name);
+    return IsolatedStoreImpl::findGauge(name);
   }
   HistogramOptConstRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.findHistogram(name);
+    return IsolatedStoreImpl::findHistogram(name);
   }
   TextReadoutOptConstRef findTextReadout(StatName name) const override {
     Thread::LockGuard lock(lock_);
-    return store_.findTextReadout(name);
+    return IsolatedStoreImpl::findTextReadout(name);
   }
 
   // Stats::Store
-  const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
-  SymbolTable& symbolTable() override { return store_.symbolTable(); }
-  ScopeSharedPtr rootScope() override { return store_.rootScope(); }
-  ConstScopeSharedPtr constRootScope() const override { return store_.constRootScope(); }
-
   std::vector<CounterSharedPtr> counters() const override {
     Thread::LockGuard lock(lock_);
-    return store_.counters();
+    return IsolatedStoreImpl::counters();
   }
   std::vector<GaugeSharedPtr> gauges() const override {
     Thread::LockGuard lock(lock_);
-    return store_.gauges();
+    return IsolatedStoreImpl::gauges();
   }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
-    return store_.histograms();
+    return IsolatedStoreImpl::histograms();
   }
   std::vector<TextReadoutSharedPtr> textReadouts() const override {
     Thread::LockGuard lock(lock_);
-    return store_.textReadouts();
+    return IsolatedStoreImpl::textReadouts();
   }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
 
-  bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
-  bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
-  bool iterate(const IterateFn<Histogram>& fn) const override { return store_.iterate(fn); }
-  bool iterate(const IterateFn<TextReadout>& fn) const override { return store_.iterate(fn); }
+  bool iterate(const IterateFn<Counter>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedStoreImpl::iterate(fn);
+  }
+  bool iterate(const IterateFn<Gauge>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedStoreImpl::iterate(fn);
+  }
+  bool iterate(const IterateFn<Histogram>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedStoreImpl::iterate(fn);
+  }
+  bool iterate(const IterateFn<TextReadout>& fn) const override {
+    Thread::LockGuard lock(lock_);
+    return IsolatedStoreImpl::iterate(fn);
+  }
 
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachCounter(f_size, f_stat);
+    IsolatedStoreImpl::forEachCounter(f_size, f_stat);
   }
   void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachGauge(f_size, f_stat);
+    IsolatedStoreImpl::forEachGauge(f_size, f_stat);
   }
   void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachTextReadout(f_size, f_stat);
+    IsolatedStoreImpl::forEachTextReadout(f_size, f_stat);
   }
   void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachHistogram(f_size, f_stat);
+    IsolatedStoreImpl::forEachHistogram(f_size, f_stat);
   }
   void forEachScope(std::function<void(std::size_t)> f_size,
                     StatFn<const Scope> f_scope) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachScope(f_size, f_scope);
+    IsolatedStoreImpl::forEachScope(f_size, f_scope);
   }
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachSinkedCounter(f_size, f_stat);
+    IsolatedStoreImpl::forEachSinkedCounter(f_size, f_stat);
   }
   void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachSinkedGauge(f_size, f_stat);
+    IsolatedStoreImpl::forEachSinkedGauge(f_size, f_stat);
   }
   void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    store_.forEachSinkedTextReadout(f_size, f_stat);
-  }
-  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
-    UNREFERENCED_PARAMETER(sink_predicates);
+    IsolatedStoreImpl::forEachSinkedTextReadout(f_size, f_stat);
   }
 
-  // Stats::StoreRoot
-  void addSink(Sink&) override {}
-  void setTagProducer(TagProducerPtr&&) override {}
-  void setStatsMatcher(StatsMatcherPtr&&) override {}
-  void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
-  void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
-  void shutdownThreading() override {}
-  void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
+  void mergeHistograms(PostMergeCb cb) override {
+    Thread::LockGuard lock(lock_);
+    merge_cb_ = cb;
+  }
 
   void runMergeCallback() { merge_cb_(); }
 
+ protected:
+  ScopeSharedPtr makeScope(StatName name) override {
+    return std::make_shared<TestScopeWrapper>(lock_, name, *this);
+  }
+
 private:
   mutable Thread::MutexBasicLockable lock_;
-  IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
 };
 

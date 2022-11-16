@@ -157,20 +157,7 @@ public:
     return rootScope()->histogramFromString(name, unit);
   }
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
-};
 
-using StorePtr = std::unique_ptr<Store>;
-
-/**
- * Callback invoked when a store's mergeHistogram() runs.
- */
-using PostMergeCb = std::function<void()>;
-
-/**
- * The root of the stat store.
- */
-class StoreRoot : public Store {
-public:
   /**
    * Add a sink that is used for stat flushing.
    */
@@ -208,6 +195,11 @@ public:
   virtual void shutdownThreading() PURE;
 
   /**
+   * Callback invoked when a store's mergeHistogram() runs.
+   */
+  using PostMergeCb = std::function<void()>;
+
+  /**
    * Called during the flush process to merge all the thread local histograms. The passed in
    * callback will be called on the main thread, but it will happen after the method returns
    * which means that the actual flush process will happen on the main thread after this method
@@ -225,7 +217,7 @@ public:
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 };
 
-using StoreRootPtr = std::unique_ptr<StoreRoot>;
+using StorePtr = std::unique_ptr<Store>;
 
 } // namespace Stats
 } // namespace Envoy

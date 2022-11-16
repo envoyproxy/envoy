@@ -77,7 +77,7 @@ public:
    * @return special values relating to the "server" stats scope, whose
    *         merging has to be handled by Server::InstanceImpl.
    */
-  virtual ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) PURE;
+  virtual ServerStatsFromParent mergeParentStatsIfAny(Stats::Store& stats_store) PURE;
 
   /**
    * Shutdown the half of our hot restarter that acts as a parent.
