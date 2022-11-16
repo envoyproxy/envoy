@@ -387,6 +387,19 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%ROUNDTRIP_DURATION%
+  HTTP/3 (QUIC)
+    Total duration in milliseconds of the request from the start time to receiving the final ack from
+    the downstream.
+
+  HTTP/1 and HTTP/2
+    Not implemented ("-").
+
+  TCP/UDP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_TX_DURATION%
   HTTP
     Total duration in milliseconds of the request from the first byte read from the upstream host to the last
