@@ -46,9 +46,9 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+  Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
-  MOCK_METHOD(Admin&, admin, ());
+  MOCK_METHOD(OptRef<Admin>, admin, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
@@ -160,7 +160,7 @@ public:
   MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(Server::Admin&, admin, ());
+  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());

@@ -73,7 +73,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -98,6 +98,15 @@ private:
   Stats::ScopeSharedPtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
+};
+
+using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainBaseAction : public Matcher::Action {
+public:
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
 };
 
 class FilterChainImpl : public Network::DrainableFilterChain {
@@ -164,7 +173,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -395,6 +404,9 @@ private:
 
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
+
+  // Index filter chains by name, used by the matcher actions.
+  FilterChainsByName filter_chains_by_name_;
 };
 } // namespace Server
 } // namespace Envoy

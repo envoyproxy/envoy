@@ -47,9 +47,9 @@ public:
   virtual ~Instance() = default;
 
   /**
-   * @return Admin& the global HTTP admin endpoint for the server.
+   * @return OptRef<Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Admin& admin() PURE;
+  virtual OptRef<Admin> admin() PURE;
 
   /**
    * @return Api::Api& the API used by the server.
