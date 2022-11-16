@@ -1224,6 +1224,29 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
   EXPECT_EQ(roundtrip_duration, "-");
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
+  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // omit required authority header to invoke EnvoyQuicServerStream::resetStream
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/dynamo/url"}, {":scheme", "http"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  ASSERT_TRUE(response->complete());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  std::string delimiter = ",";
+  std::string protocol = log.substr(0, log.find(delimiter));
+  std::string roundtrip_duration = log.substr(log.find(delimiter) + 1, log.length());
+  EXPECT_EQ(protocol, "HTTP/3");
+  EXPECT_EQ(roundtrip_duration, "-");
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
