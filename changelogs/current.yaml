@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: quic
+  change: |
+    Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing metric.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
