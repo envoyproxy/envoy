@@ -304,7 +304,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_EQ(1024, findGauge("test.http_bandwidth_limit.response_allowed_size"));
 
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
-  EXPECT_EQ("2150", trailers_.get_("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ("150", trailers_.get_("test-bandwidth-response-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -437,8 +437,10 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
 
   request_timer->invokeCallback();
   response_timer->invokeCallback();
-  EXPECT_EQ("2200", trailers_.get_("test-bandwidth-request-delay-ms"));
-  EXPECT_EQ("2200", trailers_.get_("test-bandwidth-response-delay-ms"));
+  // Only waiting for 1 unit
+  EXPECT_EQ("50", trailers_.get_("test-bandwidth-request-delay-ms"));
+  // Waiting for 4 units
+  EXPECT_EQ("200", trailers_.get_("test-bandwidth-response-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -512,8 +514,8 @@ TEST_F(FilterTest, WithTrailers) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
   response_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
-  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
-  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ("50", response_trailers_.get_("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ("50", response_trailers_.get_("test-bandwidth-response-delay-ms"));
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
@@ -587,7 +589,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
 
   EXPECT_EQ("50", response_trailers_.get_("bandwidth-request-delay-ms"));
-  EXPECT_EQ("150", response_trailers_.get_("bandwidth-response-delay-ms"));
+  EXPECT_EQ("50", response_trailers_.get_("bandwidth-response-delay-ms"));
 }
 
 } // namespace BandwidthLimitFilter

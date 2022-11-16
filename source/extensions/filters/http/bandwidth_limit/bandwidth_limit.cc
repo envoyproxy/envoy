@@ -83,10 +83,11 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [&config](uint64_t len, bool limit_enforced) {
+        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().request_allowed_size_.set(len);
           if (limit_enforced) {
             config.stats().request_enforced_.inc();
+            request_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
@@ -147,10 +148,11 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [&config](uint64_t len, bool limit_enforced) {
+        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().response_allowed_size_.set(len);
           if (limit_enforced) {
             config.stats().response_enforced_.inc();
+            response_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
@@ -204,7 +206,6 @@ BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap& response_trailers) {
 
 void BandwidthLimiter::updateStatsOnDecodeFinish() {
   if (request_latency_) {
-    request_duration_ = request_latency_.get()->elapsed();
     request_latency_->complete();
     request_latency_.reset();
     getConfig().stats().request_pending_.dec();
@@ -216,13 +217,13 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
     const auto& config = getConfig();
 
     if (config.enableResponseTrailers() && trailers_ != nullptr) {
-      auto response_duration = response_latency_.get()->elapsed();
-      if (request_duration_ > ZeroMilliseconds) {
-        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_.count()));
+      if (request_delay_ > ZeroMilliseconds) {
+        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_delay_.count()));
+        request_delay_ = ZeroMilliseconds;
       }
-      if (response_duration > ZeroMilliseconds) {
-        trailers_->setCopy(config.responseDelayTrailer(),
-                           std::to_string(response_duration.count()));
+      if (response_delay_ > ZeroMilliseconds) {
+        trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_delay_.count()));
+        response_delay_ = ZeroMilliseconds;
       }
     }
 
