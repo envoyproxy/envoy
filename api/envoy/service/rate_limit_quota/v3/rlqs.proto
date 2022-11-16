@@ -82,6 +82,7 @@ message RateLimitQuotaUsageReports {
     uint64 num_requests_denied = 4;
 
     // An optional info for the list of Envoy instances that send the usage report ``BucketQuotaUsage``.
+    // This field should only be provided in the first report, the subsequent messages will have the same Envoy node inforamtion.
     repeated config.core.v3.Node nodes = 5;
   }
 
