@@ -876,7 +876,7 @@ public:
   Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
-  Server::Admin& admin() override { return admin_; }
+  OptRef<Server::Admin> admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
@@ -905,7 +905,7 @@ public:
   Api::Api& api() override { return api_; }
 
 private:
-  Server::Admin& admin_;
+  OptRef<Server::Admin> admin_;
   Stats::Scope& server_scope_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
