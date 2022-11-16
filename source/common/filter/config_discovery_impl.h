@@ -392,6 +392,7 @@ protected:
                                          absl::string_view type_url) const;
   void validateProtoConfigTypeUrl(const std::string& type_url,
                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
+  // Return the config dump map key string for the corresponding ECDS filter type.
   virtual const std::string getConfigDumpType() const PURE;
 
 private:
