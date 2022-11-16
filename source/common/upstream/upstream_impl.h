@@ -29,6 +29,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/lazy_init.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -710,7 +711,7 @@ public:
                   TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
                   bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
 
-  static LazyInitStats<ClusterTrafficStats>
+  static Stats::LazyInit<ClusterTrafficStats>
   generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
@@ -798,7 +799,7 @@ public:
   const std::string& observabilityName() const override { return observability_name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  LazyInitStats<ClusterTrafficStats>& trafficStats() const override { return traffic_stats_; }
+  Stats::LazyInit<ClusterTrafficStats>& trafficStats() const override { return traffic_stats_; }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   ClusterLbStats& lbStats() const override { return lb_stats_; }
   ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
@@ -915,7 +916,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  mutable LazyInitStats<ClusterTrafficStats> traffic_stats_;
+  mutable Stats::LazyInit<ClusterTrafficStats> traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

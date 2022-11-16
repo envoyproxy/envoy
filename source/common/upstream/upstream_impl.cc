@@ -832,7 +832,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-LazyInitStats<ClusterTrafficStats>
+Stats::LazyInit<ClusterTrafficStats>
 ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& stat_names) {
   return {scope, stat_names};
 }

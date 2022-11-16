@@ -18,6 +18,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
+#include "envoy/stats/lazy_init.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
@@ -1056,7 +1057,7 @@ public:
   /**
    * @return ClusterTrafficStats& all traffic related stats for this cluster.
    */
-  virtual LazyInitStats<ClusterTrafficStats>& trafficStats() const PURE;
+  virtual Stats::LazyInit<ClusterTrafficStats>& trafficStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic

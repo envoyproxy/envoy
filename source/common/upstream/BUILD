@@ -505,6 +505,7 @@ envoy_cc_library(
         "//source/common/common:dns_utils_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_lib",
+        "//envoy/stats:lazy_init",
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",

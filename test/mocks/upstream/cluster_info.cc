@@ -53,14 +53,14 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      traffic_stats_names_(stats_store_.symbolTable()),
+      traffic_stat_names_(stats_store_.symbolTable()),
       config_update_stats_names_(stats_store_.symbolTable()),
       lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),
       cluster_load_report_stat_names_(stats_store_.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
-      traffic_stats_(stats_store_, traffic_stats_names_),
+      traffic_stats_(stats_store_, traffic_stat_names_),
       config_update_stats_(config_update_stats_names_, stats_store_),
       lb_stats_(lb_stat_names_, stats_store_), endpoint_stats_(endpoint_stat_names_, stats_store_),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),

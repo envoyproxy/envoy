@@ -928,21 +928,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
     }
   };
 
-  // Since ClusterInfo::trafficStats() are lazy-init, we need to update any stat for a cluster's
-  // trafficStats() to trigger creation of the cluster upstreamStats.
-  absl::Notification n;
-  test_server_->server().dispatcher().post([&]() {
-    (void)*test_server_->server()
-        .clusterManager()
-        .clusters()
-        .getCluster("cluster_0")
-        ->get()
-        .info()
-        ->trafficStats();
-    n.Notify();
-  });
-
-  n.WaitForNotification();
+  ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_0"));
 
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     test_name_against_mapping(tag_extracted_counter_map, *counter);

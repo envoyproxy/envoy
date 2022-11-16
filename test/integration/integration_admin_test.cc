@@ -129,20 +129,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   initialize();
 
   BufferingStreamDecoderPtr response;
-  // With https://github.com/envoyproxy/envoy/pull/23921 ClusterInfo::trafficStats is lazy init.
-  // We need to trigger creation of ClusterInfo::trafficStats() by calling the * operator.
-  absl::Notification n;
-  test_server_->server().dispatcher().post([&]() {
-    (void)*test_server_->server()
-        .clusterManager()
-        .clusters()
-        .getCluster("cluster_0")
-        ->get()
-        .info()
-        ->trafficStats();
-    n.Notify();
-  });
-  n.WaitForNotification();
+
+  ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_0"));
 
   EXPECT_EQ("404", request("admin", "GET", "/notfound", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
@@ -247,7 +235,6 @@ TEST_P(IntegrationAdminTest, Admin) {
       response->body(),
       HasSubstr("envoy_listener_admin_http_downstream_rq_xx{envoy_response_code_class=\"4\","
                 "envoy_http_conn_manager_prefix=\"admin\"} 2\n"));
-
   EXPECT_THAT(response->body(), HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
   EXPECT_THAT(response->body(),
               HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));

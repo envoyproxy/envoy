@@ -165,26 +165,4 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }
 
-/**
- * LazyInit$StatsStruct is a wrapper with creator of the actual "$StatsStruct"
- * structure.
- * It instantiate a $StatsStruct struct when any data member is referenced.
- * See https://github.com/envoyproxy/envoy/issues/23575 for more details.
- */
-template <typename StatsStructType> struct LazyInitStats {
-  LazyInitStats(Stats::Scope& scope, const typename StatsStructType::StatNameType& stat_names)
-      : scope_(scope), ctor_([&scope, &stat_names]() -> StatsStructType* {
-          ENVOY_LOG_MISC(error, "DDDD begin to create stats now...");
-          return new StatsStructType(stat_names, scope);
-        }) {}
-
-  StatsStructType* operator->() { return internal_stats_.get(ctor_); }
-  StatsStructType& operator*() { return *internal_stats_.get(ctor_); }
-
-  Stats::Scope& scope_;
-  std::function<StatsStructType*()> ctor_;
-  Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
-      internal_stats_{};
-};
-
 } // namespace Envoy
