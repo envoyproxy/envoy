@@ -10,6 +10,7 @@
 #include "source/common/http/codec_client.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/lazy_init.h"
 
 #include "absl/strings/string_view.h"
 

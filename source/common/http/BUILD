@@ -43,6 +43,7 @@ envoy_cc_library(
     hdrs = ["async_client_utility.h"],
     deps = [
         "//envoy/http:async_client_interface",
+        "//source/common/stats:lazy_init",
     ],
 )
 
@@ -54,6 +55,7 @@ envoy_cc_library(
         ":codec_wrappers_lib",
         ":exception_lib",
         ":status_lib",
+        "//source/common/stats:lazy_init",
         ":utility_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/http:codec_interface",

@@ -6,6 +6,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/thread.h"
+#include "source/common/stats/lazy_init.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/inlined_vector.h"

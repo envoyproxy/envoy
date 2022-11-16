@@ -265,6 +265,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/stats:lazy_init",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -364,6 +365,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
+        "//source/common/stats:lazy_init",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],

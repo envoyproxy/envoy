@@ -37,6 +37,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lazy_init",
+    hdrs = ["lazy_init.h"],
+    deps = [
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "histogram_lib",
     srcs = ["histogram_impl.cc"],
     hdrs = ["histogram_impl.h"],
@@ -281,6 +289,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        ":lazy_init",
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
     ],
