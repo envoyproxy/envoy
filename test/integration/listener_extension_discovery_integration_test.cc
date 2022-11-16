@@ -578,6 +578,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, DestroyDuringInit) {
 
 // Basic ECDS config dump test with one filter.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false);
   initialize();
@@ -619,6 +620,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, BasicSuccessWithConfigDump) {
 
 // ECDS config dump test with the filter configuration being removed by TTL expired.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemovedByTtl) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter(filter_name_, false, false);
   initialize();
@@ -648,7 +650,8 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, ConfigDumpWithFilterConfigRemo
 }
 
 // ECDS config dump test with two filters.
-TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameWithConfigDump) {
+TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsSameFilterTypeWithConfigDump) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", true);
@@ -694,6 +697,7 @@ TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsDifferentNameW
 
 // ECDS config dump test with specified resource and regex name search.
 TEST_P(ListenerExtensionDiscoveryIntegrationTest, TwoSubscriptionsConfigDumpWithResourceAndRegex) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_connections_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   addDynamicFilter("foo", true);

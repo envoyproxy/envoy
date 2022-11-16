@@ -857,6 +857,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
 
 // ECDS config dump test with one listener ECDS filter and one HTTP ECDS filter.
 TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   two_ecds_filters_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
   // HTTP ECDS filter
