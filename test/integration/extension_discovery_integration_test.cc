@@ -855,21 +855,30 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   codec_client_->close();
 }
 
-TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessConfigDump) {
+// ECDS config dump test with one listener ECDS filter and one HTTP ECDS filter.
+TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
   two_ecds_filters_ = true;
   on_server_init_function_ = [&]() { waitXdsStream(); };
+  // HTTP ECDS filter
   addDynamicFilter("foo", false);
+  // Listener ECDS filter
   addDynamicListenerFilter("bar");
   initialize();
+
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
+
+  // Send configuration update for HTTP ECDS filter.
   sendXdsResponse("foo", "1", denyPrivateConfig());
+  // Send configuration update for listener ECDS filter.
   sendListenerFilterEcdsResponse("bar", "2", 7);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  // Get config_dump and verify HTTP and Listener ECDS filters are dumped correctly.
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
