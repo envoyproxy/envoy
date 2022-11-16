@@ -24,13 +24,13 @@ public:
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
   EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
-  EngineBuilder& addGrpcStatsDomain(const std::string& stats_domain);
+  EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
-  EngineBuilder& addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames);
+  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
@@ -38,16 +38,16 @@ public:
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
-  EngineBuilder& addVirtualClusters(const std::string& virtual_clusters);
-  EngineBuilder& addKeyValueStore(const std::string& name, KeyValueStoreSharedPtr key_value_store);
-  EngineBuilder& addStringAccessor(const std::string& name, StringAccessorSharedPtr accessor);
-  EngineBuilder& addNativeFilter(const std::string& name, const std::string& typed_config);
+  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
+  EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
+  EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
+  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
-  EngineBuilder& addPlatformFilter(const std::string& name);
-  EngineBuilder& setAppVersion(const std::string& app_version);
-  EngineBuilder& setAppId(const std::string& app_id);
-  EngineBuilder& setDeviceOs(const std::string& app_id);
+  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& setAppVersion(std::string app_version);
+  EngineBuilder& setAppId(std::string app_id);
+  EngineBuilder& setDeviceOs(std::string app_id);
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
   EngineBuilder& enableGzip(bool gzip_on);
@@ -73,8 +73,8 @@ protected:
 
 private:
   struct NativeFilterConfig {
-    NativeFilterConfig(const std::string& name, const std::string& typed_config)
-        : name_(name), typed_config_(typed_config) {}
+    NativeFilterConfig(std::string name, std::string typed_config)
+        : name_(std::move(name)), typed_config_(std::move(typed_config)) {}
 
     std::string name_;
     std::string typed_config_;
