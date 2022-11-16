@@ -105,9 +105,8 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF");
-
-  EXPECT_DEATH(verifyQuicServerTransportSocketFactory(yaml, true),
-               "TLS Client Authentication is not supported over QUIC");
+  EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
+                            "TLS Client Authentication is not supported over QUIC");
 }
 
 class QuicClientTransportSocketFactoryTest : public testing::Test {
