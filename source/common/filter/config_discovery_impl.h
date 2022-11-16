@@ -395,9 +395,12 @@ protected:
   virtual const std::string getConfigDumpType() const PURE;
 
 private:
-  void setupEcdsConfigDumpCallbacks(Server::Admin& admin) {
+  void setupEcdsConfigDumpCallbacks(OptRef<Server::Admin> admin) {
+    if (!admin.has_value()) {
+      return;
+    }
     if (config_tracker_entry_ == nullptr) {
-      config_tracker_entry_ = admin.getConfigTracker().add(
+      config_tracker_entry_ = admin->getConfigTracker().add(
           getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
             return dumpEcdsFilterConfigs(name_matcher);
           });
