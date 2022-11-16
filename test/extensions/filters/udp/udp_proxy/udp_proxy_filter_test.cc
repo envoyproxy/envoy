@@ -56,7 +56,22 @@ Api::IoCallUint64Result makeError(int sys_errno) {
                                                     Network::IoSocketError::deleteIoError));
 }
 
-class UdpProxyFilterTest : public testing::Test {
+class UdpProxyFilterBase : public testing::Test {
+public:
+  UdpProxyFilterBase() {
+    EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          Api::OsSysCallsImpl real;
+          return real.getaddrinfo(node, service, hints, res);
+        }));
+  }
+
+protected:
+  Api::MockOsSysCalls os_sys_calls_;
+};
+
+class UdpProxyFilterTest : public UdpProxyFilterBase {
 public:
   struct TestSession {
     TestSession(UdpProxyFilterTest& parent,
@@ -337,7 +352,6 @@ use_original_src_ip: true
     return true;
   }
 
-  Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> factory_context_;
   UdpProxyFilterConfigSharedPtr config_;
@@ -1129,12 +1143,6 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
     GTEST_SKIP();
   }
   EXPECT_CALL(os_sys_calls_, supportsIpTransparent());
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                 const struct addrinfo* hints, struct addrinfo** res) {
-        Api::OsSysCallsImpl real;
-        return real.getaddrinfo(node, service, hints, res);
-      }));
 
   InSequence s;
 
@@ -1147,13 +1155,6 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
     // The option is not supported on this platform. Just skip the test.
     GTEST_SKIP();
   }
-
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                 const struct addrinfo* hints, struct addrinfo** res) {
-        Api::OsSysCallsImpl real;
-        return real.getaddrinfo(node, service, hints, res);
-      }));
 
   InSequence s;
 
