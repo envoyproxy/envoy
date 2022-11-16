@@ -622,6 +622,8 @@ bool CompressorFilter::compressionEnabled(
       }
       break;
     case CompressorPerRoute::OVERRIDE_NOT_SET:
+      // This can't happen, because the `override` oneof has a `validate.required` PGV constraint,
+      // which is checked in `CommonFactoryBase::createRouteSpecificFilterConfig`.
       ASSERT(false, "CompressorPerRoute::override not set. Ignoring.");
     }
   }
