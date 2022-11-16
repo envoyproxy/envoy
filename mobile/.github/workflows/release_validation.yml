@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -17,16 +15,16 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
-      - run: ./mobile/ci/mac_ci_setup.sh
+      - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            //mobile:ios_xcframework
+            //:ios_xcframework
         name: 'Build xcframework'
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
       - run: unzip bazel-bin/library/swift/Envoy.xcframework.zip -d examples/swift/swiftpm/Packages || true

@@ -1,18 +1,16 @@
-name: tsan
+name: asan
 
 on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
-  tsan:
-    name: tsan
+  asan:
+    name: asan
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
       env:
@@ -27,7 +25,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/tsan.yml$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/asan.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
@@ -45,9 +43,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: steps.check_context.outputs.run_tests == 'true'
         run: |
-          bazel test \
-            --test_output=all \
+          ./bazelw test --test_output=all \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-asan") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-tsan") \
             //test/common/...

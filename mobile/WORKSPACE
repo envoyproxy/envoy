@@ -27,11 +27,6 @@ load("@envoy_mobile//bazel:envoy_mobile_repositories.bzl", "envoy_mobile_reposit
 envoy_mobile_repositories()
 
 local_repository(
-    name = "envoy",
-    path = "envoy",
-)
-
-local_repository(
     name = "envoy_build_config",
     path = "envoy_build_config",
 )

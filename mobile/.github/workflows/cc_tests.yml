@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -25,7 +23,7 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         name: 'Run tests'
         run: |
-          bazel test \
+          ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \

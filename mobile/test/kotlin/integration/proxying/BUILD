@@ -1,5 +1,5 @@
-load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
-load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
+load("//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
+load("//bazel:kotlin_test.bzl", "envoy_mobile_android_test")
 
 envoy_mobile_kt_library(
     name = "proxy_lib",

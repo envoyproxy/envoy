@@ -1,23 +1,18 @@
-name: tsan
+name: python_tests
 
 on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
-  tsan:
-    name: tsan
+  pythontests:
+    name: python_tests
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
-      env:
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
     steps:
       - uses: actions/checkout@v1
         with:
@@ -27,27 +22,21 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/tsan.yml$ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e cc/ -e python/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/python_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - uses: actions/setup-java@v1
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          java-version: '8'
-          java-package: jdk
-          architecture: x64
       - name: 'Run tests'
+        if: steps.check_context.outputs.run_tests == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: steps.check_context.outputs.run_tests == 'true'
         run: |
-          bazel test \
+          ./bazelw test \
+            --action_env=LD_LIBRARY_PATH \
             --test_output=all \
-            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-tsan") \
-            //test/common/...
+            //test/python/...

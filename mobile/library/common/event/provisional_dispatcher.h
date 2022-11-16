@@ -79,11 +79,11 @@ private:
   // TODO(goaway): This class supports a straightforward case-specific lock-free implementation, but
   // uses heavyweight synchronization for expediency at present.
   Thread::MutexBasicLockable state_lock_;
-  bool drained_ GUARDED_BY(state_lock_){};
-  std::list<Event::PostCb> init_queue_ GUARDED_BY(state_lock_);
+  bool drained_ ABSL_GUARDED_BY(state_lock_){};
+  std::list<Event::PostCb> init_queue_ ABSL_GUARDED_BY(state_lock_);
   Event::Dispatcher* event_dispatcher_{};
   Thread::ThreadSynchronizer synchronizer_;
-  bool terminated_ GUARDED_BY(state_lock_){};
+  bool terminated_ ABSL_GUARDED_BY(state_lock_){};
 };
 
 using ProvisionalDispatcherPtr = std::unique_ptr<ProvisionalDispatcher>;

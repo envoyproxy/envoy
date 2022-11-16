@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -28,7 +26,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             --config=sizeopt \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -59,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git checkout main && git pull origin main && git submodule update
-          bazel build \
+          ./bazelw build \
             --config=sizeopt \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -93,4 +91,4 @@ jobs:
           zip -9 dist/main.zip dist/main.stripped
           zip -9 dist/current.zip dist/current.stripped
       - name: 'Test size regression'
-        run: .mobile./mobile/citest_size_regression.sh dist/main.zip dist/current.zip
+        run: ./ci/test_size_regression.sh dist/main.zip dist/current.zip

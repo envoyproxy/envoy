@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -23,16 +21,16 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./mobile/ci/mac_ci_setup.sh --android
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Build envoy.aar distributable'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
-            //mobile:android_dist
+            //:android_dist
   javahelloworld:
     name: java_helloworld
     needs: androidbuild
@@ -47,23 +45,23 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./mobile/ci/mac_ci_setup.sh --android
+      - run: ./ci/mac_ci_setup.sh --android
         name: 'Install dependencies'
       - name: 'Start simulator'
-        run: ./mobile/ci/mac_start_emulator.sh
+        run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start java app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/java/hello_world:hello_envoy
-          adb install -r --no-incremental bazel-bin/mobile/examples/java/hello_world/hello_envoy.apk
+          adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
       - name: 'Check connectivity'
         run: adb logcat -e "received headers with status 200" -m 1
@@ -82,22 +80,22 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./mobile/ci/mac_ci_setup.sh --android
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ./mobile/ci/mac_start_emulator.sh
+        run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
             //examples/kotlin/hello_world:hello_envoy_kt
-          adb install -r --no-incremental bazel-bin/mobile/examples/kotlin/hello_world/hello_envoy_kt.apk
+          adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
       - name: 'Check connectivity'
         run: adb logcat -e "received headers with status 200" -m 1
@@ -116,17 +114,17 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./mobile/ci/mac_ci_setup.sh --android
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ./mobile/ci/mac_start_emulator.sh
+        run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
@@ -150,17 +148,17 @@ jobs:
           java-package: jdk
           architecture: x64
       - name: 'Install dependencies'
-        run: ./mobile/ci/mac_ci_setup.sh --android
+        run: ./ci/mac_ci_setup.sh --android
       - name: 'Start simulator'
-        run: ./mobile/ci/mac_start_emulator.sh
+        run: ./ci/mac_start_emulator.sh
       # Return to using:
-      #   bazel mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel build \
+          ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
