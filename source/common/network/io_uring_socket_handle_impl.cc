@@ -91,6 +91,13 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
 
   if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
     ENVOY_LOG(trace, "close the listen socket");
+
+    // There could be chance the listen socket was close before initialzie file event.
+    if (!io_uring_worker_.has_value()) {
+      ::close(fd_);
+      SET_SOCKET_INVALID(fd_);
+      return Api::ioCallUint64ResultNoError();
+    }
     io_uring_worker_.ref().closeSocket(fd_);
     SET_SOCKET_INVALID(fd_);
     return Api::ioCallUint64ResultNoError();
