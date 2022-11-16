@@ -363,7 +363,7 @@ public:
 
   void runMergeCallback() { merge_cb_(); }
 
- protected:
+protected:
   ScopeSharedPtr makeScope(StatName name) override {
     return std::make_shared<TestScopeWrapper>(lock_, name, *this);
   }

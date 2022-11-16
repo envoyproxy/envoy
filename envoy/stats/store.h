@@ -130,7 +130,6 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
-
   // TODO(#24007): The cast operator is available temporarily to bound the size
   // of https://github.com/envoyproxy/envoy/pull/23851, which detaches the
   // inheritance of Scope as a parent of Store. There is semantic complexity to

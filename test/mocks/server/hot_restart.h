@@ -20,7 +20,7 @@ public:
   MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
   MOCK_METHOD(absl::optional<AdminShutdownResponse>, sendParentAdminShutdownRequest, ());
   MOCK_METHOD(void, sendParentTerminateRequest, ());
-  MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::Store& stats_store));
+  MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::Store & stats_store));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(uint32_t, baseId, ());
   MOCK_METHOD(std::string, version, ());
