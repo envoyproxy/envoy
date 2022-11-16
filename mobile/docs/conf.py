@@ -67,7 +67,7 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
+extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinxcontrib.googleanalytics']
 extlinks = {
     'issue': ('https://github.com/envoyproxy/envoy-mobile/issues/%s', ''),
     'repo': ('https://github.com/envoyproxy/envoy-mobile/blob/{}/%s'.format(blob_sha), ''),
@@ -254,3 +254,6 @@ html_style = 'css/envoy.css'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'envoydoc'
+
+# Google Analytics tag ID
+googleanalytics_id = 'G-DXJEH1ZRXX'
