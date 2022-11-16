@@ -64,14 +64,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lazy_init",
-    hdrs = ["lazy_init.h"],
-    deps = [
-        "//source/common/common:thread_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "primitive_stats_macros",
     hdrs = ["primitive_stats_macros.h"],
     deps = [":primitive_stats_interface"],

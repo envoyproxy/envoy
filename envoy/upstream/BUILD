@@ -161,7 +161,6 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
-        "//envoy/stats:lazy_init",
         "//envoy/upstream:types_interface",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -18,7 +18,6 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
-#include "envoy/stats/lazy_init.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
