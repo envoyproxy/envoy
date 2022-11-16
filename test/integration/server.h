@@ -74,11 +74,6 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, StatName prefix, IsolatedStoreImpl& store)
       : IsolatedScopeImpl(prefix, store), lock_(lock) {}
 
-  ScopeSharedPtr createScope(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return IsolatedScopeImpl::createScope(name);
-  }
-
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
     return IsolatedScopeImpl::scopeFromStatName(name);
@@ -322,38 +317,53 @@ public:
     return IsolatedStoreImpl::iterate(fn);
   }
 
+  template<class StatType> StatFn<StatType> iterUnlocked(StatFn<StatType> f_stat) const {
+    return [this, f_stat](StatType& stat) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      RefcountPtr<StatType> stat_shared_ptr(&stat);
+      lock_.unlock();
+      f_stat(*stat_shared_ptr);
+      lock_.lock();
+    };
+  }
+
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachCounter(f_size, f_stat);
+    IsolatedStoreImpl::forEachCounter(f_size, iterUnlocked(f_stat));
   }
   void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachGauge(f_size, f_stat);
+    IsolatedStoreImpl::forEachGauge(f_size, iterUnlocked(f_stat));
   }
   void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachTextReadout(f_size, f_stat);
+    IsolatedStoreImpl::forEachTextReadout(f_size, iterUnlocked(f_stat));
   }
   void forEachHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachHistogram(f_size, f_stat);
+    IsolatedStoreImpl::forEachHistogram(f_size, iterUnlocked(f_stat));
   }
   void forEachScope(std::function<void(std::size_t)> f_size,
                     StatFn<const Scope> f_scope) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachScope(f_size, f_scope);
+    auto iter = [this, f_scope](const Scope& scope) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      ConstScopeSharedPtr scope_shared_ptr = scope.getConstShared();
+      lock_.unlock();
+      f_scope(*scope_shared_ptr);
+      lock_.lock();
+    };
+    IsolatedStoreImpl::forEachScope(f_size, iter);
   }
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachSinkedCounter(f_size, f_stat);
+    IsolatedStoreImpl::forEachSinkedCounter(f_size, iterUnlocked(f_stat));
   }
   void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachSinkedGauge(f_size, f_stat);
+    IsolatedStoreImpl::forEachSinkedGauge(f_size, iterUnlocked(f_stat));
   }
   void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
-    IsolatedStoreImpl::forEachSinkedTextReadout(f_size, f_stat);
+    IsolatedStoreImpl::forEachSinkedTextReadout(f_size, iterUnlocked(f_stat));
   }
 
   void mergeHistograms(PostMergeCb cb) override {
