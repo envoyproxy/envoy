@@ -583,7 +583,7 @@ message HttpConnectionManager {
   //
   // When configured the extensions will be called before any routing, tracing, or any filter processing.
   // Each extension will be applied in the order they are configured.
-  // The same header will be mutated by multiple extensions, then the last extension will win.
+  // If the same header is mutated by multiple extensions, then the last extension will win.
   //
   // [#extension-category: envoy.http.early_header_mutation]
   repeated config.core.v3.TypedExtensionConfig early_header_mutation_extensions = 51;
