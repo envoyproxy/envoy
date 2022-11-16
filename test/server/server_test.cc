@@ -448,8 +448,10 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
+  sleep(10);
+
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
+  TestUtility::waitForCounterGe(stats_store_, "stats.flushed", 1, time_system_);
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 

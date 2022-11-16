@@ -38,8 +38,6 @@ public:
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 
-  ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
-
   /**
    * Deliver an individual histogram value to all registered sinks.
    */
@@ -132,23 +130,33 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
+
+  // TODO(#24007): The cast operator is available temporarily to bound the size
+  // of https://github.com/envoyproxy/envoy/pull/23851, which detaches the
+  // inheritance of Scope as a parent of Store. There is semantic complexity to
+  // that PR, so it's going to be easier review if it's as small as possible.
+  //
+  // A follow-up PR is required to remove the functions below, which will
+  // require a large number of files to be trivially changed, by explicitly
+  // accessing the rootScope() to call these methods.
   operator Scope&() { return *rootScope(); }
 
+  // Delegate somea methods to the root scope; these are exposed to make it more
+  // convenient to use stats_macros.h. We can consider dropping them if desired,
+  // when we resovle #24007 or in the next follow-up.
   Counter& counterFromString(const std::string& name) {
     return rootScope()->counterFromString(name);
   }
-
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
     return rootScope()->gaugeFromString(name, import_mode);
   }
-
   TextReadout& textReadoutFromString(const std::string& name) {
     return rootScope()->textReadoutFromString(name);
   }
-
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) {
     return rootScope()->histogramFromString(name, unit);
   }
+  ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
 
 using StorePtr = std::unique_ptr<Store>;

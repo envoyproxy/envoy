@@ -275,6 +275,9 @@ public:
    */
   virtual StatName prefix() const PURE;
 
+  /**
+   * @return a reference to the Store object that owns this scope.
+   */
   virtual Store& store() PURE;
 };
 

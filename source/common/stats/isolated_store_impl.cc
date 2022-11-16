@@ -36,11 +36,11 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       null_gauge_(new NullGaugeImpl(symbol_table)) {}
 
 ScopeSharedPtr IsolatedStoreImpl::rootScope() {
-  if (default_scope_ == nullptr) {
+  if (lazy_default_scope_ == nullptr) {
     StatNameManagedStorage name_storage("", symbolTable());
-    default_scope_ = makeScope(StatName(name_storage.statName()));
+    lazy_default_scope_ = makeScope(StatName(name_storage.statName()));
   }
-  return default_scope_;
+  return lazy_default_scope_;
 }
 
 ConstScopeSharedPtr IsolatedStoreImpl::constRootScope() const {

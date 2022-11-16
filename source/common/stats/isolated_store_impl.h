@@ -236,7 +236,7 @@ private:
   IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
-  ScopeSharedPtr default_scope_;
+  mutable ScopeSharedPtr lazy_default_scope_;
   std::vector<ScopeSharedPtr> scopes_;
 };
 
@@ -248,7 +248,7 @@ public:
   IsolatedScopeImpl(StatName prefix, IsolatedStoreImpl& store)
       : prefix_(prefix, store.symbolTable()), store_(store) {}
 
-  ~IsolatedScopeImpl() { prefix_.free(symbolTable()); }
+  ~IsolatedScopeImpl() override { prefix_.free(store_.symbolTable()); }
 
   // Stats::Scope
   SymbolTable& symbolTable() override { return store_.symbolTable(); }

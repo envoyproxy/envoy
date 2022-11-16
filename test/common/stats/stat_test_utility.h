@@ -146,7 +146,7 @@ public:
   std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
 
 protected:
-  virtual ScopeSharedPtr makeScope(StatName name) override;
+  ScopeSharedPtr makeScope(StatName name) override;
 
 private:
   friend class TestScope;
