@@ -128,5 +128,8 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: jwt_authn
+  change: |
+    added support for copying jwt claims to http headers.
 
 deprecated:
